@@ -20,7 +20,7 @@ jobs:
       - name: Cargo Build
         run: >
           wasm-pack build tig-benchmarker --release --target web;
-          rm tig-benchmarker/wasm/.gitignore;
+          rm tig-benchmarker/pkg/.gitignore;
       - name: Auto commit
         id: auto_commit
         uses: stefanzweifel/git-auto-commit-action@v5
