@@ -6,10 +6,12 @@ on:
       - 'satisfiability/*'
       - 'vehicle_routing/*'
       - 'knapsack/*'
-      - 'test/benchmarker/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
+      - 'dev/satisfiability/*'
+      - 'dev/vehicle_routing/*'
+      - 'dev/knapsack/*'
 
 jobs:
   test_workspace:
