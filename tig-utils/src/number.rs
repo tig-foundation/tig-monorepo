@@ -1,0 +1,355 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
+    fmt::Display,
+    iter::Sum,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
+};
+use uint::construct_uint;
+
+construct_uint! {
+    pub struct U256(4);
+}
+
+impl U256 {
+    pub const fn from_u128(value: u128) -> Self {
+        let mut ret = [0; 4];
+        ret[0] = value as u64;
+        ret[1] = (value >> 64) as u64;
+        U256(ret)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct PreciseNumber(U256);
+
+impl PreciseNumber {
+    const DECIMALS: u32 = 18;
+    const PRECISION: U256 = U256::from_u128(10u128.pow(PreciseNumber::DECIMALS));
+
+    pub fn inner(&self) -> &U256 {
+        &self.0
+    }
+
+    pub fn from<T: Into<U256>>(value: T) -> Self {
+        Self(value.into() * PreciseNumber::PRECISION)
+    }
+
+    pub fn from_f64(value: f64) -> Self {
+        Self(((value * 10f64.powi(PreciseNumber::DECIMALS as i32)) as i128).into())
+    }
+
+    pub(crate) fn sqrt(&self) -> PreciseNumber {
+        let num = self.inner().as_u128() as f64;
+        let div = 10f64.powi(PreciseNumber::DECIMALS as i32);
+        PreciseNumber::from_f64((num / div).sqrt())
+    }
+
+    pub fn from_dec_str(value: &str) -> Result<Self, uint::FromDecStrErr> {
+        Ok(Self(U256::from_dec_str(value)?))
+    }
+}
+
+impl Display for PreciseNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Serialize for PreciseNumber {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for PreciseNumber {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_dec_str(s.as_str()).map_err(|e| serde::de::Error::custom(e))
+    }
+}
+
+impl Add for PreciseNumber {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+impl<'a> Add<&'a PreciseNumber> for PreciseNumber {
+    type Output = Self;
+
+    fn add(self, other: &'a Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+impl<'a> Add<PreciseNumber> for &'a PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn add(self, other: PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 + other.0)
+    }
+}
+
+impl<'a, 'b> Add<&'a PreciseNumber> for &'b PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn add(self, other: &'a PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 + other.0)
+    }
+}
+
+impl AddAssign for PreciseNumber {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
+impl<'a> AddAssign<&'a PreciseNumber> for PreciseNumber {
+    fn add_assign(&mut self, rhs: &'a PreciseNumber) {
+        self.0 += rhs.0;
+    }
+}
+
+impl Sub for PreciseNumber {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
+    }
+}
+
+impl<'a> Sub<&'a PreciseNumber> for PreciseNumber {
+    type Output = Self;
+
+    fn sub(self, other: &'a Self) -> Self {
+        Self(self.0 - other.0)
+    }
+}
+
+impl<'a> Sub<PreciseNumber> for &'a PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn sub(self, other: PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 - other.0)
+    }
+}
+
+impl<'a, 'b> Sub<&'a PreciseNumber> for &'b PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn sub(self, other: &'a PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 - other.0)
+    }
+}
+
+impl SubAssign for PreciseNumber {
+    fn sub_assign(&mut self, other: Self) {
+        self.0 -= other.0;
+    }
+}
+
+impl<'a> SubAssign<&'a PreciseNumber> for PreciseNumber {
+    fn sub_assign(&mut self, other: &'a Self) {
+        self.0 -= other.0;
+    }
+}
+
+impl Mul for PreciseNumber {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0 * rhs.0 / Self::PRECISION)
+    }
+}
+
+impl<'a> Mul<&'a PreciseNumber> for PreciseNumber {
+    type Output = Self;
+
+    fn mul(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0 * rhs.0 / Self::PRECISION)
+    }
+}
+
+impl<'a> Mul<PreciseNumber> for &'a PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn mul(self, rhs: PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 * rhs.0 / PreciseNumber::PRECISION)
+    }
+}
+
+impl<'a, 'b> Mul<&'a PreciseNumber> for &'b PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn mul(self, rhs: &'a PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 * rhs.0 / PreciseNumber::PRECISION)
+    }
+}
+
+impl MulAssign for PreciseNumber {
+    fn mul_assign(&mut self, other: Self) {
+        self.0 = self.0 * other.0 / Self::PRECISION;
+    }
+}
+
+impl<'a> MulAssign<&'a PreciseNumber> for PreciseNumber {
+    fn mul_assign(&mut self, other: &'a Self) {
+        self.0 = self.0 * other.0 / Self::PRECISION;
+    }
+}
+
+impl Div for PreciseNumber {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self(self.0 * Self::PRECISION / rhs.0)
+    }
+}
+
+impl<'a> Div<&'a PreciseNumber> for PreciseNumber {
+    type Output = Self;
+
+    fn div(self, rhs: &'a Self) -> Self::Output {
+        Self(self.0 * Self::PRECISION / rhs.0)
+    }
+}
+
+impl<'a> Div<PreciseNumber> for &'a PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn div(self, rhs: PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 * PreciseNumber::PRECISION / rhs.0)
+    }
+}
+
+impl<'a, 'b> Div<&'a PreciseNumber> for &'b PreciseNumber {
+    type Output = PreciseNumber;
+
+    fn div(self, rhs: &'a PreciseNumber) -> PreciseNumber {
+        PreciseNumber(self.0 * PreciseNumber::PRECISION / rhs.0)
+    }
+}
+
+impl DivAssign for PreciseNumber {
+    fn div_assign(&mut self, other: Self) {
+        self.0 = self.0 * Self::PRECISION / other.0;
+    }
+}
+
+impl<'a> DivAssign<&'a PreciseNumber> for PreciseNumber {
+    fn div_assign(&mut self, other: &'a Self) {
+        self.0 = self.0 * Self::PRECISION / other.0;
+    }
+}
+
+impl PartialEq for PreciseNumber {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<'a> PartialEq<&'a PreciseNumber> for PreciseNumber {
+    fn eq(&self, other: &&'a PreciseNumber) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<'a> PartialEq<PreciseNumber> for &'a PreciseNumber {
+    fn eq(&self, other: &PreciseNumber) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl PartialOrd for PreciseNumber {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<'a> PartialOrd<&'a PreciseNumber> for PreciseNumber {
+    fn partial_cmp(&self, other: &&'a PreciseNumber) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<'a> PartialOrd<PreciseNumber> for &'a PreciseNumber {
+    fn partial_cmp(&self, other: &PreciseNumber) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl Ord for PreciseNumber {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl Eq for PreciseNumber {}
+
+impl<'a> Sum<&'a PreciseNumber> for PreciseNumber {
+    fn sum<I: Iterator<Item = &'a PreciseNumber>>(iter: I) -> Self {
+        iter.fold(PreciseNumber::from(0), |acc, x| acc + *x)
+    }
+}
+
+impl Sum for PreciseNumber {
+    fn sum<I: Iterator<Item = PreciseNumber>>(iter: I) -> Self {
+        iter.fold(PreciseNumber::from(0), |acc, x| acc + x)
+    }
+}
+
+pub trait PreciseNumberOps {
+    fn l1_normalise(&self) -> Vec<PreciseNumber>;
+    fn arithmetic_mean(&self) -> PreciseNumber;
+    fn variance(&self) -> PreciseNumber;
+    fn standard_deviation(&self) -> PreciseNumber;
+}
+
+impl<T> PreciseNumberOps for T
+where
+    T: AsRef<[PreciseNumber]>,
+{
+    fn l1_normalise(&self) -> Vec<PreciseNumber> {
+        let values = self.as_ref();
+        let max_value = *values.iter().max().unwrap();
+        let zero = PreciseNumber::from(0);
+        if max_value == zero {
+            values.iter().map(|_| zero.clone()).collect()
+        } else {
+            values.iter().map(|&x| x / max_value).collect()
+        }
+    }
+
+    fn arithmetic_mean(&self) -> PreciseNumber {
+        let values = self.as_ref();
+        let sum: PreciseNumber = values.iter().sum();
+        let count = PreciseNumber::from(values.len() as u32);
+        sum / count
+    }
+
+    fn variance(&self) -> PreciseNumber {
+        let values = self.as_ref();
+        let mean = self.arithmetic_mean();
+        let variance_sum: PreciseNumber = values
+            .iter()
+            .map(|&x| {
+                let diff = if x >= mean { x - mean } else { mean - x };
+                diff * diff
+            })
+            .sum::<PreciseNumber>();
+        let count = PreciseNumber::from(values.len() as u32);
+        variance_sum / count
+    }
+    fn standard_deviation(&self) -> PreciseNumber {
+        self.variance().sqrt()
+    }
+}

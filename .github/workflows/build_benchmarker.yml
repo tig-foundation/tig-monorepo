@@ -1,0 +1,40 @@
+name: Build Benchmarker
+
+on: 
+  push:
+    branches:
+      - 'benchmarker/*'
+      - 'test/benchmarker/*'
+      - 'dev/benchmarker/*'
+
+jobs:
+  build_wasm:
+    name: Compile Benchmarker to WASM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Cargo Build
+        run: >
+          wasm-pack build tig-benchmarker --release --target web;
+          rm tig-benchmarker/wasm/.gitignore;
+      - name: Auto commit
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Add compiled WASM for benchmarker
+      - name: Update Commit Status (Success)
+        if: success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+      - name: Update Commit Status (Failure)
+        if: failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'

@@ -1,0 +1,41 @@
+name: Test Workspace
+
+on: 
+  push:
+    branches-ignore:
+      - 'benchmarker/*'
+      - 'satisfiability/*'
+      - 'vehicle_routing/*'
+      - 'knapsack/*'
+      - 'test/benchmarker/*'
+      - 'test/satisfiability/*'
+      - 'test/vehicle_routing/*'
+      - 'test/knapsack/*'
+      - 'dev/benchmarker/*'
+      - 'dev/satisfiability/*'
+      - 'dev/vehicle_routing/*'
+      - 'dev/knapsack/*'
+
+jobs:
+  test_workspace:
+    name: Test Workspace
+    permissions:
+      statuses: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+      - name: Cargo Test
+        run: cargo test
+      - name: Update Commit Status (Success)
+        if: success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+      - name: Update Commit Status (Failure)
+        if: failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'

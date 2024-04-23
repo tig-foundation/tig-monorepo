@@ -1,0 +1,19 @@
+[package]
+name = "tig-wasm"
+version = "0.1.0"
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+readme.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+tig-algorithms = { path = "../tig-algorithms" }
+tig-challenges = { path = "../tig-challenges" }
+tig-utils = { path = "../tig-utils" }
+wee_alloc = { version = "0.4.5" }
+
+[features]
+entry-point = []

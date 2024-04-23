@@ -1,0 +1,95 @@
+use crate::{context::*, error::*};
+use tig_structs::core::*;
+use tig_utils::*;
+
+pub(crate) async fn execute<T: Context>(
+    ctx: &mut T,
+    player: &Player,
+    details: &AlgorithmDetails,
+    code: &String,
+) -> ProtocolResult<String> {
+    verify_algorithm_name_is_unique(ctx, details).await?;
+    verify_submission_fee(ctx, player, details).await?;
+    let algorithm_id = ctx
+        .add_algorithm_to_mempool(details, code)
+        .await
+        .unwrap_or_else(|e| panic!("add_algorithm_to_mempool error: {:?}", e));
+    Ok(algorithm_id)
+}
+
+async fn verify_algorithm_name_is_unique<T: Context>(
+    ctx: &mut T,
+    details: &AlgorithmDetails,
+) -> ProtocolResult<()> {
+    if ctx
+        .get_algorithms(AlgorithmsFilter::Name(details.name.clone()), None, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
+        .first()
+        .is_some()
+    {
+        return Err(ProtocolError::DuplicateAlgorithmName {
+            algorithm_name: details.name.clone(),
+        });
+    }
+    Ok(())
+}
+
+async fn verify_submission_fee<T: Context>(
+    ctx: &mut T,
+    player: &Player,
+    details: &AlgorithmDetails,
+) -> ProtocolResult<()> {
+    let block = ctx
+        .get_block(BlockFilter::Latest, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
+        .expect("No latest block found");
+
+    if ctx
+        .get_algorithms(
+            AlgorithmsFilter::TxHash(details.tx_hash.clone()),
+            None,
+            false,
+        )
+        .await
+        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
+        .first()
+        .is_some()
+    {
+        return Err(ProtocolError::DuplicateSubmissionFeeTx {
+            tx_hash: details.tx_hash.clone(),
+        });
+    }
+
+    let transaction = ctx.get_transaction(&details.tx_hash).await.map_err(|_| {
+        ProtocolError::InvalidTransaction {
+            tx_hash: details.tx_hash.clone(),
+        }
+    })?;
+    if transaction.sender != player.id {
+        return Err(ProtocolError::InvalidSubmissionFeeSender {
+            tx_hash: details.tx_hash.clone(),
+            expected_sender: player.id.clone(),
+            actual_sender: transaction.sender.clone(),
+        });
+    }
+    let burn_address = block.config().erc20.burn_address.clone();
+    if transaction.receiver != burn_address {
+        return Err(ProtocolError::InvalidSubmissionFeeReceiver {
+            tx_hash: details.tx_hash.clone(),
+            expected_receiver: burn_address,
+            actual_receiver: transaction.receiver.clone(),
+        });
+    }
+
+    let expected_amount = block.config().algorithm_submissions.submission_fee;
+    if transaction.amount != expected_amount {
+        return Err(ProtocolError::InvalidSubmissionFeeAmount {
+            tx_hash: details.tx_hash.clone(),
+            expected_amount: jsonify(&expected_amount),
+            actual_amount: jsonify(&transaction.amount),
+        });
+    }
+    Ok(())
+}

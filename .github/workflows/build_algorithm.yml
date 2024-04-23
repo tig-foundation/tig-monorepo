@@ -1,0 +1,71 @@
+name: Build Algorithm
+
+on: 
+  push:
+    branches:
+      - 'satisfiability/*'
+      - 'vehicle_routing/*'
+      - 'knapsack/*'
+      - 'test/satisfiability/*'
+      - 'test/vehicle_routing/*'
+      - 'test/knapsack/*'
+      - 'dev/satisfiability/*'
+      - 'dev/vehicle_routing/*'
+      - 'dev/knapsack/*'
+
+jobs:
+  build_wasm:
+    name: Compile Algorithm to WASM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Env Vars
+        run: |
+          CHALLENGE=`echo $GITHUB_REF_NAME | rev | cut -d/ -f2 | rev`
+          ALGORITHM=`echo $GITHUB_REF_NAME | rev | cut -d/ -f1 | rev`
+          WASM_PATH=tig-algorithms/wasm/${CHALLENGE}/${ALGORITHM}.wasm
+          if [ -f $WASM_PATH ]; then
+            echo "SKIP_JOB=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_JOB=false" >> $GITHUB_ENV
+          fi
+          echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
+          echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
+          echo "WASM_PATH=$ALGORITHM" >> $GITHUB_ENV
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasi
+      - name: Cargo Build
+        if: env.SKIP_JOB != 'true' 
+        run: >
+          CHALLENGE=${{ env.CHALLENGE }}
+          ALGORITHM=${{ env.ALGORITHM }}
+          cargo build -p tig-wasm --target wasm32-wasi --release --features entry-point;
+          mkdir -p tig-algorithms/wasm/${{ env.CHALLENGE }};
+      - name: Optimize WASM
+        if: env.SKIP_JOB != 'true'
+        uses: NiklasEi/wasm-opt-action@v2
+        with:
+          file: target/wasm32-wasi/release/tig_wasm.wasm
+          output: tig-algorithms/wasm/${{ env.CHALLENGE }}/${{ env.ALGORITHM }}.wasm
+          options: -O2 --remove-imports
+      - name: Auto commit
+        if: env.SKIP_JOB != 'true'
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Compiled algorithm ${{ env.ALGORITHM }} into WASM
+      - name: Update Commit Status (Success)
+        if: env.SKIP_JOB != 'true' && success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+      - name: Update Commit Status (Failure)
+        if: env.SKIP_JOB != 'true' && failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'
