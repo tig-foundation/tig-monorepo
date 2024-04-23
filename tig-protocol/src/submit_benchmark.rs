@@ -28,6 +28,7 @@ pub(crate) async fn execute<T: Context>(
                 num_solutions: solutions_meta_data.len() as u32,
             },
             solutions_meta_data,
+            solution_data,
         )
         .await
         .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e));

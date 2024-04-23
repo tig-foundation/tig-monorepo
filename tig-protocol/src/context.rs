@@ -140,6 +140,7 @@ pub trait Context {
         settings: &BenchmarkSettings,
         details: &BenchmarkDetails,
         solutions_metadata: &Vec<SolutionMetaData>,
+        solution_data: &SolutionData,
     ) -> ContextResult<String>;
     async fn add_proof_to_mempool(
         &mut self,
