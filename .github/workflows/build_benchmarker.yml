@@ -3,9 +3,8 @@ name: Build Benchmarker
 on: 
   push:
     branches:
-      - 'benchmarker/*'
-      - 'test/benchmarker/*'
-      - 'dev/benchmarker/*'
+      - 'test/benchmarker'
+      - 'dev/benchmarker'
 
 jobs:
   build_wasm:
