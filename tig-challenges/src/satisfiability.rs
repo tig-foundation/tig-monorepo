@@ -102,7 +102,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         }
 
         if let Some((idx, _)) = self.clauses.iter().enumerate().find(|(_, clause)| {
-            clause.iter().any(|&literal| {
+            !clause.iter().any(|&literal| {
                 let var_idx = literal.abs() as usize - 1;
                 let var_value = solution.variables[var_idx];
                 (literal > 0 && var_value) || (literal < 0 && !var_value)

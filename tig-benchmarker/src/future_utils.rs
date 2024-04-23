@@ -1,7 +1,6 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::future::Future;
 
-use super::*;
 pub use futures::lock::Mutex;
 use gloo_timers::future::TimeoutFuture;
 use js_sys::{Array, Date, Promise};
