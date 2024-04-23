@@ -20,6 +20,7 @@ jobs:
   test_workspace:
     name: Test Workspace
     permissions:
+      contents: read
       statuses: write
     runs-on: ubuntu-latest
     steps:
