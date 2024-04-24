@@ -41,8 +41,8 @@ mod web3_feature {
             .await?
             .ok_or_else(|| anyhow!("Transaction {} not found", tx_hash))?;
         Ok(super::Transaction {
-            sender: tx.from.unwrap().to_string(),
-            receiver: receipt.to.unwrap().to_string(),
+            sender: format!("{:?}", tx.from.unwrap()),
+            receiver: format!("{:?}", receipt.to.unwrap()),
             amount: PreciseNumber::from_dec_str(&tx.value.to_string())?,
         })
     }
