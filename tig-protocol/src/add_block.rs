@@ -734,7 +734,7 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
         data.imbalance_penalty = Some(imbalance_penalty);
     }
 
-    let influences = weights.l1_normalise();
+    let influences = weights.normalise();
     for (player_id, &influence) in active_player_ids.iter().zip(influences.iter()) {
         let data = player_data.get_mut(player_id).unwrap();
 
@@ -801,7 +801,7 @@ async fn update_adoption<T: Context>(ctx: &mut T, block: &Block) {
             weights.push(weight);
         }
 
-        let adoption = weights.l1_normalise();
+        let adoption = weights.normalise();
         for ((algorithm_id, data), adoption) in algorithm_data.iter_mut().zip(adoption) {
             data.adoption = Some(adoption);
             ctx.update_algorithm_block_data(algorithm_id, &block.id, data)

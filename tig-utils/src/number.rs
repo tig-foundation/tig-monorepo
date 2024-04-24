@@ -308,7 +308,7 @@ impl Sum for PreciseNumber {
 }
 
 pub trait PreciseNumberOps {
-    fn l1_normalise(&self) -> Vec<PreciseNumber>;
+    fn normalise(&self) -> Vec<PreciseNumber>;
     fn arithmetic_mean(&self) -> PreciseNumber;
     fn variance(&self) -> PreciseNumber;
     fn standard_deviation(&self) -> PreciseNumber;
@@ -318,14 +318,14 @@ impl<T> PreciseNumberOps for T
 where
     T: AsRef<[PreciseNumber]>,
 {
-    fn l1_normalise(&self) -> Vec<PreciseNumber> {
+    fn normalise(&self) -> Vec<PreciseNumber> {
         let values = self.as_ref();
-        let max_value = *values.iter().max().unwrap();
+        let sum: PreciseNumber = values.iter().sum();
         let zero = PreciseNumber::from(0);
-        if max_value == zero {
+        if sum == zero {
             values.iter().map(|_| zero.clone()).collect()
         } else {
-            values.iter().map(|&x| x / max_value).collect()
+            values.iter().map(|&x| x / sum).collect()
         }
     }
 
