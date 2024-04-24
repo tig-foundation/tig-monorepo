@@ -10,7 +10,7 @@ pub struct Transaction {
 
 #[cfg(feature = "web3")]
 mod web3_feature {
-    use crate::json::dejsonify;
+    use crate::PreciseNumber;
     use anyhow::{anyhow, Result};
     use hex::{self, ToHex};
     use web3::{signing::*, types::*};
@@ -40,11 +40,10 @@ mod web3_feature {
             .transaction(TransactionId::Hash(tx_hash))
             .await?
             .ok_or_else(|| anyhow!("Transaction {} not found", tx_hash))?;
-
         Ok(super::Transaction {
             sender: tx.from.unwrap().to_string(),
             receiver: receipt.to.unwrap().to_string(),
-            amount: dejsonify(&tx.value.to_string())?,
+            amount: PreciseNumber::from_dec_str(&tx.value.to_string())?,
         })
     }
 }
