@@ -38,6 +38,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasi
+      - name: Cargo Test
+        if: env.SKIP_JOB != 'true' 
+        run: cargo test -p tig-algorithms
       - name: Cargo Build
         if: env.SKIP_JOB != 'true' 
         run: >
