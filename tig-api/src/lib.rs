@@ -60,9 +60,7 @@ impl Api {
 
     pub async fn get_challenges(&self, req: GetChallengesReq) -> Result<GetChallengesResp> {
         let mut query = HashMap::<String, String>::new();
-        if let Some(block_id) = req.block_id {
-            query.insert("block_id".to_string(), block_id);
-        }
+        query.insert("block_id".to_string(), req.block_id);
         let query = QueryMap::from(query);
         self.get(format!("get-challenges?{}", query.to_query_string()))
             .await
@@ -70,9 +68,7 @@ impl Api {
 
     pub async fn get_algorithms(&self, req: GetAlgorithmsReq) -> Result<GetAlgorithmsResp> {
         let mut query = HashMap::<String, String>::new();
-        if let Some(block_id) = req.block_id {
-            query.insert("block_id".to_string(), block_id);
-        }
+        query.insert("block_id".to_string(), req.block_id);
         let query = QueryMap::from(query);
         self.get(format!("get-algorithms?{}", query.to_query_string()))
             .await
@@ -80,9 +76,7 @@ impl Api {
 
     pub async fn get_players(&self, req: GetPlayersReq) -> Result<GetPlayersResp> {
         let mut query = HashMap::<String, String>::new();
-        if let Some(block_id) = req.block_id {
-            query.insert("block_id".to_string(), block_id);
-        }
+        query.insert("block_id".to_string(), req.block_id);
         query.insert("player_type".to_string(), req.player_type.to_string());
         let query = QueryMap::from(query);
         self.get(format!("get-players?{}", query.to_query_string()))
@@ -91,9 +85,7 @@ impl Api {
 
     pub async fn get_benchmarks(&self, req: GetBenchmarksReq) -> Result<GetBenchmarksResp> {
         let mut query = HashMap::<String, String>::new();
-        if let Some(block_id) = req.block_id {
-            query.insert("block_id".to_string(), block_id);
-        }
+        query.insert("block_id".to_string(), req.block_id);
         query.insert("player_id".to_string(), req.player_id);
         let query = QueryMap::from(query);
         self.get(format!("get-benchmarks?{}", query.to_query_string()))

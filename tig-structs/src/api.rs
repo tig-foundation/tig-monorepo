@@ -39,7 +39,7 @@ impl PlayerType {
 
 serializable_struct_with_getters! {
     GetPlayersReq {
-        block_id: Option<String>,
+        block_id: String,
         player_type: PlayerType,
     }
 }
@@ -69,7 +69,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     GetChallengesReq {
-        block_id: Option<String>,
+        block_id: String,
     }
 }
 
@@ -83,7 +83,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     GetAlgorithmsReq {
-        block_id: Option<String>,
+        block_id: String,
     }
 }
 
@@ -98,7 +98,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     GetBenchmarksReq {
-        block_id: Option<String>,
+        block_id: String,
         player_id: String,
     }
 }

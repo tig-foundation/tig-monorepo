@@ -321,7 +321,7 @@ async fn get_benchmarks() -> Result<(Vec<Benchmark>, Vec<Proof>, Vec<Fraud>)> {
             panic!("FIXME");
         })
         .get_benchmarks(GetBenchmarksReq {
-            block_id: Some(get_latest_block_id().await),
+            block_id: get_latest_block_id().await,
             player_id: PLAYER_ID
                 .get()
                 .unwrap_or_else(|| {
@@ -343,7 +343,7 @@ async fn get_benchmarker_data() -> Result<Option<PlayerBlockData>> {
             panic!("FIXME");
         })
         .get_players(GetPlayersReq {
-            block_id: Some(get_latest_block_id().await),
+            block_id: get_latest_block_id().await,
             player_type: PlayerType::Benchmarker,
         })
         .await
@@ -372,7 +372,7 @@ async fn get_challenges() -> Result<Vec<Challenge>> {
             panic!("FIXME");
         })
         .get_challenges(GetChallengesReq {
-            block_id: Some(get_latest_block_id().await),
+            block_id: get_latest_block_id().await,
         })
         .await
         .map_err(|e| format!("Failed to get challenges: {:?}", e))?;
@@ -389,7 +389,7 @@ async fn get_algorithms() -> Result<(HashMap<String, Vec<Algorithm>>, HashMap<St
             panic!("FIXME");
         })
         .get_algorithms(GetAlgorithmsReq {
-            block_id: Some(get_latest_block_id().await),
+            block_id: get_latest_block_id().await,
         })
         .await
         .map_err(|e| format!("Failed to get algorithms: {:?}", e))?;
