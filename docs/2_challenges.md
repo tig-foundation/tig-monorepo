@@ -54,7 +54,7 @@ The issue of valuing solutions of different difficulties can be deconstructed in
 
 The key insight behind TIG's Pareto frontiers mechanism (described below) is that the value function does not have to be explicit, but rather can be fluidly discoverable by Benchmarkers in a decentralised setting by allowing them to strike a balance between the difficulty they select and the number of solutions they can compute.
 
-![Pareto frontier](https://en.wikipedia.org/wiki/Pareto_front#/media/File:Pareto_Efficient_Frontier_1024x1024.png)
+![Pareto frontier](https://upload.wikimedia.org/wikipedia/commons/2/27/Pareto_Efficient_Frontier_1024x1024.png)
 
 *Figure: The red line is an example of a Pareto frontier. [Sourced from wikipedia](https://en.wikipedia.org/wiki/Pareto_front)*
 
