@@ -126,10 +126,7 @@ const B_SUBMITTER_ID: &'static str = "Benchmark submitter";
 const P_SUBMITTER_ID: &'static str = "Proof submitter";
 
 pub fn mutex() -> &'static Mutex<State> {
-    STATE.get().unwrap_or_else(|| {
-        web_sys::console::error_1(&"mutex".to_string().into());
-        panic!("FIXME");
-    })
+    STATE.get().unwrap()
 }
 
 pub async fn start() {
@@ -155,10 +152,7 @@ pub async fn setup(api_url: String, api_key: String, player_id: String, num_work
     API.get_or_init(|| Api::new(api_url, api_key));
     PLAYER_ID.get_or_init(|| player_id);
 
-    update_block_data().await.unwrap_or_else(|_| {
-        web_sys::console::error_1(&"setup".to_string().into());
-        panic!("FIXME");
-    });
+    update_block_data().await.unwrap();
     future_utils::spawn(async {
         update_status(BLOCK_DATA_POLLER_ID, "Running").await;
         loop {
@@ -267,15 +261,7 @@ pub async fn setup(api_url: String, api_key: String, player_id: String, num_work
 
 async fn get_latest_block_id() -> String {
     let state = mutex().lock().await;
-    state
-        .latest_block
-        .as_ref()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"get_latest_block_id".to_string().into());
-            panic!("FIXME");
-        })
-        .id
-        .clone()
+    state.latest_block.as_ref().unwrap().id.clone()
 }
 
 async fn update_status(id: &str, status: &str) {
@@ -290,10 +276,7 @@ async fn update_status(id: &str, status: &str) {
 async fn get_latest_block() -> Result<Block> {
     let GetBlockResp { block, .. } = API
         .get()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"get_latest_block".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .get_block(GetBlockReq {
             id: None,
             round: None,
@@ -302,10 +285,7 @@ async fn get_latest_block() -> Result<Block> {
         })
         .await
         .map_err(|e| format!("Failed to get latest block: {:?}", e))?;
-    Ok(block.unwrap_or_else(|| {
-        web_sys::console::error_1(&"get_latest_block2".to_string().into());
-        panic!("FIXME");
-    }))
+    Ok(block.unwrap())
 }
 
 async fn get_benchmarks() -> Result<(Vec<Benchmark>, Vec<Proof>, Vec<Fraud>)> {
@@ -316,19 +296,10 @@ async fn get_benchmarks() -> Result<(Vec<Benchmark>, Vec<Proof>, Vec<Fraud>)> {
         ..
     } = API
         .get()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"get_benchmarks".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .get_benchmarks(GetBenchmarksReq {
             block_id: get_latest_block_id().await,
-            player_id: PLAYER_ID
-                .get()
-                .unwrap_or_else(|| {
-                    web_sys::console::error_1(&"get_benchmarks".to_string().into());
-                    panic!("FIXME");
-                })
-                .clone(),
+            player_id: PLAYER_ID.get().unwrap().clone(),
         })
         .await
         .map_err(|e| format!("Failed to get benchmarks: {:?}", e))?;
@@ -338,10 +309,7 @@ async fn get_benchmarks() -> Result<(Vec<Benchmark>, Vec<Proof>, Vec<Fraud>)> {
 async fn get_benchmarker_data() -> Result<Option<PlayerBlockData>> {
     let GetPlayersResp { players, .. } = API
         .get()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"get_benchmarker_data".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .get_players(GetPlayersReq {
             block_id: get_latest_block_id().await,
             player_type: PlayerType::Benchmarker,
@@ -350,27 +318,14 @@ async fn get_benchmarker_data() -> Result<Option<PlayerBlockData>> {
         .map_err(|e| format!("Failed to get players: {:?}", e))?;
     Ok(players
         .into_iter()
-        .find(|x| {
-            x.id == *PLAYER_ID.get().unwrap_or_else(|| {
-                web_sys::console::error_1(&"get_benchmarker_data2".to_string().into());
-                panic!("FIXME");
-            })
-        })
-        .map(|x| {
-            x.block_data.unwrap_or_else(|| {
-                web_sys::console::error_1(&"get_benchmarker_data3".to_string().into());
-                panic!("FIXME");
-            })
-        }))
+        .find(|x| x.id == *PLAYER_ID.get().unwrap())
+        .map(|x| x.block_data.unwrap()))
 }
 
 async fn get_challenges() -> Result<Vec<Challenge>> {
     let GetChallengesResp { challenges, .. } = API
         .get()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"get_challenges".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .get_challenges(GetChallengesReq {
             block_id: get_latest_block_id().await,
         })
@@ -384,10 +339,7 @@ async fn get_algorithms() -> Result<(HashMap<String, Vec<Algorithm>>, HashMap<St
         algorithms, wasms, ..
     } = API
         .get()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"get_algorithms".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .get_algorithms(GetAlgorithmsReq {
             block_id: get_latest_block_id().await,
         })
@@ -403,15 +355,7 @@ async fn get_algorithms() -> Result<(HashMap<String, Vec<Algorithm>>, HashMap<St
     let download_urls = wasms
         .into_iter()
         .filter(|x| x.details.download_url.is_some())
-        .map(|x| {
-            (
-                x.algorithm_id,
-                x.details.download_url.unwrap_or_else(|| {
-                    web_sys::console::error_1(&"get_algorithms2".to_string().into());
-                    panic!("FIXME");
-                }),
-            )
-        })
+        .map(|x| (x.algorithm_id, x.details.download_url.unwrap()))
         .collect();
     Ok((algorithms_by_challenge, download_urls))
 }
@@ -471,11 +415,7 @@ async fn find_settings_to_recompute() -> Option<Job> {
     let state = mutex().lock().await;
     for (benchmark_id, benchmark) in state.benchmarks.iter() {
         if !state.proofs.contains_key(benchmark_id) && benchmark.state.is_some() {
-            let sampled_nonces = benchmark.state().sampled_nonces.clone().unwrap_or_else(|| {
-                web_sys::console::error_1(&"find_settings_to_recompute".to_string().into());
-                panic!("FIXME");
-            });
-            println!("Sampled nonces: {:?}", sampled_nonces);
+            let sampled_nonces = benchmark.state().sampled_nonces.clone().unwrap();
             return Some(Job {
                 benchmark_id: benchmark.id.clone(),
                 settings: benchmark.settings.clone(),
@@ -500,10 +440,7 @@ async fn pick_settings_to_benchmark() -> Job {
     let block_id = get_latest_block_id().await;
     let state = mutex().lock().await;
     let num_qualifiers_by_challenge = match &state.benchmarker_data {
-        Some(data) => data.num_qualifiers_by_challenge.clone().unwrap_or_else(|| {
-            web_sys::console::error_1(&"pick_settings_to_benchmark".to_string().into());
-            panic!("FIXME");
-        }),
+        Some(data) => data.num_qualifiers_by_challenge.clone().unwrap(),
         None => HashMap::new(),
     };
     let percent_qualifiers_by_challenge: HashMap<String, f64> = state
@@ -537,30 +474,21 @@ async fn pick_settings_to_benchmark() -> Job {
             .map(|w| w.1.clone())
             .collect::<Vec<f64>>(),
     )
-    .unwrap_or_else(|_| {
-        web_sys::console::error_1(&"pick_settings_to_benchmark2".to_string().into());
-        panic!("FIXME");
-    });
+    .unwrap();
     let index = dist.sample(&mut rng);
 
     let random_challenge_id = challenge_weights[index].0.clone();
     let selected_algorithm_id = state
         .selected_algorithms
         .get(&random_challenge_id)
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"pick_settings_to_benchmark3".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .clone();
 
     let challenge = state
         .challenges
         .iter()
         .find(|c| c.id == random_challenge_id)
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"pick_settings_to_benchmark4".to_string().into());
-            panic!("FIXME");
-        });
+        .unwrap();
     let min_difficulty = challenge.details.min_difficulty();
     let max_difficulty = challenge.details.max_difficulty();
     let block_data = &challenge.block_data();
@@ -572,13 +500,7 @@ async fn pick_settings_to_benchmark() -> Job {
     Job {
         benchmark_id: Alphanumeric.sample_string(&mut rng, 32),
         settings: BenchmarkSettings {
-            player_id: PLAYER_ID
-                .get()
-                .unwrap_or_else(|| {
-                    web_sys::console::error_1(&"pick_settings_to_benchmark5".to_string().into());
-                    panic!("FIXME");
-                })
-                .clone(),
+            player_id: PLAYER_ID.get().unwrap().clone(),
             block_id,
             challenge_id: random_challenge_id,
             algorithm_id: selected_algorithm_id,
@@ -594,10 +516,7 @@ async fn pick_settings_to_benchmark() -> Job {
         wasm_vm_config: state
             .latest_block
             .as_ref()
-            .unwrap_or_else(|| {
-                web_sys::console::error_1(&"pick_settings_to_benchmark6".to_string().into());
-                panic!("FIXME");
-            })
+            .unwrap()
             .config()
             .wasm_vm
             .clone(),
@@ -669,10 +588,7 @@ async fn do_benchmark() -> Result<()> {
                         (*state)
                             .benchmarks
                             .get_mut(&job.benchmark_id)
-                            .unwrap_or_else(|| {
-                                web_sys::console::error_1(&"do_benchmark7".to_string().into());
-                                panic!("FIXME");
-                            })
+                            .unwrap()
                             .details
                             .num_solutions += 1;
                     }
@@ -741,10 +657,7 @@ async fn do_manage_benchmark() -> Result<()> {
         if !state.running {
             break;
         }
-        let job = (*state).job.as_mut().unwrap_or_else(|| {
-            web_sys::console::error_1(&"do_manage_benchmark3".to_string().into());
-            panic!("FIXME");
-        });
+        let job = (*state).job.as_mut().unwrap();
         job.duration.now = time();
         if job.duration.now > job.duration.end {
             break;
@@ -757,10 +670,7 @@ async fn do_manage_benchmark() -> Result<()> {
         let num_solutions = state
             .proofs
             .get(&benchmark_id)
-            .unwrap_or_else(|| {
-                web_sys::console::error_1(&"do_manage_benchmark4".to_string().into());
-                panic!("FIXME");
-            })
+            .unwrap()
             .solutions_data()
             .len();
         drop(state);
@@ -780,21 +690,10 @@ async fn do_manage_benchmark() -> Result<()> {
     let num_solutions = state
         .proofs
         .get(&benchmark_id)
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"do_manage_benchmark5".to_string().into());
-            panic!("FIXME");
-        })
+        .unwrap()
         .solutions_data()
         .len();
-    let num_attempts = state
-        .job
-        .as_ref()
-        .unwrap_or_else(|| {
-            web_sys::console::error_1(&"do_manage_benchmark6".to_string().into());
-            panic!("FIXME");
-        })
-        .nonce_iter
-        .attempts();
+    let num_attempts = state.job.as_ref().unwrap().nonce_iter.attempts();
     (*state).job = None;
     if num_solutions == 0 {
         (*state).benchmarks.remove(&benchmark_id);
@@ -832,18 +731,10 @@ async fn do_submit_benchmark() -> Result<()> {
                 (
                     benchmark.id.clone(),
                     benchmark.settings.clone(),
-                    benchmark.solutions_meta_data.take().unwrap_or_else(|| {
-                        web_sys::console::error_1(&"run_benchmark_submitter".to_string().into());
-                        panic!("FIXME");
-                    }),
+                    benchmark.solutions_meta_data.take().unwrap(),
                     proofs
                         .get(&benchmark.id)
-                        .unwrap_or_else(|| {
-                            web_sys::console::error_1(
-                                &"run_benchmark_submitter".to_string().into(),
-                            );
-                            panic!("FIXME");
-                        })
+                        .unwrap()
                         .solutions_data()
                         .first()
                         .unwrap()
@@ -861,10 +752,7 @@ async fn do_submit_benchmark() -> Result<()> {
         .await;
         let resp = API
             .get()
-            .unwrap_or_else(|| {
-                web_sys::console::error_1(&"run_benchmark_submitter2".to_string().into());
-                panic!("FIXME");
-            })
+            .unwrap()
             .submit_benchmark(SubmitBenchmarkReq {
                 settings,
                 solutions_meta_data,
@@ -875,20 +763,8 @@ async fn do_submit_benchmark() -> Result<()> {
         update_status(B_SUBMITTER_ID, &format!("{:?}", resp)).await;
         if resp.benchmark_id != old_benchmark_id {
             let mut state = mutex().lock().await;
-            let mut benchmark = (*state)
-                .benchmarks
-                .remove(&old_benchmark_id)
-                .unwrap_or_else(|| {
-                    web_sys::console::error_1(&"run_benchmark_submitter3".to_string().into());
-                    panic!("FIXME");
-                });
-            let mut proof = (*state)
-                .proofs
-                .remove(&old_benchmark_id)
-                .unwrap_or_else(|| {
-                    web_sys::console::error_1(&"run_benchmark_submitter4".to_string().into());
-                    panic!("FIXME");
-                });
+            let mut benchmark = (*state).benchmarks.remove(&old_benchmark_id).unwrap();
+            let mut proof = (*state).proofs.remove(&old_benchmark_id).unwrap();
             benchmark.id = resp.benchmark_id.clone();
             proof.benchmark_id = resp.benchmark_id.clone();
             (*state)
@@ -925,29 +801,13 @@ async fn do_submit_proof() -> Result<()> {
             .map(|x| {
                 let state = benchmarks
                     .get(&x.benchmark_id)
-                    .unwrap_or_else(|| {
-                        web_sys::console::error_1(&"do_submit_proof".to_string().into());
-                        panic!("FIXME");
-                    })
+                    .unwrap()
                     .state
                     .as_ref()
-                    .unwrap_or_else(|| {
-                        web_sys::console::error_1(&"do_submit_proof2".to_string().into());
-                        panic!("FIXME");
-                    });
-                let sampled_nonces: HashSet<u32> = state
-                    .sampled_nonces
-                    .clone()
-                    .unwrap_or_else(|| {
-                        web_sys::console::error_1(&"do_submit_proof3".to_string().into());
-                        panic!("FIXME");
-                    })
-                    .into_iter()
-                    .collect();
-                let mut solutions_data = x.solutions_data.take().unwrap_or_else(|| {
-                    web_sys::console::error_1(&"do_submit_proof4".to_string().into());
-                    panic!("FIXME");
-                });
+                    .unwrap();
+                let sampled_nonces: HashSet<u32> =
+                    state.sampled_nonces.clone().unwrap().into_iter().collect();
+                let mut solutions_data = x.solutions_data.take().unwrap();
                 solutions_data.retain(|x| sampled_nonces.contains(&x.nonce));
                 (x.benchmark_id.clone(), solutions_data)
             })
@@ -960,10 +820,7 @@ async fn do_submit_proof() -> Result<()> {
         .await;
         let resp = API
             .get()
-            .unwrap_or_else(|| {
-                web_sys::console::error_1(&"do_submit_proof5".to_string().into());
-                panic!("FIXME");
-            })
+            .unwrap()
             .submit_proof(SubmitProofReq {
                 benchmark_id: benchmark_id.clone(),
                 solutions_data: solutions_data.into(),
