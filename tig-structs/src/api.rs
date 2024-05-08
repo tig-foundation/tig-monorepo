@@ -5,6 +5,7 @@ serializable_struct_with_getters! {
     RequestApiKeyReq {
         signature: String,
         address: String,
+        gnosis_safe_setup_tx_hash: Option<String>,
     }
 }
 

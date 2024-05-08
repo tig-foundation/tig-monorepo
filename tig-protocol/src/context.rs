@@ -118,6 +118,7 @@ pub trait Context {
         wasm_vm_config: &WasmVMConfig,
     ) -> ContextResult<anyhow::Result<SolutionData>>;
     async fn get_transaction(&mut self, tx_hash: &String) -> ContextResult<Transaction>;
+    async fn get_multisig_owners(&mut self, address: &String) -> ContextResult<Vec<String>>;
 
     // Mempool
     async fn add_block(

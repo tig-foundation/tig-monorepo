@@ -213,6 +213,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     PlayerDetails {
         name: String,
+        is_multisig: bool,
     }
 }
 serializable_struct_with_getters! {

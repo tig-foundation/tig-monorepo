@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{context::*, error::*};
 use tig_structs::core::*;
 use tig_utils::*;
@@ -61,13 +63,22 @@ async fn verify_submission_fee<T: Context>(
             tx_hash: details.tx_hash.clone(),
         });
     }
+    let mut valid_senders = HashSet::<String>::new();
+    valid_senders.insert(player.id.clone());
+    if player.details.is_multisig {
+        let multisig_owners = ctx
+            .get_multisig_owners(&player.id)
+            .await
+            .unwrap_or_else(|e| panic!("get_multisig_owners error: {:?}", e));
+        valid_senders.extend(multisig_owners.into_iter());
+    }
 
     let transaction = ctx.get_transaction(&details.tx_hash).await.map_err(|_| {
         ProtocolError::InvalidTransaction {
             tx_hash: details.tx_hash.clone(),
         }
     })?;
-    if transaction.sender != player.id {
+    if !valid_senders.contains(&transaction.sender) {
         return Err(ProtocolError::InvalidSubmissionFeeSender {
             tx_hash: details.tx_hash.clone(),
             expected_sender: player.id.clone(),
