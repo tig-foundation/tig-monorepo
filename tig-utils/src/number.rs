@@ -3,7 +3,7 @@ use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     fmt::Display,
     iter::Sum,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
+    ops::{Add, Div, Mul, Sub},
 };
 use uint::construct_uint;
 
@@ -37,12 +37,6 @@ impl PreciseNumber {
 
     pub fn from_f64(value: f64) -> Self {
         Self(((value * 10f64.powi(PreciseNumber::DECIMALS as i32)) as i128).into())
-    }
-
-    pub(crate) fn sqrt(&self) -> PreciseNumber {
-        let num = self.inner().as_u128() as f64;
-        let div = 10f64.powi(PreciseNumber::DECIMALS as i32);
-        PreciseNumber::from_f64((num / div).sqrt())
     }
 
     pub fn from_dec_str(value: &str) -> Result<Self, uint::FromDecStrErr> {
@@ -79,7 +73,7 @@ impl Add for PreciseNumber {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
+        (&self).add(&other)
     }
 }
 
@@ -87,7 +81,7 @@ impl<'a> Add<&'a PreciseNumber> for PreciseNumber {
     type Output = Self;
 
     fn add(self, other: &'a Self) -> Self {
-        Self(self.0 + other.0)
+        (&self).add(other)
     }
 }
 
@@ -95,7 +89,7 @@ impl<'a> Add<PreciseNumber> for &'a PreciseNumber {
     type Output = PreciseNumber;
 
     fn add(self, other: PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 + other.0)
+        self.add(&other)
     }
 }
 
@@ -103,19 +97,7 @@ impl<'a, 'b> Add<&'a PreciseNumber> for &'b PreciseNumber {
     type Output = PreciseNumber;
 
     fn add(self, other: &'a PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 + other.0)
-    }
-}
-
-impl AddAssign for PreciseNumber {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 += rhs.0;
-    }
-}
-
-impl<'a> AddAssign<&'a PreciseNumber> for PreciseNumber {
-    fn add_assign(&mut self, rhs: &'a PreciseNumber) {
-        self.0 += rhs.0;
+        PreciseNumber(self.0.checked_add(other.0).unwrap())
     }
 }
 
@@ -123,7 +105,7 @@ impl Sub for PreciseNumber {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
+        (&self).sub(&other)
     }
 }
 
@@ -131,7 +113,7 @@ impl<'a> Sub<&'a PreciseNumber> for PreciseNumber {
     type Output = Self;
 
     fn sub(self, other: &'a Self) -> Self {
-        Self(self.0 - other.0)
+        (&self).sub(other)
     }
 }
 
@@ -139,7 +121,7 @@ impl<'a> Sub<PreciseNumber> for &'a PreciseNumber {
     type Output = PreciseNumber;
 
     fn sub(self, other: PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 - other.0)
+        self.sub(&other)
     }
 }
 
@@ -147,19 +129,7 @@ impl<'a, 'b> Sub<&'a PreciseNumber> for &'b PreciseNumber {
     type Output = PreciseNumber;
 
     fn sub(self, other: &'a PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 - other.0)
-    }
-}
-
-impl SubAssign for PreciseNumber {
-    fn sub_assign(&mut self, other: Self) {
-        self.0 -= other.0;
-    }
-}
-
-impl<'a> SubAssign<&'a PreciseNumber> for PreciseNumber {
-    fn sub_assign(&mut self, other: &'a Self) {
-        self.0 -= other.0;
+        PreciseNumber(self.0.checked_sub(other.0).unwrap())
     }
 }
 
@@ -167,7 +137,7 @@ impl Mul for PreciseNumber {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(self.0 * rhs.0 / Self::PRECISION)
+        (&self).mul(&rhs)
     }
 }
 
@@ -175,7 +145,7 @@ impl<'a> Mul<&'a PreciseNumber> for PreciseNumber {
     type Output = Self;
 
     fn mul(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 * rhs.0 / Self::PRECISION)
+        (&self).mul(rhs)
     }
 }
 
@@ -183,7 +153,7 @@ impl<'a> Mul<PreciseNumber> for &'a PreciseNumber {
     type Output = PreciseNumber;
 
     fn mul(self, rhs: PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 * rhs.0 / PreciseNumber::PRECISION)
+        self.mul(&rhs)
     }
 }
 
@@ -191,19 +161,13 @@ impl<'a, 'b> Mul<&'a PreciseNumber> for &'b PreciseNumber {
     type Output = PreciseNumber;
 
     fn mul(self, rhs: &'a PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 * rhs.0 / PreciseNumber::PRECISION)
-    }
-}
-
-impl MulAssign for PreciseNumber {
-    fn mul_assign(&mut self, other: Self) {
-        self.0 = self.0 * other.0 / Self::PRECISION;
-    }
-}
-
-impl<'a> MulAssign<&'a PreciseNumber> for PreciseNumber {
-    fn mul_assign(&mut self, other: &'a Self) {
-        self.0 = self.0 * other.0 / Self::PRECISION;
+        PreciseNumber(
+            self.0
+                .checked_mul(rhs.0)
+                .unwrap()
+                .checked_div(PreciseNumber::PRECISION)
+                .unwrap(),
+        )
     }
 }
 
@@ -211,7 +175,7 @@ impl Div for PreciseNumber {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        Self(self.0 * Self::PRECISION / rhs.0)
+        (&self).div(&rhs)
     }
 }
 
@@ -219,7 +183,7 @@ impl<'a> Div<&'a PreciseNumber> for PreciseNumber {
     type Output = Self;
 
     fn div(self, rhs: &'a Self) -> Self::Output {
-        Self(self.0 * Self::PRECISION / rhs.0)
+        (&self).div(rhs)
     }
 }
 
@@ -227,7 +191,7 @@ impl<'a> Div<PreciseNumber> for &'a PreciseNumber {
     type Output = PreciseNumber;
 
     fn div(self, rhs: PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 * PreciseNumber::PRECISION / rhs.0)
+        self.div(&rhs)
     }
 }
 
@@ -235,19 +199,13 @@ impl<'a, 'b> Div<&'a PreciseNumber> for &'b PreciseNumber {
     type Output = PreciseNumber;
 
     fn div(self, rhs: &'a PreciseNumber) -> PreciseNumber {
-        PreciseNumber(self.0 * PreciseNumber::PRECISION / rhs.0)
-    }
-}
-
-impl DivAssign for PreciseNumber {
-    fn div_assign(&mut self, other: Self) {
-        self.0 = self.0 * Self::PRECISION / other.0;
-    }
-}
-
-impl<'a> DivAssign<&'a PreciseNumber> for PreciseNumber {
-    fn div_assign(&mut self, other: &'a Self) {
-        self.0 = self.0 * Self::PRECISION / other.0;
+        PreciseNumber(
+            self.0
+                .checked_mul(PreciseNumber::PRECISION)
+                .unwrap()
+                .checked_div(rhs.0)
+                .unwrap(),
+        )
     }
 }
 
@@ -311,7 +269,6 @@ pub trait PreciseNumberOps {
     fn normalise(&self) -> Vec<PreciseNumber>;
     fn arithmetic_mean(&self) -> PreciseNumber;
     fn variance(&self) -> PreciseNumber;
-    fn standard_deviation(&self) -> PreciseNumber;
 }
 
 impl<T> PreciseNumberOps for T
@@ -348,8 +305,5 @@ where
             .sum::<PreciseNumber>();
         let count = PreciseNumber::from(values.len() as u32);
         variance_sum / count
-    }
-    fn standard_deviation(&self) -> PreciseNumber {
-        self.variance().sqrt()
     }
 }

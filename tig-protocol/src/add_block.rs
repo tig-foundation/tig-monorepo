@@ -718,14 +718,14 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
         }
 
         let mean = percent_qualifiers.arithmetic_mean();
-        let std = percent_qualifiers.standard_deviation();
-        let cv = if mean == zero {
+        let variance = percent_qualifiers.variance();
+        let cv_sqr = if mean == zero {
             zero.clone()
         } else {
-            std / mean
+            variance / (mean * mean)
         };
 
-        let imbalance = cv * cv / (num_challenges - one);
+        let imbalance = cv_sqr / (num_challenges - one);
         let imbalance_penalty = one - one / (one + imbalance_multiplier * imbalance);
 
         weights.push(mean * (one - imbalance_penalty));
@@ -796,7 +796,7 @@ async fn update_adoption<T: Context>(ctx: &mut T, block: &Block) {
                     .block_data()
                     .influence();
 
-                weight += influence * num_qualifiers;
+                weight = weight + influence * num_qualifiers;
             }
             weights.push(weight);
         }
@@ -850,7 +850,7 @@ async fn update_innovator_rewards<T: Context>(ctx: &mut T, block: &Block) {
     for (_, algorithms) in eligible_algorithms_by_challenge.iter() {
         let mut total_adoption = zero.clone();
         for algorithm in algorithms.iter() {
-            total_adoption += *algorithm.block_data().adoption();
+            total_adoption = total_adoption + algorithm.block_data().adoption();
         }
 
         for algorithm in algorithms.iter() {
