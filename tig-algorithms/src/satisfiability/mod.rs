@@ -98,3 +98,120 @@
 // c001_a098 placeholder
 // c001_a099 placeholder
 // c001_a100 placeholder
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tig_challenges::{satisfiability::*, *};
+
+    #[test]
+    fn test_submissions() {
+        let difficulty = Difficulty {
+            num_variables: 50,
+            clauses_to_variables_percent: 300,
+        };
+        let seed = 0;
+        let challenge = Challenge::generate_instance(seed, &difficulty).unwrap();
+
+        // assert!(c001_a001 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a002 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a003 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a004 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a005 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a006 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a007 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a008 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a009 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a010 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a011 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a012 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a013 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a014 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a015 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a016 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a017 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a018 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a019 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a020 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a021 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a022 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a023 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a024 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a025 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a026 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a027 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a028 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a029 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a030 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a031 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a032 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a033 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a034 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a035 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a036 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a037 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a038 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a039 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a040 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a041 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a042 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a043 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a044 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a045 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a046 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a047 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a048 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a049 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a050 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a051 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a052 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a053 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a054 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a055 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a056 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a057 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a058 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a059 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a060 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a061 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a062 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a063 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a064 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a065 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a066 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a067 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a068 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a069 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a070 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a071 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a072 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a073 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a074 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a075 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a076 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a077 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a078 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a079 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a080 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a081 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a082 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a083 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a084 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a085 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a086 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a087 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a088 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a089 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a090 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a091 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a092 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a093 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a094 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a095 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a096 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a097 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a098 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a099 placeholder::solve_challenge(&challenge).is_ok());
+        // assert!(c001_a100 placeholder::solve_challenge(&challenge).is_ok());
+    }
+}
