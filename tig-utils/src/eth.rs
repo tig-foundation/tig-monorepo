@@ -81,7 +81,7 @@ mod web3_feature {
 
         let gnosis_safe = Contract::from_json(
             eth.clone(),
-            H160::from_str(&gnosis_safe_address)?,
+            H160::from_str(&address)?,
             GNOSIS_SAFE_ABI.as_bytes(),
         )
         .unwrap();
