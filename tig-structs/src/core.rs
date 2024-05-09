@@ -85,6 +85,7 @@ serializable_struct_with_getters! {
         round_submitted: Option<u32>,
         round_pushed: Option<u32>,
         round_merged: Option<u32>,
+        banned: bool,
     }
 }
 serializable_struct_with_getters! {

@@ -133,7 +133,8 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         let round_pushed = state
             .round_pushed
             .unwrap_or(state.round_submitted() + config.algorithm_submissions.push_delay);
-        if details.round >= round_pushed
+        if !state.banned
+            && details.round >= round_pushed
             && wasms
                 .get(&algorithm.id)
                 .is_some_and(|w| w.details.compile_success)
@@ -212,6 +213,7 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
             round_submitted: None,
             round_pushed: None,
             round_merged: None,
+            banned: false,
         };
         ctx.update_algorithm_state(algorithm_id, &state)
             .await
