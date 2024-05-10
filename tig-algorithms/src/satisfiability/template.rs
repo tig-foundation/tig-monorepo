@@ -10,6 +10,7 @@
 //! <Optional: remove if not needed>
 //!
 //! # License
+//! <Important: read TIG's Terms & Conditions before replacing>
 //! <Optional: remove if not needed>
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
@@ -23,24 +24,4 @@ pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
     Err(anyhow!("Not implemented"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::solve_challenge;
-    use tig_challenges::{satisfiability::*, *};
-
-    // Write any personal tests you want to run against your algorithm in this module
-    // All your tests must have #[ignore]
-    // You can run ignored tests with `cargo test -p tig-algorithms -- --include-ignored`
-
-    #[test]
-    #[ignore]
-    fn test_solve_challenge() {
-        let difficulty = Difficulty {
-            num_variables: 50,
-            clauses_to_variables_percent: 300,
-        };
-        let seed = 0;
-        let challenge = Challenge::generate_instance(seed, &difficulty).unwrap();
-        assert!(solve_challenge(&challenge).is_ok());
-    }
-}
+// do not include any tests in this file, it will result in your submission being rejected
