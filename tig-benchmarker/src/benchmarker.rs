@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use tig_api::*;
 use tig_structs::{config::WasmVMConfig, core::*};
 use tig_utils::*;
-use tig_worker::compute_solution;
+use tig_worker::{compute_solution, ComputeResult};
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -560,15 +560,13 @@ async fn do_benchmark() -> Result<()> {
             blob = download_wasm_blob(&job.settings.algorithm_id).await?;
             last_algorithm_id = job.settings.algorithm_id.clone();
         }
-        if let Ok(solution_data) = compute_solution(
+        if let Ok(ComputeResult::ValidSolution(solution_data)) = compute_solution(
             &job.settings,
             nonce,
             blob.as_slice(),
             job.wasm_vm_config.max_memory,
             job.wasm_vm_config.max_fuel,
-        )
-        .map_err(|e| e.to_string())?
-        {
+        ) {
             if solution_data.calc_solution_signature() <= job.solution_signature_threshold {
                 let mut state = mutex().lock().await;
                 if let Some(Some(solutions_meta_data)) = (*state)

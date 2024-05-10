@@ -1,6 +1,7 @@
 pub use anyhow::{Error as ContextError, Result as ContextResult};
 use tig_structs::{config::*, core::*};
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum SubmissionType {
     Algorithm,
     Benchmark,

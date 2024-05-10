@@ -27,8 +27,10 @@ where
     }
 
     fn verify_solution(&self, solution: &T) -> Result<()>;
-    fn verify_solution_from_json(&self, solution: &str) -> Result<Result<()>> {
-        Ok(self.verify_solution(&serde_json::from_str(solution)?))
+    fn verify_solution_from_json(&self, solution: &str) -> Result<()> {
+        let solution = serde_json::from_str(solution)
+            .map_err(|e| anyhow!("Failed to parse solution: {}", e))?;
+        self.verify_solution(&solution)
     }
 }
 
