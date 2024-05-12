@@ -157,6 +157,11 @@ async fn update_status(status: &str) {
 }
 
 async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
+    {
+        let mut state = (*state()).lock().await;
+        state.job = None;
+        state.timer = None;
+    }
     update_status("Querying latest data").await;
     // retain only benchmarks that are within the lifespan period
     // preserves solution_meta_data and solution_data
@@ -268,8 +273,6 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     {
         // workers exit when iter returns None
         (*(*nonce_iter).lock().await).empty();
-        let mut state = state().lock().await;
-        (*state).timer = None;
     };
 
     // transfers solutions computed by workers to benchmark state
