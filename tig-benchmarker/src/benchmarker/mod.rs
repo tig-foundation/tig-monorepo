@@ -118,7 +118,7 @@ pub enum Status {
 #[derive(Serialize, Debug, Clone)]
 pub struct State {
     pub status: Status,
-    pub time_left: Option<Timer>,
+    pub timer: Option<Timer>,
     pub query_data: QueryData,
     pub selected_algorithms: HashMap<String, String>,
     pub job: Option<Job>,
@@ -237,7 +237,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     .await;
     {
         let mut state = state().lock().await;
-        (*state).time_left = Some(Timer::new(ms_per_benchmark as u64));
+        (*state).timer = Some(Timer::new(ms_per_benchmark as u64));
     }
     loop {
         {
@@ -252,7 +252,9 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
             ))
             .await;
             let State {
-                status, time_left, ..
+                status,
+                timer: time_left,
+                ..
             } = &mut (*state().lock().await);
             if time_left.as_mut().unwrap().update().finished()
                 || nonce_iter.is_empty()
@@ -267,7 +269,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
         // workers exit when iter returns None
         (*(*nonce_iter).lock().await).empty();
         let mut state = state().lock().await;
-        (*state).time_left = None;
+        (*state).timer = None;
     };
 
     // transfers solutions computed by workers to benchmark state
@@ -396,7 +398,7 @@ pub async fn setup(api_url: String, api_key: String, player_id: String) {
     STATE.get_or_init(|| {
         Mutex::new(State {
             status: Status::Stopped,
-            time_left: None,
+            timer: None,
             query_data,
             selected_algorithms: HashMap::new(),
             job: None,
