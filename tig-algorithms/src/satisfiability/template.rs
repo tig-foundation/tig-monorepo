@@ -24,4 +24,4 @@ pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
     Err(anyhow!("Not implemented"))
 }
 
-// do not include any tests in this file, it will result in your submission being rejected
+// Important! Do not include any tests in this file, it will result in your submission being rejected
