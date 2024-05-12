@@ -14,8 +14,8 @@ mod exports {
     }
 
     #[wasm_bindgen]
-    pub async fn start(num_workers: u32) {
-        benchmarker::start(num_workers).await;
+    pub async fn start(num_workers: u32, ms_per_benchmark: u32) {
+        benchmarker::start(num_workers, ms_per_benchmark).await;
     }
 
     #[wasm_bindgen]

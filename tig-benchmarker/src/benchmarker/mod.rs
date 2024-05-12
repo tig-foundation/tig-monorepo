@@ -28,10 +28,27 @@ pub struct QueryData {
 }
 
 #[derive(Serialize, Clone, Debug)]
-pub struct Duration {
+pub struct Timer {
     pub start: u64,
     pub end: u64,
     pub now: u64,
+}
+impl Timer {
+    fn new(ms: u64) -> Self {
+        let now = time();
+        Timer {
+            start: now,
+            end: now + ms,
+            now,
+        }
+    }
+    fn update(&mut self) -> &Self {
+        self.now = time();
+        self
+    }
+    fn finished(&self) -> bool {
+        self.now >= self.end
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -101,6 +118,7 @@ pub enum Status {
 #[derive(Serialize, Debug, Clone)]
 pub struct State {
     pub status: Status,
+    pub time_left: Option<Timer>,
     pub query_data: QueryData,
     pub selected_algorithms: HashMap<String, String>,
     pub job: Option<Job>,
@@ -138,7 +156,7 @@ async fn update_status(status: &str) {
     }
 }
 
-async fn run_once(num_workers: u32) -> Result<()> {
+async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     update_status("Querying latest data").await;
     // retain only benchmarks that are within the lifespan period
     // preserves solution_meta_data and solution_data
@@ -217,9 +235,12 @@ async fn run_once(num_workers: u32) -> Result<()> {
         solutions_data.clone(),
     )
     .await;
-    let start = time();
-    loop {
+    {
+        let mut state = state().lock().await;
         let now = time();
+        (*state).time_left = Some(Timer::new(ms_per_benchmark as u64));
+    }
+    loop {
         {
             // transfers solutions computed by workers to benchmark state
             let num_solutions =
@@ -231,7 +252,13 @@ async fn run_once(num_workers: u32) -> Result<()> {
                 nonce_iter.attempts()
             ))
             .await;
-            if now - start >= 15000 || nonce_iter.is_empty() {
+            let State {
+                status, time_left, ..
+            } = &mut (*state().lock().await);
+            if time_left.as_mut().unwrap().update().finished()
+                || nonce_iter.is_empty()
+                || *status == Status::Stopping
+            {
                 break;
             }
         }
@@ -319,7 +346,7 @@ async fn drain_solutions(
     to_update.extend((*solutions_data).drain(..));
     to_update.len() as u32
 }
-pub async fn start(num_workers: u32) {
+pub async fn start(num_workers: u32, ms_per_benchmark: u32) {
     {
         let mut state = (*state()).lock().await;
         if state.status != Status::Stopped {
@@ -339,7 +366,7 @@ pub async fn start(num_workers: u32) {
                     state.status = Status::Stopped;
                 }
             }
-            if let Err(e) = run_once(num_workers).await {
+            if let Err(e) = run_once(num_workers, ms_per_benchmark).await {
                 update_status(&format!("Error: {:?}", e)).await;
                 sleep(5000).await;
             }
@@ -368,6 +395,7 @@ pub async fn setup(api_url: String, api_key: String, player_id: String) {
     STATE.get_or_init(|| {
         Mutex::new(State {
             status: Status::Stopped,
+            time_left: None,
             query_data,
             selected_algorithms: HashMap::new(),
             job: None,
