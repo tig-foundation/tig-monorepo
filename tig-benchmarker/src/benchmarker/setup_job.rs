@@ -7,7 +7,7 @@ use rand::{
 };
 use rand_distr::Distribution;
 use std::collections::HashMap;
-use tig_structs::{config::WasmVMConfig, core::*};
+use tig_structs::core::*;
 use tig_utils::{FrontierOps, PointOps};
 
 pub async fn execute() -> Result<()> {
@@ -53,6 +53,7 @@ pub async fn execute() -> Result<()> {
 
 async fn find_settings_to_recompute() -> Result<Option<Job>> {
     let QueryData {
+        latest_block,
         benchmarks,
         proofs,
         frauds,
@@ -76,10 +77,7 @@ async fn find_settings_to_recompute() -> Result<Option<Job>> {
                 settings: benchmark.settings.clone(),
                 solution_signature_threshold: u32::MAX, // is fine unless the player has committed fraud
                 sampled_nonces: Some(sampled_nonces),
-                wasm_vm_config: WasmVMConfig {
-                    max_memory: u64::MAX,
-                    max_fuel: u64::MAX,
-                },
+                wasm_vm_config: latest_block.config().wasm_vm.clone(),
             }));
         }
     }
@@ -93,6 +91,7 @@ async fn pick_settings_to_benchmark() -> Result<Job> {
         ..
     } = &(*state().lock().await);
     let QueryData {
+        latest_block,
         player_data,
         challenges,
         download_urls,
@@ -107,14 +106,14 @@ async fn pick_settings_to_benchmark() -> Result<Job> {
         download_url: get_download_url(&selected_algorithm_id, download_urls)?,
         settings: BenchmarkSettings {
             player_id: player_id().clone(),
-            block_id: query_data.latest_block.id.clone(),
+            block_id: latest_block.id.clone(),
             challenge_id: challenge.id.clone(),
             algorithm_id: selected_algorithm_id,
             difficulty,
         },
         solution_signature_threshold: *challenge.block_data().solution_signature_threshold(),
         sampled_nonces: None,
-        wasm_vm_config: query_data.latest_block.config().wasm_vm.clone(),
+        wasm_vm_config: latest_block.config().wasm_vm.clone(),
     })
 }
 
@@ -124,12 +123,12 @@ fn pick_challenge<'a>(
     challenges: &'a Vec<Challenge>,
     selected_algorithms: &HashMap<String, String>,
 ) -> Result<&'a Challenge> {
-    let num_qualifiers_by_challenge = match &player_data {
-        Some(data) => data
-            .num_qualifiers_by_challenge
-            .clone()
-            .ok_or_else(|| format!("Expecting num_qualifiers_by_challenge"))?,
-        None => HashMap::new(),
+    let num_qualifiers_by_challenge = match player_data
+        .as_ref()
+        .map(|x| x.num_qualifiers_by_challenge.as_ref())
+    {
+        Some(Some(num_qualifiers_by_challenge)) => num_qualifiers_by_challenge.clone(),
+        _ => HashMap::new(),
     };
     let percent_qualifiers_by_challenge: HashMap<String, f64> = challenges
         .iter()

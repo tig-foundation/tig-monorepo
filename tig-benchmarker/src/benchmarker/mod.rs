@@ -237,7 +237,6 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     .await;
     {
         let mut state = state().lock().await;
-        let now = time();
         (*state).time_left = Some(Timer::new(ms_per_benchmark as u64));
     }
     loop {
@@ -267,6 +266,8 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     {
         // workers exit when iter returns None
         (*(*nonce_iter).lock().await).empty();
+        let mut state = state().lock().await;
+        (*state).time_left = None;
     };
 
     // transfers solutions computed by workers to benchmark state

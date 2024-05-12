@@ -9,8 +9,7 @@ mod exports {
     #[wasm_bindgen]
     pub async fn state() -> JsValue {
         let state = benchmarker::state().lock().await.clone();
-        let value = serde_json::to_value(&state).unwrap();
-        serde_wasm_bindgen::to_value(&value).unwrap()
+        serde_wasm_bindgen::to_value(&state).unwrap()
     }
 
     #[wasm_bindgen]
