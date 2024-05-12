@@ -8,13 +8,13 @@ mod exports {
 
     #[wasm_bindgen]
     pub async fn state() -> JsValue {
-        let state = benchmarker::mutex().lock().await.clone();
+        let state = benchmarker::state().lock().await.clone();
         serde_wasm_bindgen::to_value(&state).unwrap()
     }
 
     #[wasm_bindgen]
-    pub async fn start() {
-        benchmarker::start().await;
+    pub async fn start(num_workers: u32) {
+        benchmarker::start(num_workers).await;
     }
 
     #[wasm_bindgen]
@@ -28,7 +28,7 @@ mod exports {
     }
 
     #[wasm_bindgen]
-    pub async fn setup(api_url: String, api_key: String, player_id: String, num_workers: u32) {
-        benchmarker::setup(api_url, api_key, player_id.to_string(), num_workers).await;
+    pub async fn setup(api_url: String, api_key: String, player_id: String) {
+        benchmarker::setup(api_url, api_key, player_id.to_string()).await;
     }
 }

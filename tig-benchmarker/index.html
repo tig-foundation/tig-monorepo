@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>TIG Benchmarker Test</title>
+  </head>
+  <body>
+    <h1>TIG Browser Benchmarker</h1>
+    <h2>Instructions:</h2>
+    <ol>
+      <li>Open the browser console</li>
+      <li>Setup: `await benchmarker.setup(&lt;api_url&gt;, &lt;api_key&gt;, &lt;player_id&gt;)`</li>
+      <li>Start: `await benchmarker.start(&lt;num_workers&gt;)`</li>
+      <li>Stop: `await benchmarker.stop()`</li>
+      <li>Select Algorithm: `await benchmarker.select_algorithm(&lt;challenge_id>, &lt;algorithm_id&gt;)`</li>
+      <li>View State: `await benchmarker.state()`</li>
+    </ol>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>
