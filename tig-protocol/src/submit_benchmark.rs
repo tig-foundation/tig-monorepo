@@ -227,12 +227,12 @@ fn verify_benchmark_difficulty(difficulty: &Vec<i32>, challenge: &Challenge) -> 
         )
     };
     match difficulty.within(lower_frontier, upper_frontier) {
-        PointCompareFrontiers::Above(_) => {
+        PointCompareFrontiers::Above => {
             return Err(ProtocolError::DifficultyAboveHardestFrontier {
                 difficulty: difficulty.clone(),
             });
         }
-        PointCompareFrontiers::Below(_) => {
+        PointCompareFrontiers::Below => {
             return Err(ProtocolError::DifficultyBelowEasiestFrontier {
                 difficulty: difficulty.clone(),
             });

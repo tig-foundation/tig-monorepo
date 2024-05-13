@@ -6,10 +6,10 @@ pub type Point = Vec<i32>;
 pub type Frontier<P = Point> = HashSet<P>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum PointCompareFrontiers<P> {
-    Below(P),
+pub enum PointCompareFrontiers {
+    Below,
     Within,
-    Above(P),
+    Above,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,7 +28,7 @@ pub trait PointOps {
         &self,
         lower_frontier: &Frontier<Self::Point>,
         upper_frontier: &Frontier<Self::Point>,
-    ) -> PointCompareFrontiers<Self::Point>;
+    ) -> PointCompareFrontiers;
 }
 pub trait FrontierOps {
     type Point;
@@ -85,21 +85,21 @@ impl PointOps for Point {
         &self,
         lower_frontier: &Frontier<Self::Point>,
         upper_frontier: &Frontier<Self::Point>,
-    ) -> PointCompareFrontiers<Self::Point> {
+    ) -> PointCompareFrontiers {
         // Check if the point is not dominated by any point in the lower frontier
-        if let Some(point) = lower_frontier
+        if lower_frontier
             .iter()
-            .find(|lower_point| self.pareto_compare(lower_point) == ParetoCompare::BDominatesA)
+            .any(|lower_point| self.pareto_compare(lower_point) == ParetoCompare::BDominatesA)
         {
-            return PointCompareFrontiers::Below(point.clone());
+            return PointCompareFrontiers::Below;
         }
 
         // Check if the point does not dominate any point in the upper frontier
-        if let Some(point) = upper_frontier
+        if upper_frontier
             .iter()
-            .find(|upper_point| self.pareto_compare(upper_point) == ParetoCompare::ADominatesB)
+            .any(|upper_point| self.pareto_compare(upper_point) == ParetoCompare::ADominatesB)
         {
-            return PointCompareFrontiers::Above(point.clone());
+            return PointCompareFrontiers::Above;
         }
 
         PointCompareFrontiers::Within
@@ -155,9 +155,22 @@ impl FrontierOps for Frontier {
         max_point: &Self::Point,
         multiplier: f64,
     ) -> Frontier<Self::Point> {
-        self.iter()
+        let frontier: Frontier<Self::Point> = self
+            .iter()
             .map(|point| point.scale(min_point, max_point, multiplier))
-            .collect()
+            .collect();
+        if multiplier > 1.0 {
+            frontier.pareto_frontier()
+        } else {
+            frontier
+                .into_iter()
+                .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+                .collect::<Frontier>()
+                .pareto_frontier()
+                .iter()
+                .map(|d| d.iter().map(|x| -x).collect())
+                .collect()
+        }
     }
     fn sample<R: Rng>(&self, rng: &mut R) -> Self::Point {
         // FIXME only works for 2 dimensional points

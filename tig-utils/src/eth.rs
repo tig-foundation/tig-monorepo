@@ -1,7 +1,7 @@
 use crate::number::PreciseNumber;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Transaction {
     pub sender: String,
     pub receiver: String,

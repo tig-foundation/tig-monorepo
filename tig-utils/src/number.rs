@@ -43,7 +43,7 @@ impl PreciseNumber {
         Ok(Self(U256::from_dec_str(value)?))
     }
 
-    pub fn approx_inverse_exp(x: PreciseNumber) -> PreciseNumber {
+    pub fn approx_inv_exp(x: PreciseNumber) -> PreciseNumber {
         // taylor series approximation of e^-x
         let one = PreciseNumber::from(1);
         let mut positive_terms = one.clone();

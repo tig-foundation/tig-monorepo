@@ -646,7 +646,9 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
         let multiplier = (*block_data.num_qualifiers() as f64
             / config.qualifiers.total_qualifiers_threshold as f64)
             .clamp(0.0, config.difficulty_bounds.max_multiplier);
-        let scaled_frontier = base_frontier.scale(&min_difficulty, &max_difficulty, multiplier);
+        let scaled_frontier = base_frontier
+            .scale(&min_difficulty, &max_difficulty, multiplier)
+            .extend(&min_difficulty, &max_difficulty);
 
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
@@ -729,7 +731,7 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
 
         let imbalance = cv_sqr / (num_challenges - one);
         let imbalance_penalty =
-            one - PreciseNumber::approx_inverse_exp(imbalance_multiplier * imbalance);
+            one - PreciseNumber::approx_inv_exp(imbalance_multiplier * imbalance);
 
         weights.push(mean * (one - imbalance_penalty));
 

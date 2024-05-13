@@ -26,7 +26,8 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
       - name: Cargo Test
-        run: cargo test
+        run: >
+          cargo test -p tig-utils --features web3
       - name: Update Commit Status (Success)
         if: success()
         uses: myrotvorets/set-commit-status-action@master
