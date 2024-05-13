@@ -1,0 +1,123 @@
+TIG Benchmarker Outbound Game License 
+Version 1.0, January 2024 
+https://www.tig.foundation 
+
+By exercising any right granted under this Licence, You irrevocably accept 
+these terms and conditions. 
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION 
+
+1. Definitions. 
+
+"Benchmarking" shall mean the use of a Work, subject to the Innovation 
+Game Terms and Conditions, to solve random instances of challenges 
+published by TIG from time to time. 
+
+"Innovation Game Terms and Conditions" shall mean the terms and conditions 
+for the Innovation Game offered by TIG at the time of exercise of rights 
+by You under this License, a copy of which can be obtained at 
+https://www.tig.foundation/terms-and-conditions. 
+
+"Licensable" shall mean having the right to grant, to the maximum extent 
+possible, whether at the time of the initial grant or subsequently any, 
+and all, of the rights conveyed by this License. 
+
+"License" shall mean the terms and conditions for use, reproduction, and 
+distribution as defined by Sections 1 through 7 of this document. 
+
+"Licensor" shall mean the copyright owner or entity authorised by the 
+copyright owner to grant the license to the copyright in the Work in 
+accordance with Section 2 of this License. 
+
+"Object" form shall mean any form resulting from mechanical transformation 
+or translation of a Source form, including but not limited to compiled 
+object code, generated documentation, and conversions to other media 
+types. 
+
+"Patent Claims" of TIG shall mean any patent claim(s) in any TIG Patent, 
+including without limitation, method, process, and apparatus claims, 
+Licensable by TIG that would necessarily be infringed, but for the grant 
+of the License, by the making, using, selling, offering for sale, having 
+made, import, or transfer of the Work alone or by combination of the Work 
+with other software distributed by Licensor with the Work. 
+
+"Source" form shall mean the preferred form for making modifications, 
+including but not limited to software source code, documentation source, 
+and configuration files. 
+
+"TIG" shall mean The TIG Foundation, a company registered in Germany with 
+a registered office at Kurfurstendamm 15, 10719 Berlin, Deutschland. 
+
+"TIG Patent" shall mean a patent, patent application, and all 
+continuations, continuations in part, divisions, extensions, renewals, 
+reissues, and re-examinations relating thereto, in any jurisdiction 
+throughout the world owned or controlled by TIG. 
+
+"Work" shall mean the work of authorship, whether in Source or Object 
+form, made available under this License, as indicated by the copyright 
+notice that is included in or attached to the work [an example is provided 
+in the Appendix 1 below]. 
+
+"You" (or "Your") shall mean an individual or Legal Entity exercising 
+permissions granted by this License. 
+2. Grant of Copyright License. Subject to the terms and conditions of this 
+License, Licensor hereby grants to You a worldwide, non-exclusive, no 
+charge, royalty-free, copyright license to use and reproduce the Work only 
+for the purpose of Benchmarking. 
+
+3. Grant of Patent License. Subject to the terms and conditions of this 
+License, Licensor hereby grants to You a worldwide, non-exclusive, no
+charge, royalty-free, license under Patent Claims of TIG to make, have 
+made and use the Work only for the purposes of Benchmarking. 
+
+NO MODIFICATION OF THE WORK BY YOU IS PERMITTED UNDER THE TERMS OF THIS 
+LICENSE. 
+
+NO USE OF THE WORK BY YOU IS PERMITTED EXCEPT AS EXPRESSLY LICENSED IN 
+SECTIONS 2 AND 3 ABOVE. 
+
+4. Trademarks. This License does not grant permission to use the trade 
+names, trademarks, service marks, or product names of the Licensor, except 
+as required for reasonable and customary use in describing the origin of 
+the Work and reproducing the content of the NOTICE file. 
+
+5. Disclaimer of Warranty. Unless required by applicable law or agreed to 
+in writing, Licensor provides the Work on an "AS IS" BASIS, WITHOUT 
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, 
+including, without limitation, any warranties or conditions of TITLE, NON
+INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You 
+are solely responsible for determining the appropriateness of using or 
+redistributing the Work and assume any risks associated with Your exercise 
+of permissions under this License. 
+
+6. Limitation of Liability. In no event and under no legal theory, whether 
+in tort (including negligence), contract, or otherwise, unless required by 
+applicable law (such as deliberate and grossly negligent acts) or agreed 
+to in writing, shall TIG or Licensor be liable to You for damages, 
+including any direct, indirect, special, incidental, or consequential 
+damages of any character arising as a result of this License or out of the 
+use or inability to use the Work (including but not limited to damages for 
+loss of goodwill, work stoppage, computer failure or malfunction, or any 
+and all other commercial damages or losses), even if TIG or Licensor, as 
+the case may be, has been advised of the possibility of such damages. 
+
+7. Termination. The rights granted under this License will terminate 
+automatically if You fail to comply with any of its terms. 
+
+END OF TERMS AND CONDITIONS 
+
+APPENDIX 1: The TIG Benchmarker Outbound Game License. 
+
+Copyright [yyyy] [name of copyright owner] 
+
+Licensed under the TIG Benchmarker Outbound Game License v1.0 (the 
+"License"); you may not use this file except in compliance with the 
+License. You may obtain a copy of the License at 
+
+https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses 
+
+Unless required by applicable law or agreed to in writing, software 
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT 
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the 
+License for the specific language governing permissions and limitations 
+under the License. 

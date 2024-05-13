@@ -1,4 +1,6 @@
-# TIG-Token
+# tig-token
+
+Solidity code for TIG token
 
 ## Deployed ERC20
 

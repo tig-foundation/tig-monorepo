@@ -1,10 +1,10 @@
 [package]
 name = "tig-utils"
 version = "0.1.0"
+readme = "README.md"
 authors.workspace = true
 repository.workspace = true
 edition.workspace = true
-readme.workspace = true
 
 [dependencies]
 anyhow = "1.0.81"

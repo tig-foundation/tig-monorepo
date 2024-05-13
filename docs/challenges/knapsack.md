@@ -2,12 +2,6 @@
 
 [The area of Knapsack problems is one of the most active research areas of combinatorial optimization](https://en.wikipedia.org/wiki/Knapsack_problem). The problem is to maximise the value of items placed in a knapsack given the constraint that the total weight of items cannot exceed some limit.
 
-Figure 1 (below) illustrates a simple example.  In this case, the weight of all items in the knapsack cannot exceed 15kg.  Here, the solution is that the maximum value of items in the knapsack is $15, which is attained by including all items apart from the green item. 
-
-<img src="../assets/knapsack_example.png" alt="Knapsack Example" width="100%"/>
-<figcaption>Figure 1. Example of Knapsack Problem</figcaption>
-<br/>
-
 # Example
 
 For our challenge, we use a version of the knapsack problem with configurable difficulty, where the following two parameters can be adjusted in order to vary the difficulty of the challenge:
@@ -53,7 +47,7 @@ The Knapsack problems have a wide variety of practical applications. The [use of
 
 Although originally studied in the context of logistics, Knapsack problems appear regularly in diverse areas of science and technology. For example, in gene expression data, there are usually thousands of genes, but only a subset of them are informative for a specific problem. The Knapsack Problem can be used to select a subset of genes (items) that maximises the total information (value) without exceeding the limit of the number of genes that can be included in the analysis (weight limit).
 
-<img src="../assets/gene_clustering.jfif" alt="Gene Clustering" width="100%"/>
+<img src="../../assets/gene_clustering.jfif" alt="Gene Clustering" width="100%"/>
 
 
 <figcaption>Figure 2: <a href="https://openres.ersjournals.com/content/4/4/00031-2018" target="_blank">Microarray clustering of differentially expressed genes in blood</a>. Genes are clustered in rows, with red indicating high expression, yellow intermediate expression and blue low expression. The Knapsack problem is <a href="https://www.sciencedirect.com/science/article/abs/pii/S0305054821003877" target="_blank">used to analyse</a> gene expression clustering.</figcaption>

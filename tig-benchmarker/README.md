@@ -1,4 +1,6 @@
-# TIG Browser Benchmarker
+# tig-benchmarker
+
+A Rust crate that implements a Benchmarker for TIG that can run in the browser. 
 
 This browser benchmarker is deployed to https://play.tig.foundation/benchmarker
 

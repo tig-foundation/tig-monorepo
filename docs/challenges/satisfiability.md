@@ -65,7 +65,7 @@ SAT has a vast range of applications in science and industry in fields including
 SAT is used in computational biology to solve the "cell formation problem" of [organising a plant into cells](https://www.sciencedirect.com/science/article/abs/pii/S0957417412006173).
 SAT is also heavily utilised in [electronic circuit design](https://dl.acm.org/doi/abs/10.1145/337292.337611).
 
-<img src="../assets/circuit.jfif" alt="Application of SAT" width="100%"/>
+<img src="../../assets/circuit.jfif" alt="Application of SAT" width="100%"/>
 
 <figcaption>Figure 1: Chips made possible by electronic circuit design.</figcaption>
 <br/>
