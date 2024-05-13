@@ -42,6 +42,25 @@ impl PreciseNumber {
     pub fn from_dec_str(value: &str) -> Result<Self, uint::FromDecStrErr> {
         Ok(Self(U256::from_dec_str(value)?))
     }
+
+    pub fn approx_inverse_exp(x: PreciseNumber) -> PreciseNumber {
+        // taylor series approximation of e^-x
+        let one = PreciseNumber::from(1);
+        let mut positive_terms = one.clone();
+        let mut negative_terms = PreciseNumber::from(0);
+        let mut numerator = one.clone();
+        let mut denominator = one.clone();
+        for i in 0..32 {
+            numerator = numerator * x;
+            denominator = denominator * PreciseNumber::from(i + 1);
+            if i % 2 == 0 {
+                negative_terms = negative_terms + numerator / denominator;
+            } else {
+                positive_terms = positive_terms + numerator / denominator;
+            }
+        }
+        positive_terms - negative_terms
+    }
 }
 
 impl Display for PreciseNumber {

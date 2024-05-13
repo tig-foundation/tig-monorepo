@@ -728,7 +728,8 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
         };
 
         let imbalance = cv_sqr / (num_challenges - one);
-        let imbalance_penalty = one - one / (one + imbalance_multiplier * imbalance);
+        let imbalance_penalty =
+            one - PreciseNumber::approx_inverse_exp(imbalance_multiplier * imbalance);
 
         weights.push(mean * (one - imbalance_penalty));
 
