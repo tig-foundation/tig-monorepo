@@ -4,12 +4,11 @@ use std::{
     collections::{HashMap, HashSet},
     ops::Mul,
 };
-use tig_structs::core::*;
+use tig_structs::{config::*, core::*};
 use tig_utils::*;
 
 pub(crate) async fn execute<T: Context>(ctx: &mut T) -> String {
     let block = create_block(ctx).await;
-    confirm_mempool_challenges(ctx, &block).await;
     confirm_mempool_algorithms(ctx, &block).await;
     confirm_mempool_benchmarks(ctx, &block).await;
     confirm_mempool_proofs(ctx, &block).await;
@@ -47,7 +46,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         .height
         .saturating_sub(config.benchmark_submissions.lifespan_period);
     let mut data = BlockData {
-        mempool_challenge_ids: HashSet::<String>::new(),
         mempool_algorithm_ids: HashSet::<String>::new(),
         mempool_benchmark_ids: HashSet::<String>::new(),
         mempool_fraud_ids: HashSet::<String>::new(),
@@ -58,14 +56,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         active_benchmark_ids: HashSet::<String>::new(),
         active_player_ids: HashSet::<String>::new(),
     };
-    for challenge in ctx
-        .get_challenges(ChallengesFilter::Mempool, None)
-        .await
-        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
-        .iter()
-    {
-        data.mempool_challenge_ids.insert(challenge.id.clone());
-    }
     for algorithm in ctx
         .get_algorithms(AlgorithmsFilter::Mempool, None, false)
         .await
@@ -107,16 +97,8 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         data.mempool_wasm_ids.insert(wasm.algorithm_id.clone());
     }
 
-    for challenge in ctx
-        .get_challenges(ChallengesFilter::Confirmed, None)
-        .await
-        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
-    {
-        let round_active = challenge.state.unwrap().round_active;
-        if round_active.is_some_and(|x| details.round >= x) {
-            data.active_challenge_ids.insert(challenge.id);
-        }
-    }
+    data.active_challenge_ids
+        .extend(config.difficulty.parameters.keys().cloned());
     let wasms: HashMap<String, Wasm> = ctx
         .get_wasms(WasmsFilter::Confirmed, false)
         .await
@@ -196,17 +178,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         .add_block(&details, &data, &config)
         .await
         .unwrap_or_else(|e| panic!("add_block error: {:?}", e));
-    for challenge_id in data.mempool_challenge_ids.iter() {
-        let state = ChallengeState {
-            block_confirmed: None,
-            round_submitted: None,
-            round_active: None,
-            round_inactive: None,
-        };
-        ctx.update_challenge_state(challenge_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
-    }
     for algorithm_id in data.mempool_algorithm_ids.iter() {
         let state = AlgorithmState {
             block_confirmed: None,
@@ -291,20 +262,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         config: Some(config.clone()),
         details,
         data: Some(data),
-    }
-}
-
-async fn confirm_mempool_challenges<T: Context>(ctx: &mut T, block: &Block) {
-    for challenge_id in block.data().mempool_challenge_ids.iter() {
-        let challenge = get_challenge_by_id(ctx, challenge_id, None)
-            .await
-            .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e));
-        let mut state = challenge.state().clone();
-        state.block_confirmed = Some(block.details.height);
-        state.round_submitted = Some(block.details.round);
-        ctx.update_challenge_state(challenge_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
     }
 }
 
@@ -565,6 +522,7 @@ async fn update_qualifiers<T: Context>(ctx: &mut T, block: &Block) {
             let BenchmarkSettings {
                 player_id,
                 algorithm_id,
+                challenge_id,
                 difficulty,
                 ..
             } = &benchmark.settings;
@@ -573,6 +531,15 @@ async fn update_qualifiers<T: Context>(ctx: &mut T, block: &Block) {
                 && *challenge_data.num_qualifiers() > config.qualifiers.total_qualifiers_threshold
             {
                 break;
+            }
+            let difficulty_parameters = &config.difficulty.parameters[challenge_id];
+            let min_difficulty = difficulty_parameters.min_difficulty();
+            let max_difficulty = difficulty_parameters.max_difficulty();
+            if (0..difficulty.len())
+                .into_iter()
+                .any(|i| difficulty[i] < min_difficulty[i] || difficulty[i] > max_difficulty[i])
+            {
+                continue;
             }
             curr_frontier_index = frontier_indexes[difficulty];
             let player_data = data_by_player.get_mut(player_id).unwrap();
@@ -629,8 +596,9 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
             .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e));
         let mut block_data = challenge.block_data().clone();
 
-        let min_difficulty = challenge.details.min_difficulty();
-        let max_difficulty = challenge.details.max_difficulty();
+        let difficulty_parameters = &config.difficulty.parameters[&challenge.id];
+        let min_difficulty = difficulty_parameters.min_difficulty();
+        let max_difficulty = difficulty_parameters.max_difficulty();
 
         let base_frontier = block_data
             .qualifier_difficulties()
@@ -645,7 +613,7 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
 
         let multiplier = (*block_data.num_qualifiers() as f64
             / config.qualifiers.total_qualifiers_threshold as f64)
-            .clamp(0.0, config.difficulty_bounds.max_multiplier);
+            .clamp(0.0, config.difficulty.max_scaling_factor);
         let scaled_frontier = base_frontier
             .scale(&min_difficulty, &max_difficulty, multiplier)
             .extend(&min_difficulty, &max_difficulty);

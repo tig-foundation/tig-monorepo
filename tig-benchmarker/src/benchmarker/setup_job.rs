@@ -7,7 +7,7 @@ use rand::{
 };
 use rand_distr::Distribution;
 use std::collections::HashMap;
-use tig_structs::core::*;
+use tig_structs::{config::*, core::*};
 use tig_utils::{FrontierOps, PointOps};
 
 pub async fn execute() -> Result<()> {
@@ -100,7 +100,7 @@ async fn pick_settings_to_benchmark() -> Result<Job> {
     let mut rng = StdRng::seed_from_u64(time() as u64);
     let challenge = pick_challenge(&mut rng, player_data, challenges, selected_algorithms)?;
     let selected_algorithm_id = selected_algorithms[&challenge.id].clone();
-    let difficulty = pick_difficulty(&mut rng, challenge)?;
+    let difficulty = pick_difficulty(&mut rng, latest_block, challenge)?;
     Ok(Job {
         benchmark_id: Alphanumeric.sample_string(&mut rng, 32),
         download_url: get_download_url(&selected_algorithm_id, download_urls)?,
@@ -168,9 +168,10 @@ fn pick_challenge<'a>(
     Ok(challenge)
 }
 
-fn pick_difficulty(rng: &mut StdRng, challenge: &Challenge) -> Result<Vec<i32>> {
-    let min_difficulty = challenge.details.min_difficulty();
-    let max_difficulty = challenge.details.max_difficulty();
+fn pick_difficulty(rng: &mut StdRng, block: &Block, challenge: &Challenge) -> Result<Vec<i32>> {
+    let difficulty_parameters = &block.config().difficulty.parameters[&challenge.id];
+    let min_difficulty = difficulty_parameters.min_difficulty();
+    let max_difficulty = difficulty_parameters.max_difficulty();
     let block_data = challenge.block_data();
     let random_difficulty = block_data.base_frontier().sample(rng).scale(
         &min_difficulty,

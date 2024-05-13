@@ -34,8 +34,6 @@ pub enum BlockFilter {
 pub enum ChallengesFilter {
     Id(String),
     Name(String),
-    Mempool,
-    Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum FraudsFilter {
@@ -128,10 +126,6 @@ pub trait Context {
         data: &BlockData,
         config: &ProtocolConfig,
     ) -> ContextResult<String>;
-    async fn add_challenge_to_mempool(
-        &mut self,
-        details: &ChallengeDetails,
-    ) -> ContextResult<String>;
     async fn add_algorithm_to_mempool(
         &mut self,
         details: &AlgorithmDetails,
@@ -162,11 +156,6 @@ pub trait Context {
     ) -> ContextResult<()>;
 
     // Updates
-    async fn update_challenge_state(
-        &mut self,
-        challenge_id: &String,
-        state: &ChallengeState,
-    ) -> ContextResult<()>;
     async fn update_challenge_block_data(
         &mut self,
         challenge_id: &String,

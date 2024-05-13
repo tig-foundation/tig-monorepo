@@ -19,7 +19,7 @@ pub(crate) async fn execute<T: Context>(
     verify_benchmark_settings_are_unique(ctx, settings).await?;
     verify_nonces_are_unique(solutions_meta_data)?;
     verify_solutions_signatures(solutions_meta_data, &challenge)?;
-    verify_benchmark_difficulty(&settings.difficulty, &challenge)?;
+    verify_benchmark_difficulty(&settings.difficulty, &challenge, &block)?;
     let benchmark_id = ctx
         .add_benchmark_to_mempool(
             &settings,
@@ -199,10 +199,14 @@ fn verify_solutions_signatures(
     Ok(())
 }
 
-fn verify_benchmark_difficulty(difficulty: &Vec<i32>, challenge: &Challenge) -> ProtocolResult<()> {
-    let challenge_data = challenge.block_data();
+fn verify_benchmark_difficulty(
+    difficulty: &Vec<i32>,
+    challenge: &Challenge,
+    block: &Block,
+) -> ProtocolResult<()> {
+    let config = block.config();
+    let difficulty_parameters = &config.difficulty.parameters[&challenge.id];
 
-    let difficulty_parameters = &challenge.details.difficulty_parameters;
     if difficulty.len() != difficulty_parameters.len()
         || difficulty
             .iter()
@@ -215,6 +219,7 @@ fn verify_benchmark_difficulty(difficulty: &Vec<i32>, challenge: &Challenge) -> 
         });
     }
 
+    let challenge_data = challenge.block_data();
     let (lower_frontier, upper_frontier) = if *challenge_data.scaling_factor() > 1f64 {
         (
             challenge_data.base_frontier(),

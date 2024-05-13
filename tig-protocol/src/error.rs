@@ -1,4 +1,4 @@
-use tig_structs::core::{BenchmarkSettings, DifficultyParameter};
+use tig_structs::{config::DifficultyParameter, core::BenchmarkSettings};
 
 #[derive(Debug, PartialEq)]
 pub enum ProtocolError {

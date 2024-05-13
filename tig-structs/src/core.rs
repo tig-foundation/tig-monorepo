@@ -36,7 +36,6 @@ serializable_struct_with_getters! {
     Challenge {
         id: String,
         details: ChallengeDetails,
-        state: Option<ChallengeState>,
         block_data: Option<ChallengeBlockData>,
     }
 }
@@ -150,7 +149,6 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     BlockData {
-        mempool_challenge_ids: HashSet<String>,
         mempool_algorithm_ids: HashSet<String>,
         mempool_benchmark_ids: HashSet<String>,
         mempool_proof_ids: HashSet<String>,
@@ -167,36 +165,6 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     ChallengeDetails {
         name: String,
-        difficulty_parameters: Vec<DifficultyParameter>,
-    }
-}
-impl ChallengeDetails {
-    pub fn min_difficulty(&self) -> Point {
-        self.difficulty_parameters
-            .iter()
-            .map(|p| p.min_value)
-            .collect()
-    }
-    pub fn max_difficulty(&self) -> Point {
-        self.difficulty_parameters
-            .iter()
-            .map(|p| p.max_value)
-            .collect()
-    }
-}
-serializable_struct_with_getters! {
-    ChallengeState {
-        block_confirmed: Option<u32>,
-        round_submitted: Option<u32>,
-        round_active: Option<u32>,
-        round_inactive: Option<u32>,
-    }
-}
-serializable_struct_with_getters! {
-    DifficultyParameter {
-        name: String,
-        min_value: i32,
-        max_value: i32,
     }
 }
 serializable_struct_with_getters! {

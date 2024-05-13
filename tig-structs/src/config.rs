@@ -1,5 +1,7 @@
 use crate::serializable_struct_with_getters;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+pub use tig_utils::Point;
 use tig_utils::PreciseNumber;
 
 serializable_struct_with_getters! {
@@ -9,7 +11,7 @@ serializable_struct_with_getters! {
         wasm_vm: WasmVMConfig,
         solution_signature: SolutionSignatureConfig,
         qualifiers: QualifiersConfig,
-        difficulty_bounds: DifficultyBoundsConfig,
+        difficulty: DifficultyConfig,
         multi_factor_proof_of_work: MultiFactorProofOfWorkConfig,
         rounds: RoundsConfig,
         algorithm_submissions: AlgorithmSubmissionsConfig,
@@ -52,8 +54,28 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    DifficultyBoundsConfig {
-        max_multiplier: f64,
+    DifficultyParameter {
+        name: String,
+        min_value: i32,
+        max_value: i32,
+    }
+}
+pub trait MinMaxDifficulty {
+    fn min_difficulty(&self) -> Point;
+    fn max_difficulty(&self) -> Point;
+}
+impl MinMaxDifficulty for Vec<DifficultyParameter> {
+    fn min_difficulty(&self) -> Point {
+        self.iter().map(|p| p.min_value).collect()
+    }
+    fn max_difficulty(&self) -> Point {
+        self.iter().map(|p| p.max_value).collect()
+    }
+}
+serializable_struct_with_getters! {
+    DifficultyConfig {
+        max_scaling_factor: f64,
+        parameters: HashMap<String, Vec<DifficultyParameter>>,
     }
 }
 serializable_struct_with_getters! {
