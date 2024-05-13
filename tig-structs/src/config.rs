@@ -12,7 +12,7 @@ serializable_struct_with_getters! {
         solution_signature: SolutionSignatureConfig,
         qualifiers: QualifiersConfig,
         difficulty: DifficultyConfig,
-        multi_factor_proof_of_work: MultiFactorProofOfWorkConfig,
+        optimisable_proof_of_work: OptimisableProofOfWorkConfig,
         rounds: RoundsConfig,
         algorithm_submissions: AlgorithmSubmissionsConfig,
         rewards: RewardsConfig,
@@ -79,7 +79,7 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    MultiFactorProofOfWorkConfig {
+    OptimisableProofOfWorkConfig {
         imbalance_multiplier: f64,
     }
 }

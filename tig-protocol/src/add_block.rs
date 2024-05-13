@@ -667,7 +667,7 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
     let zero = PreciseNumber::from(0);
     let one = PreciseNumber::from(1);
     let imbalance_multiplier =
-        PreciseNumber::from_f64(config.multi_factor_proof_of_work.imbalance_multiplier);
+        PreciseNumber::from_f64(config.optimisable_proof_of_work.imbalance_multiplier);
     let num_challenges = PreciseNumber::from(active_challenge_ids.len());
 
     let mut weights = Vec::<PreciseNumber>::new();
