@@ -2,7 +2,7 @@
 
 **Capturing value from The Innovation Game IP**
 
-<img src="../../assets/licensing_model.jpg" width="100%"/>
+<img src="../images/licensing_model.jpg" width="100%"/>
 
 ## Introduction
 
