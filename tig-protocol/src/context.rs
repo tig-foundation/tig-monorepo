@@ -34,6 +34,7 @@ pub enum BlockFilter {
 pub enum ChallengesFilter {
     Id(String),
     Name(String),
+    All,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum FraudsFilter {
