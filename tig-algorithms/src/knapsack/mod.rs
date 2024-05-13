@@ -1,4 +1,3 @@
-pub mod template;
 // c003_a001 placeholder
 // c003_a002 placeholder
 // c003_a003 placeholder
