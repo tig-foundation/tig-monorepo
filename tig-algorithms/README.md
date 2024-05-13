@@ -1,4 +1,4 @@
-### tig-algorithms
+# tig-algorithms
 
 A Rust crate that hosts algorithm submissions made by Innovators in TIG.
 
