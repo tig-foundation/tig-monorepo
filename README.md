@@ -4,10 +4,11 @@ This repository contains the implementation of The Innovation Game (TIG).
 
 ## Important Links
 
-* [TIG's tech explainer](docs/tech/1_basics.md)
-* [TIG's licensing explainer](docs/licenses/anatomy.md)
+* [TIG Whitepaper](docs/whitepaper.pdf)
+* [TIG Tech Explainer](docs/tech/1_basics.md)
+* [TIG Licensing Explainer](docs/licenses/anatomy.md)
 * [Getting Started with Innovating](docs/guides/innovating.md)
-* [Challenge descriptions](docs/challenges/satisfiability.md)
+* [Challenge Descriptions](docs/challenges/satisfiability.md)
 
 ## Repo Contents
 
