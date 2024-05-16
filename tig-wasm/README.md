@@ -20,3 +20,7 @@ These steps replicate what TIG's CI does (`.github/workflows/build_algorithm.yml
     mkdir -p tig-algorithms/wasm/${CHALLENGE}
     wasm-opt target/wasm32-wasi/release/tig_wasm.wasm -o tig-algorithms/wasm/${CHALLENGE}/${ALGORITHM}.wasm -O2 --remove-imports
     ```
+
+# License
+
+[End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)

@@ -20,3 +20,7 @@ Requires `x-api-key` header to be set
 * `submit-algorithm`
 * `submit-benchmark`
 * `submit-proof`
+
+# License
+
+[End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)

@@ -5,6 +5,7 @@ readme = "README.md"
 authors.workspace = true
 repository.workspace = true
 edition.workspace = true
+license = "https://github.com/tig-foundation/tig-monorepo/tree/main/docs/agreements/end_user_license_agreement.pdf"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -35,9 +35,13 @@ Every algorithm has its own `<branch>` with name `<challenge_name>/<algorithm_na
 
 Only algorithms that are successfully compiled into WASM have their branch pushed to this public repository.
 
-Each algorithm branch will have 2 files:
-1. Rust code @ `tig-algorithms/src/<branch>.rs`
-2. Wasm blob @ `tig-algorithms/wasm/<branch>.wasm`
+Each algorithm branch will have 6 key files:
+1. Rust code with TIG commercial license header @ `tig-algorithms/src/<branch>/commercial.rs`
+2. Rust code with TIG open data license header @ `tig-algorithms/src/<branch>/open_data.rs`
+3. Rust code with TIG benchmarker outbound license header @ `tig-algorithms/src/<branch>/benchmarker_outbound.rs`
+4. Rust code with TIG innovator outbound license header @ `tig-algorithms/src/<branch>/innovator_outbound.rs`
+5. Rust code with TIG inbound license header @ `tig-algorithms/src/<branch>/inbound.rs`
+6. Wasm blob @ `tig-algorithms/wasm/<branch>.wasm`
 
 To pull an existing algorithm from TIG public repository, run the following command:
 ```
@@ -48,9 +52,24 @@ git pull public <branch>
 ## Developing Your Algorithm
 
 1. Pick a challenge (`<challenge_name>`) to develop an algorithm for
-2. Make a copy of an existing algorithm's rust code or `tig-algorithms/<challenge_name>/template.rs`
-3. Rename the file with your own `<algorithm_name>`
-4. Edit `tig-algorithms/<challenge_name>/mod.rs` to export your algorithm and test it:
+2. Make a copy of `tig-algorithms/<challenge_name>/template.rs` or an existing algorithm (see notes)
+3. Make sure your file has the following notice in its header if you intend to submit it to TIG:
+```
+Copyright [yyyy] [name of copyright owner]
+
+Licensed under the TIG Inbound Game License v1.0 or (at your option) any later
+version (the "License"); you may not use this file except in compliance with the
+License. You may obtain a copy of the License at
+
+https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+```
+4. Rename the file with your own `<algorithm_name>`
+5. Edit `tig-algorithms/<challenge_name>/mod.rs` to export your algorithm and test it:
     ```
     pub mod <algorithm_name>;
 
@@ -82,12 +101,13 @@ git pull public <branch>
         }
     }
     ```
-5. Check that your algorithm compiles & runs:
+6. Check that your algorithm compiles & runs:
     ```
     cargo test -p tig-algorithms
     ```
 
 Notes:
+* If you are copying and modifying an algorithm that has been submitted to TIG, make sure to use the `innovator_outbound` version
 * Do not include tests in your algorithm file. TIG will reject your algorithm submission.
 * Only your algorithm's rust code gets submitted. You should not be adding dependencies to `tig-algorithms` as they will not be available when TIG compiles your algorithm
 

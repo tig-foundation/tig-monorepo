@@ -13,3 +13,7 @@ cd tig-benchmarker
 wasm-pack build --release --target web
 python3 -m http.server 80
 ```
+
+# License
+
+[End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)

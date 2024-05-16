@@ -8,3 +8,7 @@ Presently, TIG features three challenges:
 3. [Knapsack problem](../docs/challenges/knapsack.md)
 
 Over the coming year, an additional seven challenges from domains including artificial intelligence, biology, medicine, and climate science will be phased in. 
+
+# License
+
+[End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)

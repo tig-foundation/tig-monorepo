@@ -12,3 +12,7 @@ A Rust crate that contains the implementation of TIG's core protocol logic.
     * updating algorithm merge points
 3. `submit_algorithm.rs`/`submit_benchmark.rs`/`submit_proof.rs` implements the logic for validating an algorithm/benchmark/proof submission before adding it to the mempool
 4. `verify_proof.rs` implements the logic for validating the runtime signature of a solution
+
+# License
+
+[Download Agreement](../docs/agreements/download_agreement.pdf)
