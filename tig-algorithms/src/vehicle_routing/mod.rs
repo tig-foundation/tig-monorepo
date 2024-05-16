@@ -1,4 +1,4 @@
-// c002_a001 placeholder
+pub mod clarke_wright;
 // c002_a002 placeholder
 // c002_a003 placeholder
 // c002_a004 placeholder
