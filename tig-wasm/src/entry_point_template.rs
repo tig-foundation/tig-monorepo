@@ -1,6 +1,3 @@
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 use tig_algorithms::{CHALLENGE}::{ALGORITHM};
 use tig_challenges::{*, {CHALLENGE}::*};
 use tig_utils::compress_obj;
