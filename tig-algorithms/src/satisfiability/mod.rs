@@ -1,4 +1,4 @@
-// c001_a001 placeholder
+pub mod schnoing;
 // c001_a002 placeholder
 // c001_a003 placeholder
 // c001_a004 placeholder
