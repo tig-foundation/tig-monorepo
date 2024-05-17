@@ -33,6 +33,6 @@ Notes:
 
 In order to guard against potential manipulation of algorithm adoption by Benchmarkers, Innovator rewards are linked to Benchmarker rewards (where imbalance is heavily penalised):
 
-$$innovator\textunderscore{ }reward \propto \sum_{benchmarkers} influence \cdot algorithm\textunderscore{ }\\%qualifiers$$
+$$innovator\textunderscore{ }reward \propto \sum_{benchmarkers} benchmarker\textunderscore{ }reward \cdot algorithm\textunderscore{ }\\%qualifiers$$
 
 Where $algorithm\textunderscore{ }\\%qualifiers$ is the fraction of qualifiers found by a Benchmarker using a particular algorithm (the algorithm submitted by the Innovator)
