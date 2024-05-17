@@ -20,7 +20,7 @@ This repository contains the implementation of The Innovation Game (TIG).
 * [tig-structs](./tig-structs/README.md) - A Rust crate that contains the definitions of structs used throughout TIG
 * [tig-token](./tig-token/README.md) - Solidity contract for TIG's ERC20 token that is deployed on Ethereum L2 Base chain
 * [tig-utils](./tig-utils/README.md) - A Rust crate that contains utility functions used throughout TIG
-* [tig-wasm](./tig-benchmarker/README.md) - A Rust crate for wrapping algorithm submissions for compilation into WASM with an exported `entry_point`
+* [tig-wasm](./tig-wasm/README.md) - A Rust crate for wrapping algorithm submissions for compilation into WASM with an exported `entry_point`
 * [tig-worker](./tig-worker/README.md) - A Rust crate for verifying and computing solutions
 
 ## License
