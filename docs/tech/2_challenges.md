@@ -32,7 +32,7 @@ Each challenge also stipulates the method for verifying whether a "solution" ind
 
 Notes:
 
-- The minimum difficulty of each challenge ensures a minimum of 10^15 unique instances. This number increases further as difficulty increases.
+- The minimum difficulty of each challenge ensures a minimum of $10^{15}$ unique instances. This number increases further as difficulty increases.
 - Some instances may lack a solution, while others may possess multiple solutions.
 - Algorithms are not guaranteed to find a solution.
 

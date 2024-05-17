@@ -17,7 +17,7 @@ The following is an example of the Capacitated Vehicle Routing problem with conf
 
 The demand of each customer is selected independently and uniformly at random from the range [25, 50]. The maximum capacity of each vehicle is set to 100.
 
-Consider an example `Challenge` instance with `num_nodes=5` and `better_than_baseline=0.8` Let the baseline value be 175:
+Consider an example instance with `num_nodes=5` and `better_than_baseline=0.8` with the `baseline=175`:
 
 ```
 demands = [0, 25, 30, 40, 50] # a N array where index (i) is the demand at node i
@@ -29,7 +29,7 @@ distance_matrix = [ # a NxN symmetric matrix where index (i,j) is distance from 
     [40, 35, 30, 10, 0]
 ]
 max_capacity = 100 # total demand for each route must not exceed this number 
-max_total_distance = baseline*better_than_baseline = 140 # routes must have total distance under this number to be a solution 
+max_total_distance = baseline*better_than_baseline = 140 # (better_than_baseline * baseline) routes must have total distance under this number to be a solution 
 ```
 
 The depot is the first node (node 0) with demand 0. The vehicle capacity is set to 100. In this example, routes must have a total distance of 140 or less to be a solution.

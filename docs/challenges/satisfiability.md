@@ -27,7 +27,7 @@ $$num\textunderscore{ }clauses = floor(num\textunderscore{ }variables \cdot \fra
 
 Where $floor$ is a function that rounds a floating point number down to the closest integer.
 
-Consider an example `Challenge` instance with `num_variables=4` and `clauses_to_variables_percent=75`:
+Consider an example instance with `num_variables=4` and `clauses_to_variables_percent=75`:
 
 ```
 clauses = [

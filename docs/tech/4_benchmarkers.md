@@ -43,7 +43,7 @@ A Benchmarker must select their settings, comprising 5 fields, before benchmarki
 
 TIG makes it intractable for Benchmarkers to attempt to re-use solutions by:
 
-1. Challenge instances are deterministically pseudo-randomly generated, with at least 10^15 unique instances even at minimum difficulty.
+1. Challenge instances are deterministically pseudo-randomly generated, with at least $10^{15}$ unique instances even at minimum difficulty.
 2. Instance seeds are computed by hashing benchmark settings and XOR-ing with a nonce, ensuring randomness.
 
 During benchmarking, Benchmarkers iterate over nonces for seed and instance generation.
@@ -94,7 +94,7 @@ A benchmark, a lightweight batch of valid solutions found using identical settin
 
 Upon benchmark submission, it enters the mempool for inclusion in the next block. When the benchmark is confirmed into a block, up to three unique nonces are sampled from the metadata, and corresponding solution data must be submitted by Benchmarkers.
 
-TIG refers to this sampling as probabilistic verification, and ensures its unpredictability by using both the new block id and benchmark id in seeding the pseudo-random number generator. Probabilistic verification not only drastically reduces the amount of solution data that gets submitted to TIG, but also renders it irrational to fraudulently “pad” a benchmark with fake solutions:
+TIG refers to this sampling as probabilistic verification, and ensures its unpredictability by using both the new block id and benchmark id in seeding the pseudo-random number generator. Probabilistic verification not only drastically reduces the amount of solution data that gets submitted to TIG, but also renders it irrational to fraudulently "pad" a benchmark with fake solutions:
 
 If a Benchmarker computes N solutions, and pads M fake solutions to the benchmark for a total of N + M solutions, then the chance of getting away with this is $\left(\frac{N}{N+M}\right)^3$. The expected payoff for honesty (N solutions always accepted) is always greater than the payoff for fraudulence (N+M solutions sometimes accepted):
 
