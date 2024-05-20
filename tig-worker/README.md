@@ -17,13 +17,17 @@ Performance testing is done in a sandboxed WASM Virtual Machine.
     export ALGORITHM=<algorithm_name>
     ```
 3. Pick a difficulty & create `settings.json`:
+    * [Difficulty for Satisfiability](../tig-challenges/src/satisfiability.rs#L12). Recommend `[50, 300]` for initial tests
+    * [Difficulty for Vehicle Routing](../tig-challenges/src/vehicle_routing.rs#L7). Recommend `[40, 250]` for initial tests
+    * [Difficulty for Knapsack](../tig-challenges/src/knapsack.rs#L8). Recommend `[50, 10]` for initial tests
+
     ```
     {
         "block_id": "",
         "algorithm_id": "",
         "challenge_id": "",
         "player_id": "",
-        "difficulty": [50, 300]
+        "difficulty": <your difficulty>
     }
     ```
 4. Test the algorithm:

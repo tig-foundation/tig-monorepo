@@ -1,5 +1,17 @@
 # Getting Started with Innovating
 
+## Developer Environment
+
+TIG compiles all algorithms into WASM for sandboxing and for verifiable execution.
+
+TIG currently requires all algorithms to be written in [Rust](https://www.rust-lang.org/tools/install).
+
+We recommend developing using [Visual Studio Code](https://code.visualstudio.com/) with Rust plugins:
+* rust-analyzer
+* Even Better TOML
+* crates
+* CodeLLDB
+
 ## Setting up Private Fork
 
 Innovators will want to create a private fork so that they can test that their algorithm can be successfully compiled into WASM by the CI.
@@ -130,5 +142,7 @@ git push origin <challenge_name>/<algorithm_name>
 ```
 
 ## Making Your Submission
+
+**IMPORTANT:** Submissions are final and cannot be modified after they are made. Please make a private fork of this repo and ensure the CI can compile your algorithm.
 
 You will need to burn 0.001 ETH to make a submission. Visit https://play.tig.foundation/innovator and follow the instructions.
