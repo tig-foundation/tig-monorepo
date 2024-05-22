@@ -12,7 +12,6 @@ pub(crate) async fn execute<T: Context>(
     verify_proof_not_already_submitted(ctx, benchmark_id).await?;
     let benchmark = get_benchmark_by_id(ctx, benchmark_id).await?;
     verify_benchmark_ownership(player, &benchmark)?;
-    verify_sufficient_lifespan(ctx, &benchmark).await?;
     verify_sampled_nonces(&benchmark, &solutions_data)?;
     ctx.add_proof_to_mempool(benchmark_id, solutions_data)
         .await
@@ -80,25 +79,6 @@ fn verify_benchmark_ownership(player: &Player, benchmark: &Benchmark) -> Protoco
             actual_player_id: player.id.to_string(),
             expected_player_id,
         });
-    }
-    Ok(())
-}
-
-async fn verify_sufficient_lifespan<T: Context>(
-    ctx: &mut T,
-    benchmark: &Benchmark,
-) -> ProtocolResult<()> {
-    let block = ctx
-        .get_block(BlockFilter::Latest, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
-        .expect("Expecting latest block to exist");
-    let config = block.config();
-    let submission_delay = block.details.height - benchmark.details.block_started + 1;
-    if submission_delay * (config.benchmark_submissions.submission_delay_multiplier + 1)
-        >= config.benchmark_submissions.lifespan_period
-    {
-        return Err(ProtocolError::InsufficientLifespan);
     }
     Ok(())
 }
