@@ -143,6 +143,6 @@ git push origin <challenge_name>/<algorithm_name>
 
 ## Making Your Submission
 
-**IMPORTANT:** Submissions are final and cannot be modified after they are made. Please make a private fork of this repo and ensure the CI can compile your algorithm.
+**IMPORTANT:** Submissions are final and cannot be modified after they are made. Please make a private fork of this repo and ensure the CI can compile your algorithm. We also highly recommend compiling your algorithm into WASM and testing its performance with `tig-worker`.
 
 You will need to burn 0.001 ETH to make a submission. Visit https://play.tig.foundation/innovator and follow the instructions.
