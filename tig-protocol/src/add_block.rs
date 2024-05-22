@@ -37,10 +37,11 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         .get_config()
         .await
         .unwrap_or_else(|e| panic!("get_config error: {:?}", e));
+    let height = latest_block.details.height + 1;
     let details = BlockDetails {
         prev_block_id: latest_block.id.clone(),
-        height: latest_block.details.height + 1,
-        round: latest_block.details.height / config.rounds.blocks_per_round + 1,
+        height,
+        round: height / config.rounds.blocks_per_round + 1,
     };
     let from_block_started = details
         .height
