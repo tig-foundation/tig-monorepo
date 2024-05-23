@@ -1,4 +1,4 @@
-// c003_a001 placeholder
+pub mod dynamic;
 // c003_a002 placeholder
 // c003_a003 placeholder
 // c003_a004 placeholder
