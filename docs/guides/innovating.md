@@ -63,6 +63,8 @@ git pull public <branch>
 
 ## Developing Your Algorithm
 
+**READ THE IMPORTANT NOTES AT THE BOTTOM OF THIS SECTION**
+
 1. Pick a challenge (`<challenge_name>`) to develop an algorithm for
 2. Make a copy of `tig-algorithms/<challenge_name>/template.rs` or an existing algorithm (see notes)
 3. Make sure your file has the following notice in its header if you intend to submit it to TIG:
@@ -118,10 +120,11 @@ language governing permissions and limitations under the License.
     cargo test -p tig-algorithms
     ```
 
-Notes:
+**IMPORTANT (READ THIS):**
 * If you are copying and modifying an algorithm that has been submitted to TIG, make sure to use the `innovator_outbound` version
 * Do not include tests in your algorithm file. TIG will reject your algorithm submission.
-* Only your algorithm's rust code gets submitted. You should not be adding dependencies to `tig-algorithms` as they will not be available when TIG compiles your algorithm
+* Only your algorithm's rust code gets submitted. You should not be modifying `Cargo.toml` in `tig-algorithms`. Any extra dependencies you add will not be available when TIG compiles your algorithm
+* If you need to use random number generation be sure to use `StdRng::seed_from_u64` to ensure your algorithm is deterministic.
 
 ## Locally Compiling Your Algorithm into WASM 
 
@@ -143,6 +146,10 @@ git push origin <challenge_name>/<algorithm_name>
 
 ## Making Your Submission
 
-**IMPORTANT:** Submissions are final and cannot be modified after they are made. Please make a private fork of this repo and ensure the CI can compile your algorithm. We also highly recommend compiling your algorithm into WASM and testing its performance with `tig-worker`.
-
 You will need to burn 0.001 ETH to make a submission. Visit https://play.tig.foundation/innovator and follow the instructions.
+
+**IMPORTANT:** 
+* Submissions are final and cannot be modified after they are made
+* Be sure to adhere to the notes in [developing your algorithm](#developing-your-algorithm)
+* We highly recommend [compiling your algorithm into WASM](#locally-compiling-your-algorithm-into-wasm) and [testing its performance](#testing-performance-of-algorithms) with `tig-worker`.
+* We highly recommend [checking the CI can compile your algorithm](#checking-ci-successfully-compiles-your-algorithm)
