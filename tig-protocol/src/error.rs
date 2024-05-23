@@ -8,9 +8,6 @@ pub enum ProtocolError {
     DifficultyBelowEasiestFrontier {
         difficulty: Vec<i32>,
     },
-    DuplicateAlgorithmName {
-        algorithm_name: String,
-    },
     DuplicateBenchmarkSettings {
         settings: BenchmarkSettings,
     },
@@ -112,9 +109,6 @@ impl std::fmt::Display for ProtocolError {
                 "Difficulty '{:?}' is below the easiest allowed frontier",
                 difficulty
             ),
-            ProtocolError::DuplicateAlgorithmName { algorithm_name } => {
-                write!(f, "Algorithm name '{}' is already used", algorithm_name)
-            }
             ProtocolError::DuplicateBenchmarkSettings { settings }=> {
                 write!(f, "A benchmark with settings '{:?}' has been submitted before.", settings)
             }

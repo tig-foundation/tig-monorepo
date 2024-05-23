@@ -11,7 +11,6 @@ pub(crate) async fn execute<T: Context>(
     code: &String,
 ) -> ProtocolResult<String> {
     verify_challenge_exists(ctx, details).await?;
-    verify_algorithm_name_is_unique(ctx, details).await?;
     verify_submission_fee(ctx, player, details).await?;
     let algorithm_id = ctx
         .add_algorithm_to_mempool(details, code)
@@ -32,24 +31,6 @@ async fn verify_challenge_exists<T: Context>(
     {
         return Err(ProtocolError::InvalidChallenge {
             challenge_id: details.challenge_id.clone(),
-        });
-    }
-    Ok(())
-}
-
-async fn verify_algorithm_name_is_unique<T: Context>(
-    ctx: &mut T,
-    details: &AlgorithmDetails,
-) -> ProtocolResult<()> {
-    if ctx
-        .get_algorithms(AlgorithmsFilter::Name(details.name.clone()), None, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
-        .first()
-        .is_some()
-    {
-        return Err(ProtocolError::DuplicateAlgorithmName {
-            algorithm_name: details.name.clone(),
         });
     }
     Ok(())
