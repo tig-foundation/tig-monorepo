@@ -1,7 +1,9 @@
 use crate::{context::*, error::*};
+use logging_timer::time;
 use std::collections::{HashMap, HashSet};
 use tig_structs::core::*;
 
+#[time]
 pub(crate) async fn execute<T: Context>(
     ctx: &mut T,
     player: &Player,
@@ -25,6 +27,7 @@ pub(crate) async fn execute<T: Context>(
     Ok(Ok(()))
 }
 
+#[time]
 async fn get_benchmark_by_id<T: Context>(
     ctx: &mut T,
     benchmark_id: &String,
@@ -39,6 +42,7 @@ async fn get_benchmark_by_id<T: Context>(
         })
 }
 
+#[time]
 async fn verify_no_fraud<T: Context>(ctx: &mut T, benchmark_id: &String) -> ProtocolResult<()> {
     if ctx
         .get_frauds(FraudsFilter::BenchmarkId(benchmark_id.clone()), false)
@@ -54,6 +58,7 @@ async fn verify_no_fraud<T: Context>(ctx: &mut T, benchmark_id: &String) -> Prot
     Ok(())
 }
 
+#[time]
 async fn verify_proof_not_already_submitted<T: Context>(
     ctx: &mut T,
     benchmark_id: &String,
@@ -72,6 +77,7 @@ async fn verify_proof_not_already_submitted<T: Context>(
     Ok(())
 }
 
+#[time]
 fn verify_benchmark_ownership(player: &Player, benchmark: &Benchmark) -> ProtocolResult<()> {
     let expected_player_id = benchmark.settings.player_id.clone();
     if player.id != expected_player_id {
@@ -83,6 +89,7 @@ fn verify_benchmark_ownership(player: &Player, benchmark: &Benchmark) -> Protoco
     Ok(())
 }
 
+#[time]
 fn verify_sampled_nonces(
     benchmark: &Benchmark,
     solutions_data: &Vec<SolutionData>,
@@ -99,6 +106,7 @@ fn verify_sampled_nonces(
     Ok(())
 }
 
+#[time]
 async fn verify_solutions_are_valid<T: Context>(
     ctx: &mut T,
     benchmark: &Benchmark,

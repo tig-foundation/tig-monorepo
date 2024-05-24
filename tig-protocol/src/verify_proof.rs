@@ -1,6 +1,8 @@
 use crate::{context::*, error::*};
+use logging_timer::time;
 use tig_structs::core::*;
 
+#[time]
 pub(crate) async fn execute<T: Context>(
     ctx: &mut T,
     benchmark_id: &String,
@@ -17,6 +19,7 @@ pub(crate) async fn execute<T: Context>(
     Ok(verified)
 }
 
+#[time]
 async fn get_benchmark_by_id<T: Context>(
     ctx: &mut T,
     benchmark_id: &String,
@@ -30,6 +33,7 @@ async fn get_benchmark_by_id<T: Context>(
         .expect(format!("Expecting benchmark {} to exist", benchmark_id).as_str()))
 }
 
+#[time]
 async fn get_proof_by_benchmark_id<T: Context>(
     ctx: &mut T,
     benchmark_id: &String,
@@ -43,6 +47,7 @@ async fn get_proof_by_benchmark_id<T: Context>(
         .expect(format!("Expecting proof for benchmark {} to exist", benchmark_id).as_str()))
 }
 
+#[time]
 async fn verify_solutions_with_algorithm<T: Context>(
     ctx: &mut T,
     benchmark: &Benchmark,

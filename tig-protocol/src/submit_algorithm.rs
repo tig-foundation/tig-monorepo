@@ -1,9 +1,10 @@
-use std::collections::HashSet;
-
 use crate::{context::*, error::*};
+use logging_timer::time;
+use std::collections::HashSet;
 use tig_structs::core::*;
 use tig_utils::*;
 
+#[time]
 pub(crate) async fn execute<T: Context>(
     ctx: &mut T,
     player: &Player,
@@ -19,6 +20,7 @@ pub(crate) async fn execute<T: Context>(
     Ok(algorithm_id)
 }
 
+#[time]
 async fn verify_challenge_exists<T: Context>(
     ctx: &mut T,
     details: &AlgorithmDetails,
@@ -36,6 +38,7 @@ async fn verify_challenge_exists<T: Context>(
     Ok(())
 }
 
+#[time]
 async fn verify_submission_fee<T: Context>(
     ctx: &mut T,
     player: &Player,

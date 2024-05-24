@@ -1,8 +1,10 @@
 use crate::{context::*, error::*};
+use logging_timer::time;
 use std::collections::HashMap;
 use tig_structs::core::*;
 use tig_utils::*;
 
+#[time]
 pub(crate) async fn execute<T: Context>(
     ctx: &mut T,
     player: &Player,
@@ -44,6 +46,7 @@ pub(crate) async fn execute<T: Context>(
     Ok((benchmark_id, verified))
 }
 
+#[time]
 fn verify_player_owns_benchmark(
     player: &Player,
     settings: &BenchmarkSettings,
@@ -57,6 +60,7 @@ fn verify_player_owns_benchmark(
     Ok(())
 }
 
+#[time]
 async fn verify_sufficient_lifespan<T: Context>(ctx: &mut T, block: &Block) -> ProtocolResult<()> {
     let latest_block = ctx
         .get_block(BlockFilter::Latest, false)
@@ -73,6 +77,7 @@ async fn verify_sufficient_lifespan<T: Context>(ctx: &mut T, block: &Block) -> P
     Ok(())
 }
 
+#[time]
 async fn get_challenge_by_id<T: Context>(
     ctx: &mut T,
     challenge_id: &String,
@@ -98,6 +103,7 @@ async fn get_challenge_by_id<T: Context>(
     Ok(challenge)
 }
 
+#[time]
 async fn verify_algorithm<T: Context>(
     ctx: &mut T,
     algorithm_id: &String,
@@ -122,6 +128,7 @@ async fn verify_algorithm<T: Context>(
     Ok(())
 }
 
+#[time]
 async fn get_block_by_id<T: Context>(ctx: &mut T, block_id: &String) -> ProtocolResult<Block> {
     ctx.get_block(BlockFilter::Id(block_id.clone()), true)
         .await
@@ -131,6 +138,7 @@ async fn get_block_by_id<T: Context>(ctx: &mut T, block_id: &String) -> Protocol
         })
 }
 
+#[time]
 fn verify_sufficient_solutions(
     block: &Block,
     solutions_meta_data: &Vec<SolutionMetaData>,
@@ -145,6 +153,7 @@ fn verify_sufficient_solutions(
     Ok(())
 }
 
+#[time]
 async fn verify_benchmark_settings_are_unique<T: Context>(
     ctx: &mut T,
     settings: &BenchmarkSettings,
@@ -164,6 +173,7 @@ async fn verify_benchmark_settings_are_unique<T: Context>(
     Ok(())
 }
 
+#[time]
 fn verify_nonces_are_unique(solutions_meta_data: &Vec<SolutionMetaData>) -> ProtocolResult<()> {
     let nonces: HashMap<u32, u32> =
         solutions_meta_data
@@ -180,6 +190,7 @@ fn verify_nonces_are_unique(solutions_meta_data: &Vec<SolutionMetaData>) -> Prot
     Ok(())
 }
 
+#[time]
 fn verify_solutions_signatures(
     solutions_meta_data: &Vec<SolutionMetaData>,
     challenge: &Challenge,
@@ -199,6 +210,7 @@ fn verify_solutions_signatures(
     Ok(())
 }
 
+#[time]
 fn verify_benchmark_difficulty(
     difficulty: &Vec<i32>,
     challenge: &Challenge,
@@ -248,6 +260,7 @@ fn verify_benchmark_difficulty(
     Ok(())
 }
 
+#[time]
 async fn verify_solution_is_valid<T: Context>(
     ctx: &mut T,
     settings: &BenchmarkSettings,

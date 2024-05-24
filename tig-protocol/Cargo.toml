@@ -9,6 +9,7 @@ edition.workspace = true
 
 [dependencies]
 anyhow = { version = "1.0.81" }
+logging_timer = "1.1.1"
 rand = "0.8.4"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
