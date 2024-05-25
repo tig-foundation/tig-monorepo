@@ -10,11 +10,19 @@
     <ol>
       <li>Open the browser console</li>
       <li>Setup: `await benchmarker.setup(&lt;api_url&gt;, &lt;api_key&gt;, &lt;player_id&gt;)`</li>
-      <li>Start: `await benchmarker.start(&lt;num_workers&gt;)`</li>
-      <li>Stop: `await benchmarker.stop()`</li>
-      <li>Select Algorithm: `await benchmarker.select_algorithm(&lt;challenge_id>, &lt;algorithm_id&gt;)`</li>
+      <li>Select Algorithm: `await benchmarker.select_algorithm(&lt;challenge_id&gt;, &lt;algorithm_id&gt;)`</li>
+      <li>Start: `await benchmarker.start(&lt;num_workers&gt;, &lt;ms_per_benchmark&gt;)`</li>
       <li>View State: `await benchmarker.state()`</li>
+      <li>Stop: `await benchmarker.stop()`</li>
     </ol>
+    <h2>Notes:</h2>
+    <ul>
+      <li>challenge_id for satisfiability: c001</li>
+      <li>challenge_id for vehicle_routing: c002</li>
+      <li>challenge_id for knapsack: c003</li>
+      <li>algorithm_id format cXXX_aXXX, e.g. first algorithm for satisifaiblity is c001_a001</li>
+      <li>recommended ms_per_benchmark is 15000 (15s)</li>
+    </ul>
     <script type="module" src="./index.js"></script>
   </body>
 </html>
