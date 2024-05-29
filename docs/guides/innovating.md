@@ -135,7 +135,7 @@ language governing permissions and limitations under the License.
 * If you are copying and modifying an algorithm that has been submitted to TIG, make sure to use the `innovator_outbound` version
 * Do not include tests in your algorithm file. TIG will reject your algorithm submission.
 * Only your algorithm's rust code gets submitted. You should not be modifying `Cargo.toml` in `tig-algorithms`. Any extra dependencies you add will not be available when TIG compiles your algorithm
-* If you need to use random number generation be sure to use `StdRng::seed_from_u64` to ensure your algorithm is deterministic.
+* If you need to use random number generation be sure to use `let mut rng = StdRng::seed_from_u64(challenge.seed as u64)` to ensure your algorithm is deterministic.
 
 ## Locally Compiling Your Algorithm into WASM 
 
