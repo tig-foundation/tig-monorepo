@@ -61,7 +61,7 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         active_algorithm_ids: HashSet::<String>::new(),
         active_benchmark_ids: HashSet::<String>::new(),
         active_player_ids: HashSet::<String>::new(),
-        eth_block_num,
+        eth_block_num: Some(eth_block_num),
     };
     for algorithm in ctx
         .get_algorithms(AlgorithmsFilter::Mempool, None, false)

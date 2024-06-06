@@ -158,7 +158,7 @@ serializable_struct_with_getters! {
         active_algorithm_ids: HashSet<String>,
         active_benchmark_ids: HashSet<String>,
         active_player_ids: HashSet<String>,
-        eth_block_num: String,
+        eth_block_num: Option<String>,
     }
 }
 
