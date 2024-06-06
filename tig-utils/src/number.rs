@@ -43,6 +43,10 @@ impl PreciseNumber {
         Ok(Self(U256::from_dec_str(value)?))
     }
 
+    pub fn from_hex_str(value: &str) -> Result<Self, uint::FromStrRadixErr> {
+        Ok(Self(U256::from_str_radix(value, 16)?))
+    }
+
     pub fn approx_inv_exp(x: PreciseNumber) -> PreciseNumber {
         // taylor series approximation of e^-x
         let one = PreciseNumber::from(1);
