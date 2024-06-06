@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tig_utils::{jsonify, u32_from_str};
-pub use tig_utils::{Frontier, Point, PreciseNumber, Transaction};
+pub use tig_utils::{Frontier, Point, PreciseNumber, Transaction, U256};
 
 serializable_struct_with_getters! {
     Algorithm {
@@ -158,6 +158,7 @@ serializable_struct_with_getters! {
         active_algorithm_ids: HashSet<String>,
         active_benchmark_ids: HashSet<String>,
         active_player_ids: HashSet<String>,
+        eth_block_num: String,
     }
 }
 
@@ -189,6 +190,8 @@ serializable_struct_with_getters! {
     PlayerBlockData {
         num_qualifiers_by_challenge: Option<HashMap<String, u32>>,
         cutoff: Option<u32>,
+        balance: Option<PreciseNumber>,
+        rolling_balance: Option<PreciseNumber>,
         imbalance: Option<PreciseNumber>,
         imbalance_penalty: Option<PreciseNumber>,
         influence: Option<PreciseNumber>,

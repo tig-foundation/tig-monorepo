@@ -13,9 +13,10 @@ macro_rules! serializable_struct_with_getters {
             $($getters)*
         }
     );
-    ( @ $name:ident { $param:ident : Option<$type:ty>, $($rest:tt)* } -> ($($fields:tt)*) ($($getters:tt)*) ) => (
+    ( @ $name:ident { $(#[$attr:meta])* $param:ident : Option<$type:ty>, $($rest:tt)* } -> ($($fields:tt)*) ($($getters:tt)*) ) => (
         serializable_struct_with_getters!(@ $name { $($rest)* } -> (
             $($fields)*
+            $(#[$attr])*
             #[serde(default)]
             pub $param : Option<$type>,
         ) (
@@ -28,9 +29,10 @@ macro_rules! serializable_struct_with_getters {
         ));
     );
 
-    ( @ $name:ident { $param:ident : $type:ty, $($rest:tt)* } -> ($($fields:tt)*) ($($getters:tt)*) ) => (
+    ( @ $name:ident { $(#[$attr:meta])* $param:ident : $type:ty, $($rest:tt)* } -> ($($fields:tt)*) ($($getters:tt)*) ) => (
         serializable_struct_with_getters!(@ $name { $($rest)* } -> (
             $($fields)*
+            $(#[$attr])*
             pub $param : $type,
         ) (
             $($getters)*
