@@ -1,33 +1,45 @@
-use std::collections::HashMap;
-
 use super::{api, player_id, QueryData, Result};
-use crate::future_utils;
+use crate::future_utils::{join, Mutex};
+use once_cell::sync::OnceCell;
+use std::collections::HashMap;
 use tig_api::*;
 use tig_structs::core::*;
 
+static CACHE: OnceCell<Mutex<HashMap<String, QueryData>>> = OnceCell::new();
+
 pub async fn execute() -> Result<QueryData> {
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let latest_block = query_latest_block().await?;
-    let results = future_utils::join(
-        query_algorithms(latest_block.id.clone()),
-        query_player_data(latest_block.id.clone()),
-        query_benchmarks(latest_block.id.clone()),
-        query_challenges(latest_block.id.clone()),
-    )
-    .await?;
-    let (algorithms_by_challenge, download_urls) = results.0?;
-    let player_data = results.1?;
-    let (benchmarks, proofs, frauds) = results.2?;
-    let challenges = results.3?;
-    Ok(QueryData {
-        latest_block,
-        algorithms_by_challenge,
-        player_data,
-        download_urls,
-        benchmarks,
-        proofs,
-        frauds,
-        challenges,
-    })
+    let latest_block_id = latest_block.id.clone();
+    let mut cache = cache.lock().await;
+    if !cache.contains_key(&latest_block.id) {
+        cache.clear();
+        let results = join(
+            query_algorithms(latest_block.id.clone()),
+            query_player_data(latest_block.id.clone()),
+            query_benchmarks(latest_block.id.clone()),
+            query_challenges(latest_block.id.clone()),
+        )
+        .await?;
+        let (algorithms_by_challenge, download_urls) = results.0?;
+        let player_data = results.1?;
+        let (benchmarks, proofs, frauds) = results.2?;
+        let challenges = results.3?;
+        cache.insert(
+            latest_block.id.clone(),
+            QueryData {
+                latest_block,
+                algorithms_by_challenge,
+                player_data,
+                download_urls,
+                benchmarks,
+                proofs,
+                frauds,
+                challenges,
+            },
+        );
+    }
+    Ok(cache.get(&latest_block_id).unwrap().clone())
 }
 
 async fn query_latest_block() -> Result<Block> {
