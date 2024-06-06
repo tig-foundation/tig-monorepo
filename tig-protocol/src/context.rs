@@ -1,5 +1,4 @@
 pub use anyhow::{Error as ContextError, Result as ContextResult};
-use std::collections::HashMap;
 use tig_structs::{config::*, core::*};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -120,9 +119,12 @@ pub trait Context {
     ) -> ContextResult<anyhow::Result<SolutionData>>;
     async fn get_transaction(&mut self, tx_hash: &String) -> ContextResult<Transaction>;
     async fn get_multisig_owners(&mut self, address: &String) -> ContextResult<Vec<String>>;
-    async fn get_players_balance(
+    async fn get_latest_eth_block_num(&mut self) -> ContextResult<String>;
+    async fn get_player_deposit(
         &mut self,
-    ) -> ContextResult<(String, HashMap<String, PreciseNumber>)>;
+        eth_block_num: &String,
+        player_id: &String,
+    ) -> ContextResult<Option<PreciseNumber>>;
 
     // Mempool
     async fn add_block(

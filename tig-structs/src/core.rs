@@ -190,8 +190,8 @@ serializable_struct_with_getters! {
     PlayerBlockData {
         num_qualifiers_by_challenge: Option<HashMap<String, u32>>,
         cutoff: Option<u32>,
-        balance: Option<PreciseNumber>,
-        rolling_balance: Option<PreciseNumber>,
+        deposit: Option<PreciseNumber>,
+        rolling_deposit: Option<PreciseNumber>,
         imbalance: Option<PreciseNumber>,
         imbalance_penalty: Option<PreciseNumber>,
         influence: Option<PreciseNumber>,

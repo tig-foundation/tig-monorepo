@@ -16,7 +16,7 @@ pub(crate) async fn execute<T: Context>(ctx: &mut T) -> String {
     confirm_mempool_proofs(ctx, &block).await;
     confirm_mempool_frauds(ctx, &block).await;
     confirm_mempool_wasms(ctx, &block).await;
-    update_rolling_balances(ctx, &block).await;
+    update_deposits(ctx, &block).await;
     update_cutoffs(ctx, &block).await;
     update_solution_signature_thresholds(ctx, &block).await;
     update_qualifiers(ctx, &block).await;
@@ -50,7 +50,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
     let from_block_started = details
         .height
         .saturating_sub(config.benchmark_submissions.lifespan_period);
-    let (eth_block_num, mut balances) = ctx.get_players_balance().await.unwrap();
     let mut data = BlockData {
         mempool_algorithm_ids: HashSet::<String>::new(),
         mempool_benchmark_ids: HashSet::<String>::new(),
@@ -61,7 +60,7 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         active_algorithm_ids: HashSet::<String>::new(),
         active_benchmark_ids: HashSet::<String>::new(),
         active_player_ids: HashSet::<String>::new(),
-        eth_block_num: Some(eth_block_num),
+        eth_block_num: Some(ctx.get_latest_eth_block_num().await.unwrap()),
     };
     for algorithm in ctx
         .get_algorithms(AlgorithmsFilter::Mempool, None, false)
@@ -249,7 +248,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
             .await
             .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
     }
-    let zero = PreciseNumber::from(0);
     for player_id in data.active_player_ids.iter() {
         let data = PlayerBlockData {
             reward: None,
@@ -259,8 +257,8 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
             imbalance_penalty: None,
             num_qualifiers_by_challenge: None,
             round_earnings: None,
-            balance: balances.remove(player_id).or_else(|| Some(zero.clone())),
-            rolling_balance: None,
+            deposit: None,
+            rolling_deposit: None,
         };
         ctx.update_player_block_data(player_id, &block_id, &data)
             .await
@@ -369,19 +367,20 @@ async fn confirm_mempool_wasms<T: Context>(ctx: &mut T, block: &Block) {
 }
 
 #[time]
-async fn update_rolling_balances<T: Context>(ctx: &mut T, block: &Block) {
+async fn update_deposits<T: Context>(ctx: &mut T, block: &Block) {
+    let eth_block_num = block.data().eth_block_num();
     let config = block.config();
     let zero = PreciseNumber::from(0);
-    let lifespan = PreciseNumber::from(config.benchmark_submissions.lifespan_period);
-    let decay = PreciseNumber::from(config.benchmark_submissions.lifespan_period - 1);
+    let one = PreciseNumber::from(1);
+    let decay = PreciseNumber::from_f64(config.optimisable_proof_of_work.rolling_deposit_decay);
     for player_id in block.data().active_player_ids.iter() {
-        let prev_rolling_balance =
+        let rolling_deposit =
             match get_player_by_id(ctx, player_id, Some(&block.details.prev_block_id))
                 .await
                 .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
                 .block_data
             {
-                Some(data) => data.rolling_balance,
+                Some(data) => data.rolling_deposit,
                 None => None,
             }
             .unwrap_or_else(|| zero.clone());
@@ -391,8 +390,13 @@ async fn update_rolling_balances<T: Context>(ctx: &mut T, block: &Block) {
             .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e));
         let mut data = player.block_data().clone();
 
-        data.rolling_balance =
-            Some((prev_rolling_balance * decay + player.block_data().balance.unwrap()) / lifespan);
+        let deposit = ctx
+            .get_player_deposit(eth_block_num, player_id)
+            .await
+            .unwrap()
+            .unwrap_or_else(|| zero.clone());
+        data.rolling_deposit = Some(decay * rolling_deposit + (one - decay) * deposit);
+        data.deposit = Some(deposit);
 
         ctx.update_player_block_data(player_id, &block.id, &data)
             .await
@@ -715,9 +719,9 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
                 .clone(),
         );
     }
-    let total_rolling_balance = player_data
+    let total_deposit = player_data
         .values()
-        .map(|data| data.rolling_balance.clone().unwrap())
+        .map(|data| data.deposit.clone().unwrap())
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
@@ -745,10 +749,10 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
             });
         }
         if config.optimisable_proof_of_work.enable_proof_of_deposit {
-            percent_qualifiers.push(if total_rolling_balance == zero {
+            percent_qualifiers.push(if total_deposit == zero {
                 zero.clone()
             } else {
-                data.rolling_balance.clone().unwrap() / total_rolling_balance
+                data.deposit.clone().unwrap() / total_deposit
             });
         }
 
