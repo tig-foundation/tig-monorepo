@@ -15,8 +15,8 @@ info:
     url: https://github.com/tig-foundation/tig-monorepo/blob/main/docs/agreements/end_user_license_agreement.pdf
   version: 1.0.0
 servers:
-  - url: https://api.tig.foundation/play
-  - url: https://api.tig.foundation/test
+  - url: https://mainnet-api.tig.foundation
+  - url: https://testnet-api.tig.foundation
 paths:
   /get-algorithms:
     get:

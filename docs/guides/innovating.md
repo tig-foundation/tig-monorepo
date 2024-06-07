@@ -130,8 +130,8 @@ language governing permissions and limitations under the License.
 **IMPORTANT (READ THIS):**
 * Not all challenge instances have solutions. Algorithms that can detect such cases and exit early (`return Ok(None)`) will potentially have better performance than algorithms that don't exit early
 * You can find the current qualifying difficulties by:
-    * Query https://api.tig.foundation/play/get-block for <block_id>
-    * Query https://api.tig.foundation/play/get-challenges?block_id=<block_id> for <qualifier_difficulties>
+    * Query https://mainnet-api.tig.foundation/get-block for <block_id>
+    * Query https://mainnet-api.tig.foundation/get-challenges?block_id=<block_id> for <qualifier_difficulties>
 * If you are copying and modifying an algorithm that has been submitted to TIG, make sure to use the `innovator_outbound` version
 * Do not include tests in your algorithm file. TIG will reject your algorithm submission.
 * Only your algorithm's rust code gets submitted. You should not be modifying `Cargo.toml` in `tig-algorithms`. Any extra dependencies you add will not be available when TIG compiles your algorithm

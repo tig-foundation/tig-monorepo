@@ -38,8 +38,8 @@ Performance testing is done in a sandboxed WASM Virtual Machine.
 Notes:
 * You can query the latest difficulty ranges via TIG's API:
     ```
-    query https://api.tig.foundation/play/get-block for <block_id>
-    query https://api.tig.foundation/play/get-challenges?block_id=<block_id> for qualifier_difficulties
+    query https://mainnet-api.tig.foundation/get-block for <block_id>
+    query https://mainnet-api.tig.foundation/get-challenges?block_id=<block_id> for qualifier_difficulties
     ```
 
 # License
