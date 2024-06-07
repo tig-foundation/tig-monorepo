@@ -49,6 +49,8 @@ impl Api {
                 vec![
                     ("x-api-key".to_string(), self.api_key.clone()),
                     ("user-agent".to_string(), "TIG API".to_string()),
+                    ("accept".to_string(), "application/json".to_string()),
+                    ("content-type".to_string(), "application/json".to_string()),
                 ]
                 .into_iter()
                 .collect(),

@@ -83,6 +83,8 @@ serializable_struct_with_getters! {
         imbalance_multiplier: f64,
         #[serde(default)]
         enable_proof_of_deposit: bool,
+        #[serde(default)]
+        rolling_deposit_decay: f64,
     }
 }
 serializable_struct_with_getters! {
