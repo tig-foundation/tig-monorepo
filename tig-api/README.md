@@ -5,8 +5,8 @@ A Rust crate for making requests to TIG's API.
 Developers must either enable feature `request` (uses `reqwest`) or `request-js` (uses `web-sys`) 
 
 ## API Url
-* Mainnet https://api.tig.foundation/play
-* Testnet https://api.tig.foundation/test
+* Mainnet https://mainnet-api.tig.foundation
+* Testnet https://testnet-api.tig.foundation
 
 ## API Documentation
 
