@@ -46,6 +46,7 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         prev_block_id: latest_block.id.clone(),
         height,
         round: height / config.rounds.blocks_per_round + 1,
+        eth_block_num: Some(ctx.get_latest_eth_block_num().await.unwrap()),
     };
     let from_block_started = details
         .height
@@ -60,7 +61,6 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
         active_algorithm_ids: HashSet::<String>::new(),
         active_benchmark_ids: HashSet::<String>::new(),
         active_player_ids: HashSet::<String>::new(),
-        eth_block_num: Some(ctx.get_latest_eth_block_num().await.unwrap()),
     };
     for algorithm in ctx
         .get_algorithms(AlgorithmsFilter::Mempool, None, false)
@@ -368,7 +368,7 @@ async fn confirm_mempool_wasms<T: Context>(ctx: &mut T, block: &Block) {
 
 #[time]
 async fn update_deposits<T: Context>(ctx: &mut T, block: &Block) {
-    let eth_block_num = block.data().eth_block_num();
+    let eth_block_num = block.details.eth_block_num();
     let config = block.config();
     let zero = PreciseNumber::from(0);
     let one = PreciseNumber::from(1);

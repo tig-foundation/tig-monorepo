@@ -145,6 +145,7 @@ serializable_struct_with_getters! {
         prev_block_id: String,
         height: u32,
         round: u32,
+        eth_block_num: Option<String>,
     }
 }
 serializable_struct_with_getters! {
@@ -158,7 +159,6 @@ serializable_struct_with_getters! {
         active_algorithm_ids: HashSet<String>,
         active_benchmark_ids: HashSet<String>,
         active_player_ids: HashSet<String>,
-        eth_block_num: Option<String>,
     }
 }
 
