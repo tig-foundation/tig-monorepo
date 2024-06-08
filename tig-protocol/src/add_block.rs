@@ -954,7 +954,10 @@ async fn update_merge_points<T: Context>(ctx: &mut T, block: &Block) {
             .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
         let mut data = algorithm.block_data().clone();
 
-        let prev_merge_points =
+        // first block of the round
+        let prev_merge_points = if block.details.height % config.rounds.blocks_per_round == 0 {
+            0
+        } else {
             match get_algorithm_by_id(ctx, algorithm_id, Some(&block.details.prev_block_id))
                 .await
                 .unwrap_or_else(|e| panic!("update_merge_points error: {:?}", e))
@@ -962,7 +965,8 @@ async fn update_merge_points<T: Context>(ctx: &mut T, block: &Block) {
             {
                 Some(data) => *data.merge_points(),
                 None => 0,
-            };
+            }
+        };
         data.merge_points = Some(
             if algorithm.state().round_merged.is_some() || *data.adoption() < adoption_threshold {
                 prev_merge_points
@@ -980,7 +984,8 @@ async fn update_merge_points<T: Context>(ctx: &mut T, block: &Block) {
 async fn update_merges<T: Context>(ctx: &mut T, block: &Block) {
     let config = block.config();
 
-    if block.details.height % config.rounds.blocks_per_round != 0 {
+    // last block of the round
+    if (block.details.height + 1) % config.rounds.blocks_per_round != 0 {
         return;
     }
 
