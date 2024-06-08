@@ -23,8 +23,8 @@ mod exports {
     }
 
     #[wasm_bindgen]
-    pub async fn select_algorithm(challenge_id: String, algorithm_id: String) {
-        benchmarker::select_algorithm(challenge_id, algorithm_id).await;
+    pub async fn select_algorithm(challenge_name: String, algorithm_name: String) {
+        benchmarker::select_algorithm(challenge_name, algorithm_name).await;
     }
 
     #[wasm_bindgen]
