@@ -10,7 +10,7 @@ pub mod dynamic; // c003_a001
 
 // c003_a006
 
-// c003_a007
+pub mod knapmaxxing; // c003_a007
 
 // c003_a008
 
