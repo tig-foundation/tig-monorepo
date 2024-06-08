@@ -368,11 +368,17 @@ async fn confirm_mempool_wasms<T: Context>(ctx: &mut T, block: &Block) {
 
 #[time]
 async fn update_deposits<T: Context>(ctx: &mut T, block: &Block) {
+    let decay = match &block
+        .config()
+        .optimisable_proof_of_work
+        .rolling_deposit_decay
+    {
+        Some(decay) => PreciseNumber::from_f64(*decay),
+        None => return, // Proof of deposit not implemented for these blocks
+    };
     let eth_block_num = block.details.eth_block_num();
-    let config = block.config();
     let zero = PreciseNumber::from(0);
     let one = PreciseNumber::from(1);
-    let decay = PreciseNumber::from_f64(config.optimisable_proof_of_work.rolling_deposit_decay);
     for player_id in block.data().active_player_ids.iter() {
         let rolling_deposit =
             match get_player_by_id(ctx, player_id, Some(&block.details.prev_block_id))
@@ -748,7 +754,12 @@ async fn update_influence<T: Context>(ctx: &mut T, block: &Block) {
                 PreciseNumber::from(num_qualifiers_by_player) / PreciseNumber::from(num_qualifiers)
             });
         }
-        if config.optimisable_proof_of_work.enable_proof_of_deposit {
+        let OptimisableProofOfWorkConfig {
+            rolling_deposit_decay,
+            enable_proof_of_deposit,
+            ..
+        } = &config.optimisable_proof_of_work;
+        if rolling_deposit_decay.is_some() && enable_proof_of_deposit.is_some_and(|x| x) {
             percent_qualifiers.push(if total_deposit == zero {
                 zero.clone()
             } else {

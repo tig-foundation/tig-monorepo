@@ -81,10 +81,8 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     OptimisableProofOfWorkConfig {
         imbalance_multiplier: f64,
-        #[serde(default)]
-        enable_proof_of_deposit: bool,
-        #[serde(default)]
-        rolling_deposit_decay: f64,
+        enable_proof_of_deposit: Option<bool>,
+        rolling_deposit_decay: Option<f64>,
     }
 }
 serializable_struct_with_getters! {
