@@ -262,7 +262,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
                 ..
             } = &mut (*state().lock().await);
             if time_left.as_mut().unwrap().update().finished()
-                || nonce_iter.is_empty()
+                || (nonce_iter.is_empty() && num_solutions == nonce_iter.attempts()) // nonce_iter is only empty if recomputing
                 || *status == Status::Stopping
             {
                 break;
@@ -388,9 +388,11 @@ pub async fn stop() {
         _ => {}
     }
 }
-pub async fn select_algorithm(challenge_id: String, algorithm_id: String) {
+pub async fn select_algorithm(challenge_name: String, algorithm_name: String) {
     let mut state = (*state()).lock().await;
-    state.selected_algorithms.insert(challenge_id, algorithm_id);
+    state
+        .selected_algorithms
+        .insert(challenge_name, algorithm_name);
 }
 
 pub async fn setup(api_url: String, api_key: String, player_id: String) {

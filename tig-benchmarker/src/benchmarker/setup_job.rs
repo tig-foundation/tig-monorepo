@@ -95,11 +95,17 @@ async fn pick_settings_to_benchmark() -> Result<Job> {
         player_data,
         challenges,
         download_urls,
+        algorithms_by_challenge,
         ..
     } = query_data;
     let mut rng = StdRng::seed_from_u64(time() as u64);
     let challenge = pick_challenge(&mut rng, player_data, challenges, selected_algorithms)?;
-    let selected_algorithm_id = selected_algorithms[&challenge.id].clone();
+    let selected_algorithm_id = get_algorithm_id(
+        algorithms_by_challenge,
+        challenge,
+        download_urls,
+        &selected_algorithms[&challenge.details.name],
+    )?;
     let difficulty = pick_difficulty(&mut rng, latest_block, challenge)?;
     Ok(Job {
         benchmark_id: Alphanumeric.sample_string(&mut rng, 32),
@@ -130,6 +136,10 @@ fn pick_challenge<'a>(
         Some(Some(num_qualifiers_by_challenge)) => num_qualifiers_by_challenge.clone(),
         _ => HashMap::new(),
     };
+    let challenge_name_2_id: HashMap<String, String> = challenges
+        .iter()
+        .map(|c| (c.details.name.clone(), c.id.clone()))
+        .collect();
     let percent_qualifiers_by_challenge: HashMap<String, f64> = challenges
         .iter()
         .map(|c| {
@@ -143,15 +153,22 @@ fn pick_challenge<'a>(
             (c.id.clone(), percent)
         })
         .collect();
-    let challenge_weights: Vec<(String, f64)> = selected_algorithms
-        .keys()
-        .map(|challenge_id| {
-            (
-                challenge_id.clone(),
-                1f64 - percent_qualifiers_by_challenge[challenge_id] + 1e-10f64,
+    if selected_algorithms.len() == 0 {
+        return Err("Your <algorithm_selection>.json is empty".to_string());
+    }
+    let mut challenge_weights = Vec::<(String, f64)>::new();
+    for challenge_name in selected_algorithms.keys() {
+        let challenge_id = challenge_name_2_id.get(challenge_name).ok_or_else(|| {
+            format!(
+                "Your <algorithm_selection>.json contains a non-existent challenge '{}'",
+                challenge_name
             )
-        })
-        .collect();
+        })?;
+        challenge_weights.push((
+            challenge_id.clone(),
+            1f64 - percent_qualifiers_by_challenge[challenge_id] + 1e-10f64,
+        ));
+    }
     let dist = WeightedIndex::new(
         &challenge_weights
             .iter()
@@ -179,6 +196,26 @@ fn pick_difficulty(rng: &mut StdRng, block: &Block, challenge: &Challenge) -> Re
         *block_data.scaling_factor(),
     );
     Ok(random_difficulty)
+}
+
+fn get_algorithm_id(
+    algorithms_by_challenge: &HashMap<String, Vec<Algorithm>>,
+    challenge: &Challenge,
+    download_urls: &HashMap<String, String>,
+    selected_algorithm_name: &String,
+) -> Result<String> {
+    let selected_algorithm_id = algorithms_by_challenge[&challenge.id]
+        .iter()
+        .find(|a| download_urls.contains_key(&a.id) && a.details.name == *selected_algorithm_name)
+        .ok_or_else(|| {
+            format!(
+                "Your <algorithm_selection>.json contains a non-existent algorithm '{}'",
+                selected_algorithm_name
+            )
+        })?
+        .id
+        .clone();
+    Ok(selected_algorithm_id)
 }
 
 fn get_download_url(
