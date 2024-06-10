@@ -39,7 +39,7 @@ Upon submission, algorithms are committed to their own branch and pushed to a pr
 Notes:
 
 - Confirmation of an algorithm's submission occurs in the next block, determining the submission round.
-- An algorithm submitted in round X is made public at the onset of round X + 3.
+- An algorithm submitted in round X is made public at the onset of round X + 2.
 
 ### 3.2.2. Merge Points Mechanism
 

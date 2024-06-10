@@ -17,6 +17,11 @@ info:
 servers:
   - url: https://mainnet-api.tig.foundation
   - url: https://testnet-api.tig.foundation
+tags:
+  - name: GET
+    description: There is a rate limit of 60 requests per minute per IP address.
+  - name: POST
+    description: There is a rate limit of 20 requests per minute per IP address.
 paths:
   /get-algorithms:
     get:
@@ -275,8 +280,6 @@ paths:
           * The transaction should emit a `ProxyCreation` event. [Example](https://basescan.org/tx/0xa61a5d1e4deaf4f4c42ede0ad412e4ca02f5b3d38ebff61f56e8e8d16153d4e6)
           
           * `<signature>` can be produced by any current owner of the multisig
-          
-        * If header `X-Aws-Waf-Token` is invalid, a `405` error will be returned where the body is HTML for completing a captcha
         
       requestBody:
         content:
@@ -290,11 +293,6 @@ paths:
                   $ref: '#/components/schemas/Signature'
                 gnosis_safe_setup_tx_hash:
                   $ref: '#/components/schemas/TxHash'
-      parameters:
-        - in: header
-          name: X-Aws-Waf-Token
-          schema:
-            type: string
       responses:
         '200':
           description: Success
@@ -305,8 +303,6 @@ paths:
                 properties:
                   api_key:
                     $ref: '#/components/schemas/MD5'
-        '405':
-          description: Complete captcha
   /submit-algorithm:
     post:
       tags:
