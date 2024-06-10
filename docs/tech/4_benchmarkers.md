@@ -138,6 +138,6 @@ Every block, 85% of block rewards are distributed pro-rata amongst Benchmarkers 
 
 ### 4.4.1. Cutoff Mechanism
 
-To strongly disincentivise Benchmarkers from focusing only on a single challenge (e.g. benchmarking their own algorithm), TIG employs a cutoff mechanism. This mechanism limits the maximum qualifiers per challenge based on an average number of solutions multiplied by a multiplier (currently set to 2.5).
+To strongly disincentivise Benchmarkers from focusing only on a single challenge (e.g. benchmarking their own algorithm), TIG employs a cutoff mechanism. This mechanism limits the maximum qualifiers per challenge based on an average number of solutions multiplied by a multiplier (currently set to 1.5).
 
 The multiplier is such that the cutoff mechanism will not affect normal benchmarking in 99.9% of cases.

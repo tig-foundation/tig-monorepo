@@ -73,7 +73,7 @@ The Pareto frontiers mechanism works as follows:
 3. Update the total number of qualifying solutions.
 4. If the total number of qualifiers is below a threshold, repeat the process.
 
-\*The threshold number of qualifiers is currently set to 1,000.
+\*The threshold number of qualifiers is currently set to 5,000.
 
 Notes:
 

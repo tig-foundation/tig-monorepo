@@ -34,8 +34,8 @@ TIG’s token emission schedule comprises 5 tranches, each with the same total e
 
 | **Tranche** | **#Rounds** | **Token emissions per block** | **Token emissions per round** | **Start Date** | **End Date** |
 | --- | --- | --- | --- | --- | --- |
-| 1   | 26  | 100 | 1,008,000 | 24 Nov 2023 | 30 May 2024\* |
-| 2   | 52  | 50  | 504,000 | 31 May 2024\* | 30 May 2025\* |
+| 1   | 26  | 100 | 1,008,000 | 24 Nov 2023 | 1 June 2024 |
+| 2   | 52  | 50  | 504,000 | 1 June 2024 | 31 May 2025\* |
 | 3   | 104 | 25  | 252,000 | 31 May 2025\* | 29 May 2027\* |
 | 4   | 208 | 12.5 | 126,000 | 30 May 2027\* | 24 May 2031\* |
 | 5   | 416 | 6.25 | 63,000 | 25 May 2031\* | 14 May 2039\* |
