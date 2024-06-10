@@ -1,22 +1,21 @@
 use super::{Job, NonceIterator};
 use crate::future_utils;
-use future_utils::{sleep, spawn, Mutex};
+use future_utils::{spawn, yield_now, Mutex};
 use std::sync::Arc;
 use tig_worker::{compute_solution, ComputeResult, SolutionData};
 
 pub async fn execute(
-    num_workers: u32,
+    nonce_iters: Vec<Arc<Mutex<NonceIterator>>>,
     job: &Job,
     wasm: &Vec<u8>,
-    nonce_iter: Arc<Mutex<NonceIterator>>,
     solutions_data: Arc<Mutex<Vec<SolutionData>>>,
 ) {
-    for _ in 0..num_workers {
+    for nonce_iter in nonce_iters {
         let job = job.clone();
         let wasm = wasm.clone();
-        let nonce_iter = nonce_iter.clone();
         let solutions_data = solutions_data.clone();
         spawn(async move {
+            let mut last_yield = std::time::Instant::now();
             loop {
                 match {
                     let mut nonce_iter = (*nonce_iter).lock().await;
@@ -38,10 +37,13 @@ pub async fn execute(
                                 (*solutions_data).push(solution_data);
                             }
                         }
-                        sleep(1).await;
                     }
                 }
+                if last_yield.elapsed().as_millis() > 25 {
+                    yield_now().await;
+                    last_yield = std::time::Instant::now();
+                }
             }
-        })
+        });
     }
 }

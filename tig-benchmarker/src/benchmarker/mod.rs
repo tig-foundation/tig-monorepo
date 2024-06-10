@@ -69,10 +69,17 @@ pub struct NonceIterator {
 }
 
 impl NonceIterator {
-    pub fn new(nonces: Option<Vec<u32>>) -> Self {
+    pub fn from_vec(nonces: Vec<u32>) -> Self {
         Self {
-            nonces,
+            nonces: Some(nonces),
             current: 0,
+            attempts: 0,
+        }
+    }
+    pub fn from_u32(start: u32) -> Self {
+        Self {
+            nonces: None,
+            current: start,
             attempts: 0,
         }
     }
@@ -229,14 +236,25 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     let wasm = download_wasm::execute(&job).await?;
 
     // variables that are shared by workers
-    let nonce_iter = Arc::new(Mutex::new(NonceIterator::new(job.sampled_nonces.clone())));
+    let nonce_iters = match &job.sampled_nonces {
+        Some(nonces) => vec![Arc::new(Mutex::new(NonceIterator::from_vec(
+            nonces.clone(),
+        )))],
+        None => (0..num_workers)
+            .into_iter()
+            .map(|x| {
+                Arc::new(Mutex::new(NonceIterator::from_u32(
+                    u32::MAX / num_workers * x,
+                )))
+            })
+            .collect(),
+    };
     let solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
     update_status("Starting benchmark").await;
     run_benchmark::execute(
-        num_workers,
+        nonce_iters.iter().cloned().collect(),
         &job,
         &wasm,
-        nonce_iter.clone(),
         solutions_data.clone(),
     )
     .await;
@@ -249,11 +267,16 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
             // transfers solutions computed by workers to benchmark state
             let num_solutions =
                 drain_solutions(job.benchmark_id.clone(), solutions_data.clone()).await;
-            let nonce_iter = (*nonce_iter).lock().await;
+            let mut finished = true;
+            let mut num_attempts = 0;
+            for nonce_iter in nonce_iters.iter().cloned() {
+                let nonce_iter = (*nonce_iter).lock().await;
+                num_attempts += nonce_iter.attempts();
+                finished &= nonce_iter.is_empty();
+            }
             update_status(&format!(
                 "Computed {} solutions out of {} instances",
-                num_solutions,
-                nonce_iter.attempts()
+                num_solutions, num_attempts
             ))
             .await;
             let State {
@@ -262,7 +285,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
                 ..
             } = &mut (*state().lock().await);
             if time_left.as_mut().unwrap().update().finished()
-                || (nonce_iter.is_empty() && num_solutions == nonce_iter.attempts()) // nonce_iter is only empty if recomputing
+                || (finished && num_solutions == num_attempts) // nonce_iter is only empty if recomputing
                 || *status == Status::Stopping
             {
                 break;
@@ -270,10 +293,9 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
         }
         sleep(200).await;
     }
-    {
-        // workers exit when iter returns None
+    for nonce_iter in nonce_iters {
         (*(*nonce_iter).lock().await).empty();
-    };
+    }
 
     // transfers solutions computed by workers to benchmark state
     let num_solutions = drain_solutions(job.benchmark_id.clone(), solutions_data.clone()).await;

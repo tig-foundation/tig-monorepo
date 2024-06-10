@@ -9,7 +9,7 @@ mod utils {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
     pub use tokio::sync::Mutex;
-    use tokio::{join, time};
+    use tokio::{join, task, time};
 
     pub async fn join<T, U, V, W>(
         a: impl Future<Output = T> + 'static,
@@ -28,6 +28,10 @@ mod utils {
 
     pub fn spawn(f: impl Future<Output = ()> + 'static + Send) {
         tokio::spawn(f);
+    }
+
+    pub async fn yield_now() {
+        task::yield_now().await
     }
 
     pub async fn sleep(ms: u32) {
@@ -99,6 +103,10 @@ mod utils {
             f.await;
             Ok(JsValue::undefined())
         });
+    }
+
+    pub async fn yield_now() {
+        TimeoutFuture::new(0).await;
     }
 
     pub async fn sleep(ms: u32) {
