@@ -46,7 +46,7 @@ fn cli() -> Command {
             Arg::new("api")
                 .long("api")
                 .help("(Optional) Set api_url")
-                .default_value("https://api.tig.foundation/play")
+                .default_value("https://mainnet-api.tig.foundation")
                 .value_parser(value_parser!(String)),
         )
 }

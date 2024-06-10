@@ -28,7 +28,7 @@ There are two ways to run locally:
     ```
     cargo build -p tig-benchmarker --release --no-default-features --features standalone
     # edit below line for your own algorithm selection
-    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' >> algo_selection.json
+    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' > algo_selection.json
     ./target/release/tig-benchmarker <address> <api_key> algo_selection.json
     ```
 
@@ -36,7 +36,7 @@ There are two ways to run locally:
     ```
     docker build -f tig-benchmarker/Dockerfile -t tig-benchmarker .
     # edit below line for your own algorithm selection
-    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' >> algo_selection.json
+    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' > algo_selection.json
     docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> algo_selection.json
     ```
 
