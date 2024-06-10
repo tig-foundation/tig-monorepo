@@ -124,7 +124,7 @@ language governing permissions and limitations under the License.
     ```
 6. Use the above test to debug your algorithm:
     ```
-    cargo test -p tig-algorithms
+    cargo test -p tig-algorithms -- --nocapture
     ```
 
 **IMPORTANT (READ THIS):**

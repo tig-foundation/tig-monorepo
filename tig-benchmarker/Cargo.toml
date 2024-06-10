@@ -8,6 +8,7 @@ repository.workspace = true
 edition.workspace = true
 
 [dependencies]
+clap = { version = "4.5.4", optional = true }
 futures = { version = "0.3.30" }
 gloo-timers = { version = "0.3.0", optional = true, features = ["futures"] }
 js-sys = { version = "0.3.68", optional = true }
@@ -17,11 +18,13 @@ rand_distr = { version = "0.4.3", default-features = false, features = [
     "alloc",
 ] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0.113" }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 tig-api = { path = "../tig-api" }
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
 tig-worker = { path = "../tig-worker" }
+tokio = { version = "1.37.0", features = ["full"], optional = true }
 wasm-bindgen = { version = "0.2.91", features = [
     "serde-serialize",
 ], optional = true }
@@ -33,6 +36,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["browser"]
+standalone = ["dep:clap", "dep:tokio", "tig-api/request"]
 browser = [
     "dep:gloo-timers",
     "dep:wasm-bindgen",
