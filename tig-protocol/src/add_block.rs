@@ -682,10 +682,10 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
                     .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
                     .block_data()
                     .scaling_factor
-                    .unwrap_or(1.0);
+                    .unwrap_or(1.0)
+                    .clamp(0.0, config.difficulty.max_scaling_factor);
             scaling_factor = scaling_factor_decay * prev_scaling_factor
-                + (1.0 - scaling_factor_decay)
-                + scaling_factor;
+                + (1.0 - scaling_factor_decay) * scaling_factor;
         }
         let scaled_frontier = base_frontier
             .scale(&min_difficulty, &max_difficulty, scaling_factor)
