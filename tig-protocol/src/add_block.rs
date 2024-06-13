@@ -672,16 +672,28 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
             .collect::<Frontier>() // mirror the points back;
             .extend(&min_difficulty, &max_difficulty);
 
-        let multiplier = (*block_data.num_qualifiers() as f64
+        let mut scaling_factor = (*block_data.num_qualifiers() as f64
             / config.qualifiers.total_qualifiers_threshold as f64)
             .clamp(0.0, config.difficulty.max_scaling_factor);
+        if let Some(scaling_factor_decay) = config.difficulty.scaling_factor_decay {
+            let prev_scaling_factor =
+                get_challenge_by_id(ctx, challenge_id, Some(&block.details.prev_block_id))
+                    .await
+                    .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
+                    .block_data()
+                    .scaling_factor
+                    .unwrap_or(1.0);
+            scaling_factor = scaling_factor_decay * prev_scaling_factor
+                + (1.0 - scaling_factor_decay)
+                + scaling_factor;
+        }
         let scaled_frontier = base_frontier
-            .scale(&min_difficulty, &max_difficulty, multiplier)
+            .scale(&min_difficulty, &max_difficulty, scaling_factor)
             .extend(&min_difficulty, &max_difficulty);
 
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
-        block_data.scaling_factor = Some(multiplier);
+        block_data.scaling_factor = Some(scaling_factor);
 
         ctx.update_challenge_block_data(challenge_id, &block.id, &block_data)
             .await
