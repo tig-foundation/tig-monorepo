@@ -661,7 +661,7 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
         let min_difficulty = difficulty_parameters.min_difficulty();
         let max_difficulty = difficulty_parameters.max_difficulty();
 
-        let base_frontier = block_data
+        let lowest_frontier = block_data
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
@@ -672,21 +672,27 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
             .collect::<Frontier>() // mirror the points back;
             .extend(&min_difficulty, &max_difficulty);
 
-        let mut scaling_factor = (*block_data.num_qualifiers() as f64
-            / config.qualifiers.total_qualifiers_threshold as f64)
-            .clamp(0.0, config.difficulty.max_scaling_factor);
-        if let Some(scaling_factor_decay) = config.difficulty.scaling_factor_decay {
-            let prev_scaling_factor =
-                get_challenge_by_id(ctx, challenge_id, Some(&block.details.prev_block_id))
-                    .await
-                    .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
-                    .block_data()
-                    .scaling_factor
-                    .unwrap_or(1.0)
-                    .clamp(0.0, config.difficulty.max_scaling_factor);
-            scaling_factor = scaling_factor_decay * prev_scaling_factor
-                + (1.0 - scaling_factor_decay) * scaling_factor;
-        }
+        let scaling_factor = *block_data.num_qualifiers() as f64
+            / config.qualifiers.total_qualifiers_threshold as f64;
+        let (scaling_factor, base_frontier) = match config.difficulty.min_frontiers_gap {
+            Some(min_gap) => {
+                if scaling_factor >= 1.0 {
+                    (
+                        (scaling_factor / (1.0 - min_gap))
+                            .min(config.difficulty.max_scaling_factor),
+                        lowest_frontier
+                            .scale(&min_difficulty, &max_difficulty, 1.0 - min_gap)
+                            .extend(&min_difficulty, &max_difficulty),
+                    )
+                } else {
+                    (scaling_factor.min(1.0 - min_gap), lowest_frontier.clone())
+                }
+            }
+            None => (
+                scaling_factor.min(config.difficulty.max_scaling_factor),
+                lowest_frontier,
+            ),
+        };
         let scaled_frontier = base_frontier
             .scale(&min_difficulty, &max_difficulty, scaling_factor)
             .extend(&min_difficulty, &max_difficulty);
