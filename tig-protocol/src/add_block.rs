@@ -674,8 +674,9 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
 
         let scaling_factor = *block_data.num_qualifiers() as f64
             / config.qualifiers.total_qualifiers_threshold as f64;
-        let (scaling_factor, base_frontier) = match config.difficulty.min_frontiers_gap {
-            Some(min_gap) => {
+        let (scaling_factor, base_frontier) = match &config.difficulty.min_frontiers_gaps {
+            Some(min_gaps) => {
+                let min_gap = min_gaps[&challenge.id];
                 if scaling_factor >= 1.0 {
                     (
                         (scaling_factor / (1.0 - min_gap))
