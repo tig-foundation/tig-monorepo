@@ -1,6 +1,6 @@
 use super::{Job, NonceIterator};
 use crate::future_utils;
-use future_utils::{spawn, yield_now, Mutex};
+use future_utils::{spawn, time, yield_now, Mutex};
 use std::sync::Arc;
 use tig_worker::{compute_solution, ComputeResult, SolutionData};
 
@@ -15,7 +15,7 @@ pub async fn execute(
         let wasm = wasm.clone();
         let solutions_data = solutions_data.clone();
         spawn(async move {
-            let mut last_yield = std::time::Instant::now();
+            let mut last_yield = time();
             loop {
                 match {
                     let mut nonce_iter = (*nonce_iter).lock().await;
@@ -39,9 +39,10 @@ pub async fn execute(
                         }
                     }
                 }
-                if last_yield.elapsed().as_millis() > 25 {
+                let now = time();
+                if now - last_yield > 25 {
                     yield_now().await;
-                    last_yield = std::time::Instant::now();
+                    last_yield = now;
                 }
             }
         });

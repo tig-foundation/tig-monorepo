@@ -1,9 +1,9 @@
 use super::{player_id, state, Job, QueryData, Result, State};
 use crate::future_utils::time;
 use rand::{
-    distributions::{Alphanumeric, DistString, WeightedIndex},
+    distributions::{Alphanumeric, DistString, Uniform, WeightedIndex},
     rngs::StdRng,
-    SeedableRng,
+    Rng, SeedableRng,
 };
 use rand_distr::Distribution;
 use std::collections::HashMap;
@@ -190,10 +190,16 @@ fn pick_difficulty(rng: &mut StdRng, block: &Block, challenge: &Challenge) -> Re
     let min_difficulty = difficulty_parameters.min_difficulty();
     let max_difficulty = difficulty_parameters.max_difficulty();
     let block_data = challenge.block_data();
+    let scaling_factor = *block_data.scaling_factor();
+    let distribution = if scaling_factor >= 1.0 {
+        Uniform::new(1.0, scaling_factor)
+    } else {
+        Uniform::new(scaling_factor, 1.0)
+    };
     let random_difficulty = block_data.base_frontier().sample(rng).scale(
         &min_difficulty,
         &max_difficulty,
-        *block_data.scaling_factor(),
+        rng.sample(&distribution),
     );
     Ok(random_difficulty)
 }
