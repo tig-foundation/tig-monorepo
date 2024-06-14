@@ -75,7 +75,7 @@ impl MinMaxDifficulty for Vec<DifficultyParameter> {
 serializable_struct_with_getters! {
     DifficultyConfig {
         max_scaling_factor: f64,
-        scaling_factor_decay: Option<f64>,
+        min_frontiers_gaps: Option<HashMap<String, f64>>,
         parameters: HashMap<String, Vec<DifficultyParameter>>,
     }
 }
