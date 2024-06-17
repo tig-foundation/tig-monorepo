@@ -226,6 +226,7 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
             solution_signature_threshold: None,
             scaled_frontier: None,
             base_frontier: None,
+            cutoff_frontier: None,
             scaling_factor: None,
             qualifier_difficulties: None,
         };
@@ -659,7 +660,7 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
         let min_difficulty = difficulty_parameters.min_difficulty();
         let max_difficulty = difficulty_parameters.max_difficulty();
 
-        let lowest_frontier = block_data
+        let cutoff_frontier = block_data
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
@@ -679,23 +680,24 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
                     (
                         (scaling_factor / (1.0 - min_gap))
                             .min(config.difficulty.max_scaling_factor),
-                        lowest_frontier
+                        cutoff_frontier
                             .scale(&min_difficulty, &max_difficulty, 1.0 - min_gap)
                             .extend(&min_difficulty, &max_difficulty),
                     )
                 } else {
-                    (scaling_factor.min(1.0 - min_gap), lowest_frontier.clone())
+                    (scaling_factor.min(1.0 - min_gap), cutoff_frontier.clone())
                 }
             }
             None => (
                 scaling_factor.min(config.difficulty.max_scaling_factor),
-                lowest_frontier,
+                cutoff_frontier.clone(),
             ),
         };
         let scaled_frontier = base_frontier
             .scale(&min_difficulty, &max_difficulty, scaling_factor)
             .extend(&min_difficulty, &max_difficulty);
 
+        block_data.cutoff_frontier = Some(cutoff_frontier);
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
         block_data.scaling_factor = Some(scaling_factor);

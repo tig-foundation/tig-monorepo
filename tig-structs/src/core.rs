@@ -174,6 +174,7 @@ serializable_struct_with_getters! {
         num_qualifiers: Option<u32>,
         qualifier_difficulties: Option<HashSet<Point>>,
         base_frontier: Option<Frontier>,
+        cutoff_frontier: Option<Frontier>,
         scaled_frontier: Option<Frontier>,
         scaling_factor: Option<f64>,
     }
