@@ -42,9 +42,10 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     SolutionSignatureConfig {
-        max_percent_delta: f64,
+        max_percent_delta: Option<f64>,
+        threshold_decay: Option<f64>,
         equilibrium_rate_multiplier: f64,
-        percent_error_multiplier: f64,
+        percent_error_multiplier: Option<f64>,
     }
 }
 serializable_struct_with_getters! {
