@@ -39,7 +39,7 @@ fn cli() -> Command {
             Arg::new("duration")
                 .long("duration")
                 .help("(Optional) Set duration of a benchmark in milliseconds")
-                .default_value("15000")
+                .default_value("7500")
                 .value_parser(value_parser!(u32)),
         )
         .arg(
