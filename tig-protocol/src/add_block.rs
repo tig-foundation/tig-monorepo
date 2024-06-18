@@ -1,10 +1,7 @@
 use crate::context::*;
 use logging_timer::time;
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Mul,
-};
+use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 use tig_utils::*;
 
@@ -229,6 +226,7 @@ async fn create_block<T: Context>(ctx: &mut T) -> Block {
             solution_signature_threshold: None,
             scaled_frontier: None,
             base_frontier: None,
+            cutoff_frontier: None,
             scaling_factor: None,
             qualifier_difficulties: None,
         };
@@ -455,21 +453,8 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &mut T, block: &B
     }
 
     for challenge_id in block.data().active_challenge_ids.iter() {
-        let num_new_solutions = *num_new_solutions_by_challenge
-            .get(challenge_id)
-            .unwrap_or(&0) as f64;
-        let equilibrium_rate = config.qualifiers.total_qualifiers_threshold as f64
-            / config.benchmark_submissions.lifespan_period as f64;
-        let percentage_error = 1f64
-            - num_new_solutions
-                / (config.solution_signature.equilibrium_rate_multiplier * equilibrium_rate);
         let max_threshold = u32::MAX as f64;
-        let percent_delta = (percentage_error * config.solution_signature.percent_error_multiplier)
-            .abs()
-            .clamp(0f64, config.solution_signature.max_percent_delta)
-            .mul(if percentage_error < 0f64 { -1f64 } else { 1f64 });
-
-        let prev_solution_signature_threshold =
+        let current_threshold =
             match get_challenge_by_id(ctx, challenge_id, Some(&block.details.prev_block_id))
                 .await
                 .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
@@ -478,14 +463,28 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &mut T, block: &B
                 Some(data) => *data.solution_signature_threshold() as f64,
                 None => max_threshold,
             };
+        let current_rate = *num_new_solutions_by_challenge
+            .get(challenge_id)
+            .unwrap_or(&0) as f64;
+
+        let equilibrium_rate = config.qualifiers.total_qualifiers_threshold as f64
+            / config.benchmark_submissions.lifespan_period as f64;
+        let target_rate = config.solution_signature.equilibrium_rate_multiplier * equilibrium_rate;
+        let target_threshold = if current_rate == 0.0 {
+            max_threshold
+        } else {
+            (current_threshold * target_rate / current_rate).clamp(0.0, max_threshold)
+        };
+
+        let threshold_decay = config.solution_signature.threshold_decay.unwrap_or(0.99);
         let mut block_data = get_challenge_by_id(ctx, challenge_id, Some(&block.id))
             .await
             .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
             .block_data()
             .clone();
         block_data.solution_signature_threshold = Some(
-            (prev_solution_signature_threshold + percent_delta * max_threshold)
-                .clamp(0f64, max_threshold) as u32,
+            (current_threshold * threshold_decay + target_threshold * (1.0 - threshold_decay))
+                .clamp(0.0, max_threshold) as u32,
         );
 
         ctx.update_challenge_block_data(challenge_id, &block.id, &block_data)
@@ -661,7 +660,7 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
         let min_difficulty = difficulty_parameters.min_difficulty();
         let max_difficulty = difficulty_parameters.max_difficulty();
 
-        let lowest_frontier = block_data
+        let cutoff_frontier = block_data
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
@@ -681,23 +680,24 @@ async fn update_frontiers<T: Context>(ctx: &mut T, block: &Block) {
                     (
                         (scaling_factor / (1.0 - min_gap))
                             .min(config.difficulty.max_scaling_factor),
-                        lowest_frontier
+                        cutoff_frontier
                             .scale(&min_difficulty, &max_difficulty, 1.0 - min_gap)
                             .extend(&min_difficulty, &max_difficulty),
                     )
                 } else {
-                    (scaling_factor.min(1.0 - min_gap), lowest_frontier.clone())
+                    (scaling_factor.min(1.0 - min_gap), cutoff_frontier.clone())
                 }
             }
             None => (
                 scaling_factor.min(config.difficulty.max_scaling_factor),
-                lowest_frontier,
+                cutoff_frontier.clone(),
             ),
         };
         let scaled_frontier = base_frontier
             .scale(&min_difficulty, &max_difficulty, scaling_factor)
             .extend(&min_difficulty, &max_difficulty);
 
+        block_data.cutoff_frontier = Some(cutoff_frontier);
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
         block_data.scaling_factor = Some(scaling_factor);

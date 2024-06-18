@@ -1,3 +1,4 @@
+mod difficulty_sampler;
 mod download_wasm;
 mod find_proof_to_submit;
 mod query_data;
@@ -7,11 +8,15 @@ mod submit_benchmark;
 mod submit_proof;
 
 use crate::future_utils::{sleep, spawn, time, Mutex};
+use difficulty_sampler::DifficultySampler;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
 use tig_api::Api;
-use tig_structs::{config::WasmVMConfig, core::*};
+use tig_structs::{
+    config::{MinMaxDifficulty, WasmVMConfig},
+    core::*,
+};
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -130,6 +135,8 @@ pub struct State {
     pub selected_algorithms: HashMap<String, String>,
     pub job: Option<Job>,
     pub submission_errors: HashMap<String, String>,
+    #[serde(skip_serializing)]
+    pub difficulty_samplers: HashMap<String, DifficultySampler>,
 }
 
 static BLOBS: OnceCell<Mutex<HashMap<String, Vec<u8>>>> = OnceCell::new();
@@ -173,34 +180,58 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     // retain only benchmarks that are within the lifespan period
     // preserves solution_meta_data and solution_data
     let mut new_query_data = query_data::execute().await?;
-    {
-        let mut state = (*state()).lock().await;
-        let block_started_cutoff = new_query_data.latest_block.details.height.saturating_sub(
-            new_query_data
-                .latest_block
-                .config()
-                .benchmark_submissions
-                .lifespan_period,
-        );
-        let mut latest_benchmarks = state.query_data.benchmarks.clone();
-        latest_benchmarks.retain(|_, x| x.details.block_started >= block_started_cutoff);
-        latest_benchmarks.extend(new_query_data.benchmarks.drain());
+    if {
+        let state = (*state()).lock().await;
+        state.query_data.latest_block.id != new_query_data.latest_block.id
+    } {
+        {
+            let mut state = (*state()).lock().await;
+            let block_started_cutoff = new_query_data.latest_block.details.height.saturating_sub(
+                new_query_data
+                    .latest_block
+                    .config()
+                    .benchmark_submissions
+                    .lifespan_period,
+            );
+            let mut latest_benchmarks = state.query_data.benchmarks.clone();
+            latest_benchmarks.retain(|_, x| x.details.block_started >= block_started_cutoff);
+            latest_benchmarks.extend(new_query_data.benchmarks.drain());
 
-        let mut latest_proofs = state.query_data.proofs.clone();
-        latest_proofs.retain(|id, _| latest_benchmarks.contains_key(id));
-        latest_proofs.extend(new_query_data.proofs.drain());
+            let mut latest_proofs = state.query_data.proofs.clone();
+            latest_proofs.retain(|id, _| latest_benchmarks.contains_key(id));
+            latest_proofs.extend(new_query_data.proofs.drain());
 
-        let mut latest_frauds = state.query_data.frauds.clone();
-        latest_frauds.retain(|id, _| latest_benchmarks.contains_key(id));
-        latest_frauds.extend(new_query_data.frauds.drain());
+            let mut latest_frauds = state.query_data.frauds.clone();
+            latest_frauds.retain(|id, _| latest_benchmarks.contains_key(id));
+            latest_frauds.extend(new_query_data.frauds.drain());
 
-        (*state)
-            .submission_errors
-            .retain(|id, _| latest_benchmarks.contains_key(id));
-        new_query_data.benchmarks = latest_benchmarks;
-        new_query_data.proofs = latest_proofs;
-        new_query_data.frauds = latest_frauds;
-        (*state).query_data = new_query_data;
+            (*state)
+                .submission_errors
+                .retain(|id, _| latest_benchmarks.contains_key(id));
+            new_query_data.benchmarks = latest_benchmarks;
+            new_query_data.proofs = latest_proofs;
+            new_query_data.frauds = latest_frauds;
+            (*state).query_data = new_query_data;
+        }
+
+        update_status("Updating difficulty sampler with query data").await;
+        {
+            let mut state = state().lock().await;
+            let State {
+                query_data,
+                difficulty_samplers,
+                ..
+            } = &mut (*state);
+            for challenge in query_data.challenges.iter() {
+                let difficulty_sampler = difficulty_samplers
+                    .entry(challenge.id.clone())
+                    .or_insert_with(|| DifficultySampler::new());
+                let min_difficulty = query_data.latest_block.config().difficulty.parameters
+                    [&challenge.id]
+                    .min_difficulty();
+                difficulty_sampler.update_with_block_data(&min_difficulty, challenge.block_data());
+            }
+        }
     }
 
     update_status("Finding proof to submit").await;
@@ -218,7 +249,6 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
             update_status("No proof to submit").await;
         }
     }
-
     // creates a benchmark & proof with job.benchmark_id
     update_status("Selecting settings to benchmark").await;
     setup_job::execute().await?;
@@ -250,12 +280,14 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
             .collect(),
     };
     let solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
+    let solutions_count = Arc::new(Mutex::new(0u32));
     update_status("Starting benchmark").await;
     run_benchmark::execute(
         nonce_iters.iter().cloned().collect(),
         &job,
         &wasm,
         solutions_data.clone(),
+        solutions_count.clone(),
     )
     .await;
     {
@@ -321,6 +353,17 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
             .await;
         }
     } else {
+        update_status("Updating difficulty sampler with solutions").await;
+        {
+            let num_solutions = *solutions_count.lock().await;
+            let mut state = state().lock().await;
+            state
+                .difficulty_samplers
+                .get_mut(&job.settings.challenge_id)
+                .unwrap()
+                .update_with_solutions(&job.settings.difficulty, num_solutions);
+        }
+
         if num_solutions == 0 {
             update_status("Finished. No solutions to submit").await;
         } else {
@@ -422,11 +465,21 @@ pub async fn setup(api_url: String, api_key: String, player_id: String) {
     API.get_or_init(|| Api::new(api_url, api_key));
     PLAYER_ID.get_or_init(|| player_id);
     let query_data = query_data::execute().await.expect("Failed to query data");
+    let mut difficulty_samplers = HashMap::new();
+    for challenge in query_data.challenges.iter() {
+        let difficulty_sampler = difficulty_samplers
+            .entry(challenge.id.clone())
+            .or_insert_with(|| DifficultySampler::new());
+        let min_difficulty =
+            query_data.latest_block.config().difficulty.parameters[&challenge.id].min_difficulty();
+        difficulty_sampler.update_with_block_data(&min_difficulty, challenge.block_data());
+    }
     STATE.get_or_init(|| {
         Mutex::new(State {
             status: Status::Stopped,
             timer: None,
             query_data,
+            difficulty_samplers,
             selected_algorithms: HashMap::new(),
             job: None,
             submission_errors: HashMap::new(),

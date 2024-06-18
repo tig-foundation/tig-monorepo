@@ -1,14 +1,13 @@
 use super::{player_id, state, Job, QueryData, Result, State};
 use crate::future_utils::time;
 use rand::{
-    distributions::{Alphanumeric, DistString, Uniform, WeightedIndex},
+    distributions::{Alphanumeric, DistString, WeightedIndex},
     rngs::StdRng,
-    Rng, SeedableRng,
+    SeedableRng,
 };
 use rand_distr::Distribution;
 use std::collections::HashMap;
-use tig_structs::{config::*, core::*};
-use tig_utils::{FrontierOps, PointOps};
+use tig_structs::core::*;
 
 pub async fn execute() -> Result<()> {
     let job = if let Some(x) = find_settings_to_recompute().await? {
@@ -88,6 +87,7 @@ async fn pick_settings_to_benchmark() -> Result<Job> {
     let State {
         query_data,
         selected_algorithms,
+        difficulty_samplers,
         ..
     } = &(*state().lock().await);
     let QueryData {
@@ -106,7 +106,7 @@ async fn pick_settings_to_benchmark() -> Result<Job> {
         download_urls,
         &selected_algorithms[&challenge.details.name],
     )?;
-    let difficulty = pick_difficulty(&mut rng, latest_block, challenge)?;
+    let difficulty = difficulty_samplers[&challenge.id].sample(&mut rng);
     Ok(Job {
         benchmark_id: Alphanumeric.sample_string(&mut rng, 32),
         download_url: get_download_url(&selected_algorithm_id, download_urls)?,
@@ -155,7 +155,7 @@ fn pick_challenge<'a>(
         .collect();
     if selected_algorithms.len() == 0 {
         return Err("Your <algorithm_selection>.json is empty".to_string());
-    }
+    };
     let mut challenge_weights = Vec::<(String, f64)>::new();
     for challenge_name in selected_algorithms.keys() {
         let challenge_id = challenge_name_2_id.get(challenge_name).ok_or_else(|| {
@@ -164,9 +164,14 @@ fn pick_challenge<'a>(
                 challenge_name
             )
         })?;
+        let max_percent_qualifiers = *percent_qualifiers_by_challenge
+            .values()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
         challenge_weights.push((
             challenge_id.clone(),
-            1f64 - percent_qualifiers_by_challenge[challenge_id] + 1e-10f64,
+            4.0 * max_percent_qualifiers / 3.0 - percent_qualifiers_by_challenge[challenge_id]
+                + 1e-10f64,
         ));
     }
     let dist = WeightedIndex::new(
@@ -183,25 +188,6 @@ fn pick_challenge<'a>(
         .find(|c| c.id == *random_challenge_id)
         .ok_or_else(|| "Selected challenge should exist")?;
     Ok(challenge)
-}
-
-fn pick_difficulty(rng: &mut StdRng, block: &Block, challenge: &Challenge) -> Result<Vec<i32>> {
-    let difficulty_parameters = &block.config().difficulty.parameters[&challenge.id];
-    let min_difficulty = difficulty_parameters.min_difficulty();
-    let max_difficulty = difficulty_parameters.max_difficulty();
-    let block_data = challenge.block_data();
-    let scaling_factor = *block_data.scaling_factor();
-    let distribution = if scaling_factor >= 1.0 {
-        Uniform::new(1.0, scaling_factor)
-    } else {
-        Uniform::new(scaling_factor, 1.0)
-    };
-    let random_difficulty = block_data.base_frontier().sample(rng).scale(
-        &min_difficulty,
-        &max_difficulty,
-        rng.sample(&distribution),
-    );
-    Ok(random_difficulty)
 }
 
 fn get_algorithm_id(
