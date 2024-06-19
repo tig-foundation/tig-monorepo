@@ -15,9 +15,9 @@ pub(crate) async fn execute<T: Context>(ctx: &mut T) -> String {
     confirm_mempool_wasms(ctx, &block).await;
     update_deposits(ctx, &block).await;
     update_cutoffs(ctx, &block).await;
-    update_solution_signature_thresholds(ctx, &block).await;
     update_qualifiers(ctx, &block).await;
     update_frontiers(ctx, &block).await;
+    update_solution_signature_thresholds(ctx, &block).await;
     update_influence(ctx, &block).await;
     update_adoption(ctx, &block).await;
     update_innovator_rewards(ctx, &block).await;
@@ -429,8 +429,9 @@ async fn update_cutoffs<T: Context>(ctx: &mut T, block: &Block) {
             .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e));
         let mut data = player.block_data().clone();
 
-        data.cutoff =
-            Some((total_solutions / num_challenges * config.qualifiers.cutoff_multiplier) as u32);
+        data.cutoff = Some(
+            (total_solutions / num_challenges * config.qualifiers.cutoff_multiplier).ceil() as u32,
+        );
 
         ctx.update_player_block_data(player_id, &block.id, &data)
             .await
@@ -441,15 +442,64 @@ async fn update_cutoffs<T: Context>(ctx: &mut T, block: &Block) {
 #[time]
 async fn update_solution_signature_thresholds<T: Context>(ctx: &mut T, block: &Block) {
     let config = block.config();
+    let num_challenges = block.data().active_challenge_ids.len() as f64;
 
-    let mut num_new_solutions_by_challenge = HashMap::<String, u32>::new();
+    let mut total_solutions_by_player_and_challenge =
+        HashMap::<String, HashMap<String, u32>>::new();
+    for benchmark_id in block.data().active_benchmark_ids.iter() {
+        let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
+            .await
+            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
+        *total_solutions_by_player_and_challenge
+            .entry(benchmark.settings.player_id.clone())
+            .or_default()
+            .entry(benchmark.settings.challenge_id.clone())
+            .or_default() += benchmark.details.num_solutions;
+    }
+
+    let mut solutions_rate_multiplier_by_player = HashMap::<String, HashMap<String, f64>>::new();
+    for player_id in block.data().active_player_ids.iter() {
+        let total_solutions_by_challenge = &total_solutions_by_player_and_challenge[player_id];
+        let player_avg_solutions = (total_solutions_by_challenge
+            .values()
+            .fold(0, |acc, v| acc + *v) as f64
+            / num_challenges)
+            .ceil();
+        solutions_rate_multiplier_by_player.insert(
+            player_id.clone(),
+            total_solutions_by_challenge
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        if *v == 0 {
+                            1.0
+                        } else {
+                            (player_avg_solutions / (*v as f64)).min(1.0)
+                        },
+                    )
+                })
+                .collect(),
+        );
+    }
+
+    let mut solutions_rate_by_challenge = HashMap::<String, f64>::new();
     for benchmark_id in block.data().mempool_proof_ids.iter() {
         let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
             .await
             .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
-        *num_new_solutions_by_challenge
+        let scale = match solutions_rate_multiplier_by_player.get(&benchmark.settings.player_id) {
+            Some(fraction_qualifiers) => {
+                match fraction_qualifiers.get(&benchmark.settings.challenge_id) {
+                    Some(fraction) => fraction.clone(),
+                    None => 1.0,
+                }
+            }
+            None => 1.0,
+        };
+        *solutions_rate_by_challenge
             .entry(benchmark.settings.challenge_id.clone())
-            .or_default() += benchmark.details.num_solutions;
+            .or_default() += scale * benchmark.details.num_solutions as f64;
     }
 
     for challenge_id in block.data().active_challenge_ids.iter() {
@@ -463,9 +513,9 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &mut T, block: &B
                 Some(data) => *data.solution_signature_threshold() as f64,
                 None => max_threshold,
             };
-        let current_rate = *num_new_solutions_by_challenge
+        let current_rate = *solutions_rate_by_challenge
             .get(challenge_id)
-            .unwrap_or(&0) as f64;
+            .unwrap_or(&0.0);
 
         let equilibrium_rate = config.qualifiers.total_qualifiers_threshold as f64
             / config.benchmark_submissions.lifespan_period as f64;
