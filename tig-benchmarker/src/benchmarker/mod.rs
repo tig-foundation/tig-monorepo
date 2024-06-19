@@ -351,6 +351,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
                 job.benchmark_id
             ))
             .await;
+            sleep(5000).await;
         }
     } else {
         update_status("Updating difficulty sampler with solutions").await;
