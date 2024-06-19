@@ -7,6 +7,7 @@ use tig_structs::core::*;
 const PADDING_FACTOR: f32 = 0.2;
 const DECAY: f32 = 0.7;
 const INITIAL_SOLUTIONS_WEIGHT: f32 = 500.0;
+const SOLUTIONS_MULTIPLIER: f32 = 10.0;
 
 #[derive(Debug, Clone)]
 pub struct Weights {
@@ -108,7 +109,7 @@ impl DifficultySampler {
                     break;
                 }
                 let decay = dist * (1.0 - DECAY) + DECAY;
-                let delta = (1.0 - decay) * num_solutions as f32;
+                let delta = (1.0 - decay) * num_solutions as f32 * SOLUTIONS_MULTIPLIER;
                 self.weights[x + x_offset][y + y_offset].solutions *= decay;
                 self.weights[x + x_offset][y + y_offset].solutions += delta;
                 if x_offset != 0 && x >= x_offset {
