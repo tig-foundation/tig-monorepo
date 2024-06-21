@@ -275,7 +275,7 @@ async fn master_node(
                 },
             );
         warp::serve(get_nonce_offset.or(get_job).or(post_solutions_data))
-            .run(([127, 0, 0, 1], port))
+            .run(([0, 0, 0, 0], port))
             .await;
     });
     loop {
