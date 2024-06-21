@@ -109,8 +109,8 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
     let master_url = format!("http://{}:{}", master, port);
     let mut job: Option<Job> = None;
     let mut nonce_iters: Vec<Arc<Mutex<NonceIterator>>> = Vec::new();
-    let solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
-    let solutions_count = Arc::new(Mutex::new(0u32));
+    let mut solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
+    let mut solutions_count = Arc::new(Mutex::new(0u32));
     let mut num_solutions = 0;
     loop {
         let next_job = match get::<String>(&format!("{}/job", master_url), None).await {
@@ -129,11 +129,9 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
                 (*(*nonce_iter).lock().await).empty();
             }
             nonce_iters.clear();
-            {
-                (*solutions_data).lock().await.clear();
-                *(*solutions_count).lock().await = 0;
-                num_solutions = 0;
-            }
+            solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
+            solutions_count = Arc::new(Mutex::new(0u32));
+            num_solutions = 0;
             if next_job
                 .as_ref()
                 .is_some_and(|x| x.sampled_nonces.is_none())
