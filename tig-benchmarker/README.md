@@ -20,9 +20,9 @@ python3 -m http.server 80
 
 ## Standalone Benchmarker
 
-`tig-benchmarker` can be compiled into an executable for running locally.
+`tig-benchmarker` can be compiled into an executable for running standalone, or in slave mode (see notes)
 
-There are two ways to run locally:
+There are two ways to start the master benchmarker:
 
 1. Compile into exectuable and then run the executable:
     ```
@@ -44,6 +44,8 @@ There are two ways to run locally:
 
 * Every 10 seconds, the benchmarker reads your json file path and uses the contents to update its algorithm selection. 
 * You can see available algorithms in the dropdowns of the [Benchmarker UI](https://play.tig.foundation/benchmarker)
+* `tig-benchmarker` starts a master node by default. The port can be set with `--port <port>` (default 5115)
+* `tig-benchmarker` that are started with the option `--master <hostname>` are ran as slaves and will poll the master for jobs
 * `tig-benchmarker` can be executed with `--help` to see all options including setting the number of workers, and setting the duration of a benchmark
 
 # Finding your API Key

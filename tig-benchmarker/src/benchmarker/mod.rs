@@ -1,8 +1,8 @@
 mod difficulty_sampler;
-mod download_wasm;
+pub mod download_wasm;
 mod find_proof_to_submit;
 mod query_data;
-mod run_benchmark;
+pub mod run_benchmark;
 mod setup_job;
 mod submit_benchmark;
 mod submit_proof;
@@ -10,7 +10,7 @@ mod submit_proof;
 use crate::future_utils::{sleep, spawn, time, Mutex};
 use difficulty_sampler::DifficultySampler;
 use once_cell::sync::OnceCell;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tig_api::Api;
 use tig_structs::{
@@ -56,14 +56,14 @@ impl Timer {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Job {
-    download_url: String,
-    benchmark_id: String,
-    settings: BenchmarkSettings,
-    solution_signature_threshold: u32,
-    sampled_nonces: Option<Vec<u32>>,
-    wasm_vm_config: WasmVMConfig,
+    pub download_url: String,
+    pub benchmark_id: String,
+    pub settings: BenchmarkSettings,
+    pub solution_signature_threshold: u32,
+    pub sampled_nonces: Option<Vec<u32>>,
+    pub wasm_vm_config: WasmVMConfig,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -139,17 +139,12 @@ pub struct State {
     pub difficulty_samplers: HashMap<String, DifficultySampler>,
 }
 
-static BLOBS: OnceCell<Mutex<HashMap<String, Vec<u8>>>> = OnceCell::new();
 static STATE: OnceCell<Mutex<State>> = OnceCell::new();
 static API: OnceCell<Api> = OnceCell::new();
 static PLAYER_ID: OnceCell<String> = OnceCell::new();
 
 pub fn api() -> &'static Api {
     API.get().expect("API should be initialised")
-}
-
-pub fn blobs() -> &'static Mutex<HashMap<String, Vec<u8>>> {
-    BLOBS.get().expect("BLOBS should be initialised")
 }
 
 pub fn player_id() -> &'static String {
@@ -298,7 +293,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
         {
             // transfers solutions computed by workers to benchmark state
             let num_solutions =
-                drain_solutions(job.benchmark_id.clone(), solutions_data.clone()).await;
+                drain_solutions(&job.benchmark_id, &mut *(*solutions_data).lock().await).await;
             let mut finished = true;
             let mut num_attempts = 0;
             for nonce_iter in nonce_iters.iter().cloned() {
@@ -330,7 +325,8 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     }
 
     // transfers solutions computed by workers to benchmark state
-    let num_solutions = drain_solutions(job.benchmark_id.clone(), solutions_data.clone()).await;
+    let num_solutions =
+        drain_solutions(&job.benchmark_id, &mut *(*solutions_data).lock().await).await;
     if let Some(sampled_nonces) = job.sampled_nonces.as_ref() {
         if num_solutions != sampled_nonces.len() as u32 {
             let mut state = (*state()).lock().await;
@@ -395,28 +391,27 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     Ok(())
 }
 
-async fn drain_solutions(
-    benchmark_id: String,
-    solutions_data: Arc<Mutex<Vec<SolutionData>>>,
-) -> u32 {
-    let mut solutions_data = (*solutions_data).lock().await;
+pub async fn drain_solutions(benchmark_id: &String, solutions_data: &mut Vec<SolutionData>) -> u32 {
     let mut state = (*state()).lock().await;
     let QueryData {
         benchmarks, proofs, ..
     } = &mut (*state).query_data;
-    let benchmark = benchmarks.get_mut(&benchmark_id).unwrap();
-    let proof = proofs.get_mut(&benchmark_id).unwrap();
-    if let Some(x) = benchmark.solutions_meta_data.as_mut() {
-        x.extend(
-            solutions_data
-                .iter()
-                .map(|x| SolutionMetaData::from(x.clone())),
-        );
-        benchmark.details.num_solutions = x.len() as u32;
+    if let Some(benchmark) = benchmarks.get_mut(benchmark_id) {
+        let proof = proofs.get_mut(benchmark_id).unwrap();
+        if let Some(x) = benchmark.solutions_meta_data.as_mut() {
+            x.extend(
+                solutions_data
+                    .iter()
+                    .map(|x| SolutionMetaData::from(x.clone())),
+            );
+            benchmark.details.num_solutions = x.len() as u32;
+        }
+        let to_update = proof.solutions_data.as_mut().unwrap();
+        to_update.extend(solutions_data.drain(..));
+        to_update.len() as u32
+    } else {
+        0
     }
-    let to_update = proof.solutions_data.as_mut().unwrap();
-    to_update.extend((*solutions_data).drain(..));
-    to_update.len() as u32
 }
 pub async fn start(num_workers: u32, ms_per_benchmark: u32) {
     {
@@ -462,7 +457,6 @@ pub async fn select_algorithm(challenge_name: String, algorithm_name: String) {
 }
 
 pub async fn setup(api_url: String, api_key: String, player_id: String) {
-    BLOBS.get_or_init(|| Mutex::new(HashMap::new()));
     API.get_or_init(|| Api::new(api_url, api_key));
     PLAYER_ID.get_or_init(|| player_id);
     let query_data = query_data::execute().await.expect("Failed to query data");
