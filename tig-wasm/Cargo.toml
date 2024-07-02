@@ -11,6 +11,7 @@ edition.workspace = true
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
+anyhow = "1.0.81"
 tig-algorithms = { path = "../tig-algorithms" }
 tig-challenges = { path = "../tig-challenges" }
 tig-utils = { path = "../tig-utils" }
