@@ -26,7 +26,8 @@ There are two ways to start the master benchmarker:
 
 1. Compile into exectuable and then run the executable:
     ```
-    cargo build -p tig-benchmarker --release --no-default-features --features standalone
+    ALGOS_TO_COMPILE="" # See notes
+    cargo build -p tig-benchmarker --release --no-default-features --features "standalone ${ALGOS_TO_COMPILE}"
     # edit below line for your own algorithm selection
     echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' > algo_selection.json
     ./target/release/tig-benchmarker <address> <api_key> algo_selection.json
@@ -34,13 +35,24 @@ There are two ways to start the master benchmarker:
 
 2. Compile executable in a docker, and run the docker:
     ```
-    docker build -f tig-benchmarker/Dockerfile -t tig-benchmarker .
+    ALGOS_TO_COMPILE="" # See notes
+    docker build -f tig-benchmarker/Dockerfile --build-arg features="${ALGOS_TO_COMPILE}" -t tig-benchmarker .
     # edit below line for your own algorithm selection
     echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' > algo_selection.json
     docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> algo_selection.json
     ```
 
-**Note:**
+**Notes:**
+
+* Setting `ALGOS_TO_COMPILE` will run the selected algorithms directly in your execution environment to filter for nonces that results in solutions. Nonces that are filtered will then be re-run in the WASM virtual machine to compute the necessary solution data for submission.
+
+    * **WARNING** before setting `ALGOS_TO_COMPILE`, be sure to thoroughly review the algorithm code for malicious routines as it will be ran directly in your execution environment (not within a sandboxed WASM virtual machine)!
+
+    * `ALGOS_TO_COMPILE` is a space separated string of algorithms with format `<challenge_name>_<algorithm_name>`. Example: 
+    
+        ```
+        ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic"
+        ```
 
 * Every 10 seconds, the benchmarker reads your json file path and uses the contents to update its algorithm selection. 
 * You can see available algorithms in the dropdowns of the [Benchmarker UI](https://play.tig.foundation/benchmarker)
