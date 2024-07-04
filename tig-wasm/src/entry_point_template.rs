@@ -6,8 +6,9 @@ use tig_utils::compress_obj;
 pub fn entry_point(seed: u32, difficulty: Difficulty, ptr: *mut u8, max_length: usize) {
     let challenge =
         Challenge::generate_instance(seed, &difficulty).expect("Failed to generate challenge");
+    let result: anyhow::Result<Option<Solution>> = {ALGORITHM}::solve_challenge(&challenge);
     let (is_solution, compressed) =
-        if let Ok(Some(solution)) = {ALGORITHM}::solve_challenge(&challenge) {
+        if let Ok(Some(solution)) = result {
             (
                 challenge.verify_solution(&solution).is_ok(),
                 compress_obj(solution),

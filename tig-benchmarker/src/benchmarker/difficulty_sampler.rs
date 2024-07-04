@@ -263,12 +263,6 @@ impl DifficultySampler {
         let hardest_difficulty: Vec<i32> = (0..2)
             .into_iter()
             .map(|i| {
-                let v1 = block_data
-                    .qualifier_difficulties()
-                    .iter()
-                    .map(|x| x[i])
-                    .max()
-                    .unwrap();
                 let v2 = block_data
                     .scaled_frontier()
                     .iter()
@@ -281,7 +275,15 @@ impl DifficultySampler {
                     .map(|x| x[i])
                     .max()
                     .unwrap();
-                v1.max(v2).max(v3)
+                match block_data
+                    .qualifier_difficulties()
+                    .iter()
+                    .map(|x| x[i])
+                    .max()
+                {
+                    Some(v1) => v1.max(v2).max(v3),
+                    None => v2.max(v3),
+                }
             })
             .collect();
         self.dimensions = (0..2)
