@@ -6063,8 +6063,8 @@ pub async fn execute(
                                 type SolveChallengeFn = fn(&tig_challenges::knapsack::Challenge) -> anyhow::Result<Option<tig_challenges::knapsack::Solution>>;
                                 if let Some(solve_challenge) =
                                     match job.settings.algorithm_id.as_str() {
-                                        // #[cfg(feature = "c003_a001")]
-                                        // "c003_a001" => Some(tig_algorithms::knapsack::c003_a001::solve_challenge as SolveChallengeFn),
+                                        #[cfg(feature = "knapsack_dynamic")]
+                                        "c003_a001" => Some(tig_algorithms::knapsack::dynamic::solve_challenge as SolveChallengeFn),
                                         
                                         // #[cfg(feature = "c003_a002")]
                                         // "c003_a002" => Some(tig_algorithms::knapsack::c003_a002::solve_challenge as SolveChallengeFn),
