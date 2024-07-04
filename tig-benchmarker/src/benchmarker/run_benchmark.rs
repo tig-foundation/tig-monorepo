@@ -37,8 +37,8 @@ pub async fn execute(
                                 type SolveChallengeFn = fn(&tig_challenges::satisfiability::Challenge) -> anyhow::Result<Option<tig_challenges::satisfiability::Solution>>;
                                 if let Some(solve_challenge) =
                                     match job.settings.algorithm_id.as_str() {
-                                        // #[cfg(feature = "c001_a001")]
-                                        // "c001_a001" => Some(tig_algorithms::satisfiability::c001_a001::solve_challenge as SolveChallengeFn),
+                                        #[cfg(feature = "satisfiability_schnoing")]
+                                        "c001_a001" => Some(tig_algorithms::satisfiability::schnoing::solve_challenge as SolveChallengeFn),
                                         
                                         // #[cfg(feature = "c001_a002")]
                                         // "c001_a002" => Some(tig_algorithms::satisfiability::c001_a002::solve_challenge as SolveChallengeFn),

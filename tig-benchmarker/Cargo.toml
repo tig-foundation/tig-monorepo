@@ -58,7 +58,7 @@ browser = [
     "tig-api/request-js",
 ]
 
-# c001_a001 = []
+satisfiability_schnoing = []
 
 vehicle_routing_clarke_wright = []
 
