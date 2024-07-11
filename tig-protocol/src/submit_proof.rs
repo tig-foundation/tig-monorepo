@@ -5,7 +5,7 @@ use tig_structs::core::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     player: &Player,
     benchmark_id: &String,
     solutions_data: &Vec<SolutionData>,
@@ -29,7 +29,7 @@ pub(crate) async fn execute<T: Context>(
 
 #[time]
 async fn get_benchmark_by_id<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark_id: &String,
 ) -> ProtocolResult<Benchmark> {
     ctx.get_benchmarks(BenchmarksFilter::Id(benchmark_id.clone()), true)
@@ -43,7 +43,7 @@ async fn get_benchmark_by_id<T: Context>(
 }
 
 #[time]
-async fn verify_no_fraud<T: Context>(ctx: &mut T, benchmark_id: &String) -> ProtocolResult<()> {
+async fn verify_no_fraud<T: Context>(ctx: &T, benchmark_id: &String) -> ProtocolResult<()> {
     if ctx
         .get_frauds(FraudsFilter::BenchmarkId(benchmark_id.clone()), false)
         .await
@@ -60,7 +60,7 @@ async fn verify_no_fraud<T: Context>(ctx: &mut T, benchmark_id: &String) -> Prot
 
 #[time]
 async fn verify_proof_not_already_submitted<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark_id: &String,
 ) -> ProtocolResult<()> {
     if ctx
@@ -108,7 +108,7 @@ fn verify_sampled_nonces(
 
 #[time]
 async fn verify_solutions_are_valid<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark: &Benchmark,
     solutions_data: &Vec<SolutionData>,
 ) -> ProtocolResult<()> {

@@ -6,7 +6,7 @@ use tig_utils::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     player: &Player,
     details: &AlgorithmDetails,
     code: &String,
@@ -22,7 +22,7 @@ pub(crate) async fn execute<T: Context>(
 
 #[time]
 async fn verify_challenge_exists<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     details: &AlgorithmDetails,
 ) -> ProtocolResult<()> {
     if ctx
@@ -40,7 +40,7 @@ async fn verify_challenge_exists<T: Context>(
 
 #[time]
 async fn verify_submission_fee<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     player: &Player,
     details: &AlgorithmDetails,
 ) -> ProtocolResult<()> {

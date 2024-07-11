@@ -6,7 +6,7 @@ use tig_utils::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     player: &Player,
     settings: &BenchmarkSettings,
     solutions_meta_data: &Vec<SolutionMetaData>,
@@ -61,7 +61,7 @@ fn verify_player_owns_benchmark(
 }
 
 #[time]
-async fn verify_sufficient_lifespan<T: Context>(ctx: &mut T, block: &Block) -> ProtocolResult<()> {
+async fn verify_sufficient_lifespan<T: Context>(ctx: &T, block: &Block) -> ProtocolResult<()> {
     let latest_block = ctx
         .get_block(BlockFilter::Latest, false)
         .await
@@ -79,7 +79,7 @@ async fn verify_sufficient_lifespan<T: Context>(ctx: &mut T, block: &Block) -> P
 
 #[time]
 async fn get_challenge_by_id<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     challenge_id: &String,
     block: &Block,
 ) -> ProtocolResult<Challenge> {
@@ -105,7 +105,7 @@ async fn get_challenge_by_id<T: Context>(
 
 #[time]
 async fn verify_algorithm<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     algorithm_id: &String,
     block: &Block,
 ) -> ProtocolResult<()> {
@@ -129,7 +129,7 @@ async fn verify_algorithm<T: Context>(
 }
 
 #[time]
-async fn get_block_by_id<T: Context>(ctx: &mut T, block_id: &String) -> ProtocolResult<Block> {
+async fn get_block_by_id<T: Context>(ctx: &T, block_id: &String) -> ProtocolResult<Block> {
     ctx.get_block(BlockFilter::Id(block_id.clone()), true)
         .await
         .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
@@ -155,7 +155,7 @@ fn verify_sufficient_solutions(
 
 #[time]
 async fn verify_benchmark_settings_are_unique<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     settings: &BenchmarkSettings,
 ) -> ProtocolResult<()> {
     if ctx
@@ -262,7 +262,7 @@ fn verify_benchmark_difficulty(
 
 #[time]
 async fn verify_solution_is_valid<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     settings: &BenchmarkSettings,
     solutions_meta_data: &Vec<SolutionMetaData>,
     solution_data: &SolutionData,

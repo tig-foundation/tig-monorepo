@@ -4,7 +4,7 @@ use tig_structs::core::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark_id: &String,
 ) -> ProtocolResult<Result<(), String>> {
     let benchmark = get_benchmark_by_id(ctx, benchmark_id).await?;
@@ -21,7 +21,7 @@ pub(crate) async fn execute<T: Context>(
 
 #[time]
 async fn get_benchmark_by_id<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark_id: &String,
 ) -> ProtocolResult<Benchmark> {
     Ok(ctx
@@ -35,7 +35,7 @@ async fn get_benchmark_by_id<T: Context>(
 
 #[time]
 async fn get_proof_by_benchmark_id<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark_id: &String,
 ) -> ProtocolResult<Proof> {
     Ok(ctx
@@ -49,7 +49,7 @@ async fn get_proof_by_benchmark_id<T: Context>(
 
 #[time]
 async fn verify_solutions_with_algorithm<T: Context>(
-    ctx: &mut T,
+    ctx: &T,
     benchmark: &Benchmark,
     proof: &Proof,
 ) -> ProtocolResult<()> {
