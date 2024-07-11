@@ -19,23 +19,23 @@ impl<'a, T: Context> Protocol<T> {
     }
 
     pub async fn submit_algorithm(
-        &mut self,
+        &self,
         player: &Player,
         details: &AlgorithmDetails,
         code: &String,
     ) -> ProtocolResult<String> {
-        submit_algorithm::execute(&mut self.ctx, player, details, code).await
+        submit_algorithm::execute(&self.ctx, player, details, code).await
     }
 
     pub async fn submit_benchmark(
-        &mut self,
+        &self,
         player: &Player,
         settings: &BenchmarkSettings,
         solutions_meta_data: &Vec<SolutionMetaData>,
         solution_data: &SolutionData,
     ) -> ProtocolResult<(String, Result<(), String>)> {
         submit_benchmark::execute(
-            &mut self.ctx,
+            &self.ctx,
             player,
             settings,
             solutions_meta_data,
@@ -45,22 +45,19 @@ impl<'a, T: Context> Protocol<T> {
     }
 
     pub async fn submit_proof(
-        &mut self,
+        &self,
         player: &Player,
         benchmark_id: &String,
         solutions_data: &Vec<SolutionData>,
     ) -> ProtocolResult<Result<(), String>> {
-        submit_proof::execute(&mut self.ctx, player, benchmark_id, solutions_data).await
+        submit_proof::execute(&self.ctx, player, benchmark_id, solutions_data).await
     }
 
-    pub async fn verify_proof(
-        &mut self,
-        benchmark_id: &String,
-    ) -> ProtocolResult<Result<(), String>> {
-        verify_proof::execute(&mut self.ctx, benchmark_id).await
+    pub async fn verify_proof(&self, benchmark_id: &String) -> ProtocolResult<Result<(), String>> {
+        verify_proof::execute(&self.ctx, benchmark_id).await
     }
 
-    pub async fn add_block(&mut self) -> String {
-        add_block::execute(&mut self.ctx).await
+    pub async fn add_block(&self) -> String {
+        add_block::execute(&self.ctx).await
     }
 }
