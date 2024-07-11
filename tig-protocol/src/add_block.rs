@@ -68,7 +68,7 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         data.mempool_algorithm_ids.insert(algorithm.id.clone());
     }
     for benchmark in ctx
-        .get_benchmarks(BenchmarksFilter::Mempool { from_block_started }, true)
+        .get_benchmarks(BenchmarksFilter::Mempool { from_block_started }, false)
         .await
         .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
         .iter()
