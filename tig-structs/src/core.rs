@@ -36,6 +36,7 @@ serializable_struct_with_getters! {
     Challenge {
         id: String,
         details: ChallengeDetails,
+        state: Option<ChallengeState>,
         block_data: Option<ChallengeBlockData>,
     }
 }
@@ -150,6 +151,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     BlockData {
+        mempool_challenge_ids: HashSet<String>,
         mempool_algorithm_ids: HashSet<String>,
         mempool_benchmark_ids: HashSet<String>,
         mempool_proof_ids: HashSet<String>,
@@ -166,6 +168,12 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     ChallengeDetails {
         name: String,
+    }
+}
+serializable_struct_with_getters! {
+    ChallengeState {
+        block_confirmed: Option<u32>,
+        round_active: Option<u32>,
     }
 }
 serializable_struct_with_getters! {

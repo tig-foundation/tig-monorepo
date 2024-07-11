@@ -49,6 +49,7 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         .height
         .saturating_sub(config.benchmark_submissions.lifespan_period);
     let mut data = BlockData {
+        mempool_challenge_ids: HashSet::<String>::new(),
         mempool_algorithm_ids: HashSet::<String>::new(),
         mempool_benchmark_ids: HashSet::<String>::new(),
         mempool_fraud_ids: HashSet::<String>::new(),
@@ -59,6 +60,14 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         active_benchmark_ids: HashSet::<String>::new(),
         active_player_ids: HashSet::<String>::new(),
     };
+    for challenge in ctx
+        .get_challenges(ChallengesFilter::Mempool, None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+        .iter()
+    {
+        data.mempool_challenge_ids.insert(challenge.id.clone());
+    }
     for algorithm in ctx
         .get_algorithms(AlgorithmsFilter::Mempool, None, false)
         .await
@@ -100,8 +109,20 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         data.mempool_wasm_ids.insert(wasm.algorithm_id.clone());
     }
 
-    data.active_challenge_ids
-        .extend(config.difficulty.parameters.keys().cloned());
+    for challenge in ctx
+        .get_challenges(ChallengesFilter::Confirmed, None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+    {
+        if challenge
+            .state
+            .unwrap()
+            .round_active
+            .is_some_and(|r| r <= details.round)
+        {
+            data.active_challenge_ids.insert(challenge.id.clone());
+        }
+    }
     let wasms: HashMap<String, Wasm> = ctx
         .get_wasms(WasmsFilter::Confirmed, false)
         .await
@@ -181,6 +202,15 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         .add_block(&details, &data, &config)
         .await
         .unwrap_or_else(|e| panic!("add_block error: {:?}", e));
+    for challenge_id in data.mempool_challenge_ids.iter() {
+        let state = ChallengeState {
+            block_confirmed: None,
+            round_active: None,
+        };
+        ctx.update_challenge_state(challenge_id, &state)
+            .await
+            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
+    }
     for algorithm_id in data.mempool_algorithm_ids.iter() {
         let state = AlgorithmState {
             block_confirmed: None,
@@ -268,6 +298,20 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         config: Some(config.clone()),
         details,
         data: Some(data),
+    }
+}
+
+#[time]
+async fn confirm_mempool_challenges<T: Context>(ctx: &T, block: &Block) {
+    for challenge_id in block.data().mempool_challenge_ids.iter() {
+        let challenge = get_challenge_by_id(ctx, challenge_id, None)
+            .await
+            .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e));
+        let mut state = challenge.state().clone();
+        state.block_confirmed = Some(block.details.height);
+        ctx.update_challenge_state(challenge_id, &state)
+            .await
+            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
     }
 }
 
