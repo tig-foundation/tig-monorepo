@@ -911,13 +911,21 @@ async fn update_adoption<T: Context>(ctx: &T, block: &Block) {
             let mut weight = PreciseNumber::from(0);
             for (player_id, &num_qualifiers) in data.num_qualifiers_by_player().iter() {
                 let num_qualifiers = PreciseNumber::from(num_qualifiers);
-                let influence = *get_player_by_id(ctx, player_id, Some(&block.id))
+                let player_data = get_player_by_id(ctx, player_id, Some(&block.id))
                     .await
                     .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
-                    .block_data()
-                    .influence();
+                    .block_data
+                    .unwrap();
+                let influence = player_data.influence.unwrap();
+                let player_num_qualifiers = PreciseNumber::from(
+                    player_data
+                        .num_qualifiers_by_challenge
+                        .unwrap()
+                        .remove(challenge_id)
+                        .unwrap(),
+                );
 
-                weight = weight + influence * num_qualifiers;
+                weight = weight + influence * num_qualifiers / player_num_qualifiers;
             }
             weights.push(weight);
         }
