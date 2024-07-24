@@ -13,6 +13,7 @@ Cargo.lock
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-.vscode//Users/jack/TIG/TIG-algorithm-tester/.gitignore
+.vscode/
 
 .DS_Store
+__pycache__/
