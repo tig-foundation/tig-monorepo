@@ -317,25 +317,38 @@ const downloadS3Data = async (startHeight, endHeight) => {
   for (let height = startHeight; height <= endHeight; height++) {
     const fileName = `data_${height}.zip`;
     const url = `${S3_PUBLIC_URL}/${fileName}`;
-    try {
-      const response = await axios.get(url, { responseType: 'arraybuffer' });
-      const zip = new AdmZip(response.data);
-      const zipEntries = zip.getEntries();
+    let retries = 0;
+    const maxRetries = 5;
 
-      const jsonEntry = zipEntries.find(entry => entry.entryName === `data_${height}.json`);
-      if (jsonEntry) {
-        const jsonData = JSON.parse(jsonEntry.getData().toString('utf8'));
-        await consumeMessage(JSON.stringify(jsonData));
-        console.log(`Downloaded and processed data for block ${height}`);
-        await setLastProcessedHeight(height);
-        await setS3SyncHeight(height);
-      } else {
-        throw new Error(`data_${height}.json not found in the ZIP file`);
+    while (retries < maxRetries) {
+      try {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const zip = new AdmZip(response.data);
+        const zipEntries = zip.getEntries();
+
+        const jsonEntry = zipEntries.find(entry => entry.entryName === `data_${height}.json`);
+        if (jsonEntry) {
+          const jsonData = JSON.parse(jsonEntry.getData().toString('utf8'));
+          await consumeMessage(JSON.stringify(jsonData));
+          console.log(`Downloaded and processed data for block ${height}`);
+          await setLastProcessedHeight(height);
+          await setS3SyncHeight(height);
+          break;
+        } else {
+          throw new Error(`data_${height}.json not found in the ZIP file`);
+        }
+      } catch (error) {
+        retries++;
+        console.error(`error downloading and processing data for block ${height} from S3:`, error);
+        if (retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        }
       }
-    } catch (error) {
-      console.error(`error downloading and processing data for block ${height} from S3:`, error);
-    }
   }
+  if (retries === maxRetries) {
+    console.error(`Failed to download data for block ${height} after ${maxRetries} attempts`);
+  }
+}
   syncInProgress = false;
 };
 
