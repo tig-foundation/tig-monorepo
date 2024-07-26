@@ -221,10 +221,10 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
                 "Computed {} solutions out of {} instances",
                 num_solutions, num_attempts
             );
-            sleep(200).await;
+            sleep(100).await;
         } else {
-            println!("No job, sleeping 1s");
-            sleep(1000).await;
+            println!("No job, sleeping 100ms");
+            sleep(100).await;
         }
     }
 }
