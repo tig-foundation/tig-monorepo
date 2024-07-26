@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: ./postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./${NODE_ENV}-data:/var/lib/postgresql/data
+
+  synchroniser:
+    build:
+      context: ./src
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      NODE_ENV: ${NODE_ENV}

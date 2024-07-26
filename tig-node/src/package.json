@@ -1,0 +1,14 @@
+{
+  "name": "slave-node",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.14",
+    "axios": "^0.21.1",
+    "dotenv": "^16.4.5",
+    "pg": "^8.6.0"
+  }
+}
