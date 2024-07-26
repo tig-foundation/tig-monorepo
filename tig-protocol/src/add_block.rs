@@ -247,7 +247,15 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         };
         ctx.update_fraud_state(fraud_id, &state)
             .await
-            .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e));
+            .unwrap_or_else(|e| panic!("update_fraud_state error: {:?}", e));
+    }
+    for wasm_id in data.mempool_wasm_ids.iter() {
+        let state = WasmState {
+            block_confirmed: None,
+        };
+        ctx.update_wasm_state(wasm_id, &state)
+            .await
+            .unwrap_or_else(|e| panic!("update_wasm_state error: {:?}", e));
     }
 
     for challenge_id in data.active_challenge_ids.iter() {
