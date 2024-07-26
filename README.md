@@ -16,6 +16,7 @@ This repository contains the implementation of The Innovation Game (TIG).
 * [tig-api](./tig-api/README.md) - A Rust crate for making requests to TIG's API
 * [tig-benchmarker](./tig-benchmarker/README.md) - A Rust crate that implements a Benchmarker for TIG that can run in the browser
 * [tig-challenges](./tig-challenges/README.md) - A Rust crate that contains the implementation of TIG's challenges (computational problems adapted for proof-of-work)
+* [tig-node](./tig-node/README.md) - Code for running a TIG node to sync up with historic blocks.
 * [tig-protocol](./tig-protocol/README.md) - A Rust crate that contains the implementation of TIG's core protocol logic.
 * [tig-structs](./tig-structs/README.md) - A Rust crate that contains the definitions of structs used throughout TIG
 * [tig-token](./tig-token/README.md) - Solidity contract for TIG's ERC20 token that is deployed on Ethereum L2 Base chain
