@@ -1,0 +1,4 @@
+New test
+Algorithm: lazier_cw, Instances: 7535, solutions: 6462, invalid_solutions: 911, errors: 162, avg_time_per_solution: 1.547508511296812ms 
+Algorithm: simulated_annealing, Instances: 372, solutions: 372, invalid_solutions: 0, errors: 0, avg_time_per_solution: 26.881720430107528ms 
+Algorithm: genetic_algorithm, Instances: 8864, solutions: 9973, invalid_solutions: -1109, errors: 0, avg_time_per_solution: 1.0027073097362882ms 
