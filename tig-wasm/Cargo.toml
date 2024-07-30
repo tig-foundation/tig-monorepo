@@ -12,6 +12,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 anyhow = "1.0.81"
+bincode = "1.3.3"
 tig-algorithms = { path = "../tig-algorithms" }
 tig-challenges = { path = "../tig-challenges" }
 tig-utils = { path = "../tig-utils" }
