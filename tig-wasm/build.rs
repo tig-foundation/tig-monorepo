@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=CHALLENGE");
+    println!("cargo:rerun-if-env-changed=ALGORITHM");
     // Only run the following code if the "entry-point" feature is enabled
     if env::var("CARGO_FEATURE_ENTRY_POINT").is_ok() {
         // Read the CHALLENGE and ALGORITHM environment variables
