@@ -8,6 +8,7 @@ use tig_utils::*;
 #[time]
 pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
     let block = create_block(ctx).await;
+    confirm_mempool_challenges(ctx, &block).await;
     confirm_mempool_algorithms(ctx, &block).await;
     confirm_mempool_benchmarks(ctx, &block).await;
     confirm_mempool_proofs(ctx, &block).await;
