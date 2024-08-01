@@ -30,10 +30,22 @@ async fn verify_challenge_exists<T: Context>(
         .await
         .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
         .expect("Expecting latest block to exist");
-    if !latest_block
-        .data()
-        .active_challenge_ids
-        .contains(&details.challenge_id)
+    if !ctx
+        .get_challenges(ChallengesFilter::Id(details.challenge_id.clone()), None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+        .first()
+        .is_some_and(|c| {
+            c.state()
+                .round_active
+                .as_ref()
+                .is_some_and(|r| *r <= latest_block.details.round)
+        })
+    {
+        return Err(ProtocolError::InvalidChallenge {
+            challenge_id: details.challenge_id.clone(),
+        });
+    }
     {
         return Err(ProtocolError::InvalidChallenge {
             challenge_id: details.challenge_id.clone(),
