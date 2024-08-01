@@ -52,6 +52,7 @@ serializable_struct_with_getters! {
     QualifiersConfig {
         cutoff_multiplier: f64,
         total_qualifiers_threshold: u32,
+        min_cutoff: Option<u32>,
     }
 }
 serializable_struct_with_getters! {

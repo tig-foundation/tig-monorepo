@@ -464,27 +464,47 @@ async fn update_deposits<T: Context>(ctx: &T, block: &Block) {
 #[time]
 async fn update_cutoffs<T: Context>(ctx: &T, block: &Block) {
     let config = block.config();
-    let num_challenges = block.data().active_challenge_ids.len() as f64;
+    let mut cutoff_challenge_ids = HashSet::new();
+    for algorithm_id in block.data().active_algorithm_ids.iter() {
+        let algorithm = get_algorithm_by_id(ctx, algorithm_id, None)
+            .await
+            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
+        let state = algorithm.state().clone();
+        if state
+            .round_pushed
+            .is_some_and(|r| r + 1 <= block.details.round)
+        {
+            cutoff_challenge_ids.insert(algorithm.details.challenge_id.clone());
+        }
+    }
 
-    let mut total_solutions_by_player = HashMap::<String, f64>::new();
+    let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark_id in block.data().active_benchmark_ids.iter() {
         let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
             .await
             .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
-        *total_solutions_by_player
+        if !cutoff_challenge_ids.contains(&benchmark.settings.challenge_id) {
+            continue;
+        }
+        *num_solutions_by_player_by_challenge
             .entry(benchmark.settings.player_id.clone())
-            .or_default() += benchmark.details.num_solutions as f64;
+            .or_default()
+            .entry(benchmark.settings.challenge_id.clone())
+            .or_default() += benchmark.details.num_solutions;
     }
 
-    for (player_id, total_solutions) in total_solutions_by_player.iter() {
+    for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
         let player = &get_player_by_id(ctx, player_id, Some(&block.id))
             .await
             .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e));
         let mut data = player.block_data().clone();
-
-        data.cutoff = Some(
-            (total_solutions / num_challenges * config.qualifiers.cutoff_multiplier).ceil() as u32,
-        );
+        let min_num_solutions = cutoff_challenge_ids
+            .iter()
+            .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
+            .min()
+            .unwrap();
+        let cutoff = (min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32;
+        data.cutoff = Some(cutoff.max(config.qualifiers.min_cutoff.clone().unwrap()));
 
         ctx.update_player_block_data(player_id, &block.id, &data)
             .await
@@ -495,64 +515,43 @@ async fn update_cutoffs<T: Context>(ctx: &T, block: &Block) {
 #[time]
 async fn update_solution_signature_thresholds<T: Context>(ctx: &T, block: &Block) {
     let config = block.config();
-    let num_challenges = block.data().active_challenge_ids.len() as f64;
 
-    let mut total_solutions_by_player_and_challenge =
-        HashMap::<String, HashMap<String, u32>>::new();
+    let mempool_proof_ids = &block.data().mempool_proof_ids;
+    let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
+    let mut new_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark_id in block.data().active_benchmark_ids.iter() {
         let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
             .await
             .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
-        *total_solutions_by_player_and_challenge
+        *num_solutions_by_player_by_challenge
             .entry(benchmark.settings.player_id.clone())
             .or_default()
             .entry(benchmark.settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
+        if mempool_proof_ids.contains(benchmark_id) {
+            *new_solutions_by_player_by_challenge
+                .entry(benchmark.settings.player_id.clone())
+                .or_default()
+                .entry(benchmark.settings.challenge_id.clone())
+                .or_default() += benchmark.details.num_solutions;
+        }
     }
 
-    let mut solutions_rate_multiplier_by_player = HashMap::<String, HashMap<String, f64>>::new();
-    for player_id in block.data().active_player_ids.iter() {
-        let total_solutions_by_challenge = &total_solutions_by_player_and_challenge[player_id];
-        let player_avg_solutions = (total_solutions_by_challenge
-            .values()
-            .fold(0, |acc, v| acc + *v) as f64
-            / num_challenges)
-            .ceil();
-        solutions_rate_multiplier_by_player.insert(
-            player_id.clone(),
-            total_solutions_by_challenge
-                .iter()
-                .map(|(k, v)| {
-                    (
-                        k.clone(),
-                        if *v == 0 {
-                            1.0
-                        } else {
-                            (player_avg_solutions / (*v as f64)).min(1.0)
-                        },
-                    )
-                })
-                .collect(),
-        );
-    }
-
-    let mut solutions_rate_by_challenge = HashMap::<String, f64>::new();
-    for benchmark_id in block.data().mempool_proof_ids.iter() {
-        let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
+    let mut solutions_rate_by_challenge = HashMap::<String, u32>::new();
+    for (player_id, new_solutions_by_challenge) in new_solutions_by_player_by_challenge.iter() {
+        let cutoff = *get_player_by_id(ctx, player_id, Some(&block.id))
             .await
-            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
-        let scale = match solutions_rate_multiplier_by_player.get(&benchmark.settings.player_id) {
-            Some(fraction_qualifiers) => {
-                match fraction_qualifiers.get(&benchmark.settings.challenge_id) {
-                    Some(fraction) => fraction.clone(),
-                    None => 1.0,
-                }
-            }
-            None => 1.0,
-        };
-        *solutions_rate_by_challenge
-            .entry(benchmark.settings.challenge_id.clone())
-            .or_default() += scale * benchmark.details.num_solutions as f64;
+            .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
+            .block_data()
+            .cutoff();
+        for (challenge_id, new_solutions) in new_solutions_by_challenge.iter() {
+            let num_solutions =
+                num_solutions_by_player_by_challenge[player_id][challenge_id].clone();
+            *solutions_rate_by_challenge
+                .entry(challenge_id.clone())
+                .or_default() +=
+                new_solutions.saturating_sub(num_solutions - cutoff.min(num_solutions));
+        }
     }
 
     for challenge_id in block.data().active_challenge_ids.iter() {
@@ -566,9 +565,7 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &T, block: &Block
                 Some(data) => *data.solution_signature_threshold() as f64,
                 None => max_threshold,
             };
-        let current_rate = *solutions_rate_by_challenge
-            .get(challenge_id)
-            .unwrap_or(&0.0);
+        let current_rate = *solutions_rate_by_challenge.get(challenge_id).unwrap_or(&0) as f64;
 
         let equilibrium_rate = config.qualifiers.total_qualifiers_threshold as f64
             / config.benchmark_submissions.lifespan_period as f64;
