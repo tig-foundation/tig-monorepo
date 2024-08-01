@@ -6,12 +6,15 @@ on:
       - 'satisfiability/*'
       - 'vehicle_routing/*'
       - 'knapsack/*'
+      - 'vector_search/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
+      - 'test/vector_search/*'
       - 'dev/satisfiability/*'
       - 'dev/vehicle_routing/*'
       - 'dev/knapsack/*'
+      - 'dev/vector_search/*'
 
 jobs:
   build_wasm:
