@@ -25,11 +25,15 @@ async fn verify_challenge_exists<T: Context>(
     ctx: &T,
     details: &AlgorithmDetails,
 ) -> ProtocolResult<()> {
-    if ctx
-        .get_challenges(ChallengesFilter::Id(details.challenge_id.clone()), None)
+    let latest_block = ctx
+        .get_block(BlockFilter::Latest, false)
         .await
-        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
-        .is_empty()
+        .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
+        .expect("Expecting latest block to exist");
+    if !latest_block
+        .data()
+        .active_challenge_ids
+        .contains(&details.challenge_id)
     {
         return Err(ProtocolError::InvalidChallenge {
             challenge_id: details.challenge_id.clone(),
