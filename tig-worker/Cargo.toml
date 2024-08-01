@@ -19,7 +19,7 @@ tig-algorithms = { path = "../tig-algorithms" }
 tig-challenges = { path = "../tig-challenges" }
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
-wasmi = { git = "https://github.com/tig-foundation/wasmi.git", branch = "runtime_signature" }
+wasmi = { git = "https://github.com/tig-foundation/wasmi.git", branch = "runtime_signature_v0.35.0" }
 
 [features]
 

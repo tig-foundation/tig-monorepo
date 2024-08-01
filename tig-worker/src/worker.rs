@@ -12107,7 +12107,7 @@ pub fn compute_solution(
             let engine = Engine::new(&config);
             let mut store = Store::new(&engine, limits);
             store.limiter(|lim| lim);
-            store.add_fuel(max_fuel).unwrap();
+            store.set_fuel(max_fuel).unwrap();
             let linker = Linker::new(&engine);
             let module = Module::new(store.engine(), wasm).expect("Failed to instantiate module");
 
@@ -12142,7 +12142,7 @@ pub fn compute_solution(
             let runtime_signature_u64 = store.get_runtime_signature();
             let runtime_signature =
                 (runtime_signature_u64 as u32) ^ ((runtime_signature_u64 >> 32) as u32);
-            let fuel_consumed = store.fuel_consumed().unwrap();
+            let fuel_consumed = store.get_fuel().unwrap();
             // Read solution from memory
             let mut solution_len_bytes = [0u8; 4];
             memory
