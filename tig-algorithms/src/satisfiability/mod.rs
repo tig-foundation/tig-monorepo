@@ -32,7 +32,7 @@ pub mod sprint_sat; // c001_a012
 
 // c001_a017
 
-// c001_a018
+pub mod inbound; // c001_a018
 
 // c001_a019
 
