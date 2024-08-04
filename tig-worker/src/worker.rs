@@ -3041,8 +3041,8 @@ pub fn compute_solution(
             )
                 -> anyhow::Result<Option<vehicle_routing::Solution>>;
             match match settings.algorithm_id.as_str() {
-                // #[cfg(feature = "c002_a001")]
-                // "c002_a001" => Some(tig_algorithms::vehicle_routing::c002_a001::solve_challenge as SolveChallengeFn),
+                #[cfg(feature = "vehicle_routing_clarke_wright")]
+                "c002_a001" => Some(tig_algorithms::vehicle_routing::clarke_wright::solve_challenge as SolveChallengeFn),
 
                 // #[cfg(feature = "c002_a002")]
                 // "c002_a002" => Some(tig_algorithms::vehicle_routing::c002_a002::solve_challenge as SolveChallengeFn),
