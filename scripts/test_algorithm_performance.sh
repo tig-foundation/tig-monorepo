@@ -13,9 +13,27 @@ read num_nonces
 challenge_id=$(echo "$settings" | jq -r '.challenge_id')
 algorithm_id=$(echo "$settings" | jq -r '.algorithm_id')
 
-block_id=$(curl -s https://testnet-api.tig.foundation/get-block | jq -r '.block.id')
-algorithm_name=$(curl -s "https://testnet-api.tig.foundation/get-algorithms?block_id=$block_id" | jq -r --arg ID "$algorithm_id" '.algorithms[] | select(.id == $ID) | .details.name')
-challenge_name=$(curl -s "https://testnet-api.tig.foundation/get-challenges?block_id=$block_id" | jq -r --arg ID "$challenge_id" '.challenges[] | select(.id == $ID) | .details.name')
+if [[ -z "$challenge_id" || "$challenge_id" == "null" ]]; then
+  echo "Error: Unable to parse challenge_id"
+  exit 1
+fi
+if [[ -z "$algorithm_id" || "$algorithm_id" == "null" ]]; then
+  echo "Error: Unable to parse algorithm_id"
+  exit 1
+fi
+
+echo "Fetching names for challenge '$challenge_id' and algorithm '$algorithm_id'"
+block_id=$(curl -s https://mainnet-api.tig.foundation/get-block | jq -r '.block.id')
+algorithm_name=$(curl -s "https://mainnet-api.tig.foundation/get-algorithms?block_id=$block_id" | jq -r --arg ID "$algorithm_id" '.algorithms[] | select(.id == $ID) | .details.name')
+challenge_name=$(curl -s "https://mainnet-api.tig.foundation/get-challenges?block_id=$block_id" | jq -r --arg ID "$challenge_id" '.challenges[] | select(.id == $ID) | .details.name')
+if [[ -z "$algorithm_name" || "$algorithm_name" == "null" ]]; then
+  echo "Error: Unable to find algorithm_name for '$algorithm_id'"
+  exit 1
+fi
+if [[ -z "$challenge_name" || "$challenge_name" == "null" ]]; then
+  echo "Error: Unable to find challenge_name for '$challenge_id'"
+  exit 1
+fi
 
 branch="test_performance/${challenge_name}/${algorithm_name}"
 if git show-ref --quiet $branch; then
@@ -29,9 +47,9 @@ else
         exit 1
     fi
     git fetch origin
-    git checkout -b $branch origin/test/blank_slate
+    git checkout -b $branch origin/blank_slate
 fi
-git pull origin test/$challenge_name/$algorithm_name --no-edit
+git pull origin $challenge_name/$algorithm_name --no-edit
 
 cargo build -p tig-worker --release --features ${challenge_name}_${algorithm_name}
 
