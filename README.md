@@ -23,6 +23,16 @@ This repository contains the implementation of The Innovation Game (TIG).
 * [tig-wasm](./tig-wasm/README.md) - A Rust crate for wrapping algorithm submissions for compilation into WASM with an exported `entry_point`
 * [tig-worker](./tig-worker/README.md) - A Rust crate for verifying and computing solutions
 
+## Useful Scripts
+
+Under `scripts/` folder is a bunch of useful bash scripts:
+
+* `list_algorithms.sh`
+* `list_benchmark_ids.sh`
+* `list_challenges.sh`
+* `test_performance.sh`
+* `verify_benchmark_solutions.sh`
+
 ## License
 
 See README for individual folders

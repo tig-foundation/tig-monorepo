@@ -49,8 +49,8 @@ fn main() {
     match matches.subcommand() {
         Some(("compute_solution", sub_m)) => compute_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
-            sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u32>("NONCE").unwrap(),
+            sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u64>("fuel").unwrap(),
             *sub_m.get_one::<u64>("mem").unwrap(),
         ),
@@ -65,8 +65,8 @@ fn main() {
 
 fn compute_solution(
     mut settings: String,
-    wasm_path: PathBuf,
     nonce: u32,
+    wasm_path: PathBuf,
     max_memory: u64,
     max_fuel: u64,
 ) {

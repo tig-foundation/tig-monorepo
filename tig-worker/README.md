@@ -4,43 +4,83 @@ A Rust crate for verifying and computing solutions.
 
 Solutions are computed by executing an algorithm in a WASM virtual machine ([TIG's fork of wasmi](https://github.com/tig-foundation/wasmi)).
 
-## Testing Performance of Algorithms
+# Compiling
 
-Performance testing is done in a sandboxed WASM Virtual Machine.
+`tig-worker` is setup such that you can compile an algorithm to the native environment by setting the feature. This is entirely optional, and is useful for performance testing (see useful scripts).
 
-**IMPORTANT**: You can compile / test existing algorithms as binary executables, but be sure to throughly vet the code beforehand for malicious routines!
+Command for normal compilation:
+```
+cargo build -p tig-worker --release
+./target/release/tig-worker --help
+```
 
-1. Pull an existing algorithm or compile your own algorithm to WASM
-2. Set environment variables to match the algorithm you are testing:
-    ```
-    export CHALLENGE=<challenge_name>
-    export ALGORITHM=<algorithm_name>
-    ```
-3. Pick a difficulty & create `settings.json`:
-    * [Difficulty for Satisfiability](../tig-challenges/src/satisfiability.rs#L12). Recommend `[50, 300]` for initial tests
-    * [Difficulty for Vehicle Routing](../tig-challenges/src/vehicle_routing.rs#L7). Recommend `[40, 250]` for initial tests
-    * [Difficulty for Knapsack](../tig-challenges/src/knapsack.rs#L8). Recommend `[50, 10]` for initial tests
+Command for compiling specific algorithms to native environment:
+```
+ALGOS_TO_COMPILE="" # see notes
+cargo build -p tig-worker --release --features "${ALGOS_TO_COMPILE}"
+./target/release/tig-worker --help
+```
+
+**Notes:**
+
+* Setting `ALGOS_TO_COMPILE` will run the selected algorithms directly in your execution environment to filter for nonces that results in solutions. Nonces that are filtered will then be re-run in the WASM virtual machine to compute the necessary solution data for submission.
+
+* **WARNING** before setting `ALGOS_TO_COMPILE`, be sure to thoroughly review the algorithm code for malicious routines as it will be ran directly in your execution environment (not within a sandboxed WASM virtual machine)!
+
+* `ALGOS_TO_COMPILE` is a space separated string of algorithms with format `<challenge_name>_<algorithm_name>`. Example: 
 
     ```
-    {
-        "block_id": "",
-        "algorithm_id": "",
-        "challenge_id": "",
-        "player_id": "",
-        "difficulty": <your difficulty>
-    }
-    ```
-4. Test the algorithm:
-    ```
-    cargo run -p tig-worker --release -- settings.json tig-algorithms/wasm/${CHALLENGE}/${ALGORITHM}.wasm
+    ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic"
     ```
 
-Notes:
-* You can query the latest difficulty ranges via TIG's API:
-    ```
-    query https://mainnet-api.tig.foundation/get-block for <block_id>
-    query https://mainnet-api.tig.foundation/get-challenges?block_id=<block_id> for qualifier_difficulties
-    ```
+# Usage
+
+`tig-worker` has sub-commands `compute_solution` and `verify_solution`. These are used in 2 scripts:
+
+* [Test algorithm performance](../scripts/test_algorithm_performance.sh)
+* [Verify benchmark solutions](../scripts/verify_benchmark_solutions.sh)
+
+## Compute Solution
+
+Given settings, nonce and the WASM for an algorithm, `tig-worker` computes the solution data (runtime_signature, fuel_consumed, solution). This sub-command does not verify whether the solution is valid or not.
+
+* If the algorithm results in an error, `tig-worker` will terminate with exit code 1 and print error to stderr.
+
+* If the algorithm returns a solution, `tig-worker` will terminate with exit code 0 and print the solution data to stdout.
+
+```
+Usage: tig-worker compute_solution [OPTIONS] <SETTINGS> <NONCE> <WASM>
+
+Arguments:
+  <SETTINGS>  Settings json string or path to json file
+  <NONCE>     Nonce value
+  <WASM>      Path to a wasm file
+
+Options:
+      --fuel [<FUEL>]  Optional maximum fuel parameter for WASM VM [default: 1000000000]
+      --mem [<MEM>]    Optional maximum memory parameter for WASM VM [default: 1000000000]
+  -h, --help           Print help
+```
+
+## Verify Solution
+
+Given settings, nonce and a solution, `tig-worker` verifies the solution is a valid solution for the challenge instance.
+
+* If the solution is valid, `tig-worker` will terminate with exit code 0
+
+* If the solution is invalid, `tig-worker` will terminate with exit code 1
+
+```
+Usage: tig-worker verify_solution <SETTINGS> <NONCE> <SOLUTION>
+
+Arguments:
+  <SETTINGS>  Settings json string or path to json file
+  <NONCE>     Nonce value
+  <SOLUTION>  Solution json string or path to json file
+
+Options:
+  -h, --help  Print help
+```
 
 # License
 

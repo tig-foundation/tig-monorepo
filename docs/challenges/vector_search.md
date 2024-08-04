@@ -55,7 +55,7 @@ mean_distance = 0.47 / 3 = 0.16
 
 In TIG, the vector search challenge features vectors with 250 dimensions, 100000 vectors in the vector database, and uses Euclidean distance. There are two parameters can be adjusted in order to vary the difficulty of the challenge instance:
 
-- Parameter 1: $num\textunderscore{ }querie$ = **The number of queries**.  
+- Parameter 1: $num\textunderscore{ }queries$ = **The number of queries**.  
 - Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline$ = **The mean Euclidean distance of query vectors to selected nearby vectors in the database have to be below `threshold = 6 - better_than_baseline / 1000`**. 
 
 All vectors in the query and database sets are generated uniformly at random within a 250-dimensional hypercube; that is, each component in a vector is drawn from a uniform distribution over the interval $[0, 1]$.
