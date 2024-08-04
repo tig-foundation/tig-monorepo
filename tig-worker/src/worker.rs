@@ -72,8 +72,8 @@ pub fn compute_solution(
                 // #[cfg(feature = "c001_a017")]
                 // "c001_a017" => Some(tig_algorithms::satisfiability::c001_a017::solve_challenge as SolveChallengeFn),
 
-                // #[cfg(feature = "c001_a018")]
-                // "c001_a018" => Some(tig_algorithms::satisfiability::c001_a018::solve_challenge as SolveChallengeFn),
+                #[cfg(feature = "satisfiability_inbound")]
+                "c001_a018" => Some(tig_algorithms::satisfiability::inbound::solve_challenge as SolveChallengeFn),
 
                 // #[cfg(feature = "c001_a019")]
                 // "c001_a019" => Some(tig_algorithms::satisfiability::c001_a019::solve_challenge as SolveChallengeFn),
