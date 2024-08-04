@@ -6059,8 +6059,8 @@ pub fn compute_solution(
             type SolveChallengeFn =
                 fn(&knapsack::Challenge) -> anyhow::Result<Option<knapsack::Solution>>;
             match match settings.algorithm_id.as_str() {
-                // #[cfg(feature = "c003_a001")]
-                // "c003_a001" => Some(tig_algorithms::knapsack::c003_a001::solve_challenge as SolveChallengeFn),
+                #[cfg(feature = "knapsack_dynamic")]
+                "c003_a001" => Some(tig_algorithms::knapsack::dynamic::solve_challenge as SolveChallengeFn),
 
                 // #[cfg(feature = "c003_a002")]
                 // "c003_a002" => Some(tig_algorithms::knapsack::c003_a002::solve_challenge as SolveChallengeFn),

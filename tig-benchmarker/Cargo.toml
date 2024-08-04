@@ -4054,7 +4054,7 @@ vehicle_routing_clarke_wright = ["tig-worker/vehicle_routing_clarke_wright"]
 
 # c002_a999 = ["tig-worker/c002_a999"]
 
-# c003_a001 = ["tig-worker/c003_a001"]
+knapsack_dynamic = ["tig-worker/knapsack_dynamic"]
 
 # c003_a002 = ["tig-worker/c003_a002"]
 
