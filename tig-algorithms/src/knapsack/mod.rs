@@ -34,7 +34,7 @@ pub mod knapmaxxing; // c003_a007
 
 // c003_a018
 
-// c003_a019
+pub mod knapheudp; // c003_a019
 
 // c003_a020
 
