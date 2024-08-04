@@ -78,7 +78,7 @@ satisfiability_walk_sat = ["tig-worker/satisfiability_walk_sat"]
 
 # c001_a010 = ["tig-worker/c001_a010"]
 
-# c001_a011 = ["tig-worker/c001_a011"]
+satisfiability_fast_walk_sat = ["tig-worker/satisfiability_fast_walk_sat"]
 
 # c001_a012 = ["tig-worker/c001_a012"]
 

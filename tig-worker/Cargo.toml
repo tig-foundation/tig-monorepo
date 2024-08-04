@@ -43,7 +43,7 @@ satisfiability_walk_sat = []
 
 # c001_a010 = []
 
-# c001_a011 = []
+satisfiability_fast_walk_sat = []
 
 # c001_a012 = []
 
