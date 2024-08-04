@@ -23,7 +23,7 @@ wasmi = { git = "https://github.com/tig-foundation/wasmi.git", branch = "runtime
 
 [features]
 
-# c001_a001 = []
+satisfiability_schnoing = []
 
 # c001_a002 = []
 

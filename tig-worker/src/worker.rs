@@ -21,8 +21,8 @@ pub fn compute_solution(
             type SolveChallengeFn =
                 fn(&satisfiability::Challenge) -> anyhow::Result<Option<satisfiability::Solution>>;
             match match settings.algorithm_id.as_str() {
-                // #[cfg(feature = "c001_a001")]
-                // "c001_a001" => Some(tig_algorithms::satisfiability::c001_a001::solve_challenge as SolveChallengeFn),
+                #[cfg(feature = "satisfiability_schnoing")]
+                "c001_a001" => Some(tig_algorithms::satisfiability::schnoing::solve_challenge as SolveChallengeFn),
 
                 // #[cfg(feature = "c001_a002")]
                 // "c001_a002" => Some(tig_algorithms::satisfiability::c001_a002::solve_challenge as SolveChallengeFn),
