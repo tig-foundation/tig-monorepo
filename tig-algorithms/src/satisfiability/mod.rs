@@ -6,7 +6,7 @@ pub mod schnoing; // c001_a001
 
 // c001_a004
 
-// c001_a005
+pub mod walk_sat; // c001_a005
 
 // c001_a006
 
