@@ -4066,7 +4066,7 @@ knapsack_dynamic = ["tig-worker/knapsack_dynamic"]
 
 # c003_a006 = ["tig-worker/c003_a006"]
 
-# c003_a007 = ["tig-worker/c003_a007"]
+knapsack_knapmaxxing = ["tig-worker/knapsack_knapmaxxing"]
 
 # c003_a008 = ["tig-worker/c003_a008"]
 
