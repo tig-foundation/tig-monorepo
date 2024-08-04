@@ -24,7 +24,16 @@ pub async fn execute() -> Result<QueryData> {
         let (algorithms_by_challenge, download_urls) = results.0?;
         let player_data = results.1?;
         let (benchmarks, proofs, frauds) = results.2?;
-        let challenges = results.3?;
+        let challenges = results
+            .3?
+            .into_iter()
+            .filter(|c| {
+                c.state()
+                    .round_active
+                    .as_ref()
+                    .is_some_and(|r| *r <= latest_block.details.round)
+            })
+            .collect();
         cache.insert(
             latest_block.id.clone(),
             QueryData {

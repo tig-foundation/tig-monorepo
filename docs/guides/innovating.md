@@ -105,9 +105,14 @@ language governing permissions and limitations under the License.
                 // -- vehicle_routing --
                 // num_nodes: 40,
                 // better_than_baseline: 250,
+
                 // -- knapsack --
                 // num_items: 50,
                 // better_than_baseline: 10,
+                
+                // -- vector_search --
+                // num_queries: 10,
+                // better_than_baseline: 350,
             };
             let seed = 0; // change this to generate different instances
             let challenge = Challenge::generate_instance(seed, &difficulty).unwrap();
