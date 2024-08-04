@@ -80,7 +80,7 @@ browser = [
 
 # c001_a011 = ["tig-worker/c001_a011"]
 
-# c001_a012 = ["tig-worker/c001_a012"]
+satisfiability_sprint_sat = ["tig-worker/satisfiability_sprint_sat"]
 
 # c001_a013 = ["tig-worker/c001_a013"]
 
