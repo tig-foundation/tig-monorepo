@@ -31,7 +31,7 @@ wasmi = { git = "https://github.com/tig-foundation/wasmi.git", branch = "runtime
 
 # c001_a004 = []
 
-# c001_a005 = []
+satisfiability_walk_sat = []
 
 # c001_a006 = []
 
