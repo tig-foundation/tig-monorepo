@@ -62,6 +62,28 @@ Options:
   -h, --help           Print help
 ```
 
+**Example:**
+```
+SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
+NONCE=0
+WASM=./tig-algorithms/wasm/satisfiability/sprint_sat.wasm
+./target/release/tig-worker compute_solution $SETTINGS $NONCE $WASM 
+```
+
+**Notes**:
+* `challenge_id` must be set:
+  * `c001` is satisfiability
+  * `c002` is vehicle_routing
+  * `c003` is knapsack
+  * `c004` is vector_search
+* Recommended low difficulties for testing are:
+  * satisfiability [50,300]
+  * vehicle_routing [40, 250]
+  * knapsack [50, 10]
+  * vector_search [10, 350]
+* You can query the latest difficulties by using the `bash scripts/list_challenges.sh`
+* You can test the performance of an algorithm using `bash scripts/test_algorithm.sh`
+
 ## Verify Solution
 
 Given settings, nonce and a solution, `tig-worker` verifies the solution is a valid solution for the challenge instance.
@@ -81,6 +103,19 @@ Arguments:
 Options:
   -h, --help  Print help
 ```
+
+**Example:**
+```
+SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
+NONCE=0
+SOLUTION='{"variables":[1,0,1,1,1,0,1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1,1,1,0,0,0,1,1,0,0,1,1,0,0,1,0,1,0,1,1,0,0,0,1,1,0,1,1,0]}'
+./target/release/tig-worker verify_solution $SETTINGS $NONCE $SOLUTION
+```
+
+**Notes**:
+* You can list all active benchmark ids with `scripts/list_benchmark_ids.sh`
+* You get benchmark data with  `scripts/list_benchmark_ids.sh`
+* You verify a benchmark's solutions, runtime_signature and fuel_consumed with  `scripts/verify_benchmark.sh`
 
 # License
 
