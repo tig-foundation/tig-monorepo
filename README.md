@@ -30,8 +30,9 @@ Under `scripts/` folder is a bunch of useful bash scripts:
 * `list_algorithms.sh`
 * `list_benchmark_ids.sh`
 * `list_challenges.sh`
-* `test_performance.sh`
-* `verify_benchmark_solutions.sh`
+* `get_benchmark_data.sh`
+* `test_algorithm.sh`
+* `verify_benchmark.sh`
 
 ## License
 
