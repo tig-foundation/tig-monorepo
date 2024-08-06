@@ -46,11 +46,6 @@ async fn verify_challenge_exists<T: Context>(
             challenge_id: details.challenge_id.clone(),
         });
     }
-    {
-        return Err(ProtocolError::InvalidChallenge {
-            challenge_id: details.challenge_id.clone(),
-        });
-    }
     Ok(())
 }
 
