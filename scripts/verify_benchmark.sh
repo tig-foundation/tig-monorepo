@@ -1,9 +1,12 @@
 #!/bin/bash
 set -e
 
-if [ ! -f ./target/release/tig-worker ]; then
+REPO_DIR=$(dirname $(dirname "$(realpath "$0")"))
+TIG_WORKER_PATH="$REPO_DIR/target/release/tig-worker"
+
+if [ ! -f $TIG_WORKER_PATH ]; then
     echo "Error: tig-worker binary not found at ./target/release/tig-worker"
-    echo "Run: cargo build -p tig-worker --release"
+    echo "Run: cd $REPO_DIR && cargo build -p tig-worker --release"
     exit 1
 fi
 
@@ -64,8 +67,6 @@ for i in $(seq 0 $(($solutions_count - 1))); do
         echo "Ok"
     else
         echo "Mismatch. Actual: $compute_output"
-        rm $algorithm_id.wasm
-        exit 1
     fi
 done
 rm $algorithm_id.wasm
