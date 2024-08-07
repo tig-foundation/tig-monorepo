@@ -52,8 +52,30 @@ case $CHALLENGE in
 esac
 
 read -p "Enter difficulty for $CHALLENGE in format [x,y]: " difficulty
+regex='^\[[0-9]+,[0-9]+\]$'
+if ! [[ $difficulty =~ $regex ]]; then
+    echo "Error: Difficulty must be in the format [x,y] where x and y are positive integers."
+    exit 1
+fi
+is_positive_integer() {
+    [[ $1 =~ ^[0-9]+$ ]] && [ "$1" -ge 0 ]
+}
 read -p "Enter starting nonce: " start_nonce
+if ! is_positive_integer "$start_nonce"; then
+    echo "Error: Starting nonce must be a positive integer."
+    exit 1
+fi
 read -p "Enter number of nonces: " num_nonces
+if ! is_positive_integer "$num_nonces"; then
+    echo "Error: Number of nonces must be a positive integer."
+    exit 1
+fi
+read -p "Enable debug mode? (leave blank to disable) " enable_debug
+if [[ -n $enable_debug ]]; then
+    debug_mode=true
+else
+    debug_mode=false
+fi
 
 SETTINGS="{\"challenge_id\":\"$CHALLENGE_ID\",\"difficulty\":$difficulty,\"algorithm_id\":\"\",\"player_id\":\"\",\"block_id\":\"\"}"
 num_solutions=0
@@ -69,15 +91,19 @@ echo "Number of nonces: $num_nonces"
 echo -ne ""
 for ((nonce=start_nonce; nonce<start_nonce+num_nonces; nonce++)); do
     start_time=$(date +%s%3N)
-    output=$(./target/release/tig-worker compute_solution "$SETTINGS" $nonce $REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm 2>&1)
+    stdout=$(mktemp)
+    stderr=$(mktemp)
+    ./target/release/tig-worker compute_solution "$SETTINGS" $nonce $REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm >"$stdout" 2>"$stderr"
     exit_code=$?
+    output_stdout=$(cat "$stdout")
+    output_stderr=$(cat "$stderr")
     end_time=$(date +%s%3N)
     duration=$((end_time - start_time))
     total_ms=$((total_ms + duration))
     if [ $exit_code -eq 0 ]; then
         num_solutions=$((num_solutions + 1))
     else
-      if echo "$output" | grep -q "Invalid solution\|No solution found"; then
+      if echo "$output_stderr" | grep -q "Invalid solution\|No solution found"; then
           num_invalid=$((num_invalid + 1))
       else
           num_errors=$((num_errors + 1))
@@ -88,15 +114,25 @@ for ((nonce=start_nonce; nonce<start_nonce+num_nonces; nonce++)); do
     else
         avg_ms_per_solution=$((total_ms / num_solutions))
     fi
-    echo -ne "#instances: $((num_solutions + num_invalid + num_errors)), #solutions: $num_solutions, #invalid: $num_invalid, #errors: $num_errors, average ms/solution: $avg_ms_per_solution\r"
+    if [[ $debug_mode == true ]]; then
+        echo "    Nonce: $nonce"
+        echo "    Exit code: $exit_code"
+        echo "    Stdout: $output_stdout"
+        echo "    Stderr: $output_stderr"
+        echo "    Duration: $duration ms"
+        echo "#instances: $((num_solutions + num_invalid + num_errors)), #solutions: $num_solutions, #invalid: $num_invalid, #errors: $num_errors, average ms/solution: $avg_ms_per_solution"
+    else
+        echo -ne "#instances: $((num_solutions + num_invalid + num_errors)), #solutions: $num_solutions, #invalid: $num_invalid, #errors: $num_errors, average ms/solution: $avg_ms_per_solution\033[K\r"
+    fi
 done
 echo
 echo "----------------------------------------------------------------------"
 echo "To re-run this test, run the following commands:"
 echo "    git clone https://github.com/tig-foundation/tig-monorepo.git"
 echo "    cd tig-monorepo"
-echo "    git checkout origin/$CHALLENGE/$ALGORITHM"
+echo "    git pull origin/$CHALLENGE/$ALGORITHM --no-edit"
 echo "    bash scripts/test_algorithm.sh"
 echo "----------------------------------------------------------------------"
 echo "Share your results on https://www.reddit.com/r/TheInnovationGame"
 echo "----------------------------------------------------------------------"
+rm "$stdout" "$stderr"
