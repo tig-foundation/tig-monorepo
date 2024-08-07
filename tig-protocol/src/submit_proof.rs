@@ -8,18 +8,19 @@ pub(crate) async fn execute<T: Context>(
     ctx: &T,
     player: &Player,
     benchmark_id: &String,
-    solutions_data: &Vec<SolutionData>,
+    solutions_data: Vec<SolutionData>,
 ) -> ProtocolResult<Result<(), String>> {
     verify_no_fraud(ctx, benchmark_id).await?;
     verify_proof_not_already_submitted(ctx, benchmark_id).await?;
     let benchmark = get_benchmark_by_id(ctx, benchmark_id).await?;
     verify_benchmark_ownership(player, &benchmark)?;
     verify_sampled_nonces(&benchmark, &solutions_data)?;
+    let verification_result = verify_solutions_are_valid(ctx, &benchmark, &solutions_data).await;
     ctx.add_proof_to_mempool(benchmark_id, solutions_data)
         .await
         .unwrap_or_else(|e| panic!("add_proof_to_mempool error: {:?}", e));
-    if let Err(e) = verify_solutions_are_valid(ctx, &benchmark, &solutions_data).await {
-        ctx.add_fraud_to_mempool(benchmark_id, &e.to_string())
+    if let Err(e) = verification_result {
+        ctx.add_fraud_to_mempool(benchmark_id, e.to_string())
             .await
             .unwrap_or_else(|e| panic!("add_fraud_to_mempool error: {:?}", e));
         return Ok(Err(e.to_string()));

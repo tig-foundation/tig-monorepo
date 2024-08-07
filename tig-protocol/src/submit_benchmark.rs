@@ -8,24 +8,26 @@ use tig_utils::*;
 pub(crate) async fn execute<T: Context>(
     ctx: &T,
     player: &Player,
-    settings: &BenchmarkSettings,
-    solutions_meta_data: &Vec<SolutionMetaData>,
-    solution_data: &SolutionData,
+    settings: BenchmarkSettings,
+    solutions_meta_data: Vec<SolutionMetaData>,
+    solution_data: SolutionData,
 ) -> ProtocolResult<(String, Result<(), String>)> {
-    verify_player_owns_benchmark(player, settings)?;
+    verify_player_owns_benchmark(player, &settings)?;
     let block = get_block_by_id(ctx, &settings.block_id).await?;
     verify_sufficient_lifespan(ctx, &block).await?;
     let challenge = get_challenge_by_id(ctx, &settings.challenge_id, &block).await?;
     verify_algorithm(ctx, &settings.algorithm_id, &block).await?;
-    verify_sufficient_solutions(&block, solutions_meta_data)?;
-    verify_benchmark_settings_are_unique(ctx, settings).await?;
-    verify_nonces_are_unique(solutions_meta_data)?;
-    verify_solutions_signatures(solutions_meta_data, &challenge)?;
+    verify_sufficient_solutions(&block, &solutions_meta_data)?;
+    verify_benchmark_settings_are_unique(ctx, &settings).await?;
+    verify_nonces_are_unique(&solutions_meta_data)?;
+    verify_solutions_signatures(&solutions_meta_data, &challenge)?;
     verify_benchmark_difficulty(&settings.difficulty, &challenge, &block)?;
+    let verification =
+        verify_solution_is_valid(ctx, &settings, &solutions_meta_data, &solution_data).await;
     let benchmark_id = ctx
         .add_benchmark_to_mempool(
-            &settings,
-            &BenchmarkDetails {
+            settings,
+            BenchmarkDetails {
                 block_started: block.details.height,
                 num_solutions: solutions_meta_data.len() as u32,
             },
@@ -35,10 +37,8 @@ pub(crate) async fn execute<T: Context>(
         .await
         .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e));
     let mut verified = Ok(());
-    if let Err(e) =
-        verify_solution_is_valid(ctx, settings, solutions_meta_data, solution_data).await
-    {
-        ctx.add_fraud_to_mempool(&benchmark_id, &e.to_string())
+    if let Err(e) = verification {
+        ctx.add_fraud_to_mempool(&benchmark_id, e.to_string())
             .await
             .unwrap_or_else(|e| panic!("add_fraud_to_mempool error: {:?}", e));
         verified = Err(e.to_string());

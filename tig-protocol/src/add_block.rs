@@ -7,29 +7,305 @@ use tig_utils::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
-    let block = create_block(ctx).await;
-    confirm_mempool_challenges(ctx, &block).await;
-    confirm_mempool_algorithms(ctx, &block).await;
-    confirm_mempool_benchmarks(ctx, &block).await;
-    confirm_mempool_proofs(ctx, &block).await;
-    confirm_mempool_frauds(ctx, &block).await;
-    confirm_mempool_wasms(ctx, &block).await;
-    update_deposits(ctx, &block).await;
-    update_cutoffs(ctx, &block).await;
-    update_qualifiers(ctx, &block).await;
-    update_frontiers(ctx, &block).await;
-    update_solution_signature_thresholds(ctx, &block).await;
-    update_influence(ctx, &block).await;
-    update_adoption(ctx, &block).await;
-    update_innovator_rewards(ctx, &block).await;
-    update_benchmarker_rewards(ctx, &block).await;
-    update_merge_points(ctx, &block).await;
-    update_merges(ctx, &block).await;
+    let (block, mut cache) = create_block(ctx).await;
+    confirm_mempool_challenges(&block, &mut cache).await;
+    confirm_mempool_algorithms(&block, &mut cache).await;
+    confirm_mempool_benchmarks(&block, &mut cache).await;
+    confirm_mempool_proofs(ctx, &block, &mut cache).await;
+    confirm_mempool_frauds(&block, &mut cache).await;
+    confirm_mempool_wasms(&block, &mut cache).await;
+    update_deposits(ctx, &block, &mut cache).await;
+    update_cutoffs(&block, &mut cache).await;
+    update_qualifiers(&block, &mut cache).await;
+    update_frontiers(&block, &mut cache).await;
+    update_solution_signature_thresholds(&block, &mut cache).await;
+    update_influence(&block, &mut cache).await;
+    update_adoption(&block, &mut cache).await;
+    update_innovator_rewards(&block, &mut cache).await;
+    update_benchmarker_rewards(&block, &mut cache).await;
+    update_merge_points(&block, &mut cache).await;
+    update_merges(&block, &mut cache).await;
+    commit_changes(ctx, &block, &mut cache).await;
     block.id
 }
 
+struct AddBlockCache {
+    pub mempool_challenges: Vec<Challenge>,
+    pub mempool_algorithms: Vec<Algorithm>,
+    pub mempool_benchmarks: Vec<Benchmark>,
+    pub mempool_proofs: Vec<Proof>,
+    pub mempool_frauds: Vec<Fraud>,
+    pub mempool_wasms: Vec<Wasm>,
+    pub active_challenges: HashMap<String, Challenge>,
+    pub active_algorithms: HashMap<String, Algorithm>,
+    pub active_benchmarks: HashMap<String, Benchmark>,
+    pub active_players: HashMap<String, Player>,
+    pub prev_challenges: HashMap<String, Challenge>,
+    pub prev_algorithms: HashMap<String, Algorithm>,
+    pub prev_players: HashMap<String, Player>,
+}
+
 #[time]
-async fn create_block<T: Context>(ctx: &T) -> Block {
+async fn setup_cache<T: Context>(
+    ctx: &T,
+    details: &BlockDetails,
+    config: &ProtocolConfig,
+) -> AddBlockCache {
+    let from_block_started = details
+        .height
+        .saturating_sub(config.benchmark_submissions.lifespan_period);
+    let mut mempool_challenges = Vec::new();
+    for mut challenge in ctx
+        .get_challenges(ChallengesFilter::Mempool, None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+    {
+        challenge.state = Some(ChallengeState {
+            block_confirmed: None,
+            round_active: None,
+        });
+        mempool_challenges.push(challenge);
+    }
+    let mut mempool_algorithms = Vec::new();
+    for mut algorithm in ctx
+        .get_algorithms(AlgorithmsFilter::Mempool, None, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
+    {
+        algorithm.state = Some(AlgorithmState {
+            block_confirmed: None,
+            round_submitted: None,
+            round_pushed: None,
+            round_merged: None,
+            banned: false,
+        });
+        mempool_algorithms.push(algorithm);
+    }
+    let mut mempool_benchmarks = Vec::new();
+    for mut benchmark in ctx
+        .get_benchmarks(BenchmarksFilter::Mempool { from_block_started }, true)
+        .await
+        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+    {
+        benchmark.state = Some(BenchmarkState {
+            block_confirmed: None,
+            sampled_nonces: None,
+        });
+        mempool_benchmarks.push(benchmark);
+    }
+    let mut mempool_proofs = Vec::new();
+    for mut proof in ctx
+        .get_proofs(ProofsFilter::Mempool { from_block_started }, false)
+        .await
+        .unwrap_or_else(|e| panic!("mempool_proofs error: {:?}", e))
+    {
+        proof.state = Some(ProofState {
+            block_confirmed: None,
+            submission_delay: None,
+        });
+        mempool_proofs.push(proof);
+    }
+    let mut mempool_frauds = Vec::new();
+    for mut fraud in ctx
+        .get_frauds(FraudsFilter::Mempool { from_block_started }, false)
+        .await
+        .unwrap_or_else(|e| panic!("mempool_frauds error: {:?}", e))
+    {
+        fraud.state = Some(FraudState {
+            block_confirmed: None,
+        });
+        mempool_frauds.push(fraud);
+    }
+    let mut mempool_wasms = Vec::new();
+    for mut wasm in ctx
+        .get_wasms(WasmsFilter::Mempool, false)
+        .await
+        .unwrap_or_else(|e| panic!("mempool_wasms error: {:?}", e))
+    {
+        wasm.state = Some(WasmState {
+            block_confirmed: None,
+        });
+        mempool_wasms.push(wasm);
+    }
+    let mut active_challenges = HashMap::new();
+    for mut challenge in ctx
+        .get_challenges(ChallengesFilter::Confirmed, None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+    {
+        if challenge
+            .state
+            .as_ref()
+            .unwrap()
+            .round_active
+            .is_some_and(|r| r <= details.round)
+        {
+            challenge.block_data = Some(ChallengeBlockData {
+                num_qualifiers: None,
+                solution_signature_threshold: None,
+                scaled_frontier: None,
+                base_frontier: None,
+                cutoff_frontier: None,
+                scaling_factor: None,
+                qualifier_difficulties: None,
+            });
+            active_challenges.insert(challenge.id.clone(), challenge);
+        }
+    }
+    let algorithms = ctx
+        .get_algorithms(AlgorithmsFilter::Confirmed, None, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e));
+    let challenges_with_algorithms = algorithms
+        .iter()
+        .filter(|a| a.state().round_pushed.is_some())
+        .map(|a| a.details.challenge_id.clone())
+        .collect::<HashSet<String>>();
+    let mut active_algorithms = HashMap::new(); // FIXME round_pushed 1 for new challenges
+    for mut algorithm in algorithms {
+        let state = algorithm.state.as_mut().unwrap();
+        let round_pushed = *state.round_submitted()
+            + if challenges_with_algorithms.contains(&algorithm.details.challenge_id) {
+                config.algorithm_submissions.push_delay
+            } else {
+                1
+            };
+        let wasm = ctx
+            .get_wasms(WasmsFilter::AlgorithmId(algorithm.id.clone()), false)
+            .await
+            .unwrap_or_else(|e| panic!("get_wasms error: {:?}", e));
+        if !state.banned
+            && details.round >= *state.round_pushed.as_ref().unwrap_or(&round_pushed)
+            && wasm.first().is_some_and(|w| w.details.compile_success)
+        {
+            algorithm.block_data = Some(AlgorithmBlockData {
+                reward: None,
+                adoption: None,
+                merge_points: None,
+                num_qualifiers_by_player: None,
+                round_earnings: None,
+            });
+            if state.round_pushed.is_none() {
+                state.round_pushed = Some(round_pushed);
+            }
+            active_algorithms.insert(algorithm.id.clone(), algorithm);
+        }
+    }
+    let mut active_benchmarks = HashMap::new();
+    for benchmark in ctx
+        .get_benchmarks(BenchmarksFilter::Confirmed { from_block_started }, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+    {
+        let proof = ctx
+            .get_proofs(ProofsFilter::BenchmarkId(benchmark.id.clone()), false)
+            .await
+            .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
+            .pop();
+        if !proof.as_ref().is_some_and(|p| p.state.is_some()) {
+            continue;
+        }
+        let fraud = ctx
+            .get_frauds(FraudsFilter::BenchmarkId(benchmark.id.clone()), false)
+            .await
+            .unwrap_or_else(|e| panic!("get_frauds error: {:?}", e))
+            .pop();
+        if fraud.is_some_and(|f| f.state.is_some()) {
+            continue;
+        }
+        let proof = proof.unwrap();
+        let proof_state = proof.state();
+        let submission_delay = proof_state.submission_delay();
+        let block_confirmed = proof_state.block_confirmed();
+        let block_active = block_confirmed
+            + submission_delay * config.benchmark_submissions.submission_delay_multiplier;
+        if block_active <= details.height {
+            active_benchmarks.insert(benchmark.id.clone(), benchmark);
+        }
+    }
+    let mut active_players = HashMap::new();
+    for benchmark in active_benchmarks.values() {
+        let mut player = ctx
+            .get_players(
+                PlayersFilter::Id(benchmark.settings.player_id.clone()),
+                None,
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        player.block_data = Some(PlayerBlockData {
+            reward: None,
+            influence: None,
+            cutoff: None,
+            imbalance: None,
+            imbalance_penalty: None,
+            num_qualifiers_by_challenge: None,
+            round_earnings: None,
+            deposit: None,
+            rolling_deposit: None,
+        });
+        active_players.insert(player.id.clone(), player);
+    }
+    let mut prev_players = HashMap::<String, Player>::new();
+    for player_id in active_players.keys() {
+        let player = ctx
+            .get_players(
+                PlayersFilter::Id(player_id.clone()),
+                Some(BlockFilter::Id(details.prev_block_id.clone())),
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        prev_players.insert(player.id.clone(), player);
+    }
+    let mut prev_algorithms = HashMap::<String, Algorithm>::new();
+    for algorithm_id in active_algorithms.keys() {
+        let algorithm = ctx
+            .get_algorithms(
+                AlgorithmsFilter::Id(algorithm_id.clone()),
+                Some(BlockFilter::Id(details.prev_block_id.clone())),
+                false,
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        prev_algorithms.insert(algorithm_id.clone(), algorithm);
+    }
+    let mut prev_challenges = HashMap::<String, Challenge>::new();
+    for challenge_id in active_challenges.keys() {
+        let challenge = ctx
+            .get_challenges(
+                ChallengesFilter::Id(challenge_id.clone()),
+                Some(BlockFilter::Id(details.prev_block_id.clone())),
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        prev_challenges.insert(challenge_id.clone(), challenge);
+    }
+    AddBlockCache {
+        mempool_challenges,
+        mempool_algorithms,
+        mempool_benchmarks,
+        mempool_proofs,
+        mempool_frauds,
+        mempool_wasms,
+        active_challenges,
+        active_algorithms,
+        active_benchmarks,
+        active_players,
+        prev_challenges,
+        prev_algorithms,
+        prev_players,
+    }
+}
+
+#[time]
+async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
     let latest_block = ctx
         .get_block(BlockFilter::Latest, false)
         .await
@@ -46,379 +322,135 @@ async fn create_block<T: Context>(ctx: &T) -> Block {
         round: height / config.rounds.blocks_per_round + 1,
         eth_block_num: Some(ctx.get_latest_eth_block_num().await.unwrap()),
     };
-    let from_block_started = details
-        .height
-        .saturating_sub(config.benchmark_submissions.lifespan_period);
-    let mut data = BlockData {
-        mempool_challenge_ids: HashSet::<String>::new(),
-        mempool_algorithm_ids: HashSet::<String>::new(),
-        mempool_benchmark_ids: HashSet::<String>::new(),
-        mempool_fraud_ids: HashSet::<String>::new(),
-        mempool_proof_ids: HashSet::<String>::new(),
-        mempool_wasm_ids: HashSet::<String>::new(),
-        active_challenge_ids: HashSet::<String>::new(),
-        active_algorithm_ids: HashSet::<String>::new(),
-        active_benchmark_ids: HashSet::<String>::new(),
-        active_player_ids: HashSet::<String>::new(),
-    };
-    for challenge in ctx
-        .get_challenges(ChallengesFilter::Mempool, None)
-        .await
-        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
-        .iter()
-    {
-        data.mempool_challenge_ids.insert(challenge.id.clone());
-    }
-    for algorithm in ctx
-        .get_algorithms(AlgorithmsFilter::Mempool, None, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
-        .iter()
-    {
-        data.mempool_algorithm_ids.insert(algorithm.id.clone());
-    }
-    for benchmark in ctx
-        .get_benchmarks(BenchmarksFilter::Mempool { from_block_started }, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
-        .iter()
-    {
-        data.mempool_benchmark_ids.insert(benchmark.id.clone());
-    }
-    for proof in ctx
-        .get_proofs(ProofsFilter::Mempool { from_block_started }, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
-        .iter()
-    {
-        data.mempool_proof_ids.insert(proof.benchmark_id.clone());
-    }
-    for fraud in ctx
-        .get_frauds(FraudsFilter::Mempool { from_block_started }, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_frauds error: {:?}", e))
-        .iter()
-    {
-        data.mempool_fraud_ids.insert(fraud.benchmark_id.clone());
-    }
-    for wasm in ctx
-        .get_wasms(WasmsFilter::Mempool, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_wasms error: {:?}", e))
-        .iter()
-    {
-        data.mempool_wasm_ids.insert(wasm.algorithm_id.clone());
-    }
+    let cache = setup_cache(ctx, &details, &config).await;
 
-    for challenge in ctx
-        .get_challenges(ChallengesFilter::Confirmed, None)
-        .await
-        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
-    {
-        if challenge
-            .state
-            .unwrap()
-            .round_active
-            .is_some_and(|r| r <= details.round)
-        {
-            data.active_challenge_ids.insert(challenge.id.clone());
-        }
-    }
-    let wasms: HashMap<String, Wasm> = ctx
-        .get_wasms(WasmsFilter::Confirmed, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_wasms error: {:?}", e))
-        .into_iter()
-        .map(|x| (x.algorithm_id.clone(), x))
-        .collect();
-    for algorithm in ctx
-        .get_algorithms(AlgorithmsFilter::Confirmed, None, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
-    {
-        let mut state = algorithm.state.unwrap();
-        let round_pushed = state
-            .round_pushed
-            .unwrap_or(state.round_submitted() + config.algorithm_submissions.push_delay);
-        if !state.banned
-            && details.round >= round_pushed
-            && wasms
-                .get(&algorithm.id)
-                .is_some_and(|w| w.details.compile_success)
-        {
-            data.active_algorithm_ids.insert(algorithm.id.clone());
-            if state.round_pushed.is_none() {
-                state.round_pushed = Some(round_pushed);
-                ctx.update_algorithm_state(&algorithm.id, &state)
-                    .await
-                    .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
-            }
-        }
-    }
-    let confirmed_proofs = ctx
-        .get_proofs(ProofsFilter::Confirmed { from_block_started }, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
-        .into_iter()
-        .map(|x| (x.benchmark_id.clone(), x))
-        .collect::<HashMap<String, Proof>>();
-    let confirmed_frauds = ctx
-        .get_frauds(FraudsFilter::Confirmed { from_block_started }, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_frauds error: {:?}", e))
-        .into_iter()
-        .map(|x| (x.benchmark_id.clone(), x))
-        .collect::<HashMap<String, Fraud>>();
-    for benchmark in ctx
-        .get_benchmarks(BenchmarksFilter::Confirmed { from_block_started }, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
-    {
-        let proof = confirmed_proofs.get(&benchmark.id);
-        if proof.is_none() || confirmed_frauds.contains_key(&benchmark.id) {
-            continue;
-        }
-        // TODO check player state
-        let _player = ctx
-            .get_players(
-                PlayersFilter::Id(benchmark.settings.player_id.clone()),
-                None,
-            )
-            .await
-            .unwrap_or_else(|e| panic!("get_players error: {:?}", e))
-            .pop();
-        let proof_state = proof.unwrap().state();
-        let submission_delay = proof_state.submission_delay();
-        let block_confirmed = proof_state.block_confirmed();
-        let block_active = block_confirmed
-            + submission_delay * config.benchmark_submissions.submission_delay_multiplier;
-        if details.height >= block_active {
-            data.active_benchmark_ids.insert(benchmark.id.clone());
-            data.active_player_ids
-                .insert(benchmark.settings.player_id.clone());
-        }
-    }
+    let data = BlockData {
+        mempool_challenge_ids: cache
+            .mempool_challenges
+            .iter()
+            .map(|c| c.id.clone())
+            .collect(),
+        mempool_algorithm_ids: cache
+            .mempool_algorithms
+            .iter()
+            .map(|a| a.id.clone())
+            .collect(),
+        mempool_benchmark_ids: cache
+            .mempool_benchmarks
+            .iter()
+            .map(|b| b.id.clone())
+            .collect(),
+        mempool_fraud_ids: cache
+            .mempool_frauds
+            .iter()
+            .map(|f| f.benchmark_id.clone())
+            .collect(),
+        mempool_proof_ids: cache
+            .mempool_proofs
+            .iter()
+            .map(|p| p.benchmark_id.clone())
+            .collect(),
+        mempool_wasm_ids: cache
+            .mempool_wasms
+            .iter()
+            .map(|w| w.algorithm_id.clone())
+            .collect(),
+        active_challenge_ids: cache.active_challenges.keys().cloned().collect(),
+        active_algorithm_ids: cache.active_algorithms.keys().cloned().collect(),
+        active_benchmark_ids: cache.active_benchmarks.keys().cloned().collect(),
+        active_player_ids: cache.active_players.keys().cloned().collect(),
+    };
 
     let block_id = ctx
-        .add_block(&details, &data, &config)
+        .add_block(details.clone(), data.clone(), config.clone())
         .await
         .unwrap_or_else(|e| panic!("add_block error: {:?}", e));
-    for challenge_id in data.mempool_challenge_ids.iter() {
-        let state = ChallengeState {
-            block_confirmed: None,
-            round_active: None,
-        };
-        ctx.update_challenge_state(challenge_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
-    }
-    for algorithm_id in data.mempool_algorithm_ids.iter() {
-        let state = AlgorithmState {
-            block_confirmed: None,
-            round_submitted: None,
-            round_pushed: None,
-            round_merged: None,
-            banned: false,
-        };
-        ctx.update_algorithm_state(algorithm_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
-    }
-    for benchmark_id in data.mempool_benchmark_ids.iter() {
-        let state = BenchmarkState {
-            block_confirmed: None,
-            sampled_nonces: None,
-        };
-        ctx.update_benchmark_state(benchmark_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_benchmark_state error: {:?}", e));
-    }
-    for proof_id in data.mempool_proof_ids.iter() {
-        let state = ProofState {
-            block_confirmed: None,
-            submission_delay: None,
-        };
-        ctx.update_proof_state(proof_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_proof_state error: {:?}", e));
-    }
-    for fraud_id in data.mempool_fraud_ids.iter() {
-        let state = FraudState {
-            block_confirmed: None,
-        };
-        ctx.update_fraud_state(fraud_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_fraud_state error: {:?}", e));
-    }
-    for wasm_id in data.mempool_wasm_ids.iter() {
-        let state = WasmState {
-            block_confirmed: None,
-        };
-        ctx.update_wasm_state(wasm_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_wasm_state error: {:?}", e));
-    }
 
-    for challenge_id in data.active_challenge_ids.iter() {
-        let data = ChallengeBlockData {
-            num_qualifiers: None,
-            solution_signature_threshold: None,
-            scaled_frontier: None,
-            base_frontier: None,
-            cutoff_frontier: None,
-            scaling_factor: None,
-            qualifier_difficulties: None,
-        };
-        ctx.update_challenge_block_data(challenge_id, &block_id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_block_data error: {:?}", e));
-    }
-    for algorithm_id in data.active_algorithm_ids.iter() {
-        let data = AlgorithmBlockData {
-            reward: None,
-            adoption: None,
-            merge_points: None,
-            num_qualifiers_by_player: None,
-            round_earnings: None,
-        };
-        ctx.update_algorithm_block_data(algorithm_id, &block_id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
-    }
-    for player_id in data.active_player_ids.iter() {
-        let data = PlayerBlockData {
-            reward: None,
-            influence: None,
-            cutoff: None,
-            imbalance: None,
-            imbalance_penalty: None,
-            num_qualifiers_by_challenge: None,
-            round_earnings: None,
-            deposit: None,
-            rolling_deposit: None,
-        };
-        ctx.update_player_block_data(player_id, &block_id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
-    }
-
-    Block {
-        id: block_id,
-        config: Some(config.clone()),
-        details,
-        data: Some(data),
-    }
+    (
+        Block {
+            id: block_id,
+            config: Some(config.clone()),
+            details,
+            data: Some(data),
+        },
+        cache,
+    )
 }
 
 #[time]
-async fn confirm_mempool_challenges<T: Context>(ctx: &T, block: &Block) {
-    for challenge_id in block.data().mempool_challenge_ids.iter() {
-        let challenge = get_challenge_by_id(ctx, challenge_id, None)
-            .await
-            .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e));
-        let mut state = challenge.state().clone();
+async fn confirm_mempool_challenges(block: &Block, cache: &mut AddBlockCache) {
+    for challenge in cache.mempool_challenges.iter_mut() {
+        let state = challenge.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
-        ctx.update_challenge_state(challenge_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
     }
 }
 
 #[time]
-async fn confirm_mempool_algorithms<T: Context>(ctx: &T, block: &Block) {
-    for algorithm_id in block.data().mempool_algorithm_ids.iter() {
-        let algorithm = get_algorithm_by_id(ctx, algorithm_id, None)
-            .await
-            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
-        let mut state = algorithm.state().clone();
+async fn confirm_mempool_algorithms(block: &Block, cache: &mut AddBlockCache) {
+    for algorithm in cache.mempool_algorithms.iter_mut() {
+        let state = algorithm.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
         state.round_submitted = Some(block.details.round);
-        ctx.update_algorithm_state(algorithm_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
     }
 }
 
 #[time]
-async fn confirm_mempool_benchmarks<T: Context>(ctx: &T, block: &Block) {
+async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
-    for benchmark_id in block.data().mempool_benchmark_ids.iter() {
-        let benchmark = get_benchmark_by_id(ctx, benchmark_id, true)
-            .await
-            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
-
-        let seed = u32_from_str(format!("{:?}|{:?}", block.id, benchmark_id).as_str());
+    for benchmark in cache.mempool_benchmarks.iter_mut() {
+        let seed = u32_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str());
         let mut rng = StdRng::seed_from_u64(seed as u64);
-        let solutions_meta_data = benchmark.solutions_meta_data();
-        let mut indexes: Vec<usize> = (0..solutions_meta_data.len()).collect();
-        indexes.shuffle(&mut rng);
-
-        let mut state = benchmark.state().clone();
-        state.sampled_nonces = Some(
+        let sampled_nonces = {
+            let solutions_meta_data = benchmark.solutions_meta_data.as_ref().unwrap();
+            let mut indexes: Vec<usize> = (0..solutions_meta_data.len()).collect();
+            indexes.shuffle(&mut rng);
             indexes
                 .into_iter()
                 .take(config.benchmark_submissions.max_samples)
                 .map(|i| solutions_meta_data[i].nonce)
-                .collect(),
-        );
+                .collect()
+        };
+        let state = benchmark.state.as_mut().unwrap();
+        state.sampled_nonces = Some(sampled_nonces);
         state.block_confirmed = Some(block.details.height);
-
-        ctx.update_benchmark_state(&benchmark_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_benchmark_state error: {:?}", e));
     }
 }
 
 #[time]
-async fn confirm_mempool_proofs<T: Context>(ctx: &T, block: &Block) {
-    for benchmark_id in block.data().mempool_proof_ids.iter() {
-        let benchmark = get_benchmark_by_id(ctx, &benchmark_id, false)
+async fn confirm_mempool_proofs<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlockCache) {
+    for proof in cache.mempool_proofs.iter_mut() {
+        let benchmark = ctx
+            .get_benchmarks(BenchmarksFilter::Id(proof.benchmark_id.clone()), false)
             .await
-            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
-        let proof = get_proof_by_benchmark_id(ctx, &benchmark_id, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_proof_by_benchmark_id error: {:?}", e));
-        let mut state = proof.state().clone();
+            .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+            .pop()
+            .unwrap();
+        let state = proof.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
         state.submission_delay = Some(block.details.height - benchmark.details.block_started);
-        ctx.update_proof_state(benchmark_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_proof_state error: {:?}", e));
     }
 }
 
 #[time]
-async fn confirm_mempool_frauds<T: Context>(ctx: &T, block: &Block) {
+async fn confirm_mempool_frauds(block: &Block, cache: &mut AddBlockCache) {
     // Future Todo: slash player's rewards from past day
-    for benchmark_id in block.data().mempool_fraud_ids.iter() {
-        let fraud = get_fraud_by_id(ctx, &benchmark_id, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_fraud_by_id error: {:?}", e));
-        let mut state = fraud.state().clone();
+    for fraud in cache.mempool_frauds.iter_mut() {
+        let state = fraud.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
-        ctx.update_fraud_state(benchmark_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_fraud_state error: {:?}", e));
     }
 }
 
 #[time]
-async fn confirm_mempool_wasms<T: Context>(ctx: &T, block: &Block) {
-    for algorithm_id in block.data().mempool_wasm_ids.iter() {
-        let wasm = get_wasm_by_id(ctx, &algorithm_id, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e));
-        let mut state = wasm.state().clone();
+async fn confirm_mempool_wasms(block: &Block, cache: &mut AddBlockCache) {
+    for wasm in cache.mempool_wasms.iter_mut() {
+        let state = wasm.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
-        ctx.update_wasm_state(algorithm_id, &state)
-            .await
-            .unwrap_or_else(|e| panic!("update_wasm_state error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_deposits<T: Context>(ctx: &T, block: &Block) {
+async fn update_deposits<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlockCache) {
     let decay = match &block
         .config()
         .optimisable_proof_of_work
@@ -430,47 +462,31 @@ async fn update_deposits<T: Context>(ctx: &T, block: &Block) {
     let eth_block_num = block.details.eth_block_num();
     let zero = PreciseNumber::from(0);
     let one = PreciseNumber::from(1);
-    for player_id in block.data().active_player_ids.iter() {
-        let rolling_deposit =
-            match get_player_by_id(ctx, player_id, Some(&block.details.prev_block_id))
-                .await
-                .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
-                .block_data
-            {
-                Some(data) => data.rolling_deposit,
-                None => None,
-            }
-            .unwrap_or_else(|| zero.clone());
+    for player in cache.active_players.values_mut() {
+        let rolling_deposit = match &cache.prev_players.get(&player.id).unwrap().block_data {
+            Some(data) => data.rolling_deposit.clone(),
+            None => None,
+        }
+        .unwrap_or_else(|| zero.clone());
 
-        let player = get_player_by_id(ctx, player_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e));
-        let mut data = player.block_data().clone();
-
+        let data = player.block_data.as_mut().unwrap();
         let deposit = ctx
-            .get_player_deposit(eth_block_num, player_id)
+            .get_player_deposit(eth_block_num, &player.id)
             .await
             .unwrap()
             .unwrap_or_else(|| zero.clone());
         data.rolling_deposit = Some(decay * rolling_deposit + (one - decay) * deposit);
         data.deposit = Some(deposit);
-
-        ctx.update_player_block_data(player_id, &block.id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_cutoffs<T: Context>(ctx: &T, block: &Block) {
+async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
     let mut cutoff_challenge_ids = HashSet::new();
-    for algorithm_id in block.data().active_algorithm_ids.iter() {
-        let algorithm = get_algorithm_by_id(ctx, algorithm_id, None)
-            .await
-            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
-        let state = algorithm.state().clone();
-        if state
+    for algorithm in cache.active_algorithms.values() {
+        if algorithm
+            .state()
             .round_pushed
             .is_some_and(|r| r + 1 <= block.details.round)
         {
@@ -479,10 +495,7 @@ async fn update_cutoffs<T: Context>(ctx: &T, block: &Block) {
     }
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for benchmark_id in block.data().active_benchmark_ids.iter() {
-        let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
+    for benchmark in cache.active_benchmarks.values() {
         if !cutoff_challenge_ids.contains(&benchmark.settings.challenge_id) {
             continue;
         }
@@ -494,10 +507,13 @@ async fn update_cutoffs<T: Context>(ctx: &T, block: &Block) {
     }
 
     for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
-        let player = &get_player_by_id(ctx, player_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e));
-        let mut data = player.block_data().clone();
+        let data = cache
+            .active_players
+            .get_mut(player_id)
+            .unwrap()
+            .block_data
+            .as_mut()
+            .unwrap();
         let min_num_solutions = cutoff_challenge_ids
             .iter()
             .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
@@ -505,30 +521,23 @@ async fn update_cutoffs<T: Context>(ctx: &T, block: &Block) {
             .unwrap();
         let cutoff = (min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32;
         data.cutoff = Some(cutoff.max(config.qualifiers.min_cutoff.clone().unwrap()));
-
-        ctx.update_player_block_data(player_id, &block.id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_solution_signature_thresholds<T: Context>(ctx: &T, block: &Block) {
+async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
     let mempool_proof_ids = &block.data().mempool_proof_ids;
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     let mut new_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for benchmark_id in block.data().active_benchmark_ids.iter() {
-        let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
+    for benchmark in cache.active_benchmarks.values() {
         *num_solutions_by_player_by_challenge
             .entry(benchmark.settings.player_id.clone())
             .or_default()
             .entry(benchmark.settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
-        if mempool_proof_ids.contains(benchmark_id) {
+        if mempool_proof_ids.contains(&benchmark.id) {
             *new_solutions_by_player_by_challenge
                 .entry(benchmark.settings.player_id.clone())
                 .or_default()
@@ -539,9 +548,10 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &T, block: &Block
 
     let mut solutions_rate_by_challenge = HashMap::<String, u32>::new();
     for (player_id, new_solutions_by_challenge) in new_solutions_by_player_by_challenge.iter() {
-        let cutoff = *get_player_by_id(ctx, player_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
+        let cutoff = *cache
+            .active_players
+            .get(player_id)
+            .unwrap()
             .block_data()
             .cutoff();
         for (challenge_id, new_solutions) in new_solutions_by_challenge.iter() {
@@ -554,18 +564,14 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &T, block: &Block
         }
     }
 
-    for challenge_id in block.data().active_challenge_ids.iter() {
+    for challenge in cache.active_challenges.values_mut() {
         let max_threshold = u32::MAX as f64;
-        let current_threshold =
-            match get_challenge_by_id(ctx, challenge_id, Some(&block.details.prev_block_id))
-                .await
-                .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
-                .block_data
-            {
-                Some(data) => *data.solution_signature_threshold() as f64,
-                None => max_threshold,
-            };
-        let current_rate = *solutions_rate_by_challenge.get(challenge_id).unwrap_or(&0) as f64;
+        let current_threshold = match &cache.prev_challenges.get(&challenge.id).unwrap().block_data
+        {
+            Some(data) => *data.solution_signature_threshold() as f64,
+            None => max_threshold,
+        };
+        let current_rate = *solutions_rate_by_challenge.get(&challenge.id).unwrap_or(&0) as f64;
 
         let equilibrium_rate = config.qualifiers.total_qualifiers_threshold as f64
             / config.benchmark_submissions.lifespan_period as f64;
@@ -577,79 +583,43 @@ async fn update_solution_signature_thresholds<T: Context>(ctx: &T, block: &Block
         };
 
         let threshold_decay = config.solution_signature.threshold_decay.unwrap_or(0.99);
-        let mut block_data = get_challenge_by_id(ctx, challenge_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
-            .block_data()
-            .clone();
+        let block_data = challenge.block_data.as_mut().unwrap();
         block_data.solution_signature_threshold = Some(
             (current_threshold * threshold_decay + target_threshold * (1.0 - threshold_decay))
                 .clamp(0.0, max_threshold) as u32,
         );
-
-        ctx.update_challenge_block_data(challenge_id, &block.id, &block_data)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_block_data error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_qualifiers<T: Context>(ctx: &T, block: &Block) {
+async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
-    let BlockData {
-        active_benchmark_ids,
-        active_algorithm_ids,
-        active_challenge_ids,
-        active_player_ids,
-        ..
-    } = block.data();
 
-    let mut benchmarks_by_challenge = HashMap::<String, Vec<Benchmark>>::new();
-    for benchmark_id in active_benchmark_ids.iter() {
-        let benchmark = get_benchmark_by_id(ctx, benchmark_id, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_benchmark_by_id error: {:?}", e));
+    let mut benchmarks_by_challenge = HashMap::<String, Vec<&Benchmark>>::new();
+    for benchmark in cache.active_benchmarks.values() {
         benchmarks_by_challenge
             .entry(benchmark.settings.challenge_id.clone())
             .or_default()
             .push(benchmark);
     }
 
-    let mut data_by_challenge = HashMap::<String, ChallengeBlockData>::new();
-    let mut data_by_player = HashMap::<String, PlayerBlockData>::new();
-    let mut data_by_algorithm = HashMap::<String, AlgorithmBlockData>::new();
     let mut max_qualifiers_by_player = HashMap::<String, u32>::new();
-    for challenge_id in active_challenge_ids.iter() {
-        let mut block_data = get_challenge_by_id(ctx, challenge_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
-            .block_data()
-            .clone();
+    for challenge in cache.active_challenges.values_mut() {
+        let block_data = challenge.block_data.as_mut().unwrap();
         block_data.num_qualifiers = Some(0);
         block_data.qualifier_difficulties = Some(HashSet::new());
-        data_by_challenge.insert(challenge_id.clone(), block_data);
     }
-    for algorithm_id in active_algorithm_ids.iter() {
-        let mut block_data = get_algorithm_by_id(ctx, algorithm_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e))
-            .block_data()
-            .clone();
+    for algorithm in cache.active_algorithms.values_mut() {
+        let block_data = algorithm.block_data.as_mut().unwrap();
         block_data.num_qualifiers_by_player = Some(HashMap::new());
-        data_by_algorithm.insert(algorithm_id.clone(), block_data);
     }
-    for player_id in active_player_ids.iter() {
-        let mut block_data = get_player_by_id(ctx, player_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
-            .block_data()
-            .clone();
-        max_qualifiers_by_player.insert(player_id.clone(), block_data.cutoff().clone());
+    for player in cache.active_players.values_mut() {
+        let block_data = player.block_data.as_mut().unwrap();
+        max_qualifiers_by_player.insert(player.id.clone(), *block_data.cutoff());
         block_data.num_qualifiers_by_challenge = Some(HashMap::new());
-        data_by_player.insert(player_id.clone(), block_data);
     }
 
-    for challenge_id in active_challenge_ids.iter() {
+    for (challenge_id, challenge) in cache.active_challenges.iter_mut() {
         if !benchmarks_by_challenge.contains_key(challenge_id) {
             continue;
         }
@@ -676,7 +646,7 @@ async fn update_qualifiers<T: Context>(ctx: &T, block: &Block) {
 
         let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
         let mut curr_frontier_index = 0;
-        let challenge_data = data_by_challenge.get_mut(challenge_id).unwrap();
+        let challenge_data = challenge.block_data.as_mut().unwrap();
         for benchmark in benchmarks.iter() {
             let BenchmarkSettings {
                 player_id,
@@ -701,8 +671,20 @@ async fn update_qualifiers<T: Context>(ctx: &T, block: &Block) {
                 continue;
             }
             curr_frontier_index = frontier_indexes[difficulty];
-            let player_data = data_by_player.get_mut(player_id).unwrap();
-            let algorithm_data = data_by_algorithm.get_mut(algorithm_id).unwrap();
+            let player_data = cache
+                .active_players
+                .get_mut(player_id)
+                .unwrap()
+                .block_data
+                .as_mut()
+                .unwrap();
+            let algorithm_data = cache
+                .active_algorithms
+                .get_mut(algorithm_id)
+                .unwrap()
+                .block_data
+                .as_mut()
+                .unwrap();
 
             let max_qualifiers = max_qualifiers_by_player.get(player_id).unwrap().clone();
             let num_qualifiers = benchmark.details.num_solutions.min(max_qualifiers);
@@ -728,33 +710,14 @@ async fn update_qualifiers<T: Context>(ctx: &T, block: &Block) {
                 .insert(difficulty.clone());
         }
     }
-
-    for (id, data) in data_by_challenge.iter() {
-        ctx.update_challenge_block_data(id, &block.id, data)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_block_data error: {:?}", e));
-    }
-    for (id, data) in data_by_algorithm.iter() {
-        ctx.update_algorithm_block_data(id, &block.id, data)
-            .await
-            .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
-    }
-    for (id, data) in data_by_player.iter() {
-        ctx.update_player_block_data(id, &block.id, data)
-            .await
-            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
-    }
 }
 
 #[time]
-async fn update_frontiers<T: Context>(ctx: &T, block: &Block) {
+async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
-    for challenge_id in block.data().active_challenge_ids.iter() {
-        let challenge = get_challenge_by_id(ctx, challenge_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e));
-        let mut block_data = challenge.block_data().clone();
+    for challenge in cache.active_challenges.values_mut() {
+        let block_data = challenge.block_data.as_mut().unwrap();
 
         let difficulty_parameters = &config.difficulty.parameters[&challenge.id];
         let min_difficulty = difficulty_parameters.min_difficulty();
@@ -801,66 +764,49 @@ async fn update_frontiers<T: Context>(ctx: &T, block: &Block) {
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
         block_data.scaling_factor = Some(scaling_factor);
-
-        ctx.update_challenge_block_data(challenge_id, &block.id, &block_data)
-            .await
-            .unwrap_or_else(|e| panic!("update_challenge_block_data error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_influence<T: Context>(ctx: &T, block: &Block) {
+async fn update_influence(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
-    let BlockData {
-        active_challenge_ids,
-        active_player_ids,
-        ..
-    } = block.data();
-
+    let active_player_ids = &block.data().active_player_ids;
     if active_player_ids.len() == 0 {
         return;
     }
 
     let mut num_qualifiers_by_challenge = HashMap::<String, u32>::new();
-    for challenge_id in active_challenge_ids.iter() {
+    for challenge in cache.active_challenges.values() {
         num_qualifiers_by_challenge.insert(
-            challenge_id.clone(),
-            *get_challenge_by_id(ctx, challenge_id, Some(&block.id))
-                .await
-                .unwrap_or_else(|e| panic!("get_challenge_by_id error: {:?}", e))
-                .block_data()
-                .num_qualifiers(),
+            challenge.id.clone(),
+            *challenge.block_data().num_qualifiers(),
         );
     }
 
-    let mut player_data = HashMap::<String, PlayerBlockData>::new();
-    for player_id in active_player_ids.iter() {
-        player_data.insert(
-            player_id.clone(),
-            get_player_by_id(ctx, player_id, Some(&block.id))
-                .await
-                .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
-                .block_data()
-                .clone(),
-        );
-    }
-    let total_deposit = player_data
+    let total_deposit = cache
+        .active_players
         .values()
-        .map(|data| data.deposit.clone().unwrap())
+        .map(|p| p.block_data().deposit.clone().unwrap())
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
     let one = PreciseNumber::from(1);
     let imbalance_multiplier =
         PreciseNumber::from_f64(config.optimisable_proof_of_work.imbalance_multiplier);
-    let num_challenges = PreciseNumber::from(active_challenge_ids.len());
+    let num_challenges = PreciseNumber::from(cache.active_challenges.len());
 
     let mut weights = Vec::<PreciseNumber>::new();
     for player_id in active_player_ids.iter() {
-        let data = player_data.get_mut(player_id).unwrap();
+        let data = cache
+            .active_players
+            .get_mut(player_id)
+            .unwrap()
+            .block_data
+            .as_mut()
+            .unwrap();
 
         let mut percent_qualifiers = Vec::<PreciseNumber>::new();
-        for challenge_id in active_challenge_ids.iter() {
+        for challenge_id in cache.active_challenges.keys() {
             let num_qualifiers = num_qualifiers_by_challenge[challenge_id];
             let num_qualifiers_by_player = *data
                 .num_qualifiers_by_challenge()
@@ -906,72 +852,49 @@ async fn update_influence<T: Context>(ctx: &T, block: &Block) {
 
     let influences = weights.normalise();
     for (player_id, &influence) in active_player_ids.iter().zip(influences.iter()) {
-        let data = player_data.get_mut(player_id).unwrap();
-
+        let data = cache
+            .active_players
+            .get_mut(player_id)
+            .unwrap()
+            .block_data
+            .as_mut()
+            .unwrap();
         data.influence = Some(influence);
-
-        ctx.update_player_block_data(player_id, &block.id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_adoption<T: Context>(ctx: &T, block: &Block) {
-    let BlockData {
-        active_algorithm_ids,
-        active_challenge_ids,
-        ..
-    } = block.data();
-
-    let mut algorithms_by_challenge = HashMap::<String, Vec<&String>>::new();
-    for algorithm_id in active_algorithm_ids.iter() {
+async fn update_adoption(block: &Block, cache: &mut AddBlockCache) {
+    let mut algorithms_by_challenge = HashMap::<String, Vec<&mut Algorithm>>::new();
+    for algorithm in cache.active_algorithms.values_mut() {
         algorithms_by_challenge
-            .entry(
-                get_algorithm_by_id(ctx, algorithm_id, Some(&block.id))
-                    .await
-                    .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e))
-                    .details
-                    .challenge_id
-                    .clone(),
-            )
+            .entry(algorithm.details.challenge_id.clone())
             .or_default()
-            .push(algorithm_id);
+            .push(algorithm);
     }
 
-    for challenge_id in active_challenge_ids.iter() {
-        if !algorithms_by_challenge.contains_key(challenge_id) {
+    for challenge_id in cache.active_challenges.keys() {
+        let algorithms = algorithms_by_challenge.get_mut(challenge_id);
+        if algorithms.is_none() {
             continue;
         }
-
-        let mut algorithm_data = HashMap::<&String, AlgorithmBlockData>::new();
-        for algorithm_id in algorithms_by_challenge[challenge_id].iter() {
-            algorithm_data.insert(
-                algorithm_id,
-                get_algorithm_by_id(ctx, algorithm_id, Some(&block.id))
-                    .await
-                    .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e))
-                    .block_data()
-                    .clone(),
-            );
-        }
+        let algorithms = algorithms.unwrap();
 
         let mut weights = Vec::<PreciseNumber>::new();
-        for (_, data) in algorithm_data.iter() {
+        for algorithm in algorithms.iter() {
             let mut weight = PreciseNumber::from(0);
-            for (player_id, &num_qualifiers) in data.num_qualifiers_by_player().iter() {
+            for (player_id, &num_qualifiers) in
+                algorithm.block_data().num_qualifiers_by_player().iter()
+            {
                 let num_qualifiers = PreciseNumber::from(num_qualifiers);
-                let player_data = get_player_by_id(ctx, player_id, Some(&block.id))
-                    .await
-                    .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
-                    .block_data
-                    .unwrap();
+                let player_data = cache.active_players.get(player_id).unwrap().block_data();
                 let influence = player_data.influence.unwrap();
                 let player_num_qualifiers = PreciseNumber::from(
-                    player_data
+                    *player_data
                         .num_qualifiers_by_challenge
+                        .as_ref()
                         .unwrap()
-                        .remove(challenge_id)
+                        .get(challenge_id)
                         .unwrap(),
                 );
 
@@ -981,42 +904,31 @@ async fn update_adoption<T: Context>(ctx: &T, block: &Block) {
         }
 
         let adoption = weights.normalise();
-        for ((algorithm_id, data), adoption) in algorithm_data.iter_mut().zip(adoption) {
-            data.adoption = Some(adoption);
-            ctx.update_algorithm_block_data(algorithm_id, &block.id, data)
-                .await
-                .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
+        for (algorithm, adoption) in algorithms.iter_mut().zip(adoption) {
+            algorithm.block_data.as_mut().unwrap().adoption = Some(adoption);
         }
     }
 }
 
 #[time]
-async fn update_innovator_rewards<T: Context>(ctx: &T, block: &Block) {
+async fn update_innovator_rewards(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
     let adoption_threshold =
         PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
     let zero = PreciseNumber::from(0);
-    let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<Algorithm>>::new();
-    for algorithm_id in block.data().active_algorithm_ids.iter() {
-        let algorithm = get_algorithm_by_id(ctx, algorithm_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
-        let mut data = algorithm.block_data().clone();
+    let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<&mut Algorithm>>::new();
+    for algorithm in cache.active_algorithms.values_mut() {
+        let is_merged = algorithm.state().round_merged.is_some();
+        let data = algorithm.block_data.as_mut().unwrap();
+        data.reward = Some(zero.clone());
 
-        if *data.adoption() >= adoption_threshold
-            || (algorithm.state().round_merged.is_some() && *data.adoption() > zero)
-        {
+        if *data.adoption() >= adoption_threshold || (is_merged && *data.adoption() > zero) {
             eligible_algorithms_by_challenge
                 .entry(algorithm.details.challenge_id.clone())
                 .or_default()
                 .push(algorithm);
         }
-
-        data.reward = Some(zero.clone());
-        ctx.update_algorithm_block_data(algorithm_id, &block.id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
     }
     if eligible_algorithms_by_challenge.len() == 0 {
         return;
@@ -1027,88 +939,63 @@ async fn update_innovator_rewards<T: Context>(ctx: &T, block: &Block) {
         / PreciseNumber::from(eligible_algorithms_by_challenge.len());
 
     let zero = PreciseNumber::from(0);
-    for (_, algorithms) in eligible_algorithms_by_challenge.iter() {
+    for algorithms in eligible_algorithms_by_challenge.values_mut() {
         let mut total_adoption = zero.clone();
         for algorithm in algorithms.iter() {
             total_adoption = total_adoption + algorithm.block_data().adoption();
         }
 
-        for algorithm in algorithms.iter() {
-            let mut data = algorithm.block_data().clone();
+        for algorithm in algorithms.iter_mut() {
+            let data = algorithm.block_data.as_mut().unwrap();
             let adoption = *data.adoption();
-
             data.reward = Some(reward_pool_per_challenge * adoption / total_adoption);
-
-            ctx.update_algorithm_block_data(&algorithm.id, &block.id, &data)
-                .await
-                .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
         }
     }
 }
 
 #[time]
-async fn update_benchmarker_rewards<T: Context>(ctx: &T, block: &Block) {
+async fn update_benchmarker_rewards(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
     let reward_pool = PreciseNumber::from_f64(get_block_reward(block))
         * PreciseNumber::from_f64(config.rewards.distribution.benchmarkers);
 
-    for player_id in block.data().active_player_ids.iter() {
-        let mut data = get_player_by_id(ctx, player_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_player_by_id error: {:?}", e))
-            .block_data()
-            .clone();
+    for player in cache.active_players.values_mut() {
+        let data = player.block_data.as_mut().unwrap();
         let influence = *data.influence();
-
         data.reward = Some(influence * reward_pool);
-
-        ctx.update_player_block_data(player_id, &block.id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
     }
 }
 
 #[time]
-async fn update_merge_points<T: Context>(ctx: &T, block: &Block) {
+async fn update_merge_points(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
     let adoption_threshold =
         PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
-    for algorithm_id in block.data().active_algorithm_ids.iter() {
-        let algorithm = get_algorithm_by_id(ctx, algorithm_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
-        let mut data = algorithm.block_data().clone();
+    for algorithm in cache.active_algorithms.values_mut() {
+        let is_merged = algorithm.state().round_merged.is_some();
+        let data = algorithm.block_data.as_mut().unwrap();
 
         // first block of the round
         let prev_merge_points = if block.details.height % config.rounds.blocks_per_round == 0 {
             0
         } else {
-            match get_algorithm_by_id(ctx, algorithm_id, Some(&block.details.prev_block_id))
-                .await
-                .unwrap_or_else(|e| panic!("update_merge_points error: {:?}", e))
-                .block_data
-            {
+            match &cache.prev_algorithms.get(&algorithm.id).unwrap().block_data {
                 Some(data) => *data.merge_points(),
                 None => 0,
             }
         };
-        data.merge_points = Some(
-            if algorithm.state().round_merged.is_some() || *data.adoption() < adoption_threshold {
-                prev_merge_points
-            } else {
-                prev_merge_points + 1
-            },
-        );
-        ctx.update_algorithm_block_data(algorithm_id, &block.id, &data)
-            .await
-            .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
+        data.merge_points = Some(if is_merged || *data.adoption() < adoption_threshold {
+            prev_merge_points
+        } else {
+            prev_merge_points + 1
+        });
     }
 }
 
 #[time]
-async fn update_merges<T: Context>(ctx: &T, block: &Block) {
+async fn update_merges(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
     // last block of the round
@@ -1116,11 +1003,8 @@ async fn update_merges<T: Context>(ctx: &T, block: &Block) {
         return;
     }
 
-    let mut merge_algorithm_by_challenge = HashMap::<String, Algorithm>::new();
-    for algorithm_id in block.data().active_algorithm_ids.iter() {
-        let algorithm = get_algorithm_by_id(ctx, algorithm_id, Some(&block.id))
-            .await
-            .unwrap_or_else(|e| panic!("get_algorithm_by_id error: {:?}", e));
+    let mut algorithm_to_merge_by_challenge = HashMap::<String, &mut Algorithm>::new();
+    for algorithm in cache.active_algorithms.values_mut() {
         let challenge_id = algorithm.details.challenge_id.clone();
         let data = algorithm.block_data();
 
@@ -1129,25 +1013,75 @@ async fn update_merges<T: Context>(ctx: &T, block: &Block) {
         {
             continue;
         }
-        if !merge_algorithm_by_challenge.contains_key(&challenge_id)
-            || merge_algorithm_by_challenge[&challenge_id]
+        if !algorithm_to_merge_by_challenge.contains_key(&challenge_id)
+            || algorithm_to_merge_by_challenge[&challenge_id]
                 .block_data()
                 .merge_points
                 < data.merge_points
         {
-            merge_algorithm_by_challenge.insert(challenge_id, algorithm);
+            algorithm_to_merge_by_challenge.insert(challenge_id, algorithm);
         }
     }
 
     let round_merged = block.details.round + 1;
-    for (_, algorithm) in merge_algorithm_by_challenge.iter() {
-        let mut state = algorithm.state().clone();
-
+    for algorithm in algorithm_to_merge_by_challenge.values_mut() {
+        let state = algorithm.state.as_mut().unwrap();
         state.round_merged = Some(round_merged);
+    }
+}
 
-        ctx.update_algorithm_state(&algorithm.id, &state)
+#[time]
+async fn commit_changes<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlockCache) {
+    for algorithm in cache.mempool_algorithms.drain(..) {
+        ctx.update_algorithm_state(&algorithm.id, algorithm.state.unwrap())
             .await
             .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
+    }
+    for challenge in cache.mempool_challenges.drain(..) {
+        ctx.update_challenge_state(&challenge.id, challenge.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_challenge_state error: {:?}", e));
+    }
+    for benchmark in cache.mempool_benchmarks.drain(..) {
+        ctx.update_benchmark_state(&benchmark.id, benchmark.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_benchmark_state error: {:?}", e));
+    }
+    for fraud in cache.mempool_frauds.drain(..) {
+        ctx.update_fraud_state(&fraud.benchmark_id, fraud.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_fraud_state error: {:?}", e));
+    }
+    for proof in cache.mempool_proofs.drain(..) {
+        ctx.update_proof_state(&proof.benchmark_id, proof.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_proof_state error: {:?}", e));
+    }
+    for wasm in cache.mempool_wasms.drain(..) {
+        ctx.update_wasm_state(&wasm.algorithm_id, wasm.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_wasm_state error: {:?}", e));
+    }
+    for (_, algorithm) in cache.active_algorithms.drain() {
+        let state = algorithm.state.unwrap();
+        if state.round_pushed.is_some_and(|r| r == block.details.round) {
+            ctx.update_algorithm_state(&algorithm.id, state)
+                .await
+                .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
+        }
+        ctx.update_algorithm_block_data(&algorithm.id, &block.id, algorithm.block_data.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_algorithm_block_data error: {:?}", e));
+    }
+    for (_, challenge) in cache.active_challenges.drain() {
+        ctx.update_challenge_block_data(&challenge.id, &block.id, challenge.block_data.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_challenge_block_data error: {:?}", e));
+    }
+    for (_, player) in cache.active_players.drain() {
+        ctx.update_player_block_data(&player.id, &block.id, player.block_data.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_player_block_data error: {:?}", e));
     }
 }
 
@@ -1167,121 +1101,4 @@ fn get_block_reward(block: &Block) -> f64 {
             )
         })
         .block_reward
-}
-
-async fn get_player_by_id<T: Context>(
-    ctx: &T,
-    player_id: &String,
-    block_id: Option<&String>,
-) -> anyhow::Result<Player> {
-    Ok(ctx
-        .get_players(
-            PlayersFilter::Id(player_id.clone()),
-            match block_id {
-                Some(block_id) => Some(BlockFilter::Id(block_id.clone())),
-                None => None,
-            },
-        )
-        .await?
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting player {} to exist", player_id).as_str()))
-}
-
-async fn get_proof_by_benchmark_id<T: Context>(
-    ctx: &T,
-    benchmark_id: &String,
-    include_data: bool,
-) -> anyhow::Result<Proof, String> {
-    Ok(ctx
-        .get_proofs(
-            ProofsFilter::BenchmarkId(benchmark_id.clone()),
-            include_data,
-        )
-        .await
-        .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting proof for benchmark {} to exist", benchmark_id).as_str()))
-}
-
-async fn get_benchmark_by_id<T: Context>(
-    ctx: &T,
-    benchmark_id: &String,
-    include_data: bool,
-) -> anyhow::Result<Benchmark> {
-    Ok(ctx
-        .get_benchmarks(BenchmarksFilter::Id(benchmark_id.clone()), include_data)
-        .await?
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting benchmark {} to exist", benchmark_id).as_str()))
-}
-
-async fn get_fraud_by_id<T: Context>(
-    ctx: &T,
-    benchmark_id: &String,
-    include_data: bool,
-) -> anyhow::Result<Fraud> {
-    Ok(ctx
-        .get_frauds(
-            FraudsFilter::BenchmarkId(benchmark_id.clone()),
-            include_data,
-        )
-        .await?
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting fraud {} to exist", benchmark_id).as_str()))
-}
-
-async fn get_wasm_by_id<T: Context>(
-    ctx: &T,
-    algorithm_id: &String,
-    include_data: bool,
-) -> anyhow::Result<Wasm> {
-    Ok(ctx
-        .get_wasms(WasmsFilter::AlgorithmId(algorithm_id.clone()), include_data)
-        .await?
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting wasm {} to exist", algorithm_id).as_str()))
-}
-
-async fn get_algorithm_by_id<T: Context>(
-    ctx: &T,
-    algorithm_id: &String,
-    block_id: Option<&String>,
-) -> anyhow::Result<Algorithm> {
-    Ok(ctx
-        .get_algorithms(
-            AlgorithmsFilter::Id(algorithm_id.clone()),
-            match block_id {
-                Some(block_id) => Some(BlockFilter::Id(block_id.clone())),
-                None => None,
-            },
-            false,
-        )
-        .await?
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting algorithm {} to exist", algorithm_id).as_str()))
-}
-
-async fn get_challenge_by_id<T: Context>(
-    ctx: &T,
-    challenge_id: &String,
-    block_id: Option<&String>,
-) -> anyhow::Result<Challenge> {
-    Ok(ctx
-        .get_challenges(
-            ChallengesFilter::Id(challenge_id.clone()),
-            match block_id {
-                Some(block_id) => Some(BlockFilter::Id(block_id.clone())),
-                None => None,
-            },
-        )
-        .await?
-        .first()
-        .map(|x| x.to_owned())
-        .expect(format!("Expecting challenge {} to exist", challenge_id).as_str()))
 }

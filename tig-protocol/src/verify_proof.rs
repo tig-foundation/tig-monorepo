@@ -11,7 +11,7 @@ pub(crate) async fn execute<T: Context>(
     let proof = get_proof_by_benchmark_id(ctx, benchmark_id).await?;
     let mut verified = Ok(());
     if let Err(e) = verify_solutions_with_algorithm(ctx, &benchmark, &proof).await {
-        ctx.add_fraud_to_mempool(benchmark_id, &e.to_string())
+        ctx.add_fraud_to_mempool(benchmark_id, e.to_string())
             .await
             .unwrap_or_else(|e| panic!("add_fraud_to_mempool error: {:?}", e));
         verified = Err(e.to_string());
