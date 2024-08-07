@@ -21,8 +21,8 @@ impl<'a, T: Context> Protocol<T> {
     pub async fn submit_algorithm(
         &self,
         player: &Player,
-        details: &AlgorithmDetails,
-        code: &String,
+        details: AlgorithmDetails,
+        code: String,
     ) -> ProtocolResult<String> {
         submit_algorithm::execute(&self.ctx, player, details, code).await
     }
@@ -30,9 +30,9 @@ impl<'a, T: Context> Protocol<T> {
     pub async fn submit_benchmark(
         &self,
         player: &Player,
-        settings: &BenchmarkSettings,
-        solutions_meta_data: &Vec<SolutionMetaData>,
-        solution_data: &SolutionData,
+        settings: BenchmarkSettings,
+        solutions_meta_data: Vec<SolutionMetaData>,
+        solution_data: SolutionData,
     ) -> ProtocolResult<(String, Result<(), String>)> {
         submit_benchmark::execute(
             &self.ctx,
@@ -48,7 +48,7 @@ impl<'a, T: Context> Protocol<T> {
         &self,
         player: &Player,
         benchmark_id: &String,
-        solutions_data: &Vec<SolutionData>,
+        solutions_data: Vec<SolutionData>,
     ) -> ProtocolResult<Result<(), String>> {
         submit_proof::execute(&self.ctx, player, benchmark_id, solutions_data).await
     }

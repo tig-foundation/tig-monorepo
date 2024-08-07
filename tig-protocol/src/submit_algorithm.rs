@@ -8,11 +8,11 @@ use tig_utils::*;
 pub(crate) async fn execute<T: Context>(
     ctx: &T,
     player: &Player,
-    details: &AlgorithmDetails,
-    code: &String,
+    details: AlgorithmDetails,
+    code: String,
 ) -> ProtocolResult<String> {
-    verify_challenge_exists(ctx, details).await?;
-    verify_submission_fee(ctx, player, details).await?;
+    verify_challenge_exists(ctx, &details).await?;
+    verify_submission_fee(ctx, player, &details).await?;
     let algorithm_id = ctx
         .add_algorithm_to_mempool(details, code)
         .await
