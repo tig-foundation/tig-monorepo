@@ -9077,8 +9077,8 @@ pub fn compute_solution(
             type SolveChallengeFn =
                 fn(&vector_search::Challenge) -> anyhow::Result<Option<vector_search::Solution>>;
             match match settings.algorithm_id.as_str() {
-                // #[cfg(feature = "c004_a001")]
-                // "c004_a001" => Some(tig_algorithms::vector_search::c004_a001::solve_challenge as SolveChallengeFn),
+                #[cfg(feature = "vector_search_basic")]
+                "c004_a001" => Some(tig_algorithms::vector_search::basic::solve_challenge as SolveChallengeFn),
 
                 // #[cfg(feature = "c004_a002")]
                 // "c004_a002" => Some(tig_algorithms::vector_search::c004_a002::solve_challenge as SolveChallengeFn),

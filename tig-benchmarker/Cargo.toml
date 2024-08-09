@@ -6052,7 +6052,7 @@ knapsack_dynamic = ["tig-worker/knapsack_dynamic"]
 
 # c003_a999 = ["tig-worker/c003_a999"]
 
-# c004_a001 = ["tig-worker/c004_a001"]
+vector_search_basic = ["tig-worker/vector_search_basic"]
 
 # c004_a002 = ["tig-worker/c004_a002"]
 
