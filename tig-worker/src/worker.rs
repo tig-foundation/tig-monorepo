@@ -9116,8 +9116,8 @@ pub fn compute_solution(
                 // #[cfg(feature = "c004_a013")]
                 // "c004_a013" => Some(tig_algorithms::vector_search::c004_a013::solve_challenge as SolveChallengeFn),
 
-                // #[cfg(feature = "c004_a014")]
-                // "c004_a014" => Some(tig_algorithms::vector_search::c004_a014::solve_challenge as SolveChallengeFn),
+                #[cfg(feature = "vector_search_brute_force_bacalhau")]
+                "c004_a014" => Some(tig_algorithms::vector_search::brute_force_bacalhau::solve_challenge as SolveChallengeFn),
 
                 // #[cfg(feature = "c004_a015")]
                 // "c004_a015" => Some(tig_algorithms::vector_search::c004_a015::solve_challenge as SolveChallengeFn),

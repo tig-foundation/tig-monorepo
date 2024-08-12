@@ -6078,7 +6078,7 @@ browser = [
 
 # c004_a013 = ["tig-worker/c004_a013"]
 
-# c004_a014 = ["tig-worker/c004_a014"]
+vector_search_brute_force_bacalhau = ["tig-worker/vector_search_brute_force_bacalhau"]
 
 # c004_a015 = ["tig-worker/c004_a015"]
 

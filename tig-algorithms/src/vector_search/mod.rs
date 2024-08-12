@@ -24,7 +24,7 @@
 
 // c004_a013
 
-// c004_a014
+pub mod brute_force_bacalhau; // c004_a014
 
 // c004_a015
 

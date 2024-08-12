@@ -6043,7 +6043,7 @@ wasmi = { git = "https://github.com/tig-foundation/wasmi.git", branch = "runtime
 
 # c004_a013 = []
 
-# c004_a014 = []
+vector_search_brute_force_bacalhau = []
 
 # c004_a015 = []
 
