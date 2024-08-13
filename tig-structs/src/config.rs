@@ -50,6 +50,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     QualifiersConfig {
+        cutoff_phase_in_period: Option<u32>,
         cutoff_multiplier: f64,
         total_qualifiers_threshold: u32,
         min_cutoff: Option<u32>,
