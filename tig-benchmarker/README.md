@@ -29,7 +29,7 @@ There are two ways to start the master benchmarker:
     ALGOS_TO_COMPILE="" # See notes
     cargo build -p tig-benchmarker --release --no-default-features --features "standalone ${ALGOS_TO_COMPILE}"
     # edit below line for your own algorithm selection
-    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' > algo_selection.json
+    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}' > algo_selection.json
     ./target/release/tig-benchmarker <address> <api_key> algo_selection.json
     ```
 
@@ -38,7 +38,7 @@ There are two ways to start the master benchmarker:
     ALGOS_TO_COMPILE="" # See notes
     docker build -f tig-benchmarker/Dockerfile --build-arg features="${ALGOS_TO_COMPILE}" -t tig-benchmarker .
     # edit below line for your own algorithm selection
-    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic"}' > algo_selection.json
+    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}' > algo_selection.json
     docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> algo_selection.json
     ```
 
@@ -51,7 +51,7 @@ There are two ways to start the master benchmarker:
     * `ALGOS_TO_COMPILE` is a space separated string of algorithms with format `<challenge_name>_<algorithm_name>`. Example: 
     
         ```
-        ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic"
+        ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic vector_search_optimal_ann"
         ```
 
 * Every 10 seconds, the benchmarker reads your json file path and uses the contents to update its algorithm selection. 

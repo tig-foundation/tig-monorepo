@@ -30,7 +30,7 @@ cargo build -p tig-worker --release --features "${ALGOS_TO_COMPILE}"
 * `ALGOS_TO_COMPILE` is a space separated string of algorithms with format `<challenge_name>_<algorithm_name>`. Example: 
 
     ```
-    ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic"
+    ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic vector_search_optimal_ann"
     ```
 
 # Usage
