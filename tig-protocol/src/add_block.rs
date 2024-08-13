@@ -496,12 +496,13 @@ async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark in cache.active_benchmarks.values() {
+        let num_solutions_by_player = num_solutions_by_player_by_challenge
+            .entry(benchmark.settings.player_id.clone())
+            .or_default();
         if !cutoff_challenge_ids.contains(&benchmark.settings.challenge_id) {
             continue;
         }
-        *num_solutions_by_player_by_challenge
-            .entry(benchmark.settings.player_id.clone())
-            .or_default()
+        *num_solutions_by_player
             .entry(benchmark.settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
     }
