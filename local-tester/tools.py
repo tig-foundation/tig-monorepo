@@ -4,7 +4,7 @@ import sys
 import requests
 
 def run_test(i):
-    result = subprocess.run(f"../target/release/tig-worker -- settings.json wasm/{os.environ["algorithm_name"]}.wasm {i}", shell=True, capture_output=True, text=True)
+    result = subprocess.run(f"../target/release/tig-worker -- settings.json wasm/{os.environ['algorithm_name']}.wasm {i}", shell=True, capture_output=True, text=True)
     return result.returncode
 
 def build_worker():
