@@ -483,26 +483,23 @@ async fn update_deposits<T: Context>(ctx: &T, block: &Block, cache: &mut AddBloc
 #[time]
 async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
-    let mut cutoff_challenge_ids = HashSet::new();
+    let mut phase_in_challenge_ids: HashSet<String> =
+        cache.active_challenges.keys().cloned().collect();
     for algorithm in cache.active_algorithms.values() {
         if algorithm
             .state()
             .round_pushed
             .is_some_and(|r| r + 1 <= block.details.round)
         {
-            cutoff_challenge_ids.insert(algorithm.details.challenge_id.clone());
+            phase_in_challenge_ids.remove(&algorithm.details.challenge_id);
         }
     }
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark in cache.active_benchmarks.values() {
-        let num_solutions_by_player = num_solutions_by_player_by_challenge
+        *num_solutions_by_player_by_challenge
             .entry(benchmark.settings.player_id.clone())
-            .or_default();
-        if !cutoff_challenge_ids.contains(&benchmark.settings.challenge_id) {
-            continue;
-        }
-        *num_solutions_by_player
+            .or_default()
             .entry(benchmark.settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
     }
@@ -515,13 +512,36 @@ async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
             .block_data
             .as_mut()
             .unwrap();
-        let min_num_solutions = cutoff_challenge_ids
-            .iter()
+        let phase_in_start = (block.details.round - 1) * config.rounds.blocks_per_round;
+        let phase_in_period = config.qualifiers.cutoff_phase_in_period.unwrap();
+        let phase_in_end = phase_in_start + phase_in_period;
+        let min_cutoff = config.qualifiers.min_cutoff.clone().unwrap();
+        let min_num_solutions = cache
+            .active_challenges
+            .keys()
             .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
             .min()
             .unwrap();
-        let cutoff = (min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32;
-        data.cutoff = Some(cutoff.max(config.qualifiers.min_cutoff.clone().unwrap()));
+        let mut cutoff = min_cutoff
+            .max((min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32);
+        if phase_in_challenge_ids.len() > 0 && phase_in_end > block.details.height {
+            let phase_in_min_num_solutions = cache
+                .active_challenges
+                .keys()
+                .filter(|&id| !phase_in_challenge_ids.contains(id))
+                .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
+                .min()
+                .unwrap();
+            let phase_in_cutoff = min_cutoff.max(
+                (phase_in_min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil()
+                    as u32,
+            );
+            let phase_in_weight =
+                (phase_in_end - block.details.height) as f64 / phase_in_period as f64;
+            cutoff = (phase_in_cutoff as f64 * phase_in_weight
+                + cutoff as f64 * (1.0 - phase_in_weight)) as u32;
+        }
+        data.cutoff = Some(cutoff);
     }
 }
 
