@@ -27,7 +27,8 @@ There are two ways to start the master benchmarker:
 1. Compile into exectuable and then run the executable:
     ```
     ALGOS_TO_COMPILE="" # See notes
-    cargo build -p tig-benchmarker --release --no-default-features --features "standalone ${ALGOS_TO_COMPILE}"
+    # USE_CUDA="cuda" # See notes
+    cargo build -p tig-benchmarker --release --no-default-features --features "standalone ${ALGOS_TO_COMPILE} ${USE_CUDA}"
     # edit below line for your own algorithm selection
     echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}' > algo_selection.json
     ./target/release/tig-benchmarker <address> <api_key> algo_selection.json
@@ -36,7 +37,8 @@ There are two ways to start the master benchmarker:
 2. Compile executable in a docker, and run the docker:
     ```
     ALGOS_TO_COMPILE="" # See notes
-    docker build -f tig-benchmarker/Dockerfile --build-arg features="${ALGOS_TO_COMPILE}" -t tig-benchmarker .
+    # USE_CUDA="cuda" # See notes
+    docker build -f tig-benchmarker/Dockerfile --build-arg features="${ALGOS_TO_COMPILE} ${USE_CUDA}" -t tig-benchmarker .
     # edit below line for your own algorithm selection
     echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}' > algo_selection.json
     docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> algo_selection.json
@@ -56,9 +58,15 @@ There are two ways to start the master benchmarker:
 
 * Every 10 seconds, the benchmarker reads your json file path and uses the contents to update its algorithm selection. 
 * You can see available algorithms in the dropdowns of the [Benchmarker UI](https://play.tig.foundation/benchmarker)
+    * Alternatively, you can use [`script\list_algorithms.sh`](../scripts/list_algorithms.sh)
 * `tig-benchmarker` starts a master node by default. The port can be set with `--port <port>` (default 5115)
 * `tig-benchmarker` that are started with the option `--master <hostname>` are ran as slaves and will poll the master for jobs
 * `tig-benchmarker` can be executed with `--help` to see all options including setting the number of workers, and setting the duration of a benchmark
+* Uncomment `# USE_CUDA="cuda"` to compile `tig-benchmarker` to use CUDA optimisations where they are available. 
+    * You must have a CUDA compatible GPU with CUDA toolkit installed
+    * You must have set `ALGOS_TO_COMPILE`
+    * Not all algorithms have CUDA optimisations. If they don't, it will default to using the CPU version
+    * CUDA optimisations may or may not be more performant
 
 # Finding your API Key
 
