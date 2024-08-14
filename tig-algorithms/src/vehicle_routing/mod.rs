@@ -1,4 +1,5 @@
-pub mod clarke_wright; // c002_a001
+pub mod clarke_wright;
+pub use clarke_wright as c002_a001;
 
 // c002_a002
 

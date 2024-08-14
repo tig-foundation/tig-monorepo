@@ -41,7 +41,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasi
-      - name: Cargo Build
+      - name: Install CUDA
+        if: env.SKIP_JOB != 'true' 
+        uses: Jimver/cuda-toolkit@v0.2.9
+        id: cuda-toolkit
+        with:
+          cuda: '12.1.0'
+          method: network
+          sub-packages: '["nvcc"]'
+      - name: Cargo Build CUDA
+        if: env.SKIP_JOB != 'true' 
+        run: cargo build -p tig-algorithms --release --features cuda
+      - name: Cargo Build WASM
         if: env.SKIP_JOB != 'true' 
         run: >
           CHALLENGE=${{ env.CHALLENGE }}

@@ -1,4 +1,5 @@
-pub mod dynamic; // c003_a001
+pub mod dynamic;
+pub use dynamic as c003_a001;
 
 // c003_a002
 
@@ -10,7 +11,8 @@ pub mod dynamic; // c003_a001
 
 // c003_a006
 
-pub mod knapmaxxing; // c003_a007
+pub mod knapmaxxing;
+pub use knapmaxxing as c003_a007;
 
 // c003_a008
 
@@ -34,7 +36,8 @@ pub mod knapmaxxing; // c003_a007
 
 // c003_a018
 
-pub mod knapheudp; // c003_a019
+pub mod knapheudp;
+pub use knapheudp as c003_a019;
 
 // c003_a020
 

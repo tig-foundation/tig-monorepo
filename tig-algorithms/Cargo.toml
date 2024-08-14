@@ -8,9 +8,15 @@ edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.81"
+cudarc = { version = "0.11.8", features = [
+    "cuda-version-from-build-system",
+], optional = true }
 ndarray = "0.15.6"
 rand = { version = "0.8.5", default-features = false, features = ["std_rng"] }
 tig-challenges = { path = "../tig-challenges" }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[features]
+cuda = ["cudarc", "tig-challenges/cuda"]

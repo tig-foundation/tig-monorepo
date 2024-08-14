@@ -1,9 +1,9 @@
 /*!
-Copyright 2024 Uncharted Trading Limited
+Copyright 2024 TIG Foundation
 
-Licensed under the TIG Innovator Outbound Game License v1.0 (the "License"); you 
-may not use this file except in compliance with the License. You may obtain a copy 
-of the License at
+Licensed under the TIG Inbound Game License v1.0 or (at your option) any later
+version (the "License"); you may not use this file except in compliance with the
+License. You may obtain a copy of the License at
 
 https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
 
@@ -63,6 +63,75 @@ pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>
 
     Ok(Some(Solution { variables }))
 }
+
+#[cfg(feature = "cuda")]
+mod gpu_optimisation {
+    use super::*;
+    use cudarc::driver::*;
+    use std::{collections::HashMap, sync::Arc};
+    use tig_challenges::CudaKernel;
+
+    // set KERNEL to None if algorithm only has a CPU implementation
+    pub const KERNEL: Option<CudaKernel> = Some(CudaKernel {
+        // Example CUDA code from https://github.com/coreylowman/cudarc/blob/main/examples/matmul-kernel.rs
+        src: r#"
+extern "C" __global__ void matmul(float* A, float* B, float* C, int N) {
+    int ROW = blockIdx.y*blockDim.y+threadIdx.y;
+    int COL = blockIdx.x*blockDim.x+threadIdx.x;
+
+    float tmpSum = 0;
+
+    if (ROW < N && COL < N) {
+        // each thread computes one element of the block sub-matrix
+        for (int i = 0; i < N; i++) {
+            tmpSum += A[ROW * N + i] * B[i * N + COL];
+        }
+    }
+    C[ROW * N + COL] = tmpSum;
+}
+"#,
+        funcs: &["matmul"],
+    });
+
+    // Important! your GPU and CPU version of the algorithm should return the same result
+    pub fn cuda_solve_challenge(
+        challenge: &Challenge,
+        dev: &Arc<CudaDevice>,
+        mut funcs: HashMap<&'static str, CudaFunction>,
+    ) -> anyhow::Result<Option<Solution>> {
+        // Example CUDA code from https://github.com/coreylowman/cudarc/blob/main/examples/matmul-kernel.rs
+        let start = std::time::Instant::now();
+
+        let a_host = [1.0f32, 2.0, 3.0, 4.0];
+        let b_host = [1.0f32, 2.0, 3.0, 4.0];
+        let mut c_host = [0.0f32; 4];
+
+        let a_dev = dev.htod_sync_copy(&a_host)?;
+        let b_dev = dev.htod_sync_copy(&b_host)?;
+        let mut c_dev = dev.htod_sync_copy(&c_host)?;
+
+        println!("Copied in {:?}", start.elapsed());
+
+        let cfg = LaunchConfig {
+            block_dim: (2, 2, 1),
+            grid_dim: (1, 1, 1),
+            shared_mem_bytes: 0,
+        };
+        unsafe {
+            funcs
+                .remove("matmul")
+                .unwrap()
+                .launch(cfg, (&a_dev, &b_dev, &mut c_dev, 2i32))
+        }?;
+
+        dev.dtoh_sync_copy_into(&c_dev, &mut c_host)?;
+        println!("Found {:?} in {:?}", c_host, start.elapsed());
+
+        solve_challenge(challenge)
+    }
+}
+#[cfg(feature = "cuda")]
+pub use gpu_optimisation::{cuda_solve_challenge, KERNEL};
 
 #[cfg(feature = "cuda")]
 mod gpu_optimisation {

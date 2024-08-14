@@ -24,4 +24,26 @@ pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
     Err(anyhow!("Not implemented"))
 }
 
+#[cfg(feature = "cuda")]
+mod gpu_optimisation {
+    use super::*;
+    use cudarc::driver::*;
+    use std::{collections::HashMap, sync::Arc};
+    use tig_challenges::CudaKernel;
+
+    // set KERNEL to None if algorithm only has a CPU implementation
+    pub const KERNEL: Option<CudaKernel> = None;
+
+    // Important! your GPU and CPU version of the algorithm should return the same result
+    pub fn cuda_solve_challenge(
+        challenge: &Challenge,
+        dev: &Arc<CudaDevice>,
+        mut funcs: HashMap<&'static str, CudaFunction>,
+    ) -> anyhow::Result<Option<Solution>> {
+        solve_challenge(challenge)
+    }
+}
+#[cfg(feature = "cuda")]
+pub use gpu_optimisation::{cuda_solve_challenge, KERNEL};
+
 // Important! Do not include any tests in this file, it will result in your submission being rejected

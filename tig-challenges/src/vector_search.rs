@@ -8,6 +8,13 @@ use rand::{
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 
+#[cfg(feature = "cuda")]
+use crate::CudaKernel;
+#[cfg(feature = "cuda")]
+use cudarc::driver::*;
+#[cfg(feature = "cuda")]
+use std::{collections::HashMap, sync::Arc};
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_queries: u32,
@@ -59,7 +66,22 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
         .sqrt()
 }
 
+// TIG dev bounty available for a GPU optimisation for instance generation!
+#[cfg(feature = "cuda")]
+pub const KERNEL: Option<CudaKernel> = None;
+
 impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
+    #[cfg(feature = "cuda")]
+    fn cuda_generate_instance(
+        seed: u32,
+        difficulty: &Difficulty,
+        dev: &Arc<CudaDevice>,
+        mut funcs: HashMap<&'static str, CudaFunction>,
+    ) -> Result<Self> {
+        // TIG dev bounty available for a GPU optimisation for instance generation!
+        Self::generate_instance(seed, difficulty)
+    }
+
     fn generate_instance(seed: u32, difficulty: &Difficulty) -> Result<Self> {
         let mut rng = StdRng::seed_from_u64(seed as u64);
         let uniform = Uniform::from(0.0..1.0);

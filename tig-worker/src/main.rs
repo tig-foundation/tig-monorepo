@@ -51,8 +51,8 @@ fn main() {
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
             *sub_m.get_one::<u32>("NONCE").unwrap(),
             sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
-            *sub_m.get_one::<u64>("fuel").unwrap(),
             *sub_m.get_one::<u64>("mem").unwrap(),
+            *sub_m.get_one::<u64>("fuel").unwrap(),
         ),
         Some(("verify_solution", sub_m)) => verify_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),

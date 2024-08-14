@@ -2,10 +2,15 @@ mod difficulty_sampler;
 pub mod download_wasm;
 mod find_proof_to_submit;
 mod query_data;
-pub mod run_benchmark;
 mod setup_job;
 mod submit_benchmark;
 mod submit_proof;
+
+#[cfg(not(feature = "cuda"))]
+pub mod run_benchmark;
+#[cfg(feature = "cuda")]
+#[path = "cuda_run_benchmark.rs"]
+pub mod run_benchmark;
 
 use crate::future_utils::{sleep, spawn, time, Mutex};
 use difficulty_sampler::DifficultySampler;

@@ -6,32 +6,10 @@ Solutions are computed by executing an algorithm in a WASM virtual machine ([TIG
 
 # Compiling
 
-`tig-worker` is setup such that you can compile an algorithm to the native environment by setting the feature. This is entirely optional, and is useful for performance testing (see useful scripts).
-
-Command for normal compilation:
 ```
 cargo build -p tig-worker --release
 ./target/release/tig-worker --help
 ```
-
-Command for compiling specific algorithms to native environment:
-```
-ALGOS_TO_COMPILE="" # see notes
-cargo build -p tig-worker --release --features "${ALGOS_TO_COMPILE}"
-./target/release/tig-worker --help
-```
-
-**Notes:**
-
-* Setting `ALGOS_TO_COMPILE` will run the selected algorithms directly in your execution environment to filter for nonces that results in solutions. Nonces that are filtered will then be re-run in the WASM virtual machine to compute the necessary solution data for submission.
-
-* **WARNING** before setting `ALGOS_TO_COMPILE`, be sure to thoroughly review the algorithm code for malicious routines as it will be ran directly in your execution environment (not within a sandboxed WASM virtual machine)!
-
-* `ALGOS_TO_COMPILE` is a space separated string of algorithms with format `<challenge_name>_<algorithm_name>`. Example: 
-
-    ```
-    ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic vector_search_optimal_ann"
-    ```
 
 # Usage
 
