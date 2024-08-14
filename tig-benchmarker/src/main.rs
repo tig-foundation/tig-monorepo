@@ -72,7 +72,7 @@ fn cli() -> Command {
                 .long("offset")
                 .help("(Optional) Set nonce offset for each slave")
                 .default_value("5000000")
-                .value_parser(value_parser!(u32)),
+                .value_parser(value_parser!(u64)),
         )
 }
 
@@ -87,7 +87,7 @@ async fn main() {
     let api_url = matches.get_one::<String>("api").unwrap().clone();
     let api_key = matches.get_one::<String>("API_KEY").unwrap().clone();
     let player_id = matches.get_one::<String>("PLAYER_ID").unwrap().clone();
-    let nonce_offset = matches.get_one::<u32>("offset").unwrap().clone();
+    let nonce_offset = matches.get_one::<u64>("offset").unwrap().clone();
     if let Some(master) = matches.get_one::<String>("master") {
         slave_node(master, port, num_workers).await;
     } else {
@@ -158,7 +158,7 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
                 )
                 .await
                 {
-                    Ok(resp) => dejsonify::<u32>(&resp).unwrap(),
+                    Ok(resp) => dejsonify::<u64>(&resp).unwrap(),
                     Err(e) => {
                         println!("Error getting nonce offset: {:?}", e);
                         sleep(5000).await;
@@ -171,8 +171,8 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
                 nonce_iters = (0..num_workers)
                     .into_iter()
                     .map(|x| {
-                        Arc::new(Mutex::new(NonceIterator::from_u32(
-                            offset + u32::MAX / num_workers * x,
+                        Arc::new(Mutex::new(NonceIterator::from_u64(
+                            offset + u64::MAX / num_workers as u64 * x as u64,
                         )))
                     })
                     .collect();
@@ -237,7 +237,7 @@ async fn master_node(
     duration: u32,
     algorithms_path: &PathBuf,
     port: u16,
-    nonce_offset: u32,
+    nonce_offset: u64,
 ) {
     benchmarker::setup(api_url, api_key, player_id).await;
     benchmarker::start(num_workers, duration).await;
@@ -247,9 +247,9 @@ async fn master_node(
             .and(warp::get())
             .and(warp::any().map(move || offsets.clone()))
             .and_then(
-                move |slave_id: String, offsets: Arc<Mutex<HashMap<String, u32>>>| async move {
+                move |slave_id: String, offsets: Arc<Mutex<HashMap<String, u64>>>| async move {
                     let offsets = &mut (*offsets).lock().await;
-                    let len = offsets.len() as u32;
+                    let len = offsets.len() as u64;
                     let o = offsets
                         .entry(slave_id)
                         .or_insert_with(|| (len + 1) * nonce_offset);

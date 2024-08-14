@@ -18,30 +18,30 @@ where
     T: SolutionTrait,
     U: DifficultyTrait<N>,
 {
-    fn generate_instance(seed: u32, difficulty: &U) -> Result<Self>;
-    fn generate_instance_from_str(seed: u32, difficulty: &str) -> Result<Self> {
+    fn generate_instance(seed: u64, difficulty: &U) -> Result<Self>;
+    fn generate_instance_from_str(seed: u64, difficulty: &str) -> Result<Self> {
         Self::generate_instance(seed, &serde_json::from_str(difficulty)?)
     }
-    fn generate_instance_from_vec(seed: u32, difficulty: &Vec<i32>) -> Result<Self> {
+    fn generate_instance_from_vec(seed: u64, difficulty: &Vec<i32>) -> Result<Self> {
         match difficulty.as_slice().try_into() {
             Ok(difficulty) => Self::generate_instance_from_arr(seed, &difficulty),
             Err(_) => Err(anyhow!("Invalid difficulty length")),
         }
     }
-    fn generate_instance_from_arr(seed: u32, difficulty: &[i32; N]) -> Result<Self> {
+    fn generate_instance_from_arr(seed: u64, difficulty: &[i32; N]) -> Result<Self> {
         Self::generate_instance(seed, &U::from_arr(difficulty))
     }
 
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seed: u32,
+        seed: u64,
         difficulty: &U,
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
     ) -> Result<Self>;
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance_from_str(
-        seed: u32,
+        seed: u64,
         difficulty: &str,
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
@@ -50,7 +50,7 @@ where
     }
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance_from_vec(
-        seed: u32,
+        seed: u64,
         difficulty: &Vec<i32>,
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
@@ -62,7 +62,7 @@ where
     }
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance_from_arr(
-        seed: u32,
+        seed: u64,
         difficulty: &[i32; N],
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,

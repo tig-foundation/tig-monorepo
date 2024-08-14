@@ -18,6 +18,7 @@ rand = { version = "0.8.5", default-features = false, features = ["std_rng"] }
 reqwest = { version = "0.12.2", optional = true }
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113", features = ["preserve_order"] }
+sha3 = "0.10.8"
 uint = "0.9.5"
 wasm-bindgen = { version = "0.2.91", optional = true }
 wasm-bindgen-futures = { version = "0.4.41", optional = true }

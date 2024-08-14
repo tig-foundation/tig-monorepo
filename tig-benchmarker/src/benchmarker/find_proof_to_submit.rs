@@ -14,11 +14,11 @@ pub async fn execute() -> Result<Option<(String, Vec<SolutionData>)>> {
             continue;
         }
         if let Some(state) = &benchmarks[benchmark_id].state {
-            let sampled_nonces: HashSet<u32> =
+            let sampled_nonces: HashSet<u64> =
                 state.sampled_nonces.clone().unwrap().into_iter().collect();
             let mut solutions_data = proof.solutions_data.take().unwrap();
             solutions_data.retain(|x| sampled_nonces.contains(&x.nonce));
-            let extracted_nonces: HashSet<u32> = solutions_data.iter().map(|x| x.nonce).collect();
+            let extracted_nonces: HashSet<u64> = solutions_data.iter().map(|x| x.nonce).collect();
             if extracted_nonces != sampled_nonces {
                 return Err(format!(
                     "No solutions for sampled nonces: '{:?}'",

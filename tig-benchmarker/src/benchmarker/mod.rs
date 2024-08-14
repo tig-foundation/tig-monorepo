@@ -67,54 +67,54 @@ pub struct Job {
     pub benchmark_id: String,
     pub settings: BenchmarkSettings,
     pub solution_signature_threshold: u32,
-    pub sampled_nonces: Option<Vec<u32>>,
+    pub sampled_nonces: Option<Vec<u64>>,
     pub wasm_vm_config: WasmVMConfig,
 }
 
 #[derive(Serialize, Debug, Clone)]
 pub struct NonceIterator {
-    nonces: Option<Vec<u32>>,
-    current: u32,
-    attempts: u32,
+    nonces: Option<Vec<u64>>,
+    current: u64,
+    attempts: u64,
 }
 
 impl NonceIterator {
-    pub fn from_vec(nonces: Vec<u32>) -> Self {
+    pub fn from_vec(nonces: Vec<u64>) -> Self {
         Self {
             nonces: Some(nonces),
             current: 0,
             attempts: 0,
         }
     }
-    pub fn from_u32(start: u32) -> Self {
+    pub fn from_u64(start: u64) -> Self {
         Self {
             nonces: None,
             current: start,
             attempts: 0,
         }
     }
-    pub fn attempts(&self) -> u32 {
+    pub fn attempts(&self) -> u64 {
         self.attempts
     }
     pub fn is_empty(&self) -> bool {
-        self.nonces.as_ref().is_some_and(|x| x.is_empty()) || self.current == u32::MAX
+        self.nonces.as_ref().is_some_and(|x| x.is_empty()) || self.current == u64::MAX
     }
     pub fn empty(&mut self) {
         if let Some(nonces) = self.nonces.as_mut() {
             nonces.clear();
         }
-        self.current = u32::MAX;
+        self.current = u64::MAX;
     }
 }
 impl Iterator for NonceIterator {
-    type Item = u32;
+    type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(nonces) = self.nonces.as_mut() {
             let value = nonces.pop();
-            self.attempts += value.is_some() as u32;
+            self.attempts += value.is_some() as u64;
             value
-        } else if self.current < u32::MAX {
+        } else if self.current < u64::MAX {
             let value = Some(self.current);
             self.attempts += 1;
             self.current += 1;
@@ -273,8 +273,8 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
         None => (0..num_workers)
             .into_iter()
             .map(|x| {
-                Arc::new(Mutex::new(NonceIterator::from_u32(
-                    u32::MAX / num_workers * x,
+                Arc::new(Mutex::new(NonceIterator::from_u64(
+                    u64::MAX / num_workers as u64 * x as u64,
                 )))
             })
             .collect(),
@@ -317,7 +317,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
                 ..
             } = &mut (*state().lock().await);
             if time_left.as_mut().unwrap().update().finished()
-                || (finished && num_solutions == num_attempts) // nonce_iter is only empty if recomputing
+                || (finished && num_solutions == (num_attempts as u32)) // nonce_iter is only empty if recomputing
                 || *status == Status::Stopping
             {
                 break;

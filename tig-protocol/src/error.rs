@@ -12,7 +12,7 @@ pub enum ProtocolError {
         settings: BenchmarkSettings,
     },
     DuplicateNonce {
-        nonce: u32,
+        nonce: u64,
     },
     DuplicateProof {
         benchmark_id: String,
@@ -35,7 +35,7 @@ pub enum ProtocolError {
         benchmark_id: String,
     },
     InvalidBenchmarkNonce {
-        nonce: u32,
+        nonce: u64,
     },
     InvalidBlock {
         block_id: String,
@@ -48,23 +48,23 @@ pub enum ProtocolError {
         difficulty_parameters: Vec<DifficultyParameter>,
     },
     InvalidProofNonces {
-        expected_nonces: Vec<u32>,
-        submitted_nonces: Vec<u32>,
+        expected_nonces: Vec<u64>,
+        submitted_nonces: Vec<u64>,
     },
     InvalidSignatureFromSolutionData {
         actual_signature: u32,
-        nonce: u32,
+        nonce: u64,
         expected_signature: u32,
     },
     InvalidSolution {
-        nonce: u32,
+        nonce: u64,
     },
     InvalidSolutionData {
         algorithm_id: String,
-        nonce: u32,
+        nonce: u64,
     },
     InvalidSolutionSignature {
-        nonce: u32,
+        nonce: u64,
         solution_signature: u32,
         threshold: u32,
     },
