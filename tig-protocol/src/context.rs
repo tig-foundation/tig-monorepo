@@ -105,13 +105,13 @@ pub trait Context {
     async fn verify_solution(
         &self,
         settings: &BenchmarkSettings,
-        nonce: u32,
+        nonce: u64,
         solution: &Solution,
     ) -> ContextResult<anyhow::Result<()>>;
     async fn compute_solution(
         &self,
         settings: &BenchmarkSettings,
-        nonce: u32,
+        nonce: u64,
         wasm_vm_config: &WasmVMConfig,
     ) -> ContextResult<anyhow::Result<SolutionData>>;
     async fn get_transaction(&self, tx_hash: &String) -> ContextResult<Transaction>;

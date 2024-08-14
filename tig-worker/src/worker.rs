@@ -7,7 +7,7 @@ use wasmi::{Config, Engine, Linker, Module, Store, StoreLimitsBuilder};
 
 pub fn compute_solution(
     settings: &BenchmarkSettings,
-    nonce: u32,
+    nonce: u64,
     wasm: &[u8],
     max_memory: u64,
     max_fuel: u64,
@@ -118,7 +118,7 @@ pub fn compute_solution(
 
 pub fn verify_solution(
     settings: &BenchmarkSettings,
-    nonce: u32,
+    nonce: u64,
     solution: &Solution,
 ) -> Result<()> {
     let seed = settings.calc_seed(nonce);

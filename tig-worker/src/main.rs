@@ -15,7 +15,7 @@ fn cli() -> Command {
                     arg!(<SETTINGS> "Settings json string or path to json file")
                         .value_parser(clap::value_parser!(String)),
                 )
-                .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u32)))
+                .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
                 .arg(arg!(<WASM> "Path to a wasm file").value_parser(clap::value_parser!(PathBuf)))
                 .arg(
                     arg!(--fuel [FUEL] "Optional maximum fuel parameter for WASM VM")
@@ -35,7 +35,7 @@ fn cli() -> Command {
                     arg!(<SETTINGS> "Settings json string or path to json file")
                         .value_parser(clap::value_parser!(String)),
                 )
-                .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u32)))
+                .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
                 .arg(
                     arg!(<SOLUTION> "Solution json string or path to json file")
                         .value_parser(clap::value_parser!(String)),
@@ -49,14 +49,14 @@ fn main() {
     match matches.subcommand() {
         Some(("compute_solution", sub_m)) => compute_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
-            *sub_m.get_one::<u32>("NONCE").unwrap(),
+            *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u64>("mem").unwrap(),
             *sub_m.get_one::<u64>("fuel").unwrap(),
         ),
         Some(("verify_solution", sub_m)) => verify_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
-            *sub_m.get_one::<u32>("NONCE").unwrap(),
+            *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<String>("SOLUTION").unwrap().clone(),
         ),
         _ => {}
@@ -65,7 +65,7 @@ fn main() {
 
 fn compute_solution(
     mut settings: String,
-    nonce: u32,
+    nonce: u64,
     wasm_path: PathBuf,
     max_memory: u64,
     max_fuel: u64,
@@ -114,7 +114,7 @@ fn compute_solution(
     }
 }
 
-fn verify_solution(mut settings: String, nonce: u32, mut solution: String) {
+fn verify_solution(mut settings: String, nonce: u64, mut solution: String) {
     if settings.ends_with(".json") {
         settings = fs::read_to_string(&settings).unwrap_or_else(|_| {
             eprintln!("Failed to read settings file: {}", settings);

@@ -175,7 +175,7 @@ async fn verify_benchmark_settings_are_unique<T: Context>(
 
 #[time]
 fn verify_nonces_are_unique(solutions_meta_data: &Vec<SolutionMetaData>) -> ProtocolResult<()> {
-    let nonces: HashMap<u32, u32> =
+    let nonces: HashMap<u64, u32> =
         solutions_meta_data
             .iter()
             .fold(HashMap::new(), |mut acc, s| {
@@ -267,7 +267,7 @@ async fn verify_solution_is_valid<T: Context>(
     solutions_meta_data: &Vec<SolutionMetaData>,
     solution_data: &SolutionData,
 ) -> ProtocolResult<()> {
-    let solutions_map: HashMap<u32, u32> = solutions_meta_data
+    let solutions_map: HashMap<u64, u32> = solutions_meta_data
         .iter()
         .map(|d| (d.nonce, d.solution_signature))
         .collect();

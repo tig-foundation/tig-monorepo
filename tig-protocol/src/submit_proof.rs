@@ -95,8 +95,8 @@ fn verify_sampled_nonces(
     benchmark: &Benchmark,
     solutions_data: &Vec<SolutionData>,
 ) -> ProtocolResult<()> {
-    let sampled_nonces: HashSet<u32> = benchmark.state().sampled_nonces().iter().cloned().collect();
-    let proof_nonces: HashSet<u32> = solutions_data.iter().map(|d| d.nonce).collect();
+    let sampled_nonces: HashSet<u64> = benchmark.state().sampled_nonces().iter().cloned().collect();
+    let proof_nonces: HashSet<u64> = solutions_data.iter().map(|d| d.nonce).collect();
 
     if sampled_nonces != proof_nonces {
         return Err(ProtocolError::InvalidProofNonces {
@@ -113,7 +113,7 @@ async fn verify_solutions_are_valid<T: Context>(
     benchmark: &Benchmark,
     solutions_data: &Vec<SolutionData>,
 ) -> ProtocolResult<()> {
-    let solutions_map: HashMap<u32, u32> = benchmark
+    let solutions_map: HashMap<u64, u32> = benchmark
         .solutions_meta_data()
         .iter()
         .map(|d| (d.nonce, d.solution_signature))

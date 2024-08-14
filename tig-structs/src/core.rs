@@ -2,7 +2,7 @@ use crate::{config::ProtocolConfig, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
-use tig_utils::{jsonify, u32_from_str};
+use tig_utils::{jsonify, u32_from_str, u64_from_str};
 pub use tig_utils::{Frontier, Point, PreciseNumber, Transaction, U256};
 
 serializable_struct_with_getters! {
@@ -109,8 +109,8 @@ serializable_struct_with_getters! {
     }
 }
 impl BenchmarkSettings {
-    pub fn calc_seed(&self, nonce: u32) -> u32 {
-        u32_from_str(jsonify(&self).as_str()) ^ nonce
+    pub fn calc_seed(&self, nonce: u64) -> u64 {
+        u64_from_str(jsonify(&self).as_str()) ^ nonce
     }
 }
 serializable_struct_with_getters! {
@@ -122,12 +122,12 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     BenchmarkState {
         block_confirmed: Option<u32>,
-        sampled_nonces: Option<Vec<u32>>,
+        sampled_nonces: Option<Vec<u64>>,
     }
 }
 serializable_struct_with_getters! {
     SolutionMetaData {
-        nonce: u32,
+        nonce: u64,
         solution_signature: u32,
     }
 }
@@ -219,7 +219,7 @@ serializable_struct_with_getters! {
 pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     SolutionData {
-        nonce: u32,
+        nonce: u64,
         runtime_signature: u32,
         fuel_consumed: u64,
         solution: Solution,

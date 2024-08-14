@@ -47,7 +47,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seed: u32,
+    pub seed: u64,
     pub difficulty: Difficulty,
     pub weights: Vec<u32>,
     pub values: Vec<u32>,
@@ -62,7 +62,7 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seed: u32,
+        seed: u64,
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
@@ -71,8 +71,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         Self::generate_instance(seed, difficulty)
     }
 
-    fn generate_instance(seed: u32, difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng: StdRng = StdRng::seed_from_u64(seed as u64);
+    fn generate_instance(seed: u64, difficulty: &Difficulty) -> Result<Challenge> {
+        let mut rng: StdRng = StdRng::seed_from_u64(seed);
 
         let weights: Vec<u32> = (0..difficulty.num_items)
             .map(|_| rng.gen_range(1..50))
