@@ -41,8 +41,8 @@ pub async fn execute(
                                     )
                                         -> anyhow::Result<Option<tig_challenges::c001::Solution>>;
                                 match match job.settings.algorithm_id.as_str() {
-                                    // #[cfg(feature = "c001_a001")]
-                                    // "c001_a001" => Some(c001::c001_a001::solve_challenge as SolveChallengeFn),
+                                    #[cfg(feature = "c001_a001")]
+                                    "c001_a001" => Some(c001::c001_a001::solve_challenge as SolveChallengeFn),
 
                                     // #[cfg(feature = "c001_a002")]
                                     // "c001_a002" => Some(c001::c001_a002::solve_challenge as SolveChallengeFn),
