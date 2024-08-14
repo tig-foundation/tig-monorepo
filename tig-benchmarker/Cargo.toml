@@ -62,7 +62,8 @@ browser = [
     "tig-api/request-js",
 ]
 
-# c001_a001 = []
+c001_a001 = []
+satisfiability_schnoing = ["c001_a001"]
 
 # c001_a002 = []
 
