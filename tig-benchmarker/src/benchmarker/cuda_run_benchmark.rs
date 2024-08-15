@@ -84,7 +84,7 @@ pub async fn execute(
                             yield_now().await;
                             last_yield = now;
                         }
-                        let seed = job.settings.calc_seed(nonce);
+                        let seeds = job.settings.calc_seeds(nonce);
                         let skip = match job.settings.challenge_id.as_str() {
                             "c001" => {
                                 type CudaSolveChallengeFn =
@@ -3121,7 +3121,7 @@ pub async fn execute(
                                             .clone();
                                         let challenge =
                                             tig_challenges::c001::Challenge::cuda_generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                                 &dev,
                                                 challenge_cuda_funcs,
@@ -6176,7 +6176,7 @@ pub async fn execute(
                                             .clone();
                                         let challenge =
                                             tig_challenges::c002::Challenge::cuda_generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                                 &dev,
                                                 challenge_cuda_funcs,
@@ -9231,7 +9231,7 @@ pub async fn execute(
                                             .clone();
                                         let challenge =
                                             tig_challenges::c003::Challenge::cuda_generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                                 &dev,
                                                 challenge_cuda_funcs,
@@ -12286,7 +12286,7 @@ pub async fn execute(
                                             .clone();
                                         let challenge =
                                             tig_challenges::c004::Challenge::cuda_generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                                 &dev,
                                                 challenge_cuda_funcs,

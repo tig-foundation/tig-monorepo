@@ -12,29 +12,29 @@ pub fn compute_solution(
     max_memory: u64,
     max_fuel: u64,
 ) -> Result<Option<SolutionData>> {
-    let seed = settings.calc_seed(nonce);
+    let seeds = settings.calc_seeds(nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
-                satisfiability::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                satisfiability::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c002" => {
             let challenge =
-                vehicle_routing::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                vehicle_routing::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c003" => {
             let challenge =
-                knapsack::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                knapsack::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c004" => {
             let challenge =
-                vector_search::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                vector_search::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
@@ -88,7 +88,7 @@ pub fn compute_solution(
     // Get runtime signature
     let runtime_signature_u64 = store.get_runtime_signature();
     let runtime_signature = (runtime_signature_u64 as u32) ^ ((runtime_signature_u64 >> 32) as u32);
-    let fuel_consumed = store.get_fuel().unwrap();
+    let fuel_consumed = max_fuel - store.get_fuel().unwrap();
     // Read solution from memory
     let mut solution_len_bytes = [0u8; 4];
     memory
@@ -121,11 +121,11 @@ pub fn verify_solution(
     nonce: u64,
     solution: &Solution,
 ) -> Result<()> {
-    let seed = settings.calc_seed(nonce);
+    let seeds = settings.calc_seeds(nonce);
     match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
-                satisfiability::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                satisfiability::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .expect("Failed to generate satisfiability instance");
             match satisfiability::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -136,7 +136,7 @@ pub fn verify_solution(
         }
         "c002" => {
             let challenge =
-                vehicle_routing::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                vehicle_routing::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .expect("Failed to generate vehicle_routing instance");
             match vehicle_routing::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -147,7 +147,7 @@ pub fn verify_solution(
         }
         "c003" => {
             let challenge =
-                knapsack::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                knapsack::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .expect("Failed to generate knapsack instance");
             match knapsack::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -158,7 +158,7 @@ pub fn verify_solution(
         }
         "c004" => {
             let challenge =
-                vector_search::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                vector_search::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
                     .expect("Failed to generate vector_search instance");
             match vector_search::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),

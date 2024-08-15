@@ -1,5 +1,5 @@
 use md5;
-use sha3::{Digest, Keccak256};
+use sha3::{Digest, Keccak512};
 
 pub fn md5_from_str(input: &str) -> String {
     md5_from_bytes(input.as_bytes())
@@ -15,13 +15,17 @@ pub fn u32_from_str(input: &str) -> u32 {
     u32::from_le_bytes(bytes)
 }
 
-pub fn u64_from_str(input: &str) -> u64 {
-    let mut hasher = Keccak256::new();
+pub fn u64s_from_str(input: &str) -> [u64; 8] {
+    let mut hasher = Keccak512::new();
     hasher.update(input.as_bytes());
     let result = hasher.finalize();
-    u64::from_le_bytes(
-        result.as_slice()[0..8]
+
+    let mut output = [0u64; 8];
+    for i in 0..8 {
+        let bytes = result[i * 8..(i + 1) * 8]
             .try_into()
-            .expect("Should not ever panic.."),
-    )
+            .expect("Should not ever panic..");
+        output[i] = u64::from_le_bytes(bytes);
+    }
+    output
 }
