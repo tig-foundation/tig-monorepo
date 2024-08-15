@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use tig_challenges::satisfiability::*;
 
 pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
-    let mut rng = StdRng::seed_from_u64(challenge.seed as u64);
+    let mut rng = StdRng::seed_from_u64(challenge.seeds[0] as u64);
 
     let mut p_single = vec![false; challenge.difficulty.num_variables];
     let mut n_single = vec![false; challenge.difficulty.num_variables];
