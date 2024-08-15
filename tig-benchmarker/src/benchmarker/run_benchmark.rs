@@ -32,7 +32,7 @@ pub async fn execute(
                             yield_now().await;
                             last_yield = now;
                         }
-                        let seed = job.settings.calc_seed(nonce);
+                        let seeds = job.settings.calc_seeds(nonce);
                         let skip = match job.settings.challenge_id.as_str() {
                             "c001" => {
                                 type SolveChallengeFn =
@@ -3042,7 +3042,7 @@ pub async fn execute(
                                     Some(solve_challenge) => {
                                         let challenge =
                                             tig_challenges::c001::Challenge::generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                             )
                                             .unwrap();
@@ -6064,7 +6064,7 @@ pub async fn execute(
                                     Some(solve_challenge) => {
                                         let challenge =
                                             tig_challenges::c002::Challenge::generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                             )
                                             .unwrap();
@@ -9086,7 +9086,7 @@ pub async fn execute(
                                     Some(solve_challenge) => {
                                         let challenge =
                                             tig_challenges::c003::Challenge::generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                             )
                                             .unwrap();
@@ -9103,7 +9103,7 @@ pub async fn execute(
                             "c004" => {
                                 let challenge =
                                     tig_challenges::c004::Challenge::generate_instance_from_vec(
-                                        seed,
+                                        seeds,
                                         &job.settings.difficulty,
                                     )
                                     .unwrap();
@@ -12114,7 +12114,7 @@ pub async fn execute(
                                     Some(solve_challenge) => {
                                         let challenge =
                                             tig_challenges::c004::Challenge::generate_instance_from_vec(
-                                                seed,
+                                                seeds,
                                                 &job.settings.difficulty,
                                             )
                                             .unwrap();
