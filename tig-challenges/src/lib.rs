@@ -96,7 +96,7 @@ pub struct CudaKernel {
 
 pub struct RngArray {
     rngs: [StdRng; 8],
-    index: usize,
+    index: u32,
 }
 
 impl RngArray {
@@ -106,7 +106,7 @@ impl RngArray {
     }
 
     pub fn get_mut(&mut self) -> &mut StdRng {
-        self.index = (&mut self.rngs[self.index]).gen_range(0..8);
-        &mut self.rngs[self.index]
+        self.index = (&mut self.rngs[self.index as usize]).gen_range(0..8);
+        &mut self.rngs[self.index as usize]
     }
 }

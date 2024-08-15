@@ -88,7 +88,7 @@ pub fn compute_solution(
     // Get runtime signature
     let runtime_signature_u64 = store.get_runtime_signature();
     let runtime_signature = (runtime_signature_u64 as u32) ^ ((runtime_signature_u64 >> 32) as u32);
-    let fuel_consumed = store.get_fuel().unwrap();
+    let fuel_consumed = max_fuel - store.get_fuel().unwrap();
     // Read solution from memory
     let mut solution_len_bytes = [0u8; 4];
     memory
