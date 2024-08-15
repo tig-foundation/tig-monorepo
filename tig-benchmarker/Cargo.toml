@@ -96,7 +96,8 @@ browser = [
 
 # c001_a017 = []
 
-# c001_a018 = []
+c001_a018 = []
+satisfiability_inbound = ["c001_a018"]
 
 # c001_a019 = []
 
