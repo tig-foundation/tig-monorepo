@@ -2,7 +2,7 @@ use crate::{config::ProtocolConfig, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
-use tig_utils::{jsonify, u32_from_str, u64_from_str};
+use tig_utils::{jsonify, u32_from_str, u64s_from_str};
 pub use tig_utils::{Frontier, Point, PreciseNumber, Transaction, U256};
 
 serializable_struct_with_getters! {
@@ -109,8 +109,12 @@ serializable_struct_with_getters! {
     }
 }
 impl BenchmarkSettings {
-    pub fn calc_seed(&self, nonce: u64) -> u64 {
-        u64_from_str(jsonify(&self).as_str()) ^ nonce
+    pub fn calc_seeds(&self, nonce: u64) -> [u64; 8] {
+        let mut seeds = u64s_from_str(jsonify(&self).as_str());
+        for seed in seeds.iter_mut() {
+            *seed ^= nonce;
+        }
+        seeds
     }
 }
 serializable_struct_with_getters! {

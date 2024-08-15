@@ -1,10 +1,6 @@
 use anyhow::{anyhow, Result};
 use ndarray::{Array2, Axis};
-use rand::{
-    distributions::{Distribution, Uniform},
-    rngs::StdRng,
-    SeedableRng,
-};
+use rand::distributions::{Distribution, Uniform};
 use serde::{
     de::{self, SeqAccess, Visitor},
     ser::SerializeSeq,
@@ -14,6 +10,7 @@ use serde_json::{from_value, Map, Value};
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
+use crate::RngArray;
 #[cfg(feature = "cuda")]
 use cudarc::driver::*;
 #[cfg(feature = "cuda")]
@@ -59,7 +56,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seed: u64,
+    pub seeds: [u64; 8],
     pub difficulty: Difficulty,
     pub clauses: Vec<Vec<i32>>,
 }
@@ -71,17 +68,17 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seed: u64,
+        seeds: [u64; 8],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
     ) -> Result<Self> {
         // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seed, difficulty)
+        Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seed: u64, difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = StdRng::seed_from_u64(seed);
+    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Self> {
+        let mut rngs = RngArray::new(seeds);
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
             / 100.0)
@@ -92,11 +89,12 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         let neg_distr = Uniform::new(0, 2);
 
         // Generate the clauses array.
-        let clauses_array = Array2::from_shape_fn((num_clauses, 3), |_| var_distr.sample(&mut rng));
+        let clauses_array =
+            Array2::from_shape_fn((num_clauses, 3), |_| var_distr.sample(rngs.get_mut()));
 
         // Generate the negations array.
         let negations = Array2::from_shape_fn((num_clauses, 3), |_| {
-            if neg_distr.sample(&mut rng) == 0 {
+            if neg_distr.sample(rngs.get_mut()) == 0 {
                 -1
             } else {
                 1
@@ -113,7 +111,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .collect();
 
         Ok(Self {
-            seed,
+            seeds,
             difficulty: difficulty.clone(),
             clauses,
         })

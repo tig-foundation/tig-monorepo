@@ -1,5 +1,6 @@
+use crate::RngArray;
 use anyhow::{anyhow, Result};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::collections::HashSet;
@@ -47,7 +48,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seed: u64,
+    pub seeds: [u64; 8],
     pub difficulty: Difficulty,
     pub weights: Vec<u32>,
     pub values: Vec<u32>,
@@ -62,23 +63,23 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seed: u64,
+        seeds: [u64; 8],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
     ) -> Result<Self> {
         // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seed, difficulty)
+        Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seed: u64, difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng: StdRng = StdRng::seed_from_u64(seed);
+    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Challenge> {
+        let mut rngs = RngArray::new(seeds);
 
         let weights: Vec<u32> = (0..difficulty.num_items)
-            .map(|_| rng.gen_range(1..50))
+            .map(|_| rngs.get_mut().gen_range(1..50))
             .collect();
         let values: Vec<u32> = (0..difficulty.num_items)
-            .map(|_| rng.gen_range(1..50))
+            .map(|_| rngs.get_mut().gen_range(1..50))
             .collect();
         let max_weight: u32 = weights.iter().sum::<u32>() / 2;
 
@@ -103,7 +104,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .round() as u32;
 
         Ok(Challenge {
-            seed,
+            seeds,
             difficulty: difficulty.clone(),
             weights,
             values,

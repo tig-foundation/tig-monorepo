@@ -1,10 +1,11 @@
 use anyhow::{anyhow, Result};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
+use crate::RngArray;
 #[cfg(feature = "cuda")]
 use cudarc::driver::*;
 #[cfg(feature = "cuda")]
@@ -46,7 +47,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seed: u64,
+    pub seeds: [u64; 8],
     pub difficulty: Difficulty,
     pub demands: Vec<i32>,
     pub distance_matrix: Vec<Vec<i32>>,
@@ -61,27 +62,34 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seed: u64,
+        seeds: [u64; 8],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
     ) -> Result<Self> {
         // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seed, difficulty)
+        Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seed: u64, difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng: StdRng = StdRng::seed_from_u64(seed);
+    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Challenge> {
+        let mut rngs = RngArray::new(seeds);
 
         let num_nodes = difficulty.num_nodes;
         let max_capacity = 100;
 
         let mut node_positions: Vec<(f64, f64)> = (0..num_nodes)
-            .map(|_| (rng.gen::<f64>() * 500.0, rng.gen::<f64>() * 500.0))
+            .map(|_| {
+                (
+                    rngs.get_mut().gen::<f64>() * 500.0,
+                    rngs.get_mut().gen::<f64>() * 500.0,
+                )
+            })
             .collect();
         node_positions[0] = (250.0, 250.0); // Depot is node 0, and in the center
 
-        let mut demands: Vec<i32> = (0..num_nodes).map(|_| rng.gen_range(15..30)).collect();
+        let mut demands: Vec<i32> = (0..num_nodes)
+            .map(|_| rngs.get_mut().gen_range(15..30))
+            .collect();
         demands[0] = 0; // Depot demand is 0
 
         let distance_matrix: Vec<Vec<i32>> = node_positions
@@ -112,7 +120,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             / 1000) as i32;
 
         Ok(Challenge {
-            seed,
+            seeds,
             difficulty: difficulty.clone(),
             demands,
             distance_matrix,
