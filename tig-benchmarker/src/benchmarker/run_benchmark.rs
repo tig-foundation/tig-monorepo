@@ -9101,12 +9101,6 @@ pub async fn execute(
                                 }
                             }
                             "c004" => {
-                                let challenge =
-                                    tig_challenges::c004::Challenge::generate_instance_from_vec(
-                                        seeds,
-                                        &job.settings.difficulty,
-                                    )
-                                    .unwrap();
                                 type SolveChallengeFn =
                                     fn(
                                         &tig_challenges::c004::Challenge,

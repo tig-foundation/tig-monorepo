@@ -13,10 +13,16 @@ fi
 read -p "Enter benchmark_id: " benchmark_id
 
 echo "Fetching benchmark data"
-response=$(curl -s "https://mainnet-api.tig.foundation/get-benchmark-data?benchmark_id=$benchmark_id")
+response=$(curl -s "https://testnet-api.tig.foundation/get-benchmark-data?benchmark_id=$benchmark_id")
 
 # parse data from resp
-proof=$(echo "$response" | jq '.proof')
+proof=$(echo "$response" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for item in data['proof']['solutions_data']:
+    item['nonce'] = str(item['nonce'])
+print(json.dumps(data))
+" | jq '.proof')
 if [ "$proof" == "null" ]; then
     echo "No proofs found"
     exit 0
@@ -28,12 +34,12 @@ echo "Found $solutions_count solutions to verify"
 
 # Fetch block id
 echo "Fetching block data"
-block_response=$(curl -s "https://mainnet-api.tig.foundation/get-block")
+block_response=$(curl -s "https://testnet-api.tig.foundation/get-block")
 block_id=$(echo "$block_response" | jq -r '.block.id')
 
 # Fetch algorithms for the block
 echo "Fetching algorithms data"
-algorithms_response=$(curl -s "https://mainnet-api.tig.foundation/get-algorithms?block_id=$block_id")
+algorithms_response=$(curl -s "https://testnet-api.tig.foundation/get-algorithms?block_id=$block_id")
 wasms=$(echo "$algorithms_response" | jq -c '.wasms[]')
 
 wasm=$(echo "$wasms" | jq -c "select(.algorithm_id == \"$algorithm_id\")")
@@ -62,7 +68,12 @@ for i in $(seq 0 $(($solutions_count - 1))); do
     echo Verifying solution is valid
     ./target/release/tig-worker verify_solution "$settings" $nonce "$solution"
     echo Verifying runtime_signature and fuel_consumed
-    compute_output=$(./target/release/tig-worker compute_solution "$settings" $nonce ./$algorithm_id.wasm | jq -c -S)
+    compute_output=$(./target/release/tig-worker compute_solution "$settings" $nonce ./$algorithm_id.wasm | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+data['nonce'] = str(data['nonce'])
+print(json.dumps(data))
+    " | jq -c -S)
     if [[ "$compute_output" == "$solution_data" ]]; then
         echo "Ok"
     else
