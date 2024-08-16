@@ -13,7 +13,7 @@ fi
 read -p "Enter benchmark_id: " benchmark_id
 
 echo "Fetching benchmark data"
-response=$(curl -s "https://testnet-api.tig.foundation/get-benchmark-data?benchmark_id=$benchmark_id")
+response=$(curl -s "https://mainnet-api.tig.foundation/get-benchmark-data?benchmark_id=$benchmark_id")
 
 # parse data from resp
 proof=$(echo "$response" | python3 -c "
@@ -34,12 +34,12 @@ echo "Found $solutions_count solutions to verify"
 
 # Fetch block id
 echo "Fetching block data"
-block_response=$(curl -s "https://testnet-api.tig.foundation/get-block")
+block_response=$(curl -s "https://mainnet-api.tig.foundation/get-block")
 block_id=$(echo "$block_response" | jq -r '.block.id')
 
 # Fetch algorithms for the block
 echo "Fetching algorithms data"
-algorithms_response=$(curl -s "https://testnet-api.tig.foundation/get-algorithms?block_id=$block_id")
+algorithms_response=$(curl -s "https://mainnet-api.tig.foundation/get-algorithms?block_id=$block_id")
 wasms=$(echo "$algorithms_response" | jq -c '.wasms[]')
 
 wasm=$(echo "$wasms" | jq -c "select(.algorithm_id == \"$algorithm_id\")")
