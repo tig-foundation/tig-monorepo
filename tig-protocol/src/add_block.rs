@@ -612,6 +612,54 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
     }
 }
 
+fn find_smallest_range_dimension(points: &Frontier) -> usize {
+    (0..2)
+        .min_by_key(|&d| {
+            let (min, max) = points
+                .iter()
+                .map(|p| p[d])
+                .fold((i32::MAX, i32::MIN), |(min, max), val| {
+                    (min.min(val), max.max(val))
+                });
+            max - min
+        })
+        .unwrap()
+}
+
+fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
+    if points.is_empty() {
+        return Vec::new();
+    }
+    let dimension = find_smallest_range_dimension(&points);
+    let sort_dimension = 1 - dimension;
+
+    let mut buckets: HashMap<i32, Vec<Point>> = HashMap::new();
+    for point in points {
+        buckets.entry(point[dimension]).or_default().push(point);
+    }
+    for (_, group) in buckets.iter_mut() {
+        // sort descending
+        group.sort_unstable_by(|a, b| b[sort_dimension].cmp(&a[sort_dimension]));
+    }
+    let mut result = Vec::new();
+    while !buckets.is_empty() {
+        let points: HashSet<Point> = buckets.values().map(|group| group[0].clone()).collect();
+        let frontier = points.pareto_frontier();
+        for point in frontier.iter() {
+            let bucket = buckets.get_mut(&point[dimension]).unwrap();
+            bucket.remove(0);
+            if bucket.is_empty() {
+                buckets.remove(&point[dimension]);
+            }
+        }
+        result.push(frontier);
+        if only_one {
+            break;
+        }
+    }
+    result
+}
+
 #[time]
 async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
@@ -645,19 +693,15 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
             continue;
         }
         let benchmarks = benchmarks_by_challenge.get_mut(challenge_id).unwrap();
-        let mut points = benchmarks
+        let points = benchmarks
             .iter()
             .map(|b| b.settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
-        let mut frontier_index = 0;
-        while !points.is_empty() {
-            let frontier = points.pareto_frontier();
-            points = points.difference(&frontier).cloned().collect();
-            frontier.iter().for_each(|p| {
-                frontier_indexes.insert(p.clone(), frontier_index);
-            });
-            frontier_index += 1;
+        for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() {
+            for point in frontier {
+                frontier_indexes.insert(point, frontier_index);
+            }
         }
         benchmarks.sort_by(|a, b| {
             let a_index = frontier_indexes[&a.settings.difficulty];
@@ -744,14 +788,16 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) {
         let min_difficulty = difficulty_parameters.min_difficulty();
         let max_difficulty = difficulty_parameters.max_difficulty();
 
-        let cutoff_frontier = block_data
+        let points = block_data
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-            .collect::<Frontier>()
-            .pareto_frontier()
-            .iter()
-            .map(|d| d.iter().map(|x| -x).collect())
+            .collect::<Frontier>();
+        let cutoff_frontier = pareto_algorithm(points, true)
+            .pop()
+            .unwrap()
+            .into_iter()
+            .map(|d| d.into_iter().map(|x| -x).collect())
             .collect::<Frontier>() // mirror the points back;
             .extend(&min_difficulty, &max_difficulty);
 
