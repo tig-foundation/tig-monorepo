@@ -54,7 +54,7 @@ if ! $generate_command && ! $generate_json; then
 fi
 
 if [ -z "$1" ]; then
-    echo "No branches provided. Please provide branches to merge as a space-separated string."
+    echo "No algorithms provided. Please provide algorithms to merge as a space-separated string."
     exit 1
 fi
 
@@ -62,7 +62,8 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 branches_to_merge=$1
 
 if $merge_branches; then
-    git fetch public || exit 1
+    git config pull.rebase false || exit 1
+    git fetch --all || exit 1
 
     for branch in $branches_to_merge; do
         echo "Checking out and updating branch '$branch'..."
@@ -70,7 +71,7 @@ if $merge_branches; then
         git checkout "$branch"
         if [ $? -ne 0 ]; then
             echo "Failed to checkout branch '$branch'. Please make sure you are in 'tig-monorepo' \
-or you have added it as a remote repository."
+or you have added it as a remote repository like: git remote add public <url>."
             exit 1
         fi
 
