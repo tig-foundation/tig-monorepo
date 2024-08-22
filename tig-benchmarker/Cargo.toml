@@ -111,7 +111,8 @@ satisfiability_inbound = ["c001_a018"]
 
 # c001_a022 = []
 
-# c001_a023 = []
+c001_a023 = []
+satisfiability_sat_allocd = ["c001_a023"]
 
 # c001_a024 = []
 
