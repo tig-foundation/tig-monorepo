@@ -51,7 +51,7 @@ pub async fn execute() -> Result<QueryData> {
     Ok(cache.get(&latest_block_id).unwrap().clone())
 }
 
-async fn query_latest_block() -> Result<Block> {
+pub async fn query_latest_block() -> Result<Block> {
     let GetBlockResp { block, .. } = api()
         .get_block(GetBlockReq {
             id: None,

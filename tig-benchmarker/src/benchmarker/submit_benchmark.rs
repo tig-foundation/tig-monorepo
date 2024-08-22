@@ -1,5 +1,4 @@
-use super::{api, state, Job, QueryData, Result};
-use crate::future_utils::sleep;
+use super::{api, state, Job, QueryData, Result, utils::handle_submission_error, query_data::query_latest_block};
 use tig_api::SubmitBenchmarkReq;
 
 const MAX_RETRIES: u32 = 3;
@@ -24,6 +23,9 @@ pub async fn execute(job: &Job) -> Result<String> {
             solution_data,
         }
     };
+
+    let mut current_height = query_latest_block().await?.details.height;
+
     for attempt in 1..=MAX_RETRIES {
         println!("Submission attempt {} of {}", attempt, MAX_RETRIES);
         match api().submit_benchmark(req.clone()).await {
@@ -34,11 +36,11 @@ pub async fn execute(job: &Job) -> Result<String> {
                 }
             }
             Err(e) => {
-                let err_msg = format!("Failed to submit benchmark: {:?}", e);
+                let err_msg = format!("Failed to submit benchmark after {} attempts: {:?}", attempt, e);
                 if attempt < MAX_RETRIES {
-                    println!("{}", err_msg);
-                    println!("Retrying in 5 seconds...");
-                    sleep(5000).await;
+                    if !handle_submission_error(&e, "benchmark", &mut current_height).await {
+                        return Err(err_msg);
+                    }
                 } else {
                     return Err(err_msg);
                 }

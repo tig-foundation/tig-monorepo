@@ -5,6 +5,7 @@ mod query_data;
 mod setup_job;
 mod submit_benchmark;
 mod submit_proof;
+mod utils;
 
 #[cfg(not(feature = "cuda"))]
 pub mod run_benchmark;
