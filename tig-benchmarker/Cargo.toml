@@ -111,7 +111,8 @@ satisfiability_inbound = ["c001_a018"]
 
 # c001_a022 = []
 
-# c001_a023 = []
+c001_a023 = []
+satisfiability_sat_allocd = ["c001_a023"]
 
 # c001_a024 = []
 
@@ -6091,7 +6092,8 @@ knapsack_knapheudp = ["c003_a019"]
 
 # c004_a013 = []
 
-# c004_a014 = []
+c004_a014 = []
+vector_search_brute_force_bacalhau = ["c004_a014"]
 
 # c004_a015 = []
 

@@ -47,7 +47,8 @@ pub use inbound as c001_a018;
 
 // c001_a022
 
-// c001_a023
+pub mod sat_allocd;
+pub use sat_allocd as c001_a023;
 
 // c001_a024
 
