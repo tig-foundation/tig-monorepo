@@ -1,5 +1,5 @@
 use md5;
-use sha3::{Digest, Keccak512};
+use sha3::{Digest, Keccak512, Keccak256};
 
 pub fn md5_from_str(input: &str) -> String {
     md5_from_bytes(input.as_bytes())
@@ -28,4 +28,15 @@ pub fn u64s_from_str(input: &str) -> [u64; 8] {
         output[i] = u64::from_le_bytes(bytes);
     }
     output
+}
+
+
+pub fn hash_input_with_nonce(input: &str, nonce: u64) -> [u8; 32] {
+    Keccak256::new()
+    .chain_update(b"input:")
+    .chain_update(input.as_bytes())
+    .chain_update(b"nonce:")
+    .chain_update(&nonce.to_le_bytes())
+    .finalize()
+    .into()
 }

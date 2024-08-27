@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rand::Rng;
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 
@@ -47,7 +47,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seeds: [u64; 8],
+    pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub demands: Vec<i32>,
     pub distance_matrix: Vec<Vec<i32>>,
@@ -62,7 +62,7 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seeds: [u64; 8],
+        seeds: [u8; 32],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
@@ -71,8 +71,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rngs = RngArray::new(seeds);
+    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
+        let mut rng = StdRng::from_seed(seed);
 
         let num_nodes = difficulty.num_nodes;
         let max_capacity = 100;
@@ -80,15 +80,15 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         let mut node_positions: Vec<(f64, f64)> = (0..num_nodes)
             .map(|_| {
                 (
-                    rngs.get_mut().gen::<f64>() * 500.0,
-                    rngs.get_mut().gen::<f64>() * 500.0,
+                    rng.gen::<f64>() * 500.0,
+                    rng.gen::<f64>() * 500.0,
                 )
             })
             .collect();
         node_positions[0] = (250.0, 250.0); // Depot is node 0, and in the center
 
         let mut demands: Vec<i32> = (0..num_nodes)
-            .map(|_| rngs.get_mut().gen_range(15..30))
+            .map(|_| rng.gen_range(15..30))
             .collect();
         demands[0] = 0; // Depot demand is 0
 
@@ -120,7 +120,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             / 1000) as i32;
 
         Ok(Challenge {
-            seeds,
+            seed,
             difficulty: difficulty.clone(),
             demands,
             distance_matrix,

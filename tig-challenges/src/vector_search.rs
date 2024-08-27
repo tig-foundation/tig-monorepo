@@ -1,6 +1,6 @@
-use crate::{ChallengeTrait, DifficultyTrait, RngArray, SolutionTrait};
+use crate::{ChallengeTrait, DifficultyTrait, SolutionTrait};
 use anyhow::{anyhow, Ok, Result};
-use rand::distributions::{Distribution, Uniform};
+use rand::{SeedableRng, rngs::StdRng, distributions::{Distribution, Uniform}};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 
@@ -47,7 +47,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seeds: [u64; 8],
+    pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub vector_database: Vec<Vec<f32>>,
     pub query_vectors: Vec<Vec<f32>>,
@@ -69,7 +69,7 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seeds: [u64; 8],
+        seeds: [u8; 32],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
@@ -78,19 +78,19 @@ impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Self> {
-        let mut rngs = RngArray::new(seeds);
+    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
+        let mut rng = StdRng::from_seed(seed);
         let uniform = Uniform::from(0.0..1.0);
         let search_vectors = (0..100000)
-            .map(|_| (0..250).map(|_| uniform.sample(rngs.get_mut())).collect())
+            .map(|_| (0..250).map(|_| uniform.sample(&mut rng)).collect())
             .collect();
         let query_vectors = (0..difficulty.num_queries)
-            .map(|_| (0..250).map(|_| uniform.sample(rngs.get_mut())).collect())
+            .map(|_| (0..250).map(|_| uniform.sample(&mut rng)).collect())
             .collect();
         let max_distance = 6.0 - (difficulty.better_than_baseline as f32) / 1000.0;
 
         Ok(Self {
-            seeds,
+            seed,
             difficulty: difficulty.clone(),
             vector_database: search_vectors,
             query_vectors,

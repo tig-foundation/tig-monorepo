@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use ndarray::{Array2, Axis};
-use rand::distributions::{Distribution, Uniform};
+use rand::{SeedableRng, rngs::StdRng, distributions::{Distribution, Uniform}};
 use serde::{
     de::{self, SeqAccess, Visitor},
     ser::SerializeSeq,
@@ -10,7 +10,6 @@ use serde_json::{from_value, Map, Value};
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
-use crate::RngArray;
 #[cfg(feature = "cuda")]
 use cudarc::driver::*;
 #[cfg(feature = "cuda")]
@@ -56,7 +55,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seeds: [u64; 8],
+    pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub clauses: Vec<Vec<i32>>,
 }
@@ -77,8 +76,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Self> {
-        let mut rngs = RngArray::new(seeds);
+    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
+        let mut rng = StdRng::from_seed(seed);
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
             / 100.0)
@@ -90,11 +89,11 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 
         // Generate the clauses array.
         let clauses_array =
-            Array2::from_shape_fn((num_clauses, 3), |_| var_distr.sample(rngs.get_mut()));
+            Array2::from_shape_fn((num_clauses, 3), |_| var_distr.sample(&mut rng));
 
         // Generate the negations array.
         let negations = Array2::from_shape_fn((num_clauses, 3), |_| {
-            if neg_distr.sample(rngs.get_mut()) == 0 {
+            if neg_distr.sample(&mut rng) == 0 {
                 -1
             } else {
                 1
@@ -111,7 +110,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .collect();
 
         Ok(Self {
-            seeds,
+            seed,
             difficulty: difficulty.clone(),
             clauses,
         })
