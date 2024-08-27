@@ -1,8 +1,9 @@
 use crate::{ChallengeTrait, DifficultyTrait, SolutionTrait};
 use anyhow::{anyhow, Ok, Result};
-use rand::{SeedableRng, rngs::StdRng, distributions::{Distribution, Uniform}};
+use rand::{distributions::{Distribution, Uniform}, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
@@ -79,7 +80,7 @@ impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = StdRng::from_seed(seed);
+        let mut rng = Xoshiro256PlusPlus::from_seed(seed);
         let uniform = Uniform::from(0.0..1.0);
         let search_vectors = (0..100000)
             .map(|_| (0..250).map(|_| uniform.sample(&mut rng)).collect())

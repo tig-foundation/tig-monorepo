@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use ndarray::{Array2, Axis};
-use rand::{SeedableRng, rngs::StdRng, distributions::{Distribution, Uniform}};
+use rand::{SeedableRng, distributions::{Distribution, Uniform}};
+use rand_xoshiro::Xoshiro256PlusPlus;
 use serde::{
     de::{self, SeqAccess, Visitor},
     ser::SerializeSeq,
@@ -77,7 +78,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = StdRng::from_seed(seed);
+        let mut rng = Xoshiro256PlusPlus::from_seed(seed);
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
             / 100.0)

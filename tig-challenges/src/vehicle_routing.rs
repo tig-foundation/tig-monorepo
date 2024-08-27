@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
-use crate::RngArray;
 #[cfg(feature = "cuda")]
 use cudarc::driver::*;
 #[cfg(feature = "cuda")]
@@ -72,7 +72,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng = StdRng::from_seed(seed);
+        let mut rng = Xoshiro256PlusPlus::from_seed(seed);
 
         let num_nodes = difficulty.num_nodes;
         let max_capacity = 100;

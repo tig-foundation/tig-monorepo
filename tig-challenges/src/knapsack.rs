@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::collections::HashSet;
@@ -72,7 +73,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng = StdRng::from_seed(seed);
+        let mut rng = Xoshiro256PlusPlus::from_seed(seed);
 
         let weights: Vec<u32> = (0..difficulty.num_items)
             .map(|_| rng.gen_range(1..50))
