@@ -129,12 +129,8 @@ serializable_struct_with_getters! {
     }
 }
 impl BenchmarkSettings {
-    pub fn calc_seeds(&self, nonce: u64) -> [u64; 4] {
-        let mut seeds = u64s_from_str(jsonify(&self).as_str());
-        for seed in seeds.iter_mut() {
-            *seed ^= nonce;
-        }
-        seeds
+    pub fn calc_seed(&self, nonce: u64) -> [u8; 32] {
+        u8s_from_str(&format!("{}_{}", jsonify(&self), nonce))
     }
 }
 serializable_struct_with_getters! {

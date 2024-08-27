@@ -12,29 +12,29 @@ pub fn compute_solution(
     max_memory: u64,
     max_fuel: u64,
 ) -> Result<(OutputData, Option<String>)> {
-    let seeds = settings.calc_seeds(nonce);
+    let seed = settings.calc_seed(nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
-                satisfiability::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                satisfiability::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c002" => {
             let challenge =
-                vehicle_routing::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vehicle_routing::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c003" => {
             let challenge =
-                knapsack::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                knapsack::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c004" => {
             let challenge =
-                vector_search::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vector_search::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
@@ -127,11 +127,11 @@ pub fn verify_solution(
     nonce: u64,
     solution: &Solution,
 ) -> Result<()> {
-    let seeds = settings.calc_seeds(nonce);
+    let seed = settings.calc_seed(nonce);
     match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
-                satisfiability::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                satisfiability::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate satisfiability instance");
             match satisfiability::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -142,7 +142,7 @@ pub fn verify_solution(
         }
         "c002" => {
             let challenge =
-                vehicle_routing::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vehicle_routing::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate vehicle_routing instance");
             match vehicle_routing::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -153,7 +153,7 @@ pub fn verify_solution(
         }
         "c003" => {
             let challenge =
-                knapsack::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                knapsack::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate knapsack instance");
             match knapsack::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -164,7 +164,7 @@ pub fn verify_solution(
         }
         "c004" => {
             let challenge =
-                vector_search::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vector_search::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate vector_search instance");
             match vector_search::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
