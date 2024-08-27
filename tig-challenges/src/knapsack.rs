@@ -85,7 +85,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 
         // Baseline greedy algorithm
         let mut sorted_value_to_weight_ratio: Vec<usize> = (0..difficulty.num_items).collect();
-        sorted_value_to_weight_ratio.sort_by(|&a, &b| {
+        sorted_value_to_weight_ratio.sort_unstable_by(|&a, &b| {
             let ratio_a = values[a] as f64 / weights[a] as f64;
             let ratio_b = values[b] as f64 / weights[b] as f64;
             ratio_b.partial_cmp(&ratio_a).unwrap()
