@@ -2,23 +2,7 @@
 
 A Rust crate that implements a Benchmarker for TIG. 
 
-## Browser Benchmarker
-
-`tig-benchmarker` can be compiled to WASM with bindings for browsers. 
-
-The browser version is deployed to https://play.tig.foundation/benchmarker
-
-To build & run it locally, run the following commands before visiting localhost in your browser:
-
-```
-# uncomment below to install wasm-pack
-# curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-cd tig-benchmarker
-wasm-pack build --release --target web
-python3 -m http.server 80
-```
-
-## Standalone Benchmarker
+## Compiling Your Benchmarker
 
 `tig-benchmarker` can be compiled into an executable for running standalone, or in slave mode (see notes)
 
@@ -28,10 +12,10 @@ There are two ways to start the master benchmarker:
     ```
     ALGOS_TO_COMPILE="" # See notes
     # USE_CUDA="cuda" # See notes
-    cargo build -p tig-benchmarker --release --no-default-features --features "standalone ${ALGOS_TO_COMPILE} ${USE_CUDA}"
+    cargo build -p tig-benchmarker --release --no-default-features --features "${ALGOS_TO_COMPILE} ${USE_CUDA}"
     # edit below line for your own algorithm selection
-    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}' > algo_selection.json
-    ./target/release/tig-benchmarker <address> <api_key> algo_selection.json
+    SELECTED_ALGORITHMS='{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"basic"}'
+    ./target/release/tig-benchmarker <address> <api_key> $SELECTED_ALGORITHMS
     ```
 
 2. Compile executable in a docker, and run the docker:
@@ -40,8 +24,8 @@ There are two ways to start the master benchmarker:
     # USE_CUDA="cuda" # See notes
     docker build -f tig-benchmarker/Dockerfile --build-arg features="${ALGOS_TO_COMPILE} ${USE_CUDA}" -t tig-benchmarker .
     # edit below line for your own algorithm selection
-    echo '{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}' > algo_selection.json
-    docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> algo_selection.json
+    SELECTED_ALGORITHMS='{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}'
+    docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> $SELECTED_ALGORITHMS
     ```
 
 **Notes:**
@@ -56,11 +40,12 @@ There are two ways to start the master benchmarker:
         ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic vector_search_optimal_ann"
         ```
 
-* Every 10 seconds, the benchmarker reads your json file path and uses the contents to update its algorithm selection. 
 * You can see available algorithms in the dropdowns of the [Benchmarker UI](https://play.tig.foundation/benchmarker)
     * Alternatively, you can use [`script\list_algorithms.sh`](../scripts/list_algorithms.sh)
 * `tig-benchmarker` starts a master node by default. The port can be set with `--port <port>` (default 5115)
 * `tig-benchmarker` that are started with the option `--master <hostname>` are ran as slaves and will poll the master for jobs
+    * slaves will ignore any job that doesn't match their algorithm selection
+    * one possible setup is to run the master with `--workers 0`, and then run a separate slave for each challenge with different number of workers
 * `tig-benchmarker` can be executed with `--help` to see all options including setting the number of workers, and setting the duration of a benchmark
 * Uncomment `# USE_CUDA="cuda"` to compile `tig-benchmarker` to use CUDA optimisations where they are available. 
     * You must have a CUDA compatible GPU with CUDA toolkit installed

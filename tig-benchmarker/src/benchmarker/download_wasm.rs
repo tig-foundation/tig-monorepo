@@ -1,8 +1,8 @@
 use super::{Job, Result};
-use crate::future_utils::Mutex;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use tig_utils::get;
+use tokio::sync::Mutex;
 
 static CACHE: OnceCell<Mutex<HashMap<String, Vec<u8>>>> = OnceCell::new();
 

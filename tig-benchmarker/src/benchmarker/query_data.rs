@@ -1,9 +1,9 @@
 use super::{api, player_id, QueryData, Result};
-use crate::future_utils::{join, Mutex};
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use tig_api::*;
 use tig_structs::core::*;
+use tokio::{join, sync::Mutex};
 
 static CACHE: OnceCell<Mutex<HashMap<String, QueryData>>> = OnceCell::new();
 
@@ -14,13 +14,12 @@ pub async fn execute() -> Result<QueryData> {
     let mut cache = cache.lock().await;
     if !cache.contains_key(&latest_block.id) {
         cache.clear();
-        let results = join(
+        let results = join!(
             query_algorithms(latest_block.id.clone()),
             query_player_data(latest_block.id.clone()),
             query_benchmarks(latest_block.id.clone()),
             query_challenges(latest_block.id.clone()),
-        )
-        .await?;
+        );
         let (algorithms_by_challenge, download_urls) = results.0?;
         let player_data = results.1?;
         let (benchmarks, proofs, frauds) = results.2?;

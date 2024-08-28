@@ -1,33 +1,38 @@
-use super::{state, QueryData, Result};
-use std::collections::HashSet;
-use tig_worker::SolutionData;
+use super::{state, Job, QueryData, Result, State};
+use crate::utils::time;
 
-pub async fn execute() -> Result<Option<(String, Vec<SolutionData>)>> {
+pub async fn execute() -> Result<Option<Job>> {
+    let mut state = state().lock().await;
+    let State {
+        query_data,
+        pending_proof_jobs,
+        ..
+    } = &mut *state;
     let QueryData {
         proofs,
         benchmarks,
         frauds,
         ..
-    } = &mut state().lock().await.query_data;
-    for (benchmark_id, proof) in proofs.iter_mut() {
-        if proof.solutions_data.is_none() || frauds.contains_key(benchmark_id) {
-            continue;
-        }
-        if let Some(state) = &benchmarks[benchmark_id].state {
-            let sampled_nonces: HashSet<u64> =
-                state.sampled_nonces.clone().unwrap().into_iter().collect();
-            let mut solutions_data = proof.solutions_data.take().unwrap();
-            solutions_data.retain(|x| sampled_nonces.contains(&x.nonce));
-            let extracted_nonces: HashSet<u64> = solutions_data.iter().map(|x| x.nonce).collect();
-            if extracted_nonces != sampled_nonces {
-                return Err(format!(
-                    "No solutions for sampled nonces: '{:?}'",
-                    sampled_nonces
-                        .difference(&extracted_nonces)
-                        .collect::<Vec<_>>()
-                ));
+    } = &query_data;
+    let now = time();
+    let mut pending_proof_ids = pending_proof_jobs
+        .iter()
+        .filter(|(_, job)| now >= job.timestamps.submit)
+        .map(|(id, _)| id.clone())
+        .collect::<Vec<String>>();
+    pending_proof_ids.sort_by_key(|id| pending_proof_jobs[id].timestamps.submit);
+    for benchmark_id in pending_proof_ids {
+        if let Some(sampled_nonces) = benchmarks
+            .get(&benchmark_id)
+            .and_then(|b| b.state.as_ref())
+            .and_then(|s| s.sampled_nonces.as_ref())
+        {
+            let mut job = pending_proof_jobs.remove(&benchmark_id).unwrap();
+            if proofs.contains_key(&benchmark_id) || frauds.contains_key(&benchmark_id) {
+                continue;
             }
-            return Ok(Some((benchmark_id.clone(), solutions_data)));
+            job.sampled_nonces = Some(sampled_nonces.clone());
+            return Ok(Some(job));
         }
     }
     Ok(None)

@@ -1,8 +1,11 @@
 mod difficulty_sampler;
 pub mod download_wasm;
+mod find_benchmark_to_submit;
+mod find_proof_to_recompute;
 mod find_proof_to_submit;
 mod query_data;
-mod setup_job;
+pub mod select_job;
+mod setup_jobs;
 mod submit_benchmark;
 mod submit_proof;
 
@@ -12,18 +15,21 @@ pub mod run_benchmark;
 #[path = "cuda_run_benchmark.rs"]
 pub mod run_benchmark;
 
-use crate::future_utils::{sleep, spawn, time, Mutex};
+use crate::utils::{sleep, time, Result};
 use difficulty_sampler::DifficultySampler;
 use once_cell::sync::OnceCell;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tig_api::Api;
 use tig_structs::{
     config::{MinMaxDifficulty, WasmVMConfig},
     core::*,
 };
-
-pub type Result<T> = std::result::Result<T, String>;
+use tokio::{sync::Mutex, task::yield_now};
 
 #[derive(Serialize, Clone, Debug)]
 pub struct QueryData {
@@ -37,31 +43,48 @@ pub struct QueryData {
     pub frauds: HashMap<String, Fraud>,
 }
 
-#[derive(Serialize, Clone, Debug)]
-pub struct Timer {
-    pub start: u64,
-    pub end: u64,
-    pub now: u64,
+pub struct NonceIterator {
+    start: u64,
+    current: u64,
+    end: u64,
 }
-impl Timer {
-    fn new(ms: u64) -> Self {
-        let now = time();
-        Timer {
-            start: now,
-            end: now + ms,
-            now,
+
+impl NonceIterator {
+    pub fn new(start: u64, end: u64) -> Self {
+        NonceIterator {
+            start,
+            current: start,
+            end,
         }
     }
-    fn update(&mut self) -> &Self {
-        self.now = time();
-        self
-    }
-    fn finished(&self) -> bool {
-        self.now >= self.end
+
+    pub fn num_attempts(&self) -> u64 {
+        self.current - self.start
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+impl Iterator for NonceIterator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < self.end {
+            let result = Some(self.current);
+            self.current += 1;
+            result
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Timestamps {
+    pub start: u64,
+    pub end: u64,
+    pub submit: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Job {
     pub download_url: String,
     pub benchmark_id: String,
@@ -69,78 +92,42 @@ pub struct Job {
     pub solution_signature_threshold: u32,
     pub sampled_nonces: Option<Vec<u64>>,
     pub wasm_vm_config: WasmVMConfig,
+    pub weight: f64,
+    pub timestamps: Timestamps,
+    #[serde(skip)]
+    pub solutions_data: Arc<Mutex<HashMap<u64, SolutionData>>>,
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct NonceIterator {
-    nonces: Option<Vec<u64>>,
-    current: u64,
-    attempts: u64,
-}
-
-impl NonceIterator {
-    pub fn from_vec(nonces: Vec<u64>) -> Self {
-        Self {
-            nonces: Some(nonces),
-            current: 0,
-            attempts: 0,
-        }
-    }
-    pub fn from_u64(start: u64) -> Self {
-        Self {
-            nonces: None,
-            current: start,
-            attempts: 0,
-        }
-    }
-    pub fn attempts(&self) -> u64 {
-        self.attempts
-    }
-    pub fn is_empty(&self) -> bool {
-        self.nonces.as_ref().is_some_and(|x| x.is_empty()) || self.current == u64::MAX
-    }
-    pub fn empty(&mut self) {
-        if let Some(nonces) = self.nonces.as_mut() {
-            nonces.clear();
-        }
-        self.current = u64::MAX;
-    }
-}
-impl Iterator for NonceIterator {
-    type Item = u64;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(nonces) = self.nonces.as_mut() {
-            let value = nonces.pop();
-            self.attempts += value.is_some() as u64;
-            value
-        } else if self.current < u64::MAX {
-            let value = Some(self.current);
-            self.attempts += 1;
-            self.current += 1;
-            value
-        } else {
-            None
+impl Job {
+    pub fn create_nonce_iterators(&self, num_workers: u32) -> Vec<Arc<Mutex<NonceIterator>>> {
+        match &self.sampled_nonces {
+            Some(sampled_nonces) => sampled_nonces
+                .iter()
+                .map(|&n| Arc::new(Mutex::new(NonceIterator::new(n, n + 1))))
+                .collect(),
+            None => {
+                let mut rng = StdRng::seed_from_u64(time());
+                let offset = u64::MAX / (num_workers as u64 + 1);
+                let random_offset = rng.gen_range(0..offset);
+                (0..num_workers)
+                    .map(|i| {
+                        let start = random_offset + offset * i as u64;
+                        let end = start + offset;
+                        Arc::new(Mutex::new(NonceIterator::new(start, end)))
+                    })
+                    .collect()
+            }
         }
     }
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq)]
-pub enum Status {
-    Starting,
-    Running(String),
-    Stopping,
-    Stopped,
-}
-#[derive(Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct State {
-    pub status: Status,
-    pub timer: Option<Timer>,
     pub query_data: QueryData,
-    pub selected_algorithms: HashMap<String, String>,
-    pub job: Option<Job>,
-    pub submission_errors: HashMap<String, String>,
-    #[serde(skip_serializing)]
+    pub available_jobs: HashMap<String, Job>,
+    pub pending_benchmark_jobs: HashMap<String, Job>,
+    pub pending_proof_jobs: HashMap<String, Job>,
+    pub submitted_proof_ids: HashSet<String>,
     pub difficulty_samplers: HashMap<String, DifficultySampler>,
 }
 
@@ -160,305 +147,285 @@ pub fn state() -> &'static Mutex<State> {
     STATE.get().expect("STATE should be initialised")
 }
 
-async fn update_status(status: &str) {
-    let mut state = state().lock().await;
-    if let Status::Running(_) = state.status {
-        state.status = Status::Running(status.to_string());
-        println!("{}", status);
-        #[cfg(feature = "browser")]
-        web_sys::console::log_1(&status.to_string().into());
-    }
-}
-
-async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
-    {
-        let mut state = (*state()).lock().await;
-        state.job = None;
-        state.timer = None;
-    }
-    update_status("Querying latest data").await;
-    // retain only benchmarks that are within the lifespan period
-    // preserves solution_meta_data and solution_data
-    let mut new_query_data = query_data::execute().await?;
-    if {
-        let state = (*state()).lock().await;
-        state.query_data.latest_block.id != new_query_data.latest_block.id
-    } {
-        {
-            let mut state = (*state()).lock().await;
-            let block_started_cutoff = new_query_data.latest_block.details.height.saturating_sub(
-                new_query_data
-                    .latest_block
-                    .config()
-                    .benchmark_submissions
-                    .lifespan_period,
-            );
-            let mut latest_benchmarks = state.query_data.benchmarks.clone();
-            latest_benchmarks.retain(|_, x| x.details.block_started >= block_started_cutoff);
-            latest_benchmarks.extend(new_query_data.benchmarks.drain());
-
-            let mut latest_proofs = state.query_data.proofs.clone();
-            latest_proofs.retain(|id, _| latest_benchmarks.contains_key(id));
-            latest_proofs.extend(new_query_data.proofs.drain());
-
-            let mut latest_frauds = state.query_data.frauds.clone();
-            latest_frauds.retain(|id, _| latest_benchmarks.contains_key(id));
-            latest_frauds.extend(new_query_data.frauds.drain());
-
-            (*state)
-                .submission_errors
-                .retain(|id, _| latest_benchmarks.contains_key(id));
-            new_query_data.benchmarks = latest_benchmarks;
-            new_query_data.proofs = latest_proofs;
-            new_query_data.frauds = latest_frauds;
-            (*state).query_data = new_query_data;
-        }
-
-        update_status("Updating difficulty sampler with query data").await;
-        {
-            let mut state = state().lock().await;
-            let State {
-                query_data,
-                difficulty_samplers,
-                ..
-            } = &mut (*state);
-            for challenge in query_data.challenges.iter() {
-                let difficulty_sampler = difficulty_samplers
-                    .entry(challenge.id.clone())
-                    .or_insert_with(|| DifficultySampler::new());
-                let min_difficulty = query_data.latest_block.config().difficulty.parameters
-                    [&challenge.id]
-                    .min_difficulty();
-                difficulty_sampler.update_with_block_data(&min_difficulty, challenge.block_data());
-            }
-        }
-    }
-
-    update_status("Finding proof to submit").await;
-    match find_proof_to_submit::execute().await? {
-        Some((benchmark_id, solutions_data)) => {
-            update_status(&format!("Submitting proof for {}", benchmark_id)).await;
-            if let Err(e) = submit_proof::execute(benchmark_id.clone(), solutions_data).await {
-                let mut state = state().lock().await;
-                state.submission_errors.insert(benchmark_id, e.clone());
-                return Err(e);
-            }
-            update_status(&format!("Success. Proof {} submitted", benchmark_id)).await;
-        }
-        None => {
-            update_status("No proof to submit").await;
-        }
-    }
-    // creates a benchmark & proof with job.benchmark_id
-    update_status("Selecting settings to benchmark").await;
-    setup_job::execute().await?;
-    let job = {
-        let state = state().lock().await;
-        state.job.clone().unwrap()
-    };
-    update_status(&format!("{:?}", job.settings)).await;
-
-    update_status(&format!(
-        "Downloading algorithm {}",
-        job.download_url.split("/").last().unwrap()
-    ))
-    .await;
-    let wasm = download_wasm::execute(&job).await?;
-
-    // variables that are shared by workers
-    let nonce_iters = match &job.sampled_nonces {
-        Some(nonces) => vec![Arc::new(Mutex::new(NonceIterator::from_vec(
-            nonces.clone(),
-        )))],
-        None => (0..num_workers)
-            .into_iter()
-            .map(|x| {
-                Arc::new(Mutex::new(NonceIterator::from_u64(
-                    u64::MAX / num_workers as u64 * x as u64,
-                )))
-            })
-            .collect(),
-    };
-    let solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
-    let solutions_count = Arc::new(Mutex::new(0u32));
-    update_status("Starting benchmark").await;
-    run_benchmark::execute(
-        nonce_iters.iter().cloned().collect(),
-        &job,
-        &wasm,
-        solutions_data.clone(),
-        solutions_count.clone(),
-    )
-    .await;
-    {
-        let mut state = state().lock().await;
-        (*state).timer = Some(Timer::new(ms_per_benchmark as u64));
-    }
-    loop {
-        {
-            // transfers solutions computed by workers to benchmark state
-            let num_solutions =
-                drain_solutions(&job.benchmark_id, &mut *(*solutions_data).lock().await).await;
-            let mut finished = true;
-            let mut num_attempts = 0;
-            for nonce_iter in nonce_iters.iter().cloned() {
-                let nonce_iter = (*nonce_iter).lock().await;
-                num_attempts += nonce_iter.attempts();
-                finished &= nonce_iter.is_empty();
-            }
-            update_status(&format!(
-                "Computed {} solutions out of {} instances",
-                num_solutions, num_attempts
-            ))
-            .await;
-            let State {
-                status,
-                timer: time_left,
-                ..
-            } = &mut (*state().lock().await);
-            if time_left.as_mut().unwrap().update().finished()
-                || (finished && num_solutions == (num_attempts as u32)) // nonce_iter is only empty if recomputing
-                || *status == Status::Stopping
-            {
-                break;
-            }
-        }
-        sleep(200).await;
-    }
-    for nonce_iter in nonce_iters {
-        (*(*nonce_iter).lock().await).empty();
-    }
-
-    // transfers solutions computed by workers to benchmark state
-    let num_solutions =
-        drain_solutions(&job.benchmark_id, &mut *(*solutions_data).lock().await).await;
-    if let Some(sampled_nonces) = job.sampled_nonces.as_ref() {
-        if num_solutions != sampled_nonces.len() as u32 {
-            let mut state = (*state()).lock().await;
-            (*state)
-                .query_data
-                .proofs
-                .get_mut(&job.benchmark_id)
-                .unwrap()
-                .solutions_data
-                .take();
-            return Err(format!(
-                "Failed to recompute solutions for {}",
+pub async fn proof_submitter() {
+    async fn do_work() -> Result<()> {
+        println!("[proof_submitter]: checking for any proofs to submit");
+        if let Some(mut job) = find_proof_to_submit::execute().await? {
+            println!(
+                "[proof_submitter]: submitting proof for benchmark {}",
                 job.benchmark_id
-            ));
-        } else {
-            update_status(&format!(
-                "Finished. Recompute solutions for {}",
-                job.benchmark_id
-            ))
-            .await;
-            sleep(5000).await;
-        }
-    } else {
-        update_status("Updating difficulty sampler with solutions").await;
-        {
-            let num_solutions = *solutions_count.lock().await;
-            let mut state = state().lock().await;
-            state
-                .difficulty_samplers
-                .get_mut(&job.settings.challenge_id)
-                .unwrap()
-                .update_with_solutions(&job.settings.difficulty, num_solutions);
-        }
-
-        if num_solutions == 0 {
-            update_status("Finished. No solutions to submit").await;
-        } else {
-            update_status(&format!("Finished. Submitting {} solutions", num_solutions,)).await;
-            let benchmark_id = match submit_benchmark::execute(&job).await {
-                Ok(benchmark_id) => benchmark_id,
-                Err(e) => {
-                    let mut state = (*state()).lock().await;
-                    state
-                        .submission_errors
-                        .insert(job.benchmark_id.clone(), e.clone());
-                    return Err(e);
-                }
-            };
-            update_status(&format!("Success. Benchmark {} submitted", benchmark_id)).await;
-            let mut state = (*state()).lock().await;
-            let QueryData {
-                benchmarks, proofs, ..
-            } = &mut (*state).query_data;
-            let mut benchmark = benchmarks.remove(&job.benchmark_id).unwrap();
-            let mut proof = proofs.remove(&job.benchmark_id).unwrap();
-            benchmark.id = benchmark_id.clone();
-            proof.benchmark_id = benchmark_id.clone();
-            benchmarks.insert(benchmark_id.clone(), benchmark);
-            proofs.insert(benchmark_id.clone(), proof);
-        }
-    }
-    Ok(())
-}
-
-pub async fn drain_solutions(benchmark_id: &String, solutions_data: &mut Vec<SolutionData>) -> u32 {
-    let mut state = (*state()).lock().await;
-    let QueryData {
-        benchmarks, proofs, ..
-    } = &mut (*state).query_data;
-    if let Some(benchmark) = benchmarks.get_mut(benchmark_id) {
-        let proof = proofs.get_mut(benchmark_id).unwrap();
-        if let Some(x) = benchmark.solutions_meta_data.as_mut() {
-            x.extend(
-                solutions_data
-                    .iter()
-                    .map(|x| SolutionMetaData::from(x.clone())),
             );
-            benchmark.details.num_solutions = x.len() as u32;
-        }
-        let to_update = proof.solutions_data.as_mut().unwrap();
-        to_update.extend(solutions_data.drain(..));
-        to_update.len() as u32
-    } else {
-        0
-    }
-}
-pub async fn start(num_workers: u32, ms_per_benchmark: u32) {
-    {
-        let mut state = (*state()).lock().await;
-        if state.status != Status::Stopped {
-            return;
-        }
-        state.status = Status::Starting;
-    }
-    spawn(async move {
-        {
-            let mut state = (*state()).lock().await;
-            state.status = Status::Running("Starting".to_string());
-        }
-        loop {
             {
                 let mut state = (*state()).lock().await;
-                if state.status == Status::Stopping {
-                    state.status = Status::Stopped;
+                state.submitted_proof_ids.insert(job.benchmark_id.clone());
+            }
+            match submit_proof::execute(&job).await {
+                Ok(_) => {
+                    println!(
+                        "[proof_submitter]: successfully submitted proof for benchmark {}",
+                        job.benchmark_id
+                    );
+                }
+                Err(e) => {
+                    println!("[proof_submitter]: failed to submit proof: {:?}", e);
+                    // FIXME hacky way to check for 4xx status
+                    if !e.contains("status: 4") {
+                        println!("[proof_submitter]: re-queueing proof for another submit attempt 10s later");
+                        job.timestamps.submit = time() + 10000;
+                        let mut state = (*state()).lock().await;
+                        state.submitted_proof_ids.remove(&job.benchmark_id);
+                        state
+                            .pending_proof_jobs
+                            .insert(job.benchmark_id.clone(), job);
+                    }
                 }
             }
-            if let Err(e) = run_once(num_workers, ms_per_benchmark).await {
-                update_status(&format!("Error: {:?}", e)).await;
-                sleep(5000).await;
-            }
+        } else {
+            println!("[proof_submitter]: no proofs to submit");
         }
-    });
-}
-pub async fn stop() {
-    let mut state = (*state()).lock().await;
-    match state.status {
-        Status::Running(_) => {
-            state.status = Status::Stopping;
+        Ok(())
+    }
+
+    loop {
+        if let Err(e) = do_work().await {
+            println!("[proof_submitter]: error: {:?}", e);
         }
-        _ => {}
+        println!("[proof_submitter]: sleeping 5s");
+        sleep(5000).await;
     }
 }
-pub async fn select_algorithm(challenge_name: String, algorithm_name: String) {
-    let mut state = (*state()).lock().await;
-    state
-        .selected_algorithms
-        .insert(challenge_name, algorithm_name);
+
+pub async fn benchmark_submitter() {
+    async fn do_work() -> Result<()> {
+        println!("[benchmark_submitter]: checking for any benchmarks to submit");
+        if let Some(mut job) = find_benchmark_to_submit::execute().await? {
+            let num_solutions = {
+                let solutions_data = job.solutions_data.lock().await;
+                solutions_data.len()
+            };
+            println!(
+                "[benchmark_submitter]: submitting benchmark {:?} with {} solutions",
+                job.settings, num_solutions
+            );
+            match submit_benchmark::execute(&job).await {
+                Ok(benchmark_id) => {
+                    job.benchmark_id = benchmark_id.clone();
+                    job.timestamps.submit = time();
+                    println!(
+                        "[benchmark_submitter]: successfully submitted benchmark {}",
+                        benchmark_id
+                    );
+                    {
+                        let mut state = (*state()).lock().await;
+                        state.pending_proof_jobs.insert(benchmark_id, job);
+                    }
+                }
+                Err(e) => {
+                    println!("[benchmark_submitter]: failed to submit benchmark: {:?}", e);
+                    // FIXME hacky way to check for 4xx status
+                    if !e.contains("status: 4") {
+                        println!("[benchmark_submitter]: re-queueing benchmark for another submit attempt 10s later");
+                        job.timestamps.submit = time() + 10000;
+                        let mut state = (*state()).lock().await;
+                        state
+                            .pending_benchmark_jobs
+                            .insert(job.benchmark_id.clone(), job);
+                    }
+                }
+            }
+        } else {
+            println!("[benchmark_submitter]: no benchmarks to submit");
+        }
+        Ok(())
+    }
+
+    loop {
+        if let Err(e) = do_work().await {
+            println!("[benchmark_submitter]: error: {:?}", e);
+        }
+        println!("[benchmark_submitter]: sleeping 5s");
+        sleep(5000).await;
+    }
+}
+
+pub async fn data_fetcher() {
+    async fn do_work() -> Result<()> {
+        println!("[data_fetcher]: fetching latest data");
+        let new_query_data = query_data::execute().await?;
+        if {
+            let state = (*state()).lock().await;
+            state.query_data.latest_block.id != new_query_data.latest_block.id
+        } {
+            println!(
+                "[data_fetcher]: got new block {} @ {}",
+                new_query_data.latest_block.id, new_query_data.latest_block.details.height
+            );
+            {
+                let mut state = (*state()).lock().await;
+                (*state).query_data = new_query_data;
+            }
+
+            println!("[data_fetcher]: updating difficulty samplers");
+            {
+                let mut state = state().lock().await;
+                let State {
+                    query_data,
+                    difficulty_samplers,
+                    ..
+                } = &mut (*state);
+                for challenge in query_data.challenges.iter() {
+                    let difficulty_sampler = difficulty_samplers
+                        .entry(challenge.id.clone())
+                        .or_insert_with(|| DifficultySampler::new());
+                    let min_difficulty = query_data.latest_block.config().difficulty.parameters
+                        [&challenge.id]
+                        .min_difficulty();
+                    difficulty_sampler
+                        .update_with_block_data(&min_difficulty, challenge.block_data());
+                }
+            }
+        } else {
+            println!("[data_fetcher]: no new data");
+        }
+        Ok(())
+    }
+
+    loop {
+        if let Err(e) = do_work().await {
+            println!("[data_fetcher]: error: {:?}", e);
+        }
+        println!("[data_fetcher]: sleeping 10s");
+        sleep(10000).await;
+    }
+}
+
+pub async fn benchmarker(
+    selected_algorithms: HashMap<String, String>,
+    num_workers: u32,
+    benchmark_duration_ms: u64,
+    submit_delay_ms: u64,
+) {
+    async fn do_work(
+        selected_algorithms: &HashMap<String, String>,
+        num_workers: u32,
+        benchmark_duration_ms: u64,
+        submit_delay_ms: u64,
+    ) -> Result<()> {
+        println!("[benchmarker]: setting up jobs");
+        let jobs = setup_jobs::execute(selected_algorithms, benchmark_duration_ms, submit_delay_ms)
+            .await?;
+        for (i, job) in jobs.values().enumerate() {
+            println!(
+                "[benchmarker]: job {}: {:?}, weight: {}",
+                i, job.settings, job.weight
+            );
+        }
+        {
+            let mut state = state().lock().await;
+            state.available_jobs = jobs.clone();
+        }
+
+        println!("[benchmarker]: finding proofs to re-compute");
+        let job = {
+            if let Some(job) =
+                find_proof_to_recompute::execute(benchmark_duration_ms + 5000).await?
+            {
+                println!(
+                    "[benchmarker]: found proof to recompute: {}",
+                    job.benchmark_id
+                );
+                let mut state = state().lock().await;
+                state.query_data.proofs.insert(
+                    job.benchmark_id.clone(),
+                    Proof {
+                        benchmark_id: job.benchmark_id.clone(),
+                        state: None,
+                        solutions_data: Some(Vec::new()),
+                    },
+                );
+                job
+            } else {
+                println!("[benchmarker]: no proofs to recompute");
+                println!("[benchmarker]: weighted sampling one of the available jobs");
+                select_job::execute(&jobs).await?
+            }
+        };
+
+        println!(
+            "[benchmarker]: downloading algorithm {}",
+            job.download_url.split("/").last().unwrap()
+        );
+        let wasm = download_wasm::execute(&job).await?;
+
+        println!("[benchmarker]: starting benchmark {:?}", job.settings);
+        let nonce_iterators = job.create_nonce_iterators(num_workers);
+        run_benchmark::execute(nonce_iterators.clone(), &job, &wasm).await;
+        loop {
+            {
+                let mut num_attempts = 0;
+                for nonce_iterator in &nonce_iterators {
+                    num_attempts += nonce_iterator.lock().await.num_attempts();
+                }
+                let num_solutions = job.solutions_data.lock().await.len();
+                let elapsed = time() - job.timestamps.start;
+                if num_workers > 0 || job.sampled_nonces.is_some() {
+                    println!(
+                        "[benchmarker]: #solutions: {}, #instances: {}, elapsed: {}ms",
+                        num_solutions, num_attempts, elapsed
+                    );
+                }
+                if time() >= job.timestamps.end
+                    || job
+                        .sampled_nonces
+                        .as_ref()
+                        .is_some_and(|sampled_nonces| num_solutions == sampled_nonces.len())
+                {
+                    break;
+                }
+            }
+            sleep(500).await;
+        }
+        {
+            let mut num_attempts = 0;
+            for nonce_iterator in &nonce_iterators {
+                num_attempts += nonce_iterator.lock().await.num_attempts();
+            }
+            let mut state = state().lock().await;
+            let num_solutions = job.solutions_data.lock().await.len() as u32;
+            if job.sampled_nonces.is_some() {
+                state
+                    .pending_proof_jobs
+                    .insert(job.benchmark_id.clone(), job);
+            } else if num_attempts > 0 {
+                state
+                    .difficulty_samplers
+                    .get_mut(&job.settings.challenge_id)
+                    .unwrap()
+                    .update_with_solutions(&job.settings.difficulty, num_solutions);
+            }
+
+            let jobs = state.available_jobs.drain().collect::<HashMap<_, _>>();
+            state.pending_benchmark_jobs.extend(jobs);
+        }
+        Ok(())
+    }
+
+    loop {
+        if let Err(e) = do_work(
+            &selected_algorithms,
+            num_workers,
+            benchmark_duration_ms,
+            submit_delay_ms,
+        )
+        .await
+        {
+            println!("[benchmarker]: error: {:?}", e);
+            println!("[benchmarker]: sleeping 5s");
+            sleep(5000).await;
+        } else {
+            yield_now().await;
+        }
+    }
 }
 
 pub async fn setup(api_url: String, api_key: String, player_id: String) {
@@ -476,13 +443,12 @@ pub async fn setup(api_url: String, api_key: String, player_id: String) {
     }
     STATE.get_or_init(|| {
         Mutex::new(State {
-            status: Status::Stopped,
-            timer: None,
             query_data,
             difficulty_samplers,
-            selected_algorithms: HashMap::new(),
-            job: None,
-            submission_errors: HashMap::new(),
+            available_jobs: HashMap::new(),
+            pending_benchmark_jobs: HashMap::new(),
+            pending_proof_jobs: HashMap::new(),
+            submitted_proof_ids: HashSet::new(),
         })
     });
 }
