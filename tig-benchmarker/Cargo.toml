@@ -70,7 +70,8 @@ browser = [
 
 # c001_a004 = []
 
-# c001_a005 = []
+c001_a005 = []
+satisfiability_walk_sat = ["c001_a005"]
 
 # c001_a006 = []
 
