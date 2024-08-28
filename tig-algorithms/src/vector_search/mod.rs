@@ -24,7 +24,8 @@
 
 // c004_a013
 
-// c004_a014
+pub mod brute_force_bacalhau;
+pub use brute_force_bacalhau as c004_a014;
 
 // c004_a015
 
@@ -48,7 +49,8 @@
 
 // c004_a025
 
-// c004_a026
+pub mod optimax_gpu;
+pub use optimax_gpu as c004_a026;
 
 // c004_a027
 

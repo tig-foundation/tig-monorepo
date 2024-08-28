@@ -71,7 +71,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c001_a004 = []
 
-# c001_a005 = []
+c001_a005 = []
+satisfiability_walk_sat = ["c001_a005"]
 
 # c001_a006 = []
 
@@ -83,9 +84,11 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c001_a010 = []
 
-# c001_a011 = []
+c001_a011 = []
+satisfiability_fast_walk_sat = ["c001_a011"]
 
-# c001_a012 = []
+c001_a012 = []
+satisfiability_sprint_sat = ["c001_a012"]
 
 # c001_a013 = []
 
@@ -97,7 +100,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c001_a017 = []
 
-# c001_a018 = []
+c001_a018 = []
+satisfiability_inbound = ["c001_a018"]
 
 # c001_a019 = []
 
@@ -107,7 +111,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c001_a022 = []
 
-# c001_a023 = []
+c001_a023 = []
+satisfiability_sat_allocd = ["c001_a023"]
 
 # c001_a024 = []
 
@@ -2061,7 +2066,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c001_a999 = []
 
-# c002_a001 = []
+c002_a001 = []
+vehicle_routing_clarke_wright = ["c002_a001"]
 
 # c002_a002 = []
 
@@ -4059,7 +4065,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c002_a999 = []
 
-# c003_a001 = []
+c003_a001 = []
+knapsack_dynamic = ["c003_a001"]
 
 # c003_a002 = []
 
@@ -4071,7 +4078,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c003_a006 = []
 
-# c003_a007 = []
+c003_a007 = []
+knapsack_knapmaxxing = ["c003_a007"]
 
 # c003_a008 = []
 
@@ -4095,7 +4103,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c003_a018 = []
 
-# c003_a019 = []
+c003_a019 = []
+knapsack_knapheudp = ["c003_a019"]
 
 # c003_a020 = []
 
@@ -6083,7 +6092,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c004_a013 = []
 
-# c004_a014 = []
+c004_a014 = []
+vector_search_brute_force_bacalhau = ["c004_a014"]
 
 # c004_a015 = []
 
@@ -6107,7 +6117,8 @@ satisfiability_schnoing = ["c001_a001"]
 
 # c004_a025 = []
 
-# c004_a026 = []
+c004_a026 = []
+vector_search_optimax_gpu = ["c004_a026"]
 
 # c004_a027 = []
 
