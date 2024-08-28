@@ -2128,7 +2128,8 @@ browser = [
 
 # c002_a034 = []
 
-# c002_a035 = []
+c002_a035 = []
+vehicle_routing_cw_heuristic = ["c002_a035"]
 
 # c002_a036 = []
 
