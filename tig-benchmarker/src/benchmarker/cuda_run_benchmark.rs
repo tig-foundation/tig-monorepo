@@ -96,8 +96,8 @@ pub async fn execute(
                                         -> anyhow::Result<Option<tig_challenges::c001::Solution>>;
 
                                 let filter_step = match job.settings.algorithm_id.as_str() {
-                                    // #[cfg(feature = "c001_a001")]
-                                    // "c001_a001" => Some((c001::c001_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a001::KERNEL)),
+                                    #[cfg(feature = "c001_a001")]
+                                    "c001_a001" => Some((c001::c001_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a001::KERNEL)),
 
                                     // #[cfg(feature = "c001_a002")]
                                     // "c001_a002" => Some((c001::c001_a002::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a002::KERNEL)),
