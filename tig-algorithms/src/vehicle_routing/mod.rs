@@ -67,8 +67,7 @@ include!(concat!(env!("OUT_DIR"), "/vehicle_routing_solver.rs"));
 
 // c002_a034
 
-pub mod cw_heuristic;
-pub use cw_heuristic as c002_a035;
+// c002_a035
 
 // c002_a036
 
