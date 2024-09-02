@@ -6,6 +6,7 @@ mod future_utils;
 use benchmarker::{Job, NonceIterator};
 use clap::{value_parser, Arg, Command};
 use future_utils::{sleep, Mutex};
+use tig_algorithms::SolverTrait;
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use tig_structs::core::*;
 use tig_utils::{dejsonify, get, jsonify, post};
@@ -281,8 +282,18 @@ async fn master_node(
             &fs::read_to_string(algorithms_path).unwrap(),
         )
         .unwrap();
-        for (challenge_id, algorithm_id) in selection {
-            benchmarker::select_algorithm(challenge_id, algorithm_id).await;
+        for (challenge_name, algorithm_name) in selection {
+            let algo_installed = match challenge_name.as_str() {
+                "satisfiability" => tig_algorithms::c001::Solver::algorithm_exists_name(&algorithm_name),
+                "vehicle_routing" => tig_algorithms::c002::Solver::algorithm_exists_name(&algorithm_name),
+                "knapsack" => tig_algorithms::c003::Solver::algorithm_exists_name(&algorithm_name),
+                "vector_search" => tig_algorithms::c004::Solver::algorithm_exists_name(&algorithm_name),
+                _ => false
+            };
+            if !algo_installed {
+                panic!("Algorithm {} is not installed; please install using 'git pull --no-edit --no-rebase https://github.com/tig-foundation/tig-monorepo.git {}/{}'",algorithm_name, challenge_name, algorithm_name);
+            }
+            benchmarker::select_algorithm(challenge_name, algorithm_name).await;
         }
         future_utils::sleep(10000).await;
     }

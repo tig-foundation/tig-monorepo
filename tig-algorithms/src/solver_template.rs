@@ -1,6 +1,6 @@
 use crate::SolverTrait;
 
-struct Solver;
+pub struct Solver;
 
 impl SolverTrait<2> for Solver {
     type C = tig_challenges::{CHALLENGE}::Challenge;
@@ -10,6 +10,13 @@ impl SolverTrait<2> for Solver {
     fn algorithm_exists(id: &str) -> bool {
         match id {
             {EXISTING_ALGOS}
+            _ => false
+        }
+    }
+
+    fn algorithm_exists_name(name: &str) -> bool {
+        match name {
+            {EXISTING_ALGOS_NAMES}
             _ => false
         }
     }

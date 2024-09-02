@@ -17,6 +17,8 @@ pub trait SolverTrait<const N: usize> {
 
     fn algorithm_exists(id: &str) -> bool;
 
+    fn algorithm_exists_name(name: &str) -> bool;
+
     fn get_algorithm(id: &str) -> Option<fn(&Self::C)-> anyhow::Result<Option<Self::S>>>;
 
     fn solve_challenge_with_algorithm(id: &str, c: &Self::C) -> anyhow::Result<Option<Self::S>> {
