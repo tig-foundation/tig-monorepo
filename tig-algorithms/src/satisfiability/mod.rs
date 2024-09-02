@@ -1,3 +1,4 @@
+include!(concat!(env!("OUT_DIR"), "/satisfiability_solver.rs"));
 // c001_a001
 
 // c001_a002

@@ -7,6 +7,7 @@ repository.workspace = true
 edition.workspace = true
 
 [dependencies]
+
 anyhow = "1.0.81"
 cudarc = { version = "0.12.0", features = [
     "cuda-version-from-build-system",
@@ -14,6 +15,9 @@ cudarc = { version = "0.12.0", features = [
 ndarray = "0.15.6"
 rand = { version = "0.8.5", default-features = false, features = ["std_rng"] }
 tig-challenges = { path = "../tig-challenges" }
+
+[build-dependencies]
+regex = "1.10.6"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

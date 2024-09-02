@@ -1,3 +1,4 @@
+include!(concat!(env!("OUT_DIR"), "/vehicle_routing_solver.rs"));
 // c002_a001
 
 // c002_a002

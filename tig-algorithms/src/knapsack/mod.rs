@@ -1,3 +1,4 @@
+include!(concat!(env!("OUT_DIR"), "/knapsack_solver.rs"));
 // c003_a001
 
 // c003_a002

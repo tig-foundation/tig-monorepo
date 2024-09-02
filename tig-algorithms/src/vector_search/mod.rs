@@ -1,3 +1,4 @@
+include!(concat!(env!("OUT_DIR"), "/vector_search_solver.rs"));
 // c004_a001
 
 // c004_a002
