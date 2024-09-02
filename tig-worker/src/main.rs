@@ -19,7 +19,7 @@ fn cli() -> Command {
                 .arg(arg!(<WASM> "Path to a wasm file").value_parser(clap::value_parser!(PathBuf)))
                 .arg(
                     arg!(--fuel [FUEL] "Optional maximum fuel parameter for WASM VM")
-                        .default_value("1000000000")
+                        .default_value("2000000000")
                         .value_parser(clap::value_parser!(u64)),
                 )
                 .arg(

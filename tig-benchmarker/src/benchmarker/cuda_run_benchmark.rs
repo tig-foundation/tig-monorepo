@@ -96,8 +96,8 @@ pub async fn execute(
                                         -> anyhow::Result<Option<tig_challenges::c001::Solution>>;
 
                                 let filter_step = match job.settings.algorithm_id.as_str() {
-                                    // #[cfg(feature = "c001_a001")]
-                                    // "c001_a001" => Some((c001::c001_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a001::KERNEL)),
+                                    #[cfg(feature = "c001_a001")]
+                                    "c001_a001" => Some((c001::c001_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a001::KERNEL)),
 
                                     // #[cfg(feature = "c001_a002")]
                                     // "c001_a002" => Some((c001::c001_a002::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a002::KERNEL)),
@@ -108,8 +108,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c001_a004")]
                                     // "c001_a004" => Some((c001::c001_a004::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a004::KERNEL)),
 
-                                    // #[cfg(feature = "c001_a005")]
-                                    // "c001_a005" => Some((c001::c001_a005::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a005::KERNEL)),
+                                    #[cfg(feature = "c001_a005")]
+                                    "c001_a005" => Some((c001::c001_a005::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a005::KERNEL)),
 
                                     // #[cfg(feature = "c001_a006")]
                                     // "c001_a006" => Some((c001::c001_a006::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a006::KERNEL)),
@@ -126,11 +126,11 @@ pub async fn execute(
                                     // #[cfg(feature = "c001_a010")]
                                     // "c001_a010" => Some((c001::c001_a010::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a010::KERNEL)),
 
-                                    // #[cfg(feature = "c001_a011")]
-                                    // "c001_a011" => Some((c001::c001_a011::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a011::KERNEL)),
+                                    #[cfg(feature = "c001_a011")]
+                                    "c001_a011" => Some((c001::c001_a011::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a011::KERNEL)),
 
-                                    // #[cfg(feature = "c001_a012")]
-                                    // "c001_a012" => Some((c001::c001_a012::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a012::KERNEL)),
+                                    #[cfg(feature = "c001_a012")]
+                                    "c001_a012" => Some((c001::c001_a012::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a012::KERNEL)),
 
                                     // #[cfg(feature = "c001_a013")]
                                     // "c001_a013" => Some((c001::c001_a013::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a013::KERNEL)),
@@ -147,8 +147,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c001_a017")]
                                     // "c001_a017" => Some((c001::c001_a017::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a017::KERNEL)),
 
-                                    // #[cfg(feature = "c001_a018")]
-                                    // "c001_a018" => Some((c001::c001_a018::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a018::KERNEL)),
+                                    #[cfg(feature = "c001_a018")]
+                                    "c001_a018" => Some((c001::c001_a018::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a018::KERNEL)),
 
                                     // #[cfg(feature = "c001_a019")]
                                     // "c001_a019" => Some((c001::c001_a019::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a019::KERNEL)),
@@ -162,8 +162,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c001_a022")]
                                     // "c001_a022" => Some((c001::c001_a022::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a022::KERNEL)),
 
-                                    // #[cfg(feature = "c001_a023")]
-                                    // "c001_a023" => Some((c001::c001_a023::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a023::KERNEL)),
+                                    #[cfg(feature = "c001_a023")]
+                                    "c001_a023" => Some((c001::c001_a023::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a023::KERNEL)),
 
                                     // #[cfg(feature = "c001_a024")]
                                     // "c001_a024" => Some((c001::c001_a024::cuda_solve_challenge as CudaSolveChallengeFn, &c001::c001_a024::KERNEL)),
@@ -3151,8 +3151,8 @@ pub async fn execute(
                                         -> anyhow::Result<Option<tig_challenges::c002::Solution>>;
 
                                 let filter_step = match job.settings.algorithm_id.as_str() {
-                                    // #[cfg(feature = "c002_a001")]
-                                    // "c002_a001" => Some((c002::c002_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c002::c002_a001::KERNEL)),
+                                    #[cfg(feature = "c002_a001")]
+                                    "c002_a001" => Some((c002::c002_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c002::c002_a001::KERNEL)),
 
                                     // #[cfg(feature = "c002_a002")]
                                     // "c002_a002" => Some((c002::c002_a002::cuda_solve_challenge as CudaSolveChallengeFn, &c002::c002_a002::KERNEL)),
@@ -6206,8 +6206,8 @@ pub async fn execute(
                                         -> anyhow::Result<Option<tig_challenges::c003::Solution>>;
 
                                 let filter_step = match job.settings.algorithm_id.as_str() {
-                                    // #[cfg(feature = "c003_a001")]
-                                    // "c003_a001" => Some((c003::c003_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a001::KERNEL)),
+                                    #[cfg(feature = "c003_a001")]
+                                    "c003_a001" => Some((c003::c003_a001::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a001::KERNEL)),
 
                                     // #[cfg(feature = "c003_a002")]
                                     // "c003_a002" => Some((c003::c003_a002::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a002::KERNEL)),
@@ -6224,8 +6224,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c003_a006")]
                                     // "c003_a006" => Some((c003::c003_a006::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a006::KERNEL)),
 
-                                    // #[cfg(feature = "c003_a007")]
-                                    // "c003_a007" => Some((c003::c003_a007::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a007::KERNEL)),
+                                    #[cfg(feature = "c003_a007")]
+                                    "c003_a007" => Some((c003::c003_a007::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a007::KERNEL)),
 
                                     // #[cfg(feature = "c003_a008")]
                                     // "c003_a008" => Some((c003::c003_a008::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a008::KERNEL)),
@@ -6260,8 +6260,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c003_a018")]
                                     // "c003_a018" => Some((c003::c003_a018::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a018::KERNEL)),
 
-                                    // #[cfg(feature = "c003_a019")]
-                                    // "c003_a019" => Some((c003::c003_a019::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a019::KERNEL)),
+                                    #[cfg(feature = "c003_a019")]
+                                    "c003_a019" => Some((c003::c003_a019::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a019::KERNEL)),
 
                                     // #[cfg(feature = "c003_a020")]
                                     // "c003_a020" => Some((c003::c003_a020::cuda_solve_challenge as CudaSolveChallengeFn, &c003::c003_a020::KERNEL)),
@@ -9300,8 +9300,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c004_a013")]
                                     // "c004_a013" => Some((c004::c004_a013::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a013::KERNEL)),
 
-                                    // #[cfg(feature = "c004_a014")]
-                                    // "c004_a014" => Some((c004::c004_a014::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a014::KERNEL)),
+                                    #[cfg(feature = "c004_a014")]
+                                    "c004_a014" => Some((c004::c004_a014::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a014::KERNEL)),
 
                                     // #[cfg(feature = "c004_a015")]
                                     // "c004_a015" => Some((c004::c004_a015::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a015::KERNEL)),
@@ -9336,8 +9336,8 @@ pub async fn execute(
                                     // #[cfg(feature = "c004_a025")]
                                     // "c004_a025" => Some((c004::c004_a025::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a025::KERNEL)),
 
-                                    // #[cfg(feature = "c004_a026")]
-                                    // "c004_a026" => Some((c004::c004_a026::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a026::KERNEL)),
+                                    #[cfg(feature = "c004_a026")]
+                                    "c004_a026" => Some((c004::c004_a026::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a026::KERNEL)),
 
                                     // #[cfg(feature = "c004_a027")]
                                     // "c004_a027" => Some((c004::c004_a027::cuda_solve_challenge as CudaSolveChallengeFn, &c004::c004_a027::KERNEL)),
