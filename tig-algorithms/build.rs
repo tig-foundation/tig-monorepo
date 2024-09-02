@@ -43,7 +43,6 @@ fn main() {
                 .replace("{EXISTING_ALGOS}", &existing_algos)
                 .replace("{EXISTING_ALGOS_NAMES}", &existing_algos_names);
         }
-        dbg!(dest_path.clone());
         fs::write(dest_path, solver_code).unwrap();
     }
 
