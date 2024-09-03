@@ -755,19 +755,21 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
             let num_qualifiers = benchmark.details.num_solutions.min(max_qualifiers);
             max_qualifiers_by_player.insert(player_id.clone(), max_qualifiers - num_qualifiers);
 
-            *player_data
-                .num_qualifiers_by_challenge
-                .as_mut()
-                .unwrap()
-                .entry(challenge_id.clone())
-                .or_default() += num_qualifiers;
-            *algorithm_data
-                .num_qualifiers_by_player
-                .as_mut()
-                .unwrap()
-                .entry(player_id.clone())
-                .or_default() += num_qualifiers;
-            *challenge_data.num_qualifiers.as_mut().unwrap() += num_qualifiers;
+            if num_qualifiers > 0 {
+                *player_data
+                    .num_qualifiers_by_challenge
+                    .as_mut()
+                    .unwrap()
+                    .entry(challenge_id.clone())
+                    .or_default() += num_qualifiers;
+                *algorithm_data
+                    .num_qualifiers_by_player
+                    .as_mut()
+                    .unwrap()
+                    .entry(player_id.clone())
+                    .or_default() += num_qualifiers;
+                *challenge_data.num_qualifiers.as_mut().unwrap() += num_qualifiers;
+            }
             challenge_data
                 .qualifier_difficulties
                 .as_mut()
