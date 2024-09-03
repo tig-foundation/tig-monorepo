@@ -83,27 +83,32 @@ mod tests {
         assert_eq!(
             tig_utils::get_transaction(
                 "https://mainnet.base.org",
-                "0x2c84729e0c24ca982f598215a82888bf8620ebd1e42561b932ddf925b556ba51"
+                "0x0c03ce270b4826ec62e7dd007f0b716068639f7b",
+                "0xb02b7c2a4bf72f7b5e96dcfa64d42cf75b765657998c9168beddcf06811b3701"
             )
             .await
             .unwrap(),
             tig_utils::Transaction {
-                sender: "0x097d62f58e2986f2e1d85f259454af15f02f601e".to_string(),
-                receiver: "0xe37bf84f75a8c3225d80aea2a95a24fd5a736895".to_string(),
-                amount: tig_utils::PreciseNumber::from_dec_str("362450000000000000").unwrap()
+                sender: "0x691108d12348ef0a153896492d96ff92bce90fe8".to_string(),
+                receiver: "0x4e14297b4a5f7ab2e3c32ba262df2a2f8e367111".to_string(),
+                amount: tig_utils::PreciseNumber::from_hex_str(
+                    "00000000000000000000000000000000000000000000000178f3b8cd09d1681e"
+                )
+                .unwrap()
             }
         );
         assert_eq!(
             tig_utils::get_transaction(
                 "https://sepolia.base.org",
-                "0x72589afe1f24794328f6ab0b43933ba0d2f8d7321d7bb6febe1513961dd3271e",
+                "0x3366feee9bbe5b830df9e1fa743828732b13959a",
+                "0x093aa07701f2cb1ef62f0efcf101588898d6d2869edf66b8efc23969a15c218f",
             )
             .await
             .unwrap(),
             tig_utils::Transaction {
-                sender: "0xf0e1c3b2bf8e5ec5420b82d6361d074bc4d8b7f4".to_string(),
-                receiver: "0xb88a1d716fa26dea1b20b2263c10ca2d7613e22f".to_string(),
-                amount: tig_utils::PreciseNumber::from_dec_str("499990756092107808").unwrap()
+                sender: "0x26979f7282fc78cc83a74c5aeb317e7c13d33235".to_string(),
+                receiver: "0xc30edf0147c46d0a5f79bfe9b15ce9de9b8879be".to_string(),
+                amount: tig_utils::PreciseNumber::from(123)
             }
         );
     }
