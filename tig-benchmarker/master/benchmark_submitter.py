@@ -46,7 +46,7 @@ async def _execute(state: State, job: Job):
     async with aiohttp.ClientSession() as session:
         async with session.post(f"{API_URL}/submit-benchmark", json=payload, headers=headers) as resp:
             if resp.status == 200:
-                benchmark_id = await resp.json()["benchmark_id"]
+                benchmark_id = (await resp.json())["benchmark_id"]
                 print(f"[benchmark_submitter] benchmark {job.benchmark_id} submitted successfully. benchmark_id={benchmark_id}")
                 job.benchmark_id = benchmark_id
                 state.pending_proof_jobs[benchmark_id] = job
