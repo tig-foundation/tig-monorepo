@@ -26,7 +26,7 @@ async def run(state: State):
 async def _execute(state: State, job: Job):
     solutions_meta_data = [
         SolutionMetaData(
-            solution_signature=u32_from_str(json.dumps(asdict(s), sort_keys=True, separators=(',', ': '))),
+            solution_signature=u32_from_str(json.dumps(asdict(s), sort_keys=True, separators=(',', ':'))),
             nonce=s.nonce
         )
         for s in job.solutions_data.values()
