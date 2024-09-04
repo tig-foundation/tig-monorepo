@@ -137,14 +137,17 @@ async fn slave(master: &String, port: u16, num_workers: u32, selected_algorithms
             "[slave] filtering jobs that match selected_algorithms: {:?}",
             selected_algorithms
         );
+        let now = time();
         let filtered_jobs: HashMap<String, Job> = available_jobs
             .into_iter()
-            .filter(|(benchmark_id, _)| {
-                selected_algorithms
-                    .iter()
-                    .any(|(challenge_name, algorithm_name)| {
-                        benchmark_id.starts_with(&format!("{}_{}", challenge_name, algorithm_name))
-                    })
+            .filter(|(benchmark_id, job)| {
+                now < job.timestamps.end
+                    && selected_algorithms
+                        .iter()
+                        .any(|(challenge_name, algorithm_name)| {
+                            benchmark_id
+                                .starts_with(&format!("{}_{}", challenge_name, algorithm_name))
+                        })
             })
             .collect();
 
