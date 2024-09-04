@@ -1,9 +1,11 @@
 import aiohttp
 import asyncio
 import json
+from dataclasses import asdict
 from typing import Dict, Any, Optional
 from master.data import *
 from master.utils import *
+from master.config import *
 
 async def run(state: State):
     while True:
@@ -22,17 +24,17 @@ async def run(state: State):
 
 async def _execute(state: State, job: Job):
     solutions_data = [
-        job.solutions_data[nonce] 
+        job.solutions_data[nonce]
         for nonce in job.sampled_nonces
     ]
     headers = {
         "X-Api-Key": API_KEY,
         "Content-Type": "application/json",
-        "User-Agent": "Python Tig-Benchmarker v0.1"
+        "User-Agent": "tig-benchmarker-py/v0.1"
     }
     payload = {
         "benchmark_id": job.benchmark_id,
-        "solutions_data": solution_data
+        "solutions_data": [asdict(s) for s in solution_data]
     }
 
     state.submitted_proof_ids.add(job.benchmark_id)

@@ -12,7 +12,7 @@ from master.utils import now
 from subprocess import Popen, PIPE
 
 
-async def execute(state: State) -> Job:
+async def _execute(state: State) -> Job:
     block = state.query_data.block
     wasms = state.query_data.wasms
     benchmarks = state.query_data.benchmarks

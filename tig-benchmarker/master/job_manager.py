@@ -90,7 +90,7 @@ async def _execute(state: State):
                     settings=BenchmarkSettings(
                         algorithm_id=algorithm_id,
                         challenge_id=challenge_id,
-                        difficulty=None,
+                        difficulty=difficulty,
                         player_id=PLAYER_ID,
                         block_id=block.id
                     ),

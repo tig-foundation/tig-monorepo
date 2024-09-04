@@ -3,8 +3,8 @@ from quart import Quart, jsonify, request
 from datetime import datetime
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
-from master.data import State
-from master.config import PORT
+from master.data import *
+from master.config import *
 
 async def run(state: State):
     app = Quart("tig-benchmarker")
@@ -20,10 +20,9 @@ async def run(state: State):
             return "Request must be JSON", 400
         
         slave_addr = request.remote_addr
-        solutions_data = await request.get_json()
-        
         try:
-            solutions_data = {nonce: SolutionData.from_dict(d) for nonce, d in solutions_data.items()}
+            solutions_data = await request.get_json()
+            solutions_data = {nonce: SolutionData(**d) for nonce, d in solutions_data.items()}
         except Exception as e:
             print(f"[webserver] slave {slave_addr} - error parsing solution data: {e}")
             return "Invalid solution data", 400

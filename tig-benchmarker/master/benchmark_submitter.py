@@ -1,8 +1,11 @@
 import aiohttp
 import asyncio
 import json
+import random
+from dataclasses import asdict
 from typing import Dict, Any, Optional
 from master.data import *
+from master.config import *
 from master.utils import *
 
 async def run(state: State):
@@ -23,20 +26,21 @@ async def run(state: State):
 async def _execute(state: State, job: Job):
     solutions_meta_data = [
         SolutionMetaData(
-            solution_signature=u32_from_str(json.dumps(solution_data, sort_keys=True)),
+            solution_signature=u32_from_str(json.dumps(asdict(s), sort_keys=True, separators=(',', ': '))),
             nonce=s.nonce
         )
-        for s in job.solutions_data
+        for s in job.solutions_data.values()
     ]
     headers = {
         "X-Api-Key": API_KEY,
         "Content-Type": "application/json",
-        "User-Agent": "Python Tig-Benchmarker v0.1"
+        "User-Agent": "tig-benchmarker-py/v0.1"
     }
+    random_nonce = random.choice(list(job.solutions_data))
     payload = {
-        "settings": job.settings,
-        "solutions_meta_data": solutions_meta_data,
-        "solution_data": job.solutions_data[0]
+        "settings": asdict(job.settings),
+        "solutions_meta_data": [asdict(s) for s in solutions_meta_data],
+        "solution_data": asdict(job.solutions_data[random_nonce])
     }
 
     async with aiohttp.ClientSession() as session:
