@@ -34,7 +34,7 @@ async def _execute(state: State, job: Job):
     }
     payload = {
         "benchmark_id": job.benchmark_id,
-        "solutions_data": [asdict(s) for s in solution_data]
+        "solutions_data": [asdict(s) for s in solutions_data]
     }
 
     state.submitted_proof_ids.add(job.benchmark_id)
