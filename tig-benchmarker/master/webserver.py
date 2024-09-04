@@ -22,7 +22,7 @@ async def run(state: State):
         slave_addr = request.remote_addr
         try:
             solutions_data = await request.get_json()
-            solutions_data = {nonce: SolutionData(**d) for nonce, d in solutions_data.items()}
+            solutions_data = {int(nonce): SolutionData(**d) for nonce, d in solutions_data.items()}
         except Exception as e:
             print(f"[webserver] slave {slave_addr} - error parsing solution data: {e}")
             return "Invalid solution data", 400

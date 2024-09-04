@@ -71,7 +71,7 @@ async def _execute(state: State):
             num_jobs = job_counter[f"{challenge_name}_{algorithm_name}"]
             if num_jobs >= job_config["num_jobs"]:
                 continue
-            weight = job_config["weight"] / job_config["num_jobs"]
+            weight = job_config["weight"]
             download_url = wasms[algorithm_id].details.download_url
             assert download_url is not None, f"Download URL for algorithm '{algorithm_id}' is None"
             timestamps = Timestamps(
