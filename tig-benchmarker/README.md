@@ -70,7 +70,7 @@ python3 main.py
 
 ## Customising Your Algorithms
 
-Edit [tig-benchmark/master/config.py](./master/config.py)
+Edit [tig-benchmarker/master/config.py](./master/config.py)
 
 Example:
 ```
