@@ -165,6 +165,7 @@ async fn slave(master: &String, port: u16, num_workers: u32, selected_algorithms
         println!("[slave]: starting benchmark {:?}", job.settings);
         let nonce_iterators = job.create_nonce_iterators(num_workers);
         benchmarker::run_benchmark::execute(nonce_iterators.clone(), &job, &wasm).await;
+        let start = time();
         while time() < job.timestamps.end {
             {
                 let mut num_attempts = 0;
@@ -179,6 +180,11 @@ async fn slave(master: &String, port: u16, num_workers: u32, selected_algorithms
                 );
             }
             sleep(500).await;
+        }
+        let elapsed = time() - start;
+        if elapsed < 2500 {
+            println!("[slave]: sleeping for {}ms", 2500 - elapsed);
+            sleep(2500 - elapsed).await;
         }
 
         let mut num_attempts = 0;
