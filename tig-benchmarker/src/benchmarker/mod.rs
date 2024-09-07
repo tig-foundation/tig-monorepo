@@ -159,6 +159,18 @@ pub async fn proof_submitter() {
                 let mut state = (*state()).lock().await;
                 state.submitted_proof_ids.insert(job.benchmark_id.clone());
             }
+            {
+                let solutions_data = job.solutions_data.lock().await;
+                if !job
+                    .sampled_nonces
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .all(|n| solutions_data.contains_key(n))
+                {
+                    return Err(format!("failed to find solutions for every sampled nonces"));
+                }
+            }
             match submit_proof::execute(&job).await {
                 Ok(_) => {
                     println!(

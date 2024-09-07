@@ -28,10 +28,7 @@ pub async fn execute() -> Result<Option<Job>> {
             .and_then(|s| s.sampled_nonces.as_ref())
         {
             let mut job = pending_proof_jobs.remove(&benchmark_id).unwrap();
-            if proofs.contains_key(&benchmark_id)
-                || frauds.contains_key(&benchmark_id)
-                || job.solutions_data.lock().await.len() < sampled_nonces.len()
-            {
+            if proofs.contains_key(&benchmark_id) || frauds.contains_key(&benchmark_id) {
                 continue;
             }
             job.sampled_nonces = Some(sampled_nonces.clone());
