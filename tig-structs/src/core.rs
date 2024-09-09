@@ -205,6 +205,7 @@ serializable_struct_with_getters! {
         cutoff: Option<u32>,
         deposit: Option<PreciseNumber>,
         rolling_deposit: Option<PreciseNumber>,
+        qualifying_percent_rolling_deposit: Option<PreciseNumber>,
         imbalance: Option<PreciseNumber>,
         imbalance_penalty: Option<PreciseNumber>,
         influence: Option<PreciseNumber>,
