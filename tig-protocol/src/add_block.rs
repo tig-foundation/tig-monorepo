@@ -478,6 +478,7 @@ async fn update_deposits<T: Context>(ctx: &T, block: &Block, cache: &mut AddBloc
             .unwrap_or_else(|| zero.clone());
         data.rolling_deposit = Some(decay * rolling_deposit + (one - decay) * deposit);
         data.deposit = Some(deposit);
+        data.qualifying_percent_rolling_deposit = Some(zero.clone());
     }
 }
 
