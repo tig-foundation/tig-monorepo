@@ -244,6 +244,7 @@ async fn setup_cache<T: Context>(
             round_earnings: None,
             deposit: None,
             rolling_deposit: None,
+            qualifying_percent_rolling_deposit: None,
         });
         active_players.insert(player.id.clone(), player);
     }
@@ -477,6 +478,7 @@ async fn update_deposits<T: Context>(ctx: &T, block: &Block, cache: &mut AddBloc
             .unwrap_or_else(|| zero.clone());
         data.rolling_deposit = Some(decay * rolling_deposit + (one - decay) * deposit);
         data.deposit = Some(deposit);
+        data.qualifying_percent_rolling_deposit = Some(zero.clone());
     }
 }
 
@@ -755,19 +757,21 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
             let num_qualifiers = benchmark.details.num_solutions.min(max_qualifiers);
             max_qualifiers_by_player.insert(player_id.clone(), max_qualifiers - num_qualifiers);
 
-            *player_data
-                .num_qualifiers_by_challenge
-                .as_mut()
-                .unwrap()
-                .entry(challenge_id.clone())
-                .or_default() += num_qualifiers;
-            *algorithm_data
-                .num_qualifiers_by_player
-                .as_mut()
-                .unwrap()
-                .entry(player_id.clone())
-                .or_default() += num_qualifiers;
-            *challenge_data.num_qualifiers.as_mut().unwrap() += num_qualifiers;
+            if num_qualifiers > 0 {
+                *player_data
+                    .num_qualifiers_by_challenge
+                    .as_mut()
+                    .unwrap()
+                    .entry(challenge_id.clone())
+                    .or_default() += num_qualifiers;
+                *algorithm_data
+                    .num_qualifiers_by_player
+                    .as_mut()
+                    .unwrap()
+                    .entry(player_id.clone())
+                    .or_default() += num_qualifiers;
+                *challenge_data.num_qualifiers.as_mut().unwrap() += num_qualifiers;
+            }
             challenge_data
                 .qualifier_difficulties
                 .as_mut()
@@ -887,16 +891,27 @@ async fn update_influence(block: &Block, cache: &mut AddBlockCache) {
             });
         }
         let OptimisableProofOfWorkConfig {
-            rolling_deposit_decay,
+            avg_percent_qualifiers_multiplier,
             enable_proof_of_deposit,
             ..
         } = &config.optimisable_proof_of_work;
-        if rolling_deposit_decay.is_some() && enable_proof_of_deposit.is_some_and(|x| x) {
-            percent_qualifiers.push(if total_deposit == zero {
+        if enable_proof_of_deposit.is_some_and(|x| x) {
+            let max_percent_rolling_deposit =
+                PreciseNumber::from_f64(avg_percent_qualifiers_multiplier.clone().unwrap())
+                    * percent_qualifiers.arithmetic_mean();
+            let percent_rolling_deposit = if total_deposit == zero {
                 zero.clone()
             } else {
                 data.deposit.clone().unwrap() / total_deposit
-            });
+            };
+            let qualifying_percent_rolling_deposit =
+                if percent_rolling_deposit > max_percent_rolling_deposit {
+                    max_percent_rolling_deposit.clone()
+                } else {
+                    percent_rolling_deposit
+                };
+            percent_qualifiers.push(qualifying_percent_rolling_deposit.clone());
+            data.qualifying_percent_rolling_deposit = Some(qualifying_percent_rolling_deposit);
         }
 
         let mean = percent_qualifiers.arithmetic_mean();

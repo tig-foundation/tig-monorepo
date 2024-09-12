@@ -29,7 +29,11 @@ mod web3_feature {
         Ok(format!("0x{}", address.encode_hex::<String>()))
     }
 
-    pub async fn get_transaction(rpc_url: &str, tx_hash: &str) -> Result<super::Transaction> {
+    pub async fn get_transaction(
+        rpc_url: &str,
+        erc20_address: &str,
+        tx_hash: &str,
+    ) -> Result<super::Transaction> {
         let transport = web3::transports::Http::new(rpc_url)?;
         let eth = web3::Web3::new(transport).eth();
 
@@ -41,17 +45,27 @@ mod web3_feature {
         if !receipt.status.is_some_and(|x| x.as_u64() == 1) {
             return Err(anyhow!("Transaction not confirmed"));
         }
+        let to = format!(
+            "{:?}",
+            receipt.to.ok_or_else(|| anyhow!("Receiver not found"))?
+        );
+        if to != erc20_address {
+            return Err(anyhow!(
+                "Transaction not interacting with erc20 contract '{}'",
+                erc20_address
+            ));
+        }
         let tx = eth
             .transaction(TransactionId::Hash(tx_hash))
             .await?
             .ok_or_else(|| anyhow!("Transaction {} not found", tx_hash))?;
+        if hex::encode(&tx.input.0[0..4]) != "a9059cbb" {
+            return Err(anyhow!("Not a ERC20 transfer transaction"));
+        };
         Ok(super::Transaction {
             sender: format!("{:?}", tx.from.ok_or_else(|| anyhow!("Sender not found"))?),
-            receiver: format!(
-                "{:?}",
-                receipt.to.ok_or_else(|| anyhow!("Receiver not found"))?
-            ),
-            amount: PreciseNumber::from_dec_str(&tx.value.to_string())?,
+            receiver: format!("0x{}", hex::encode(&tx.input.0[16..36])),
+            amount: PreciseNumber::from_hex_str(&hex::encode(&tx.input.0[36..68]))?,
         })
     }
 

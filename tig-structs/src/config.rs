@@ -85,6 +85,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     OptimisableProofOfWorkConfig {
         imbalance_multiplier: f64,
+        avg_percent_qualifiers_multiplier: Option<f64>,
         enable_proof_of_deposit: Option<bool>,
         rolling_deposit_decay: Option<f64>,
     }
