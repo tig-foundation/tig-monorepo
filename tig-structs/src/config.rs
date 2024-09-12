@@ -32,6 +32,7 @@ serializable_struct_with_getters! {
         submission_delay_multiplier: u32,
         max_samples: usize,
         lifespan_period: u32,
+        max_base_fee_percentage_delta: f64,
     }
 }
 serializable_struct_with_getters! {

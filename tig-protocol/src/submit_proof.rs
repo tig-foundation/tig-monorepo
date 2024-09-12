@@ -1,22 +1,25 @@
 use crate::{context::*, error::*};
 use logging_timer::time;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use tig_structs::core::*;
+use tig_utils::{MerkleBranch, MerkleHash};
 
 #[time]
 pub(crate) async fn execute<T: Context>(
     ctx: &T,
     player: &Player,
     benchmark_id: &String,
-    solutions_data: Vec<SolutionData>,
+    merkle_proofs: Vec<MerkleProof>,
 ) -> ProtocolResult<Result<(), String>> {
     verify_no_fraud(ctx, benchmark_id).await?;
     verify_proof_not_already_submitted(ctx, benchmark_id).await?;
+    let precommit = get_precommit_by_id(ctx, benchmark_id).await?;
+    verify_benchmark_ownership(player, &precommit.settings)?;
     let benchmark = get_benchmark_by_id(ctx, benchmark_id).await?;
-    verify_benchmark_ownership(player, &benchmark)?;
-    verify_sampled_nonces(&benchmark, &solutions_data)?;
-    let verification_result = verify_solutions_are_valid(ctx, &benchmark, &solutions_data).await;
-    ctx.add_proof_to_mempool(benchmark_id, solutions_data)
+    verify_merkle_proofs(&precommit, &benchmark, &merkle_proofs)?;
+    verify_sampled_nonces(&benchmark, &merkle_proofs)?;
+    let verification_result = verify_solutions_are_valid(ctx, &precommit, &merkle_proofs).await;
+    ctx.add_proof_to_mempool(benchmark_id, merkle_proofs)
         .await
         .unwrap_or_else(|e| panic!("add_proof_to_mempool error: {:?}", e));
     if let Err(e) = verification_result {
@@ -26,6 +29,21 @@ pub(crate) async fn execute<T: Context>(
         return Ok(Err(e.to_string()));
     }
     Ok(Ok(()))
+}
+
+#[time]
+async fn get_precommit_by_id<T: Context>(
+    ctx: &T,
+    benchmark_id: &String,
+) -> ProtocolResult<Precommit> {
+    ctx.get_precommits(PrecommitsFilter::BenchmarkId(benchmark_id.clone()))
+        .await
+        .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
+        .first()
+        .map(|x| x.to_owned())
+        .ok_or_else(|| ProtocolError::InvalidPrecommit {
+            benchmark_id: benchmark_id.clone(),
+        })
 }
 
 #[time]
@@ -79,8 +97,8 @@ async fn verify_proof_not_already_submitted<T: Context>(
 }
 
 #[time]
-fn verify_benchmark_ownership(player: &Player, benchmark: &Benchmark) -> ProtocolResult<()> {
-    let expected_player_id = benchmark.settings.player_id.clone();
+fn verify_benchmark_ownership(player: &Player, settings: &BenchmarkSettings) -> ProtocolResult<()> {
+    let expected_player_id = settings.player_id.clone();
     if player.id != expected_player_id {
         return Err(ProtocolError::InvalidSubmittingPlayer {
             actual_player_id: player.id.to_string(),
@@ -91,12 +109,42 @@ fn verify_benchmark_ownership(player: &Player, benchmark: &Benchmark) -> Protoco
 }
 
 #[time]
+fn verify_merkle_proofs(
+    precommit: &Precommit,
+    benchmark: &Benchmark,
+    merkle_proofs: &Vec<MerkleProof>,
+) -> ProtocolResult<()> {
+    let expected_branch_len = (64 - (precommit.details.num_nonces - 1).leading_zeros()) as usize;
+    let expected_merkle_root = benchmark.details.merkle_root.clone().unwrap();
+    for merkle_proof in merkle_proofs.iter() {
+        if merkle_proof.branch.as_ref().unwrap().0.len() != expected_branch_len {
+            return Err(ProtocolError::InvalidMerkleProof {
+                nonce: merkle_proof.leaf.nonce.clone(),
+            });
+        }
+        let output_meta_data = OutputMetaData::from(merkle_proof.leaf.clone());
+        let hash = MerkleHash::from(output_meta_data);
+        let actual_merkle_root = merkle_proof
+            .branch
+            .as_ref()
+            .unwrap()
+            .calc_merkle_root(&hash, merkle_proof.leaf.nonce as usize);
+        if actual_merkle_root != expected_merkle_root {
+            return Err(ProtocolError::InvalidMerkleProof {
+                nonce: merkle_proof.leaf.nonce.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+#[time]
 fn verify_sampled_nonces(
     benchmark: &Benchmark,
-    solutions_data: &Vec<SolutionData>,
+    merkle_proofs: &Vec<MerkleProof>,
 ) -> ProtocolResult<()> {
     let sampled_nonces: HashSet<u64> = benchmark.state().sampled_nonces().iter().cloned().collect();
-    let proof_nonces: HashSet<u64> = solutions_data.iter().map(|d| d.nonce).collect();
+    let proof_nonces: HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
 
     if sampled_nonces != proof_nonces {
         return Err(ProtocolError::InvalidProofNonces {
@@ -110,36 +158,19 @@ fn verify_sampled_nonces(
 #[time]
 async fn verify_solutions_are_valid<T: Context>(
     ctx: &T,
-    benchmark: &Benchmark,
-    solutions_data: &Vec<SolutionData>,
+    precommit: &Precommit,
+    merkle_proofs: &Vec<MerkleProof>,
 ) -> ProtocolResult<()> {
-    let solutions_map: HashMap<u64, u32> = benchmark
-        .solutions_meta_data()
-        .iter()
-        .map(|d| (d.nonce, d.solution_signature))
-        .collect();
-
-    for d in solutions_data.iter() {
-        let submitted_signature = solutions_map[&d.nonce];
-        let actual_signature = d.calc_solution_signature();
-
-        if submitted_signature != actual_signature {
-            return Err(ProtocolError::InvalidSignatureFromSolutionData {
-                nonce: d.nonce,
-                expected_signature: submitted_signature,
-                actual_signature,
-            });
-        }
-    }
-
-    for d in solutions_data.iter() {
+    for p in merkle_proofs.iter() {
         if ctx
-            .verify_solution(&benchmark.settings, d.nonce, &d.solution)
+            .verify_solution(&precommit.settings, p.leaf.nonce, &p.leaf.solution)
             .await
             .unwrap_or_else(|e| panic!("verify_solution error: {:?}", e))
             .is_err()
         {
-            return Err(ProtocolError::InvalidSolution { nonce: d.nonce });
+            return Err(ProtocolError::InvalidSolution {
+                nonce: p.leaf.nonce,
+            });
         }
     }
 

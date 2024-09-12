@@ -47,6 +47,12 @@ pub enum ProtocolError {
         difficulty: Vec<i32>,
         difficulty_parameters: Vec<DifficultyParameter>,
     },
+    InvalidMerkleProof {
+        nonce: u64,
+    },
+    InvalidPrecommit {
+        benchmark_id: String,
+    },
     InvalidProofNonces {
         expected_nonces: Vec<u64>,
         submitted_nonces: Vec<u64>,
@@ -162,6 +168,14 @@ impl std::fmt::Display for ProtocolError {
                 "Difficulty '{:?}' is invalid. Must match difficulty parameters '{:?}'",
                 difficulty, difficulty_parameters
             ),
+            ProtocolError::InvalidMerkleProof { nonce } => write!(
+                f,
+                "Merkle proof for nonce '{}' is invalid",
+                nonce
+            ),
+            ProtocolError::InvalidPrecommit { benchmark_id } => {
+                write!(f, "Precommit '{}' does not exist", benchmark_id)
+            }
             ProtocolError::InvalidProofNonces {
                 submitted_nonces,
                 expected_nonces: sampled_nonces,

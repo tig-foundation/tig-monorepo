@@ -2,8 +2,8 @@ use crate::{config::ProtocolConfig, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
-use tig_utils::{jsonify, u32_from_str, u64s_from_str};
-pub use tig_utils::{Frontier, Point, PreciseNumber, Transaction, U256};
+use tig_utils::{jsonify, u64s_from_str};
+pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transaction, U256};
 
 serializable_struct_with_getters! {
     Algorithm {
@@ -17,11 +17,9 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     Benchmark {
         id: String,
-        settings: BenchmarkSettings,
         details: BenchmarkDetails,
         state: Option<BenchmarkState>,
-        solutions_meta_data: Option<Vec<SolutionMetaData>>,
-        solution_data: Option<SolutionData>,
+        solution_idxs: Option<HashSet<u32>>,
     }
 }
 serializable_struct_with_getters! {
@@ -48,10 +46,24 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    Precommit {
+        id: String,
+        details: PrecommitDetails,
+        settings: BenchmarkSettings,
+        state: Option<PrecommitState>,
+    }
+}
+serializable_struct_with_getters! {
+    MerkleProof {
+        leaf: OutputData,
+        branch: Option<MerkleBranch>,
+    }
+}
+serializable_struct_with_getters! {
     Proof {
         benchmark_id: String,
         state: Option<ProofState>,
-        solutions_data: Option<Vec<SolutionData>>,
+        merkle_proofs: Option<Vec<MerkleProof>>,
     }
 }
 serializable_struct_with_getters! {
@@ -119,8 +131,8 @@ impl BenchmarkSettings {
 }
 serializable_struct_with_getters! {
     BenchmarkDetails {
-        block_started: u32,
         num_solutions: u32,
+        merkle_root: Option<MerkleHash>,
     }
 }
 serializable_struct_with_getters! {
@@ -130,17 +142,30 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    SolutionMetaData {
+    OutputMetaData {
         nonce: u64,
-        solution_signature: u32,
+        runtime_signature: u64,
+        fuel_consumed: u64,
+        solution_signature: u64,
     }
 }
-impl From<SolutionData> for SolutionMetaData {
-    fn from(data: SolutionData) -> Self {
-        SolutionMetaData {
+impl From<OutputData> for OutputMetaData {
+    fn from(data: OutputData) -> Self {
+        OutputMetaData {
             solution_signature: data.calc_solution_signature(),
+            runtime_signature: data.runtime_signature,
+            fuel_consumed: data.fuel_consumed,
             nonce: data.nonce,
         }
+    }
+}
+impl From<OutputMetaData> for MerkleHash {
+    fn from(data: OutputMetaData) -> Self {
+        let u64s = u64s_from_str(&jsonify(&data));
+        let mut hash = [0u8; 16];
+        hash.copy_from_slice(&u64s[0].to_le_bytes());
+        hash.copy_from_slice(&u64s[1].to_le_bytes());
+        MerkleHash(hash)
     }
 }
 
@@ -158,6 +183,7 @@ serializable_struct_with_getters! {
         mempool_challenge_ids: HashSet<String>,
         mempool_algorithm_ids: HashSet<String>,
         mempool_benchmark_ids: HashSet<String>,
+        mempool_precommit_ids: HashSet<String>,
         mempool_proof_ids: HashSet<String>,
         mempool_fraud_ids: HashSet<String>,
         mempool_wasm_ids: HashSet<String>,
@@ -189,6 +215,7 @@ serializable_struct_with_getters! {
         cutoff_frontier: Option<Frontier>,
         scaled_frontier: Option<Frontier>,
         scaling_factor: Option<f64>,
+        base_fee: Option<PreciseNumber>,
     }
 }
 
@@ -214,6 +241,19 @@ serializable_struct_with_getters! {
     }
 }
 
+// Precommit child structs
+serializable_struct_with_getters! {
+    PrecommitDetails {
+        block_started: u32,
+        num_nonces: u64,
+    }
+}
+serializable_struct_with_getters! {
+    PrecommitState {
+        block_confirmed: Option<u32>,
+    }
+}
+
 // Proof child structs
 serializable_struct_with_getters! {
     ProofState {
@@ -223,16 +263,16 @@ serializable_struct_with_getters! {
 }
 pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
-    SolutionData {
+    OutputData {
         nonce: u64,
-        runtime_signature: u32,
+        runtime_signature: u64,
         fuel_consumed: u64,
         solution: Solution,
     }
 }
-impl SolutionData {
-    pub fn calc_solution_signature(&self) -> u32 {
-        u32_from_str(&jsonify(self))
+impl OutputData {
+    pub fn calc_solution_signature(&self) -> u64 {
+        u64s_from_str(&jsonify(&self.solution))[0]
     }
 }
 

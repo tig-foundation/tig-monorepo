@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 pub use anyhow::{Error as ContextError, Result as ContextResult};
 use tig_structs::{config::*, core::*};
 
@@ -51,6 +53,13 @@ pub enum PlayersFilter {
     Innovators,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub enum PrecommitsFilter {
+    BenchmarkId(String),
+    Settings(BenchmarkSettings),
+    Mempool { from_block_started: u32 },
+    Confirmed { from_block_started: u32 },
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProofsFilter {
     BenchmarkId(String),
     Mempool { from_block_started: u32 },
@@ -96,6 +105,7 @@ pub trait Context {
         filter: PlayersFilter,
         block_data: Option<BlockFilter>,
     ) -> ContextResult<Vec<Player>>;
+    async fn get_precommits(&self, filter: PrecommitsFilter) -> ContextResult<Vec<Precommit>>;
     async fn get_proofs(
         &self,
         filter: ProofsFilter,
@@ -113,7 +123,7 @@ pub trait Context {
         settings: &BenchmarkSettings,
         nonce: u64,
         wasm_vm_config: &WasmVMConfig,
-    ) -> ContextResult<anyhow::Result<SolutionData>>;
+    ) -> ContextResult<anyhow::Result<OutputData>>;
     async fn get_transaction(&self, tx_hash: &String) -> ContextResult<Transaction>;
     async fn get_multisig_owners(&self, address: &String) -> ContextResult<Vec<String>>;
     async fn get_latest_eth_block_num(&self) -> ContextResult<String>;
@@ -138,15 +148,19 @@ pub trait Context {
     ) -> ContextResult<String>;
     async fn add_benchmark_to_mempool(
         &self,
-        settings: BenchmarkSettings,
+        benchmark_id: &String,
         details: BenchmarkDetails,
-        solutions_metadata: Vec<SolutionMetaData>,
-        solution_data: SolutionData,
+        solution_idxs: HashSet<u64>,
+    ) -> ContextResult<()>;
+    async fn add_precommit_to_mempool(
+        &self,
+        settings: BenchmarkSettings,
+        details: PrecommitDetails,
     ) -> ContextResult<String>;
     async fn add_proof_to_mempool(
         &self,
         benchmark_id: &String,
-        solutions_data: Vec<SolutionData>,
+        merkle_proofs: Vec<MerkleProof>,
     ) -> ContextResult<()>;
     async fn add_fraud_to_mempool(
         &self,

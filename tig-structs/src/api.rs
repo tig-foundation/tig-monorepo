@@ -1,5 +1,6 @@
 use crate::{core::*, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 serializable_struct_with_getters! {
     RequestApiKeyReq {
@@ -108,6 +109,7 @@ serializable_struct_with_getters! {
     GetBenchmarksResp {
         block_id: String,
         block_details: BlockDetails,
+        precommits: Vec<Precommit>,
         benchmarks: Vec<Benchmark>,
         proofs: Vec<Proof>,
         frauds: Vec<Fraud>,
@@ -122,6 +124,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     GetBenchmarkDataResp {
+        precommit: Option<Precommit>,
         benchmark: Option<Benchmark>,
         proof: Option<Proof>,
         fraud: Option<Fraud>,
@@ -131,8 +134,8 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     SubmitBenchmarkReq {
         settings: BenchmarkSettings,
-        solutions_meta_data: Vec<SolutionMetaData>,
-        solution_data: SolutionData,
+        merkle_root: String,
+        solution_nonces: HashSet<u64>,
     }
 }
 
@@ -146,7 +149,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     SubmitProofReq {
         benchmark_id: String,
-        solutions_data: Vec<SolutionData>,
+        merkle_data: Vec<MerkleProof>,
     }
 }
 
