@@ -90,7 +90,16 @@ async fn main() {
     let api_key = matches.get_one::<String>("API_KEY").unwrap().clone();
     let player_id = matches.get_one::<String>("PLAYER_ID").unwrap().clone();
     if let Some(master) = matches.get_one::<String>("master") {
-        slave(master, port, num_workers, selected_algorithms).await;
+        slave(
+            api_url,
+            api_key,
+            player_id,
+            master,
+            port,
+            num_workers,
+            selected_algorithms,
+        )
+        .await;
     } else {
         master(
             api_url,
