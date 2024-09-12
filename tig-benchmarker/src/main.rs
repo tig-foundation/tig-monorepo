@@ -106,7 +106,17 @@ async fn main() {
     }
 }
 
-async fn slave(master: &String, port: u16, num_workers: u32, selected_algorithms: String) {
+async fn slave(
+    api_url: String,
+    api_key: String,
+    player_id: String,
+    master: &String,
+    port: u16,
+    num_workers: u32,
+    selected_algorithms: String,
+) {
+    println!("[slave] setting up");
+    benchmarker::setup(api_url, api_key, player_id).await;
     println!(
         "[slave] parsing selected algorithms from: {:?}",
         selected_algorithms

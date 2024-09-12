@@ -187,6 +187,7 @@ class PlayerBlockData:
     influence: Optional[int] = None
     reward: Optional[int] = None
     round_earnings: Optional[int] = None
+    qualifying_percent_rolling_deposit: Optional[int] = None
 
 @dataclass
 class Player:
