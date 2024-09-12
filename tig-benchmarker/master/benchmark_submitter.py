@@ -34,7 +34,7 @@ async def _execute(state: State, job: Job):
     headers = {
         "X-Api-Key": API_KEY,
         "Content-Type": "application/json",
-        "User-Agent": "tig-benchmarker-py/v0.1"
+        "User-Agent": "tig-benchmarker-py/v0.2"
     }
     random_nonce = random.choice(list(job.solutions_data))
     payload = {

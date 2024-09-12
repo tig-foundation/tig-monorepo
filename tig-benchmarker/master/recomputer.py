@@ -45,7 +45,10 @@ async def _execute(state: State, job: Job):
         print(f"[recomputer] downloading wasm for algorithm '{job.settings.algorithm_id}' from {job.download_url}")
         os.makedirs(os.path.dirname(wasm_path), exist_ok=True)
         async with aiohttp.ClientSession() as session:
-            async with session.get(job.download_url) as response:
+            async with session.get(job.download_url, headers={
+                "X-Api-Key": API_KEY,
+                "User-Agent": "tig-benchmarker-py/v0.2"
+            }) as response:
                 if response.status == 200:
                     with open(wasm_path, "wb") as f:
                         f.write(await response.read())
