@@ -11,8 +11,8 @@ pub use tig_structs::api::*;
 use tig_utils::{dejsonify, get, jsonify, post};
 
 pub struct Api {
-    api_url: String,
-    api_key: String,
+    pub api_url: String,
+    pub api_key: String,
 }
 
 impl Api {

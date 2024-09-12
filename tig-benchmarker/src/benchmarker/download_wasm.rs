@@ -1,4 +1,4 @@
-use super::{Job, Result};
+use super::{api, Job, Result};
 use moka::future::{Cache, CacheBuilder};
 use once_cell::sync::OnceCell;
 use tig_utils::get;
@@ -20,9 +20,15 @@ pub async fn execute(job: &Job) -> Result<Vec<u8>> {
     if let Some(wasm_blob) = cache.get(&job.settings.algorithm_id).await {
         Ok(wasm_blob)
     } else {
-        let wasm = get::<Vec<u8>>(&job.download_url, None)
-            .await
-            .map_err(|e| format!("Failed to download wasm from {}: {:?}", job.download_url, e))?;
+        let wasm = get::<Vec<u8>>(
+            &job.download_url,
+            Some(vec![
+                ("user-agent".to_string(), "TIG Benchmarker v0.2".to_string()),
+                ("x-api-key".to_string(), api().api_key.clone()),
+            ]),
+        )
+        .await
+        .map_err(|e| format!("Failed to download wasm from {}: {:?}", job.download_url, e))?;
         (*cache)
             .insert(job.settings.algorithm_id.clone(), wasm.clone())
             .await;
