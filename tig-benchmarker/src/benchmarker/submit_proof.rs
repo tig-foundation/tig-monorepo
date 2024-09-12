@@ -1,14 +1,14 @@
 use super::{api, Result};
 use crate::future_utils::sleep;
 use tig_api::SubmitProofReq;
-use tig_worker::SolutionData;
+use tig_worker::OutputData;
 
 const MAX_RETRIES: u32 = 3;
 
-pub async fn execute(benchmark_id: String, solutions_data: Vec<SolutionData>) -> Result<()> {
+pub async fn execute(benchmark_id: String, solutions_data: Vec<OutputData>) -> Result<()> {
     let req = SubmitProofReq {
         benchmark_id,
-        solutions_data,
+        merkle_data: solutions_data,
     };
     for attempt in 1..=MAX_RETRIES {
         println!("Submission attempt {} of {}", attempt, MAX_RETRIES);

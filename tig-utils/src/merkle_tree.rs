@@ -153,14 +153,14 @@ impl MerkleTree {
         hashes[0].clone()
     }
 
-    pub fn calc_merkle_proof(&self, branch_idx: usize) -> Result<MerkleBranch> {
+    pub fn calc_merkle_branch(&self, branch_idx: usize) -> Result<MerkleBranch> {
         if branch_idx >= self.n {
             return Err(anyhow!("Invalid branch index"));
         }
 
         let mut hashes = self.hashed_leafs.clone();
         let null_hash = MerkleHash::null();
-        let mut proof = Vec::new();
+        let mut branch = Vec::new();
         let mut idx = branch_idx;
 
         while hashes.len() > 1 {
@@ -170,7 +170,7 @@ impl MerkleTree {
                 let right = chunk.get(1).unwrap_or(&null_hash);
 
                 if idx >> 1 == i {
-                    proof.push(if idx % 2 == 0 { right } else { left }.clone());
+                    branch.push(if idx % 2 == 0 { right } else { left }.clone());
                 }
 
                 let mut combined = [0u8; 32];
@@ -182,7 +182,7 @@ impl MerkleTree {
             idx /= 2;
         }
 
-        Ok(MerkleBranch(proof))
+        Ok(MerkleBranch(branch))
     }
 }
 

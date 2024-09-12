@@ -4,13 +4,13 @@ use future_utils::{spawn, time, yield_now, Mutex};
 use std::sync::Arc;
 use tig_algorithms::{c001, c002, c003, c004};
 use tig_challenges::ChallengeTrait;
-use tig_worker::{compute_solution, verify_solution, SolutionData};
+use tig_worker::{compute_solution, verify_solution, OutputData};
 
 pub async fn execute(
     nonce_iters: Vec<Arc<Mutex<NonceIterator>>>,
     job: &Job,
     wasm: &Vec<u8>,
-    solutions_data: Arc<Mutex<Vec<SolutionData>>>,
+    solutions_data: Arc<Mutex<Vec<OutputData>>>,
     solutions_count: Arc<Mutex<u32>>,
 ) {
     for nonce_iter in nonce_iters {

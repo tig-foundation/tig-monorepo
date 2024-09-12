@@ -10,6 +10,7 @@ pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
     let (block, mut cache) = create_block(ctx).await;
     confirm_mempool_challenges(&block, &mut cache).await;
     confirm_mempool_algorithms(&block, &mut cache).await;
+    confirm_mempool_precommits(&block, &mut cache).await;
     confirm_mempool_benchmarks(&block, &mut cache).await;
     confirm_mempool_proofs(ctx, &block, &mut cache).await;
     confirm_mempool_frauds(&block, &mut cache).await;
@@ -19,6 +20,7 @@ pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
     update_qualifiers(&block, &mut cache).await;
     update_frontiers(&block, &mut cache).await;
     update_solution_signature_thresholds(&block, &mut cache).await;
+    update_base_fees(&block, &mut cache).await;
     update_influence(&block, &mut cache).await;
     update_adoption(&block, &mut cache).await;
     update_innovator_rewards(&block, &mut cache).await;
@@ -33,6 +35,7 @@ struct AddBlockCache {
     pub mempool_challenges: Vec<Challenge>,
     pub mempool_algorithms: Vec<Algorithm>,
     pub mempool_benchmarks: Vec<Benchmark>,
+    pub mempool_precommits: Vec<Precommit>,
     pub mempool_proofs: Vec<Proof>,
     pub mempool_frauds: Vec<Fraud>,
     pub mempool_wasms: Vec<Wasm>,
@@ -93,6 +96,17 @@ async fn setup_cache<T: Context>(
         });
         mempool_benchmarks.push(benchmark);
     }
+    let mut mempool_precommits = Vec::new();
+    for mut precommit in ctx
+        .get_precommits(PrecommitsFilter::Mempool { from_block_started })
+        .await
+        .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
+    {
+        precommit.state = Some(PrecommitState {
+            block_confirmed: None,
+        });
+        mempool_precommits.push(precommit);
+    }
     let mut mempool_proofs = Vec::new();
     for mut proof in ctx
         .get_proofs(ProofsFilter::Mempool { from_block_started }, false)
@@ -148,6 +162,7 @@ async fn setup_cache<T: Context>(
                 cutoff_frontier: None,
                 scaling_factor: None,
                 qualifier_difficulties: None,
+                base_fee: None,
             });
             active_challenges.insert(challenge.id.clone(), challenge);
         }
@@ -292,6 +307,7 @@ async fn setup_cache<T: Context>(
         mempool_challenges,
         mempool_algorithms,
         mempool_benchmarks,
+        mempool_precommits,
         mempool_proofs,
         mempool_frauds,
         mempool_wasms,
@@ -396,9 +412,16 @@ async fn confirm_mempool_algorithms(block: &Block, cache: &mut AddBlockCache) {
 }
 
 #[time]
+async fn confirm_mempool_precommits(block: &Block, cache: &mut AddBlockCache) {
+    let config = block.config();
+    // FIXME
+}
+
+#[time]
 async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
+    // FIXME sample solutions and non-solutions
     for benchmark in cache.mempool_benchmarks.iter_mut() {
         let seed = u32_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str());
         let mut rng = StdRng::seed_from_u64(seed as u64);
@@ -612,6 +635,11 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
                 .clamp(0.0, max_threshold) as u32,
         );
     }
+}
+
+#[time]
+async fn update_base_fees(block: &Block, cache: &mut AddBlockCache) {
+    // FIXME
 }
 
 fn find_smallest_range_dimension(points: &Frontier) -> usize {

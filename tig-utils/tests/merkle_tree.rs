@@ -17,7 +17,7 @@ mod tests {
         let tree = MerkleTree::new(hashes.clone(), 16).unwrap();
         let root = tree.calc_merkle_root();
 
-        let proof = tree.calc_merkle_proof(7).unwrap();
+        let proof = tree.calc_merkle_branch(7).unwrap();
         let leaf_hash = &hashes[7];
         let calculated_root = proof.calc_merkle_root(leaf_hash, 7);
 
@@ -37,7 +37,7 @@ mod tests {
         let hashes = create_test_hashes();
 
         let tree = MerkleTree::new(hashes, 16).unwrap();
-        let result = tree.calc_merkle_proof(16);
+        let result = tree.calc_merkle_branch(16);
         assert!(result.is_err());
     }
 
@@ -46,7 +46,7 @@ mod tests {
         let hashes = create_test_hashes();
 
         let tree = MerkleTree::new(hashes.clone(), 16).unwrap();
-        let proof = tree.calc_merkle_proof(7).unwrap();
+        let proof = tree.calc_merkle_branch(7).unwrap();
 
         let tree_json = serde_json::to_string(&tree).unwrap();
         let deserialized_tree: MerkleTree = serde_json::from_str(&tree_json).unwrap();

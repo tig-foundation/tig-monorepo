@@ -1,8 +1,8 @@
 use super::{state, QueryData, Result};
 use std::collections::HashSet;
-use tig_worker::SolutionData;
+use tig_worker::OutputData;
 
-pub async fn execute() -> Result<Option<(String, Vec<SolutionData>)>> {
+pub async fn execute() -> Result<Option<(String, Vec<OutputData>)>> {
     let QueryData {
         proofs,
         benchmarks,
