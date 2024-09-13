@@ -11,7 +11,7 @@ pub async fn execute(job: &Job) -> Result<Vec<u8>> {
         .get_or_init(|| {
             Mutex::new(
                 CacheBuilder::new(100)
-                    .time_to_live(std::time::Duration::from_secs(120))
+                    .time_to_live(std::time::Duration::from_secs(7200))
                     .build(),
             )
         })
