@@ -151,7 +151,7 @@ impl MerkleTree {
     }
 
     pub fn calc_merkle_proof(&self, branch_idx: usize) -> Result<MerkleBranch> {
-        if branch_idx >= self.hashed_leafs.len() {
+        if branch_idx >= self.n {
             return Err(anyhow!("Invalid branch index"));
         }
 
