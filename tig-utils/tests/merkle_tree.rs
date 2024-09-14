@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use md5;
+    use blake3::hash;
     use serde_json;
     use tig_utils::{MerkleBranch, MerkleHash, MerkleTree};
 
     fn create_test_hashes() -> Vec<MerkleHash> {
-        (0..14)
-            .map(|i| MerkleHash(md5::compute(i.to_string().as_bytes()).0))
+        (0..14u32)
+            .map(|i| MerkleHash(hash(i.to_be_bytes().as_slice()).into()))
             .collect()
     }
 
@@ -14,13 +14,12 @@ mod tests {
     fn test_merkle_tree() {
         let hashes = create_test_hashes();
 
-        let tree = MerkleTree::new(hashes.clone(), 16).unwrap();
+        let tree = MerkleTree::new(hashes.clone(), hashes.len() + 1).unwrap();
         let root = tree.calc_merkle_root();
 
         let proof = tree.calc_merkle_proof(7).unwrap();
         let leaf_hash = &hashes[7];
         let calculated_root = proof.calc_merkle_root(leaf_hash, 7);
-
         assert_eq!(root, calculated_root);
     }
 
@@ -65,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_merkle_hash_serialization() {
-        let hash = MerkleHash([1; 16]);
+        let hash = MerkleHash([1; 32]);
         let serialized = serde_json::to_string(&hash).unwrap();
         let deserialized: MerkleHash = serde_json::from_str(&serialized).unwrap();
         assert_eq!(hash, deserialized);
