@@ -32,7 +32,7 @@ async def run(state: State):
         if benchmark_id in state.available_jobs:
             job = state.available_jobs[benchmark_id]
         elif benchmark_id in state.pending_benchmark_jobs:
-            job = pending_benchmark_jobs[benchmark_id]
+            job = state.pending_benchmark_jobs[benchmark_id]
         else:
             print(f"[webserver] error job {benchmark_id} not found")
             return "Job not found", 404
