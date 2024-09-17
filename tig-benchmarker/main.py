@@ -12,13 +12,14 @@ from master import (
 
 async def main():
     state = State(
-        query_data=await data_fetcher._execute(),
+        query_data=None,
         available_jobs={},
         pending_benchmark_jobs={},
         pending_proof_jobs={},
         submitted_proof_ids=set(),
         difficulty_samplers={}
     )
+    await data_fetcher._execute(state)
     await asyncio.gather(*[
         job_manager.run(state),
         data_fetcher.run(state),

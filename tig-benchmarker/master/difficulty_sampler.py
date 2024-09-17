@@ -8,16 +8,17 @@ SOLUTIONS_MULTIPLIER = 10.0
 
 class DifficultySampler:
     def __init__(self):
-        self.min_difficulty = np.array([], dtype=int)
-        self.padding = np.array([], dtype=int)
-        self.dimensions = np.array([], dtype=int)
-        self.weights = np.array([])
+        self.min_difficulty = None
+        self.padding = None
+        self.dimensions = None
+        self.weights = np.empty((0,0,3), dtype=float)
         self.distribution = None
 
-    def sample(self, rng):
+    def sample(self):
         if self.distribution is None:
             raise ValueError("You must update sampler first")
-        idx = rng.choice(len(self.distribution), p=self.distribution)
+        p = self.distribution.flatten()
+        idx = np.random.choice(len(p), p=p)
         num_cols = self.dimensions[1] + self.padding[1]
         x = idx // num_cols
         y = idx % num_cols
@@ -25,9 +26,13 @@ class DifficultySampler:
 
     def update_with_block_data(self, min_difficulty: List[int], block_data):
         assert len(min_difficulty) == 2, "Only difficulty with 2 parameters are supported"
+        min_difficulty = np.array(min_difficulty)
 
-        left_pad = np.subtract(self.min_difficulty, min_difficulty, where=self.min_difficulty.size > 0)
-        self.min_difficulty = np.array(min_difficulty)
+        if self.min_difficulty is None:
+            left_pad = np.zeros(2, dtype=int)
+        else:
+            left_pad = min_difficulty - self.min_difficulty
+        self.min_difficulty = min_difficulty
         self.update_dimensions_and_padding(block_data)
         size = self.dimensions + self.padding
         self.resize_weights(left_pad, size)
@@ -37,93 +42,125 @@ class DifficultySampler:
         self.update_distributions()
 
     def update_with_solutions(self, difficulty: List[int], num_solutions: int):
-        x, y = np.subtract(difficulty, self.min_difficulty)
-        if x < 0 or y < 0 or x >= self.dimensions[0] + self.padding[0] or y >= self.dimensions[1] + self.padding[1]:
-            return
+        center = np.array(difficulty) - self.min_difficulty
 
-        for x_offset in range(self.padding[0]):
-            for y_offset in range(self.padding[1]):
-                dist = np.sqrt((x_offset / self.padding[0])**2 + (y_offset / self.padding[1])**2)
-                if dist > 1.0:
-                    break
-                decay = dist * (1.0 - DECAY) + DECAY
-                delta = (1.0 - decay) * num_solutions * SOLUTIONS_MULTIPLIER
-                coords = [
-                    (x + x_offset, y + y_offset),
-                    (x - x_offset, y + y_offset),
-                    (x + x_offset, y - y_offset),
-                    (x - x_offset, y - y_offset)
-                ]
-                for cx, cy in coords:
-                    if 0 <= cx < self.weights.shape[0] and 0 <= cy < self.weights.shape[1]:
-                        self.weights[cx, cy, 1] *= decay
-                        self.weights[cx, cy, 1] += delta
+        x_min = max(0, center[0] - self.padding[0])
+        x_max = min(self.weights.shape[0], center[0] + self.padding[0])
+        y_min = max(0, center[1] - self.padding[1])
+        y_max = min(self.weights.shape[1], center[1] + self.padding[1])
+        if x_min > x_max or y_min > y_max:
+            return
+        y, x = np.meshgrid(
+            np.arange(y_min, y_max + 1, dtype=float),
+            np.arange(x_min, x_max + 1, dtype=float)
+        )
+        position = np.stack((x, y), axis=-1)
+        dist = np.linalg.norm((position - center) / self.padding, axis=-1)
+        decay = dist * (1.0 - DECAY) + DECAY
+        delta = (1.0 - decay) * num_solutions * SOLUTIONS_MULTIPLIER
+        decay[np.where(dist > 1.0)] = 1.0
+        delta[np.where(dist > 1.0)] = 0.0
+
+        self.weights[x_min:x_max + 1, y_min:y_max + 1, 1] *= decay
+        self.weights[x_min:x_max + 1, y_min:y_max + 1, 1] += delta
 
     def update_valid_range(self, block_data):
-        lower_cutoff_points = np.subtract(block_data.base_frontier(), self.min_difficulty)
-        upper_cutoff_points = np.subtract(block_data.scaled_frontier(), self.min_difficulty)
+        lower_cutoff_points = np.array(block_data.base_frontier) - self.min_difficulty
+        upper_cutoff_points = np.array(block_data.scaled_frontier) - self.min_difficulty
         
-        if block_data.scaling_factor() < 1.0:
+        if block_data.scaling_factor < 1.0:
             lower_cutoff_points, upper_cutoff_points = upper_cutoff_points, lower_cutoff_points
 
-        lower_cutoff_points = lower_cutoff_points[lower_cutoff_points[:, 0].argsort()]
-        upper_cutoff_points = upper_cutoff_points[upper_cutoff_points[:, 0].argsort()]
-
+        lower_cutoff_points = lower_cutoff_points[np.argsort(lower_cutoff_points[:, 0]), :]
+        upper_cutoff_points = upper_cutoff_points[np.argsort(upper_cutoff_points[:, 0]), :]
+        lower_cutoff_idx = 0
+        lower_cutoff = lower_cutoff_points[lower_cutoff_idx]
+        upper_cutoff_idx = 0
+        upper_cutoff1 = upper_cutoff_points[upper_cutoff_idx]
+        if len(upper_cutoff_points) > 1:
+            upper_cutoff2 = upper_cutoff_points[upper_cutoff_idx + 1]
+        else:
+            upper_cutoff2 = upper_cutoff1
+        self.weights[:, :, 2] = 0.0
         for i in range(self.weights.shape[0]):
-            lower_cutoff = lower_cutoff_points[lower_cutoff_points[:, 0] <= i][-1]
-            upper_cutoff1 = upper_cutoff_points[upper_cutoff_points[:, 0] <= i][-1]
-            upper_cutoff2 = upper_cutoff_points[upper_cutoff_points[:, 0] > i][0] if i < upper_cutoff_points[-1, 0] else upper_cutoff1
+            if lower_cutoff_idx + 1 < len(lower_cutoff_points) and i == lower_cutoff_points[lower_cutoff_idx + 1, 0]:
+                lower_cutoff_idx += 1
+                lower_cutoff = lower_cutoff_points[lower_cutoff_idx]
+            if upper_cutoff_idx + 1 < len(upper_cutoff_points) and i == upper_cutoff_points[upper_cutoff_idx + 1, 0]:
+                upper_cutoff_idx += 1
+                upper_cutoff1 = upper_cutoff_points[upper_cutoff_idx]
+                if upper_cutoff_idx + 1 < len(upper_cutoff_points):
+                    upper_cutoff2 = upper_cutoff_points[upper_cutoff_idx + 1]
+                else:
+                    upper_cutoff2 = upper_cutoff1
 
-            for j in range(self.weights.shape[1]):
-                within_lower = j > lower_cutoff[1] or (j == lower_cutoff[1] and i >= lower_cutoff[0])
-                within_upper = (j <= upper_cutoff2[1] and i <= upper_cutoff2[0]) or \
-                               (j < upper_cutoff1[1] and i < upper_cutoff2[0]) or \
-                               (j == upper_cutoff1[1] and i == upper_cutoff1[0])
-                self.weights[i, j, 2] = within_lower and within_upper
+            if i >= lower_cutoff[0]:
+                start = lower_cutoff[1]
+            else:
+                start = lower_cutoff[1] + 1
+            if i <= upper_cutoff2[0]:
+                self.weights[i, start:upper_cutoff2[1] + 1, 2] = 1.0
+            if i < upper_cutoff2[0]:
+                self.weights[i, start:upper_cutoff1[1], 2] = 1.0
+            if i == upper_cutoff1[0]:
+                self.weights[i, upper_cutoff1[1], 2] = 1.0
 
     def update_distributions(self):
-        self.distribution = np.where(self.weights[:, :, 2], 
-                                     self.weights[:, :, 0] * self.weights[:, :, 1], 
-                                     0).flatten()
-        self.distribution /= self.distribution.sum()
+        distribution = np.prod(self.weights, axis=2)
+        distribution /= np.sum(distribution)
+        self.distribution = distribution
 
     def update_qualifier_weights(self, block_data):
-        cutoff_points = np.subtract(block_data.cutoff_frontier(), self.min_difficulty)
-        cutoff_points = cutoff_points[cutoff_points[:, 0].argsort()]
+        cutoff_points = np.array(block_data.cutoff_frontier) - self.min_difficulty
+        cutoff_points = cutoff_points[np.argsort(cutoff_points[:, 0]), :]
 
+        cutoff_idx = 0
+        if len(cutoff_points) > 0:
+            cutoff = cutoff_points[0]
+        else:
+            cutoff = np.array([0, 0])
         for i in range(self.weights.shape[0]):
-            cutoff = cutoff_points[cutoff_points[:, 0] <= i][-1] if len(cutoff_points) > 0 else [0, 0]
+            if cutoff_idx + 1 < len(cutoff_points) and i == cutoff_points[cutoff_idx, 0]:
+                cutoff_idx += 1
+                cutoff = cutoff_points[cutoff_idx]
             self.weights[i, :, 0] *= 0.9
-            self.weights[i, cutoff[1]:, 0] += 0.1
+            self.weights[i, cutoff[1] + 1:, 0] += 0.1
             if i >= cutoff[0]:
                 self.weights[i, cutoff[1], 0] += 0.1
 
     def resize_weights(self, left_pad: np.ndarray, size: np.ndarray):
-        new_weights = np.full((*size, 3), fill_value=1.0)
-        new_weights[:, :, 1] = INITIAL_SOLUTIONS_WEIGHT
-
-        x_start = max(0, left_pad[0])
-        y_start = max(0, left_pad[1])
-        x_end = min(size[0], size[0] + left_pad[0])
-        y_end = min(size[1], size[1] + left_pad[1])
-
-        old_x_start = max(0, -left_pad[0])
-        old_y_start = max(0, -left_pad[1])
-
-        new_weights[x_start:x_end, y_start:y_end] = self.weights[
-            old_x_start:old_x_start + x_end - x_start,
-            old_y_start:old_y_start + y_end - y_start
-        ]
-
-        self.weights = new_weights
+        default_values = [1.0, INITIAL_SOLUTIONS_WEIGHT, 0.0]
+        if left_pad[0] > 0:
+            pad = np.full((left_pad[0], self.weights.shape[1], 3), default_values)
+            self.weights = np.vstack((pad, self.weights))
+        elif left_pad[0] < 0:
+            self.weights = self.weights[-left_pad[0]:, :, :]
+        if left_pad[1] > 0:
+            pad = np.full((self.weights.shape[0], left_pad[1], 3), default_values)
+            self.weights = np.hstack((pad, self.weights))
+        elif left_pad[1] < 0:
+            self.weights = self.weights[:, -left_pad[1]:, :]
+        right_pad = size - self.weights.shape[:2]
+        if right_pad[0] > 0:
+            pad = np.full((right_pad[0], self.weights.shape[1], 3), default_values)
+            self.weights = np.vstack((self.weights, pad))
+        elif right_pad[0] < 0:
+            self.weights = self.weights[:size[0], :, :]
+        if right_pad[1] > 0:
+            pad = np.full((self.weights.shape[0], right_pad[1], 3), default_values)
+            self.weights = np.hstack((self.weights, pad))
+        elif right_pad[1] < 0:
+            self.weights = self.weights[:, :size[1], :]
 
     def update_dimensions_and_padding(self, block_data):
-        hardest_difficulty = np.maximum(
-            np.maximum(
-                block_data.scaled_frontier().max(axis=0),
-                block_data.base_frontier().max(axis=0)
-            ),
-            block_data.qualifier_difficulties().max(axis=0) if len(block_data.qualifier_difficulties()) > 0 else -np.inf
-        )
+        hardest_difficulty = np.max([
+            np.max(block_data.scaled_frontier, axis=0),
+            np.max(block_data.base_frontier, axis=0),
+        ], axis=0)
+        if block_data.qualifier_difficulties is not None and len(block_data.qualifier_difficulties) > 0:
+            hardest_difficulty = np.max([
+                hardest_difficulty, 
+                np.max(block_data.qualifier_difficulties, axis=0)
+            ], axis=0)
         self.dimensions = hardest_difficulty - self.min_difficulty + 1
         self.padding = np.ceil(self.dimensions * PADDING_FACTOR).astype(int)

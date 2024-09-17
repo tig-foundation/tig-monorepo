@@ -3,17 +3,13 @@ import asyncio
 import json
 from typing import Dict, Any
 from master.data import *
+from master.difficulty_sampler import *
 from master.config import *
-
-_CACHE = {}
 
 async def run(state: State):
     while True:
         try:
-            print(f"[data_fetcher] querying API")
-            query_data = await _execute()
-            print(f"[data_fetcher] done")
-            state.query_data = query_data
+            await _execute(state)
         except Exception as e:
             print(f"[data_fetcher] error: {e}")
         finally:
@@ -27,13 +23,14 @@ async def _get(url: str) -> Dict[str, Any]:
                 raise Exception(f"error {response.status} fetching from {url}:\n\t{txt}")
             return json.loads(txt)
 
-async def _execute() -> QueryData:
+async def _execute(state: State):
+    print(f"[data_fetcher] querying API")
     block_data = await _get(f"{API_URL}/get-block")
     block = Block.from_dict(block_data["block"])
 
-    if block.id in _CACHE:
+    if state.query_data is not None and block.id == state.query_data.block.id:
         print(f"[data_fetcher] no new block data")
-        return _CACHE[block.id]
+        return
 
     print(f"[data_fetcher] new block @ height {block.details.height}, fetching data")
     tasks = [
@@ -67,6 +64,15 @@ async def _execute() -> QueryData:
         challenges=challenges
     )
 
-    _CACHE[block.id] = data
+    for challenge in challenges.values():
+        print(f"[data_fetcher] updating difficulty sampler for {challenge.details.name}")
+        if challenge.id not in state.difficulty_samplers:
+            state.difficulty_samplers[challenge.id] = DifficultySampler()
+        min_difficulty = [
+            p["min_value"]
+            for p in block.config["difficulty"]["parameters"][challenge.id]
+        ]
+        state.difficulty_samplers[challenge.id].update_with_block_data(min_difficulty, challenge.block_data)
 
-    return data
+    print(f"[data_fetcher] done")
+    state.query_data = data

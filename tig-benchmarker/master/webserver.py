@@ -28,13 +28,19 @@ async def run(state: State):
             return "Invalid solution data", 400
         
         print(f"[webserver] slave {slave_addr} - posted {len(solutions_data)} solutions for job {benchmark_id}")
+        job = None
         if benchmark_id in state.available_jobs:
-            state.available_jobs[benchmark_id].solutions_data.update(solutions_data)
+            job = state.available_jobs[benchmark_id]
         elif benchmark_id in state.pending_benchmark_jobs:
-            state.pending_benchmark_jobs[benchmark_id].solutions_data.update(solutions_data)
+            job = pending_benchmark_jobs[benchmark_id]
         else:
             print(f"[webserver] error job {benchmark_id} not found")
-
+            return "Job not found", 404
+        job.solutions_data.update(solutions_data)
+        state.difficulty_samplers[job.settings.challenge_id].update_with_solutions(
+            difficulty=job.settings.difficulty,
+            num_solutions=len(solutions_data)                
+        )
         return "OK", 200
 
     config = Config()

@@ -23,6 +23,7 @@ async def _execute(state: State):
     wasms = state.query_data.wasms
     available_jobs = state.available_jobs
     pending_benchmark_jobs = state.pending_benchmark_jobs
+    difficulty_samplers = state.difficulty_samplers
 
     challenge_map = dict(
         **{
@@ -80,8 +81,7 @@ async def _execute(state: State):
                 submit=n + job_config["benchmark_duration"] + job_config["wait_slave_duration"]
             )
             for _ in range(job_config["num_jobs"] - num_jobs):
-                # FIXME use difficulty sampler
-                difficulty = random.choice(challenges[challenge_id].block_data.qualifier_difficulties)
+                difficulty = difficulty_samplers[challenge_id].sample()
                 benchmark_id = f"{challenge_name}_{algorithm_name}_{difficulty[0]}_{difficulty[1]}_{now()}"
                 print(f"[job_manager] job: {benchmark_id} CREATED")
                 job = Job(
