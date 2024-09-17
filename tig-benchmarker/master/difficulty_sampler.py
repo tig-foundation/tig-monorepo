@@ -45,9 +45,9 @@ class DifficultySampler:
         center = np.array(difficulty) - self.min_difficulty
 
         x_min = max(0, center[0] - self.padding[0])
-        x_max = min(self.weights.shape[0], center[0] + self.padding[0])
+        x_max = min(self.weights.shape[0] - 1, center[0] + self.padding[0])
         y_min = max(0, center[1] - self.padding[1])
-        y_max = min(self.weights.shape[1], center[1] + self.padding[1])
+        y_max = min(self.weights.shape[1] - 1, center[1] + self.padding[1])
         if x_min > x_max or y_min > y_max:
             return
         y, x = np.meshgrid(
