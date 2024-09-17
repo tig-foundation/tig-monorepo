@@ -20,7 +20,6 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
     struct Beneficiary {
         uint256 roundEarnings;
         uint256 withdrawnEarnings;
-        uint256 lastWithdrawalTime;
     }
 
     mapping(address => Beneficiary) public beneficiaries;
@@ -31,7 +30,6 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
 
     constructor(address _tokenAddress, uint256 _totalRoundEarnings) Ownable(msg.sender) {
         token = IERC20(_tokenAddress);
-        startTime = block.timestamp;
         totalRoundEarnings = _totalRoundEarnings;
         withdrawalsEnabled = false;
     }
@@ -49,7 +47,6 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
 
             Beneficiary storage beneficiary = beneficiaries[beneficiaryAddress];
             beneficiary.roundEarnings = beneficiary.roundEarnings.add(earnings);
-            beneficiary.lastWithdrawalTime = startTime;
             totalAllocatedEarnings = totalAllocatedEarnings.add(earnings);
 
             emit EarningsAdded(beneficiaryAddress, earnings);
@@ -61,6 +58,7 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
         require(totalAllocatedEarnings == totalRoundEarnings, "Total allocated earnings do not match totalRoundEarnings");
         require(token.balanceOf(address(this)) >= totalRoundEarnings, "Contract balance does not match totalRoundEarnings");
         
+        startTime = block.timestamp;
         withdrawalsEnabled = true;
         
         emit WithdrawalsEnabled();
@@ -75,7 +73,6 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
         require(withdrawableAmount > 0, "No tokens available for withdrawal");
 
         beneficiary.withdrawnEarnings = beneficiary.withdrawnEarnings.add(withdrawableAmount);
-        beneficiary.lastWithdrawalTime = block.timestamp;
 
         require(token.transfer(msg.sender, withdrawableAmount), "Withdrawal failed");
 
@@ -83,8 +80,9 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
     }
 
     function getWithdrawableAmount(address _beneficiary) public view returns (uint256) {
+        require(withdrawalsEnabled, "Withdrawals are not enabled yet");
         Beneficiary storage beneficiary = beneficiaries[_beneficiary];
-        uint256 elapsedTime = block.timestamp.sub(beneficiary.lastWithdrawalTime);
+        uint256 elapsedTime = block.timestamp.sub(startTime);
         uint256 vestedAmount;
         if (elapsedTime >= VESTING_PERIOD) {
             vestedAmount = beneficiary.roundEarnings;
@@ -104,6 +102,7 @@ contract VestedRoundEarnings is Ownable, ReentrancyGuard {
     }
 
     function getRemainingVestingPeriod() external view returns (uint256) {
+        require(withdrawalsEnabled, "Withdrawals are not enabled yet");
         uint256 elapsedTime = block.timestamp.sub(startTime);
         if (elapsedTime >= VESTING_PERIOD) {
             return 0;
