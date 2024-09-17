@@ -22,7 +22,7 @@ class DifficultySampler:
         num_cols = self.dimensions[1] + self.padding[1]
         x = idx // num_cols
         y = idx % num_cols
-        return [x + self.min_difficulty[0], y + self.min_difficulty[1]]
+        return [int(x + self.min_difficulty[0]), int(y + self.min_difficulty[1])]
 
     def update_with_block_data(self, min_difficulty: List[int], block_data):
         assert len(min_difficulty) == 2, "Only difficulty with 2 parameters are supported"
