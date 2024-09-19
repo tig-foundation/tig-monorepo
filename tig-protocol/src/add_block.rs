@@ -192,7 +192,6 @@ async fn setup_cache<T: Context>(
                 solution_signature_threshold: None,
                 scaled_frontier: None,
                 base_frontier: None,
-                cutoff_frontier: None,
                 scaling_factor: None,
                 qualifier_difficulties: None,
                 base_fee: None,
@@ -1043,7 +1042,7 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) {
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
             .collect::<Frontier>();
-        let cutoff_frontier = pareto_algorithm(points, true)
+        let base_frontier = pareto_algorithm(points, true)
             .pop()
             .unwrap()
             .into_iter()
@@ -1051,33 +1050,13 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) {
             .collect::<Frontier>() // mirror the points back;
             .extend(&min_difficulty, &max_difficulty);
 
-        let scaling_factor = *block_data.num_qualifiers() as f64
-            / config.qualifiers.total_qualifiers_threshold as f64;
-        let (scaling_factor, base_frontier) = match &config.difficulty.min_frontiers_gaps {
-            Some(min_gaps) => {
-                let min_gap = min_gaps[&challenge.id];
-                if scaling_factor >= 1.0 {
-                    (
-                        (scaling_factor / (1.0 - min_gap))
-                            .min(config.difficulty.max_scaling_factor),
-                        cutoff_frontier
-                            .scale(&min_difficulty, &max_difficulty, 1.0 - min_gap)
-                            .extend(&min_difficulty, &max_difficulty),
-                    )
-                } else {
-                    (scaling_factor.min(1.0 - min_gap), cutoff_frontier.clone())
-                }
-            }
-            None => (
-                scaling_factor.min(config.difficulty.max_scaling_factor),
-                cutoff_frontier.clone(),
-            ),
-        };
+        let scaling_factor = (*block_data.num_qualifiers() as f64
+            / config.qualifiers.total_qualifiers_threshold as f64)
+            .min(config.difficulty.max_scaling_factor);
         let scaled_frontier = base_frontier
             .scale(&min_difficulty, &max_difficulty, scaling_factor)
             .extend(&min_difficulty, &max_difficulty);
 
-        block_data.cutoff_frontier = Some(cutoff_frontier);
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
         block_data.scaling_factor = Some(scaling_factor);
