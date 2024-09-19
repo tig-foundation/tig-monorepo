@@ -18,7 +18,7 @@ pub struct MerkleTree {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MerkleBranch(pub Vec<MerkleHash>);
+pub struct MerkleBranch(pub Vec<(u8, MerkleHash)>);
 
 impl fmt::Display for MerkleHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -100,7 +100,11 @@ impl Serialize for MerkleBranch {
     where
         S: Serializer,
     {
-        let hashes_hex: String = self.0.iter().map(|h| h.to_string()).collect();
+        let hashes_hex: String = self
+            .0
+            .iter()
+            .map(|(d, h)| format!("{:02x}{}", d, h.to_string()))
+            .collect();
         serializer.serialize_str(&hashes_hex)
     }
 }
@@ -111,22 +115,32 @@ impl<'de> Deserialize<'de> for MerkleBranch {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        if s.len() % 64 != 0 {
-            return Err(serde::de::Error::custom("Invalid MerkleProof string length"));
+        if s.len() % 66 != 0 {
+            return Err(serde::de::Error::custom(
+                "Invalid MerkleBranch string length",
+            ));
         }
-        let hashes = s
-            .chars()
-            .collect::<Vec<char>>()
-            .chunks(64)
-            .map(|chunk| chunk.iter().collect::<String>().parse())
-            .collect::<Result<Vec<MerkleHash>, _>>()
-            .map_err(serde::de::Error::custom)?;
-        Ok(MerkleBranch(hashes))
+        let mut stems = Vec::new();
+        for chunk in s.chars().collect::<Vec<char>>().chunks(66) {
+            let depth: u8 = u8::from_str_radix(&chunk[..2].iter().collect::<String>(), 16)
+                .map_err(serde::de::Error::custom)?;
+            let hash = chunk[2..]
+                .iter()
+                .collect::<String>()
+                .parse()
+                .map_err(serde::de::Error::custom)?;
+            stems.push((depth, hash));
+        }
+        Ok(MerkleBranch(stems))
     }
 }
 
 impl MerkleTree {
     pub fn new(hashed_leafs: Vec<MerkleHash>, n: usize) -> Result<Self> {
+        // check n is power of 2
+        if n.count_ones() != 1 {
+            return Err(anyhow!("Invalid tree size"));
+        }
         if hashed_leafs.len() > n {
             return Err(anyhow!("Invalid tree size"));
         }
@@ -134,15 +148,19 @@ impl MerkleTree {
     }
 
     pub fn calc_merkle_root(&self) -> MerkleHash {
-        let null_hash = MerkleHash::null();
         let mut hashes = self.hashed_leafs.clone();
         while hashes.len() > 1 {
             let mut new_hashes = Vec::with_capacity((hashes.len() + 1) / 2);
             for chunk in hashes.chunks(2) {
-                let mut combined = [0u8; 64];
-                combined[..32].copy_from_slice(&chunk[0].0);
-                combined[32..].copy_from_slice(&chunk.get(1).unwrap_or(&null_hash).0);
-                new_hashes.push(MerkleHash(blake3::hash(&combined).into()));
+                let left = &chunk[0];
+                let mut next = left.clone();
+                if let Some(right) = chunk.get(1) {
+                    let mut combined = [0u8; 64];
+                    combined[..32].copy_from_slice(&left.0);
+                    combined[32..].copy_from_slice(&right.0);
+                    next = MerkleHash(blake3::hash(&combined).into());
+                }
+                new_hashes.push(next);
             }
             hashes = new_hashes;
         }
@@ -156,27 +174,30 @@ impl MerkleTree {
         }
 
         let mut hashes = self.hashed_leafs.clone();
-        let null_hash = MerkleHash::null();
         let mut branch = Vec::new();
         let mut idx = branch_idx;
 
+        let mut depth = 0;
         while hashes.len() > 1 {
             let mut new_hashes = Vec::new();
             for (i, chunk) in hashes.chunks(2).enumerate() {
                 let left = &chunk[0];
-                let right = chunk.get(1).unwrap_or(&null_hash);
+                let mut next = left.clone();
+                if let Some(right) = chunk.get(1) {
+                    if idx >> 1 == i {
+                        branch.push((depth, if idx % 2 == 0 { right } else { left }.clone()));
+                    }
 
-                if idx >> 1 == i {
-                    branch.push(if idx % 2 == 0 { right } else { left }.clone());
+                    let mut combined = [0u8; 64];
+                    combined[..32].copy_from_slice(&left.0);
+                    combined[32..].copy_from_slice(&right.0);
+                    next = MerkleHash(blake3::hash(&combined).into());
                 }
-
-                let mut combined = [0u8; 64];
-                combined[..32].copy_from_slice(&left.0);
-                combined[32..].copy_from_slice(&right.0);
-                new_hashes.push(MerkleHash(blake3::hash(&combined).into()));
+                new_hashes.push(next);
             }
             hashes = new_hashes;
             idx /= 2;
+            depth += 1;
         }
 
         Ok(MerkleBranch(branch))
@@ -184,11 +205,23 @@ impl MerkleTree {
 }
 
 impl MerkleBranch {
-    pub fn calc_merkle_root(&self, hashed_leaf: &MerkleHash, branch_idx: usize) -> MerkleHash {
+    pub fn calc_merkle_root(
+        &self,
+        hashed_leaf: &MerkleHash,
+        branch_idx: usize,
+    ) -> Result<MerkleHash> {
         let mut root = hashed_leaf.clone();
         let mut idx = branch_idx;
 
-        for hash in &self.0 {
+        let mut curr_depth = 0;
+        for (depth, hash) in &self.0 {
+            if curr_depth > *depth {
+                return Err(anyhow!("Invalid branch"));
+            }
+            while curr_depth != *depth {
+                idx /= 2;
+                curr_depth += 1;
+            }
             let mut combined = [0u8; 64];
             if idx % 2 == 0 {
                 combined[..32].copy_from_slice(&root.0);
@@ -199,8 +232,9 @@ impl MerkleBranch {
             }
             root = MerkleHash(blake3::hash(&combined).into());
             idx /= 2;
+            curr_depth += 1;
         }
 
-        root
+        Ok(root)
     }
 }
