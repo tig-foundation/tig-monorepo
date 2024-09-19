@@ -537,7 +537,7 @@ async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
     for benchmark in cache.mempool_benchmarks.iter_mut() {
         let seed = u64s_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str())[0];
         let mut rng = StdRng::seed_from_u64(seed);
-        let mut sampled_nonces = Vec::new();
+        let mut sampled_nonces = HashSet::new();
         let mut solution_nonces = benchmark
             .solution_nonces
             .as_ref()
@@ -547,12 +547,12 @@ async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
             .collect::<Vec<u64>>();
         if solution_nonces.len() > 0 {
             solution_nonces.shuffle(&mut rng);
-            sampled_nonces.extend(
-                solution_nonces
-                    .iter()
-                    .take(config.benchmark_submissions.max_samples)
-                    .cloned(),
-            );
+            for nonce in solution_nonces
+                .iter()
+                .take(config.benchmark_submissions.max_samples)
+            {
+                sampled_nonces.insert(*nonce);
+            }
         }
         let precommit = &cache.confirmed_precommits[&benchmark.id];
         let solution_nonces = benchmark.solution_nonces.as_ref().unwrap();
@@ -570,19 +570,19 @@ async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
                     if sampled_nonces.contains(&nonce) || solution_nonces.contains(&nonce) {
                         continue;
                     }
-                    sampled_nonces.push(nonce);
+                    sampled_nonces.insert(nonce);
                 }
             } else {
                 let mut non_solution_nonces: Vec<u64> = (0..num_nonces as u64)
                     .filter(|n| !solution_nonces.contains(n))
                     .collect();
                 non_solution_nonces.shuffle(&mut rng);
-                sampled_nonces.extend(
-                    non_solution_nonces
-                        .iter()
-                        .take(config.benchmark_submissions.max_samples)
-                        .cloned(),
-                );
+                for nonce in non_solution_nonces
+                    .iter()
+                    .take(config.benchmark_submissions.max_samples)
+                {
+                    sampled_nonces.insert(*nonce);
+                }
             }
         }
 

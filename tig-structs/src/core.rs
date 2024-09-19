@@ -146,7 +146,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     BenchmarkState {
         block_confirmed: Option<u32>,
-        sampled_nonces: Option<Vec<u64>>,
+        sampled_nonces: Option<HashSet<u64>>,
     }
 }
 serializable_struct_with_getters! {

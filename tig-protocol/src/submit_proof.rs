@@ -16,6 +16,7 @@ pub(crate) async fn execute<T: Context>(
     let precommit = get_precommit_by_id(ctx, benchmark_id).await?;
     verify_benchmark_ownership(player, &precommit.settings)?;
     let benchmark = get_benchmark_by_id(ctx, benchmark_id).await?;
+    // FIXME flag as fraud
     verify_merkle_proofs(&precommit, &benchmark, &merkle_proofs)?;
     verify_sampled_nonces(&benchmark, &merkle_proofs)?;
     let verification_result = verify_solutions_are_valid(ctx, &precommit, &merkle_proofs).await;
