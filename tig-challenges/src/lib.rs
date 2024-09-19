@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::SmallRng, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -95,18 +95,18 @@ pub struct CudaKernel {
 }
 
 pub struct RngArray {
-    rngs: [StdRng; 8],
-    index: u32,
+    rngs: [SmallRng; 8],
+    index: usize,
 }
 
 impl RngArray {
     pub fn new(seeds: [u64; 8]) -> Self {
-        let rngs = seeds.map(StdRng::seed_from_u64);
+        let rngs = seeds.map(SmallRng::seed_from_u64);
         RngArray { rngs, index: 0 }
     }
 
-    pub fn get_mut(&mut self) -> &mut StdRng {
-        self.index = (&mut self.rngs[self.index as usize]).gen_range(0..8);
-        &mut self.rngs[self.index as usize]
+    pub fn get_mut(&mut self) -> &mut SmallRng {
+        self.index = (self.index + 1) % 8;
+        &mut self.rngs[self.index]
     }
 }
