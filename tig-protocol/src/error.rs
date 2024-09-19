@@ -1,4 +1,5 @@
 use tig_structs::{config::DifficultyParameter, core::BenchmarkSettings};
+use tig_utils::PreciseNumber;
 
 #[derive(Debug, PartialEq)]
 pub enum ProtocolError {
@@ -17,7 +18,7 @@ pub enum ProtocolError {
     DuplicateProof {
         benchmark_id: String,
     },
-    DuplicateSubmissionFeeTx {
+    DuplicateTransaction {
         tx_hash: String,
     },
     FlaggedAsFraud {
@@ -27,6 +28,10 @@ pub enum ProtocolError {
     InsufficientSolutions {
         min_num_solutions: usize,
         num_solutions: usize,
+    },
+    InsufficientFeeBalance {
+        fee_paid: PreciseNumber,
+        available_fee_balance: PreciseNumber,
     },
     InvalidAlgorithm {
         algorithm_id: String,
@@ -46,6 +51,15 @@ pub enum ProtocolError {
     InvalidDifficulty {
         difficulty: Vec<i32>,
         difficulty_parameters: Vec<DifficultyParameter>,
+    },
+    InvalidMerkleProof {
+        nonce: u64,
+    },
+    InvalidNumNonces {
+        num_nonces: u64,
+    },
+    InvalidPrecommit {
+        benchmark_id: String,
     },
     InvalidProofNonces {
         expected_nonces: Vec<u64>,
@@ -72,17 +86,17 @@ pub enum ProtocolError {
         expected_player_id: String,
         actual_player_id: String,
     },
-    InvalidSubmissionFeeAmount {
+    InvalidTransactionAmount {
         expected_amount: String,
         actual_amount: String,
         tx_hash: String,
     },
-    InvalidSubmissionFeeReceiver {
+    InvalidTransactionReceiver {
         tx_hash: String,
         expected_receiver: String,
         actual_receiver: String,
     },
-    InvalidSubmissionFeeSender {
+    InvalidTransactionSender {
         tx_hash: String,
         expected_sender: String,
         actual_sender: String,
@@ -120,7 +134,7 @@ impl std::fmt::Display for ProtocolError {
             ProtocolError::DuplicateProof { benchmark_id } => {
                 write!(f, "Proof already submitted for benchmark '{}'", benchmark_id)
             }
-            ProtocolError::DuplicateSubmissionFeeTx { tx_hash } => write!(
+            ProtocolError::DuplicateTransaction { tx_hash } => write!(
                 f,
                 "Transaction '{}' is already used",
                 tx_hash
@@ -128,6 +142,14 @@ impl std::fmt::Display for ProtocolError {
             ProtocolError::FlaggedAsFraud { benchmark_id } => {
                 write!(f, "Benchmark '{}' is flagged as fraud", benchmark_id)
             }
+            ProtocolError::InsufficientFeeBalance {
+                fee_paid,
+                available_fee_balance,
+            } => write!(
+                f,
+                "Insufficient fee balance. Fee to be paid: '{}', Available fee balance: '{}'",
+                fee_paid, available_fee_balance
+            ),
             ProtocolError::InsufficientLifespan => {
                 write!(f, "Benchmark will have no lifespan remaining after submission delay penalty is applied.")
             }
@@ -162,6 +184,19 @@ impl std::fmt::Display for ProtocolError {
                 "Difficulty '{:?}' is invalid. Must match difficulty parameters '{:?}'",
                 difficulty, difficulty_parameters
             ),
+            ProtocolError::InvalidMerkleProof { nonce } => write!(
+                f,
+                "Merkle proof for nonce '{}' is invalid",
+                nonce
+            ),
+            ProtocolError::InvalidNumNonces { num_nonces } => write!(
+                f,
+                "Number of nonces '{}' is invalid",
+                num_nonces
+            ),
+            ProtocolError::InvalidPrecommit { benchmark_id } => {
+                write!(f, "Precommit '{}' does not exist", benchmark_id)
+            }
             ProtocolError::InvalidProofNonces {
                 submitted_nonces,
                 expected_nonces: sampled_nonces,
@@ -207,7 +242,7 @@ impl std::fmt::Display for ProtocolError {
                 "Submission made by the invalid player. Expected: '{}', Actual: '{}'",
                 expected_player_id, actual_player_id
             ),
-            ProtocolError::InvalidSubmissionFeeAmount {
+            ProtocolError::InvalidTransactionAmount {
                 expected_amount,
                 actual_amount,
                 tx_hash,
@@ -216,12 +251,12 @@ impl std::fmt::Display for ProtocolError {
                 "Transaction '{}' paid an invalid amount of submission fee. Expected: '{}', Actual: '{}'",
                 tx_hash, expected_amount, actual_amount
             ),
-            ProtocolError::InvalidSubmissionFeeReceiver { tx_hash, expected_receiver, actual_receiver } => write!(
+            ProtocolError::InvalidTransactionReceiver { tx_hash, expected_receiver, actual_receiver } => write!(
                 f,
                 "Transaction '{}' has invalid receiver. Expected: '{}', Actual: '{}'",
                 tx_hash, expected_receiver, actual_receiver
             ),
-            ProtocolError::InvalidSubmissionFeeSender {
+            ProtocolError::InvalidTransactionSender {
                 tx_hash,
                 expected_sender,
                 actual_sender,

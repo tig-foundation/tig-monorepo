@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use bincode;
 use tig_challenges::*;
-pub use tig_structs::core::{BenchmarkSettings, Solution, SolutionData};
+pub use tig_structs::core::{BenchmarkSettings, OutputData, Solution};
 use tig_utils::decompress_obj;
 use wasmi::{Config, Engine, Linker, Module, Store, StoreLimitsBuilder};
 
@@ -11,7 +11,7 @@ pub fn compute_solution(
     wasm: &[u8],
     max_memory: u64,
     max_fuel: u64,
-) -> Result<Option<SolutionData>> {
+) -> Result<Option<OutputData>> {
     let seeds = settings.calc_seeds(nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
         "c001" => {
@@ -86,6 +86,7 @@ pub fn compute_solution(
         .map_err(|e| anyhow!("Failed to call function: {:?}", e))?;
 
     // Get runtime signature
+    // FIXME read runtime signature on execution error
     let runtime_signature_u64 = store.get_runtime_signature();
     let runtime_signature = (runtime_signature_u64 as u32) ^ ((runtime_signature_u64 >> 32) as u32);
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
@@ -103,7 +104,7 @@ pub fn compute_solution(
             &mut serialized_solution,
         )
         .expect("Failed to read solution from memory");
-    let mut solution_data = SolutionData {
+    let mut solution_data = OutputData {
         nonce,
         runtime_signature,
         fuel_consumed,

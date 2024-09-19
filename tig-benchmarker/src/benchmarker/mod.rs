@@ -279,7 +279,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
             })
             .collect(),
     };
-    let solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
+    let solutions_data = Arc::new(Mutex::new(Vec::<OutputData>::new()));
     let solutions_count = Arc::new(Mutex::new(0u32));
     update_status("Starting benchmark").await;
     run_benchmark::execute(
@@ -396,7 +396,7 @@ async fn run_once(num_workers: u32, ms_per_benchmark: u32) -> Result<()> {
     Ok(())
 }
 
-pub async fn drain_solutions(benchmark_id: &String, solutions_data: &mut Vec<SolutionData>) -> u32 {
+pub async fn drain_solutions(benchmark_id: &String, solutions_data: &mut Vec<OutputData>) -> u32 {
     let mut state = (*state()).lock().await;
     let QueryData {
         benchmarks, proofs, ..
@@ -407,7 +407,7 @@ pub async fn drain_solutions(benchmark_id: &String, solutions_data: &mut Vec<Sol
             x.extend(
                 solutions_data
                     .iter()
-                    .map(|x| SolutionMetaData::from(x.clone())),
+                    .map(|x| OutputMetaData::from(x.clone())),
             );
             benchmark.details.num_solutions = x.len() as u32;
         }

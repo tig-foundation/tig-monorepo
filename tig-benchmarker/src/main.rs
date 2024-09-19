@@ -109,7 +109,7 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
     let master_url = format!("http://{}:{}", master, port);
     let mut job: Option<Job> = None;
     let mut nonce_iters: Vec<Arc<Mutex<NonceIterator>>> = Vec::new();
-    let mut solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
+    let mut solutions_data = Arc::new(Mutex::new(Vec::<OutputData>::new()));
     let mut solutions_count = Arc::new(Mutex::new(0u32));
     let mut num_solutions = 0;
     loop {
@@ -129,7 +129,7 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
                 (*(*nonce_iter).lock().await).empty();
             }
             nonce_iters.clear();
-            solutions_data = Arc::new(Mutex::new(Vec::<SolutionData>::new()));
+            solutions_data = Arc::new(Mutex::new(Vec::<OutputData>::new()));
             solutions_count = Arc::new(Mutex::new(0u32));
             num_solutions = 0;
             if next_job
@@ -195,7 +195,7 @@ async fn slave_node(master: &String, port: u16, num_workers: u32) {
             let n = solutions_data.len();
             if n > 0 {
                 num_solutions += n as u32;
-                let data: Vec<SolutionData> = solutions_data.drain(..).collect();
+                let data: Vec<OutputData> = solutions_data.drain(..).collect();
                 println!("Posting {} solutions", n);
                 if let Err(e) = post::<String>(
                     &format!("{}/solutions_data/{}", master_url, job.benchmark_id),
@@ -264,7 +264,7 @@ async fn master_node(
             .and(warp::post())
             .and(warp::body::json())
             .and_then(
-                |benchmark_id: String, mut solutions_data: Vec<SolutionData>| async move {
+                |benchmark_id: String, mut solutions_data: Vec<OutputData>| async move {
                     benchmarker::drain_solutions(&benchmark_id, &mut solutions_data).await;
                     Ok::<_, warp::Rejection>(warp::reply::with_status(
                         "SolutionsData received",
