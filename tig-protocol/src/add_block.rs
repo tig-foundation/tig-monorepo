@@ -524,9 +524,10 @@ async fn confirm_mempool_precommits(block: &mut Block, cache: &mut AddBlockCache
             .state
             .as_mut()
             .unwrap();
-        *player_state.available_fee_balance.as_mut().unwrap() -= precommit.details.fee_paid;
-        *player_state.total_fees_paid.as_mut().unwrap() += precommit.details.fee_paid;
-        *block.details.fees_paid.as_mut().unwrap() += precommit.details.fee_paid;
+        let fee_paid = *precommit.details.fee_paid.as_ref().unwrap();
+        *player_state.available_fee_balance.as_mut().unwrap() -= fee_paid;
+        *player_state.total_fees_paid.as_mut().unwrap() += fee_paid;
+        *block.details.fees_paid.as_mut().unwrap() += fee_paid;
     }
 }
 
@@ -555,23 +556,24 @@ async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
         }
         let precommit = &cache.confirmed_precommits[&benchmark.id];
         let solution_nonces = benchmark.solution_nonces.as_ref().unwrap();
-        if precommit.details.num_nonces as usize > solution_nonces.len() {
-            if precommit.details.num_nonces as usize > solution_nonces.len() * 2 {
+        let num_nonces = *precommit.details.num_nonces.as_ref().unwrap() as usize;
+        if num_nonces > solution_nonces.len() {
+            if num_nonces > solution_nonces.len() * 2 {
                 // use rejection sampling
                 let stop_length = config
                     .benchmark_submissions
                     .max_samples
-                    .min(precommit.details.num_nonces as usize - solution_nonces.len())
+                    .min(num_nonces - solution_nonces.len())
                     + sampled_nonces.len();
                 while sampled_nonces.len() < stop_length {
-                    let nonce = rng.gen_range(0..precommit.details.num_nonces);
+                    let nonce = rng.gen_range(0..num_nonces as u64);
                     if sampled_nonces.contains(&nonce) || solution_nonces.contains(&nonce) {
                         continue;
                     }
                     sampled_nonces.push(nonce);
                 }
             } else {
-                let mut non_solution_nonces: Vec<u64> = (0..precommit.details.num_nonces)
+                let mut non_solution_nonces: Vec<u64> = (0..num_nonces as u64)
                     .filter(|n| !solution_nonces.contains(n))
                     .collect();
                 non_solution_nonces.shuffle(&mut rng);

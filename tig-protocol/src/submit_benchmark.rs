@@ -56,7 +56,7 @@ fn verify_benchmark_ownership(player: &Player, settings: &BenchmarkSettings) -> 
 #[time]
 fn verify_nonces(precommit: &Precommit, solution_nonces: &HashSet<u64>) -> ProtocolResult<()> {
     for n in solution_nonces.iter() {
-        if *n >= precommit.details.num_nonces {
+        if n >= precommit.details.num_nonces.as_ref().unwrap() {
             return Err(ProtocolError::InvalidBenchmarkNonce { nonce: *n });
         }
     }

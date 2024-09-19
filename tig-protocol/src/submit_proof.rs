@@ -114,7 +114,8 @@ fn verify_merkle_proofs(
     benchmark: &Benchmark,
     merkle_proofs: &Vec<MerkleProof>,
 ) -> ProtocolResult<()> {
-    let max_branch_len = (64 - (precommit.details.num_nonces - 1).leading_zeros()) as usize;
+    let max_branch_len =
+        (64 - (*precommit.details.num_nonces.as_ref().unwrap() - 1).leading_zeros()) as usize;
     let expected_merkle_root = benchmark.details.merkle_root.clone().unwrap();
     for merkle_proof in merkle_proofs.iter() {
         let branch = merkle_proof.branch.as_ref().unwrap();

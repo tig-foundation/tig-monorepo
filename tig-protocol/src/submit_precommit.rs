@@ -24,8 +24,8 @@ pub(crate) async fn execute<T: Context>(
             settings,
             PrecommitDetails {
                 block_started: block.details.height,
-                num_nonces,
-                fee_paid,
+                num_nonces: Some(num_nonces),
+                fee_paid: Some(fee_paid),
             },
         )
         .await
