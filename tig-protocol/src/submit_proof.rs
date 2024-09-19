@@ -16,10 +16,11 @@ pub(crate) async fn execute<T: Context>(
     let precommit = get_precommit_by_id(ctx, benchmark_id).await?;
     verify_benchmark_ownership(player, &precommit.settings)?;
     let benchmark = get_benchmark_by_id(ctx, benchmark_id).await?;
-    // FIXME flag as fraud
-    verify_merkle_proofs(&precommit, &benchmark, &merkle_proofs)?;
     verify_sampled_nonces(&benchmark, &merkle_proofs)?;
-    let verification_result = verify_solutions_are_valid(ctx, &precommit, &merkle_proofs).await;
+    let mut verification_result = verify_merkle_proofs(&precommit, &benchmark, &merkle_proofs);
+    if verification_result.is_ok() {
+        verification_result = verify_solutions_are_valid(ctx, &precommit, &merkle_proofs).await;
+    };
     ctx.add_proof_to_mempool(benchmark_id, merkle_proofs)
         .await
         .unwrap_or_else(|e| panic!("add_proof_to_mempool error: {:?}", e));
@@ -148,7 +149,7 @@ fn verify_sampled_nonces(
     benchmark: &Benchmark,
     merkle_proofs: &Vec<MerkleProof>,
 ) -> ProtocolResult<()> {
-    let sampled_nonces: HashSet<u64> = benchmark.state().sampled_nonces().iter().cloned().collect();
+    let sampled_nonces = benchmark.state().sampled_nonces().clone();
     let proof_nonces: HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
 
     if sampled_nonces != proof_nonces {
