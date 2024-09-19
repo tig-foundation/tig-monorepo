@@ -8,6 +8,7 @@ serializable_struct_with_getters! {
     ProtocolConfig {
         erc20: ERC20Config,
         benchmark_submissions: BenchmarkSubmissionsConfig,
+        precommit_submissions: PrecommitSubmissionsConfig,
         wasm_vm: WasmVMConfig,
         solution_signature: SolutionSignatureConfig,
         qualifiers: QualifiersConfig,
@@ -32,7 +33,15 @@ serializable_struct_with_getters! {
         submission_delay_multiplier: u32,
         max_samples: usize,
         lifespan_period: u32,
-        max_base_fee_percentage_delta: f64,
+    }
+}
+serializable_struct_with_getters! {
+    PrecommitSubmissionsConfig {
+        min_per_nonce_fee: PreciseNumber,
+        min_base_fee: PreciseNumber,
+        max_fee_percentage_delta: f64,
+        target_num_precommits: u32,
+        topup_amount: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {

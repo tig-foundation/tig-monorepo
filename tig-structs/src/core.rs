@@ -19,7 +19,7 @@ serializable_struct_with_getters! {
         id: String,
         details: BenchmarkDetails,
         state: Option<BenchmarkState>,
-        solution_idxs: Option<HashSet<u32>>,
+        solution_nonces: Option<HashSet<u64>>,
     }
 }
 serializable_struct_with_getters! {
@@ -42,12 +42,13 @@ serializable_struct_with_getters! {
     Player {
         id: String,
         details: PlayerDetails,
+        state: Option<PlayerState>,
         block_data: Option<PlayerBlockData>,
     }
 }
 serializable_struct_with_getters! {
     Precommit {
-        id: String,
+        benchmark_id: String,
         details: PrecommitDetails,
         settings: BenchmarkSettings,
         state: Option<PrecommitState>,
@@ -71,6 +72,13 @@ serializable_struct_with_getters! {
         benchmark_id: String,
         state: Option<FraudState>,
         allegation: Option<String>,
+    }
+}
+serializable_struct_with_getters! {
+    TopUp {
+        id: String,
+        details: TopUpDetails,
+        state: Option<TopUpState>,
     }
 }
 serializable_struct_with_getters! {
@@ -162,9 +170,11 @@ impl From<OutputData> for OutputMetaData {
 impl From<OutputMetaData> for MerkleHash {
     fn from(data: OutputMetaData) -> Self {
         let u64s = u64s_from_str(&jsonify(&data));
-        let mut hash = [0u8; 16];
-        hash.copy_from_slice(&u64s[0].to_le_bytes());
-        hash.copy_from_slice(&u64s[1].to_le_bytes());
+        let mut hash = [0u8; 32];
+        hash[0..8].copy_from_slice(&u64s[0].to_le_bytes());
+        hash[8..16].copy_from_slice(&u64s[1].to_le_bytes());
+        hash[16..24].copy_from_slice(&u64s[2].to_le_bytes());
+        hash[24..32].copy_from_slice(&u64s[3].to_le_bytes());
         MerkleHash(hash)
     }
 }
@@ -186,6 +196,7 @@ serializable_struct_with_getters! {
         mempool_precommit_ids: HashSet<String>,
         mempool_proof_ids: HashSet<String>,
         mempool_fraud_ids: HashSet<String>,
+        mempool_topup_ids: HashSet<String>,
         mempool_wasm_ids: HashSet<String>,
         active_challenge_ids: HashSet<String>,
         active_algorithm_ids: HashSet<String>,
@@ -216,6 +227,7 @@ serializable_struct_with_getters! {
         scaled_frontier: Option<Frontier>,
         scaling_factor: Option<f64>,
         base_fee: Option<PreciseNumber>,
+        per_nonce_fee: Option<PreciseNumber>,
     }
 }
 
@@ -224,6 +236,12 @@ serializable_struct_with_getters! {
     PlayerDetails {
         name: String,
         is_multisig: bool,
+    }
+}
+serializable_struct_with_getters! {
+    PlayerState {
+        total_fees_paid: Option<PreciseNumber>,
+        available_fee_balance: Option<PreciseNumber>,
     }
 }
 serializable_struct_with_getters! {
@@ -246,11 +264,13 @@ serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
         num_nonces: u64,
+        fee_paid: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
     PrecommitState {
         block_confirmed: Option<u32>,
+        rand_hash: Option<String>,
     }
 }
 
@@ -282,6 +302,20 @@ serializable_struct_with_getters! {
         block_confirmed: Option<u32>,
     }
 }
+
+// TopUp child structs
+serializable_struct_with_getters! {
+    TopUpDetails {
+        player_id: String,
+        amount: PreciseNumber,
+    }
+}
+serializable_struct_with_getters! {
+    TopUpState {
+        block_confirmed: Option<u32>,
+    }
+}
+
 // Wasm child structs
 serializable_struct_with_getters! {
     WasmDetails {
