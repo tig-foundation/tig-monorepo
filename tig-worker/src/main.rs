@@ -237,16 +237,13 @@ fn compute_batch(
         let tree = MerkleTree::new(hashes, batch_size as usize)?;
         let merkle_root = tree.calc_merkle_root();
 
-        let mut merkle_proofs = HashMap::new();
+        let mut merkle_proofs = Vec::new();
         for (nonce, output_data) in output_data_map {
             let branch = tree.calc_merkle_branch((nonce - start_nonce) as usize)?;
-            merkle_proofs.insert(
-                nonce,
-                MerkleProof {
-                    leaf: output_data,
-                    branch: Some(branch),
-                },
-            );
+            merkle_proofs.push(MerkleProof {
+                leaf: output_data,
+                branch: Some(branch),
+            });
         }
 
         let result = json!({

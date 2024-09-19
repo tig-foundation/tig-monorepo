@@ -47,7 +47,7 @@ impl TryFrom<Map<String, Value>> for Solution {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Challenge {
-    pub seeds: [u64; 8],
+    pub seeds: [u64; 4],
     pub difficulty: Difficulty,
     pub demands: Vec<i32>,
     pub distance_matrix: Vec<Vec<i32>>,
@@ -62,7 +62,7 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seeds: [u64; 8],
+        seeds: [u64; 4],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
@@ -71,7 +71,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         Self::generate_instance(seeds, difficulty)
     }
 
-    fn generate_instance(seeds: [u64; 8], difficulty: &Difficulty) -> Result<Challenge> {
+    fn generate_instance(seeds: [u64; 4], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rngs = RngArray::new(seeds);
 
         let num_nodes = difficulty.num_nodes;

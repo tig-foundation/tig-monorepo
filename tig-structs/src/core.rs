@@ -2,7 +2,7 @@ use crate::{config::ProtocolConfig, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
-use tig_utils::{jsonify, u64s_from_str};
+use tig_utils::{jsonify, u64s_from_str, u8s_from_str};
 pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transaction, U256};
 
 serializable_struct_with_getters! {
@@ -129,7 +129,7 @@ serializable_struct_with_getters! {
     }
 }
 impl BenchmarkSettings {
-    pub fn calc_seeds(&self, nonce: u64) -> [u64; 8] {
+    pub fn calc_seeds(&self, nonce: u64) -> [u64; 4] {
         let mut seeds = u64s_from_str(jsonify(&self).as_str());
         for seed in seeds.iter_mut() {
             *seed ^= nonce;
@@ -169,13 +169,7 @@ impl From<OutputData> for OutputMetaData {
 }
 impl From<OutputMetaData> for MerkleHash {
     fn from(data: OutputMetaData) -> Self {
-        let u64s = u64s_from_str(&jsonify(&data));
-        let mut hash = [0u8; 32];
-        hash[0..8].copy_from_slice(&u64s[0].to_le_bytes());
-        hash[8..16].copy_from_slice(&u64s[1].to_le_bytes());
-        hash[16..24].copy_from_slice(&u64s[2].to_le_bytes());
-        hash[24..32].copy_from_slice(&u64s[3].to_le_bytes());
-        MerkleHash(hash)
+        MerkleHash(u8s_from_str(&jsonify(&data)))
     }
 }
 

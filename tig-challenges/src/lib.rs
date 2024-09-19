@@ -19,30 +19,30 @@ where
     T: SolutionTrait,
     U: DifficultyTrait<N>,
 {
-    fn generate_instance(seeds: [u64; 8], difficulty: &U) -> Result<Self>;
-    fn generate_instance_from_str(seeds: [u64; 8], difficulty: &str) -> Result<Self> {
+    fn generate_instance(seeds: [u64; 4], difficulty: &U) -> Result<Self>;
+    fn generate_instance_from_str(seeds: [u64; 4], difficulty: &str) -> Result<Self> {
         Self::generate_instance(seeds, &serde_json::from_str(difficulty)?)
     }
-    fn generate_instance_from_vec(seeds: [u64; 8], difficulty: &Vec<i32>) -> Result<Self> {
+    fn generate_instance_from_vec(seeds: [u64; 4], difficulty: &Vec<i32>) -> Result<Self> {
         match difficulty.as_slice().try_into() {
             Ok(difficulty) => Self::generate_instance_from_arr(seeds, &difficulty),
             Err(_) => Err(anyhow!("Invalid difficulty length")),
         }
     }
-    fn generate_instance_from_arr(seeds: [u64; 8], difficulty: &[i32; N]) -> Result<Self> {
+    fn generate_instance_from_arr(seeds: [u64; 4], difficulty: &[i32; N]) -> Result<Self> {
         Self::generate_instance(seeds, &U::from_arr(difficulty))
     }
 
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seeds: [u64; 8],
+        seeds: [u64; 4],
         difficulty: &U,
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
     ) -> Result<Self>;
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance_from_str(
-        seeds: [u64; 8],
+        seeds: [u64; 4],
         difficulty: &str,
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
@@ -51,7 +51,7 @@ where
     }
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance_from_vec(
-        seeds: [u64; 8],
+        seeds: [u64; 4],
         difficulty: &Vec<i32>,
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
@@ -63,7 +63,7 @@ where
     }
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance_from_arr(
-        seeds: [u64; 8],
+        seeds: [u64; 4],
         difficulty: &[i32; N],
         dev: &Arc<CudaDevice>,
         funcs: HashMap<&'static str, CudaFunction>,
@@ -95,18 +95,18 @@ pub struct CudaKernel {
 }
 
 pub struct RngArray {
-    rngs: [SmallRng; 8],
+    rngs: [SmallRng; 4],
     index: usize,
 }
 
 impl RngArray {
-    pub fn new(seeds: [u64; 8]) -> Self {
+    pub fn new(seeds: [u64; 4]) -> Self {
         let rngs = seeds.map(SmallRng::seed_from_u64);
         RngArray { rngs, index: 0 }
     }
 
     pub fn get_mut(&mut self) -> &mut SmallRng {
-        self.index = (self.index + 1) % 8;
+        self.index = (self.index + 1) % 4;
         &mut self.rngs[self.index]
     }
 }
