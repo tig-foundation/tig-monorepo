@@ -2,7 +2,6 @@ use crate::{context::*, error::*};
 use logging_timer::time;
 use std::collections::HashSet;
 use tig_structs::core::*;
-use tig_utils::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(
@@ -36,8 +35,8 @@ async fn get_precommit_by_id<T: Context>(
     ctx.get_precommits(PrecommitsFilter::BenchmarkId(benchmark_id.clone()))
         .await
         .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
-        .first()
-        .map(|x| x.to_owned())
+        .pop()
+        .filter(|p| p.state.is_some())
         .ok_or_else(|| ProtocolError::InvalidPrecommit {
             benchmark_id: benchmark_id.clone(),
         })

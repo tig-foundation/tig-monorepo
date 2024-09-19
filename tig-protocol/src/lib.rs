@@ -5,6 +5,7 @@ mod submit_algorithm;
 mod submit_benchmark;
 mod submit_precommit;
 mod submit_proof;
+mod submit_topup;
 mod verify_proof;
 use context::*;
 pub use error::*;
@@ -53,6 +54,10 @@ impl<'a, T: Context> Protocol<T> {
         merkle_proofs: Vec<MerkleProof>,
     ) -> ProtocolResult<Result<(), String>> {
         submit_proof::execute(&self.ctx, player, benchmark_id, merkle_proofs).await
+    }
+
+    pub async fn submit_topup(&self, player: &Player, tx_hash: String) -> ProtocolResult<()> {
+        submit_topup::execute(&self.ctx, player, tx_hash).await
     }
 
     pub async fn verify_proof(&self, benchmark_id: &String) -> ProtocolResult<Result<(), String>> {

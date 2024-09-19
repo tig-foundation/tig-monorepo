@@ -1,6 +1,6 @@
 use crate::context::*;
 use logging_timer::time;
-use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
+use rand::{prelude::SliceRandom, rngs::StdRng, Rng, SeedableRng};
 use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 use tig_utils::*;
@@ -12,17 +12,18 @@ pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
     confirm_mempool_algorithms(&block, &mut cache).await;
     confirm_mempool_precommits(&block, &mut cache).await;
     confirm_mempool_benchmarks(&block, &mut cache).await;
-    confirm_mempool_proofs(ctx, &block, &mut cache).await;
+    confirm_mempool_proofs(&block, &mut cache).await;
     confirm_mempool_frauds(&block, &mut cache).await;
+    confirm_mempool_topups(&block, &mut cache).await;
     confirm_mempool_wasms(&block, &mut cache).await;
     update_deposits(ctx, &block, &mut cache).await;
     update_cutoffs(&block, &mut cache).await;
     update_qualifiers(&block, &mut cache).await;
     update_frontiers(&block, &mut cache).await;
     update_solution_signature_thresholds(&block, &mut cache).await;
-    update_base_fees(&block, &mut cache).await;
+    update_fees(&block, &mut cache).await;
     update_influence(&block, &mut cache).await;
-    update_adoption(&block, &mut cache).await;
+    update_adoption(&mut cache).await;
     update_innovator_rewards(&block, &mut cache).await;
     update_benchmarker_rewards(&block, &mut cache).await;
     update_merge_points(&block, &mut cache).await;
@@ -38,11 +39,14 @@ struct AddBlockCache {
     pub mempool_precommits: Vec<Precommit>,
     pub mempool_proofs: Vec<Proof>,
     pub mempool_frauds: Vec<Fraud>,
+    pub mempool_topups: Vec<TopUp>,
     pub mempool_wasms: Vec<Wasm>,
+    pub confirmed_precommits: HashMap<String, Precommit>,
     pub active_challenges: HashMap<String, Challenge>,
     pub active_algorithms: HashMap<String, Algorithm>,
     pub active_benchmarks: HashMap<String, Benchmark>,
     pub active_players: HashMap<String, Player>,
+    pub active_fee_players: HashMap<String, Player>,
     pub prev_challenges: HashMap<String, Challenge>,
     pub prev_algorithms: HashMap<String, Algorithm>,
     pub prev_players: HashMap<String, Player>,
@@ -57,6 +61,14 @@ async fn setup_cache<T: Context>(
     let from_block_started = details
         .height
         .saturating_sub(config.benchmark_submissions.lifespan_period);
+    let mut confirmed_precommits = HashMap::new();
+    for precommit in ctx
+        .get_precommits(PrecommitsFilter::Confirmed { from_block_started })
+        .await
+        .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
+    {
+        confirmed_precommits.insert(precommit.benchmark_id.clone(), precommit);
+    }
     let mut mempool_challenges = Vec::new();
     for mut challenge in ctx
         .get_challenges(ChallengesFilter::Mempool, None)
@@ -90,6 +102,9 @@ async fn setup_cache<T: Context>(
         .await
         .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
     {
+        if !confirmed_precommits.contains_key(&benchmark.id) {
+            continue;
+        }
         benchmark.state = Some(BenchmarkState {
             block_confirmed: None,
             sampled_nonces: None,
@@ -104,6 +119,7 @@ async fn setup_cache<T: Context>(
     {
         precommit.state = Some(PrecommitState {
             block_confirmed: None,
+            rand_hash: None,
         });
         mempool_precommits.push(precommit);
     }
@@ -113,6 +129,9 @@ async fn setup_cache<T: Context>(
         .await
         .unwrap_or_else(|e| panic!("mempool_proofs error: {:?}", e))
     {
+        if !confirmed_precommits.contains_key(&proof.benchmark_id) {
+            continue;
+        }
         proof.state = Some(ProofState {
             block_confirmed: None,
             submission_delay: None,
@@ -125,10 +144,24 @@ async fn setup_cache<T: Context>(
         .await
         .unwrap_or_else(|e| panic!("mempool_frauds error: {:?}", e))
     {
+        if !confirmed_precommits.contains_key(&fraud.benchmark_id) {
+            continue;
+        }
         fraud.state = Some(FraudState {
             block_confirmed: None,
         });
         mempool_frauds.push(fraud);
+    }
+    let mut mempool_topups = Vec::new();
+    for mut topup in ctx
+        .get_topups(TopUpsFilter::Mempool)
+        .await
+        .unwrap_or_else(|e| panic!("get_topups error: {:?}", e))
+    {
+        topup.state = Some(TopUpState {
+            block_confirmed: None,
+        });
+        mempool_topups.push(topup);
     }
     let mut mempool_wasms = Vec::new();
     for mut wasm in ctx
@@ -163,6 +196,7 @@ async fn setup_cache<T: Context>(
                 scaling_factor: None,
                 qualifier_difficulties: None,
                 base_fee: None,
+                per_nonce_fee: None,
             });
             active_challenges.insert(challenge.id.clone(), challenge);
         }
@@ -240,11 +274,9 @@ async fn setup_cache<T: Context>(
     }
     let mut active_players = HashMap::new();
     for benchmark in active_benchmarks.values() {
+        let settings = &confirmed_precommits[&benchmark.id].settings;
         let mut player = ctx
-            .get_players(
-                PlayersFilter::Id(benchmark.settings.player_id.clone()),
-                None,
-            )
+            .get_players(PlayersFilter::Id(settings.player_id.clone()), None)
             .await
             .unwrap()
             .pop()
@@ -262,6 +294,40 @@ async fn setup_cache<T: Context>(
             qualifying_percent_rolling_deposit: None,
         });
         active_players.insert(player.id.clone(), player);
+    }
+    let mut active_fee_players = HashMap::new();
+    for topup in mempool_topups.iter() {
+        let mut player = ctx
+            .get_players(PlayersFilter::Id(topup.details.player_id.clone()), None)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        if player.state.is_none() {
+            player.state = Some(PlayerState {
+                total_fees_paid: Some(PreciseNumber::from(0)),
+                available_fee_balance: Some(PreciseNumber::from(0)),
+            });
+        }
+        active_fee_players.insert(player.id.clone(), player);
+    }
+    for precommit in mempool_precommits.iter() {
+        let mut player = ctx
+            .get_players(
+                PlayersFilter::Id(precommit.settings.player_id.clone()),
+                None,
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        if player.state.is_none() {
+            player.state = Some(PlayerState {
+                total_fees_paid: Some(PreciseNumber::from(0)),
+                available_fee_balance: Some(PreciseNumber::from(0)),
+            });
+        }
+        active_fee_players.insert(player.id.clone(), player);
     }
     let mut prev_players = HashMap::<String, Player>::new();
     for player_id in active_players.keys() {
@@ -310,11 +376,14 @@ async fn setup_cache<T: Context>(
         mempool_precommits,
         mempool_proofs,
         mempool_frauds,
+        mempool_topups,
         mempool_wasms,
+        confirmed_precommits,
         active_challenges,
         active_algorithms,
         active_benchmarks,
         active_players,
+        active_fee_players,
         prev_challenges,
         prev_algorithms,
         prev_players,
@@ -362,11 +431,17 @@ async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
             .iter()
             .map(|f| f.benchmark_id.clone())
             .collect(),
+        mempool_precommit_ids: cache
+            .mempool_precommits
+            .iter()
+            .map(|p| p.benchmark_id.clone())
+            .collect(),
         mempool_proof_ids: cache
             .mempool_proofs
             .iter()
             .map(|p| p.benchmark_id.clone())
             .collect(),
+        mempool_topup_ids: cache.mempool_topups.iter().map(|t| t.id.clone()).collect(),
         mempool_wasm_ids: cache
             .mempool_wasms
             .iter()
@@ -413,28 +488,77 @@ async fn confirm_mempool_algorithms(block: &Block, cache: &mut AddBlockCache) {
 
 #[time]
 async fn confirm_mempool_precommits(block: &Block, cache: &mut AddBlockCache) {
-    let config = block.config();
-    // FIXME
+    for precommit in cache.mempool_precommits.iter_mut() {
+        let state = precommit.state.as_mut().unwrap();
+        state.block_confirmed = Some(block.details.height);
+        state.rand_hash = Some(block.id.clone());
+
+        let player_state = cache
+            .active_fee_players
+            .get_mut(&precommit.settings.player_id)
+            .unwrap()
+            .state
+            .as_mut()
+            .unwrap();
+        *player_state.available_fee_balance.as_mut().unwrap() -= precommit.details.fee_paid;
+        *player_state.total_fees_paid.as_mut().unwrap() += precommit.details.fee_paid;
+    }
 }
 
 #[time]
 async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
-
-    // FIXME sample solutions and non-solutions
     for benchmark in cache.mempool_benchmarks.iter_mut() {
-        let seed = u32_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str());
-        let mut rng = StdRng::seed_from_u64(seed as u64);
-        let sampled_nonces = {
-            let solutions_meta_data = benchmark.solutions_meta_data.as_ref().unwrap();
-            let mut indexes: Vec<usize> = (0..solutions_meta_data.len()).collect();
-            indexes.shuffle(&mut rng);
-            indexes
-                .into_iter()
-                .take(config.benchmark_submissions.max_samples)
-                .map(|i| solutions_meta_data[i].nonce)
-                .collect()
-        };
+        let seed = u64s_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str())[0];
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut sampled_nonces = Vec::new();
+        let mut solution_nonces = benchmark
+            .solution_nonces
+            .as_ref()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<u64>>();
+        if solution_nonces.len() > 0 {
+            solution_nonces.shuffle(&mut rng);
+            sampled_nonces.extend(
+                solution_nonces
+                    .iter()
+                    .take(config.benchmark_submissions.max_samples)
+                    .cloned(),
+            );
+        }
+        let precommit = &cache.confirmed_precommits[&benchmark.id];
+        let solution_nonces = benchmark.solution_nonces.as_ref().unwrap();
+        if precommit.details.num_nonces as usize > solution_nonces.len() {
+            if precommit.details.num_nonces as usize > solution_nonces.len() * 2 {
+                // use rejection sampling
+                let stop_length = config
+                    .benchmark_submissions
+                    .max_samples
+                    .min(precommit.details.num_nonces as usize - solution_nonces.len())
+                    + sampled_nonces.len();
+                while sampled_nonces.len() < stop_length {
+                    let nonce = rng.gen_range(0..precommit.details.num_nonces);
+                    if sampled_nonces.contains(&nonce) || solution_nonces.contains(&nonce) {
+                        continue;
+                    }
+                    sampled_nonces.push(nonce);
+                }
+            } else {
+                let mut non_solution_nonces: Vec<u64> = (0..precommit.details.num_nonces)
+                    .filter(|n| !solution_nonces.contains(n))
+                    .collect();
+                non_solution_nonces.shuffle(&mut rng);
+                sampled_nonces.extend(
+                    non_solution_nonces
+                        .iter()
+                        .take(config.benchmark_submissions.max_samples)
+                        .cloned(),
+                );
+            }
+        }
+
         let state = benchmark.state.as_mut().unwrap();
         state.sampled_nonces = Some(sampled_nonces);
         state.block_confirmed = Some(block.details.height);
@@ -442,17 +566,12 @@ async fn confirm_mempool_benchmarks(block: &Block, cache: &mut AddBlockCache) {
 }
 
 #[time]
-async fn confirm_mempool_proofs<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlockCache) {
+async fn confirm_mempool_proofs(block: &Block, cache: &mut AddBlockCache) {
     for proof in cache.mempool_proofs.iter_mut() {
-        let benchmark = ctx
-            .get_benchmarks(BenchmarksFilter::Id(proof.benchmark_id.clone()), false)
-            .await
-            .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
-            .pop()
-            .unwrap();
+        let precommit = &cache.confirmed_precommits[&proof.benchmark_id];
         let state = proof.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
-        state.submission_delay = Some(block.details.height - benchmark.details.block_started);
+        state.submission_delay = Some(block.details.height - precommit.details.block_started);
     }
 }
 
@@ -462,6 +581,23 @@ async fn confirm_mempool_frauds(block: &Block, cache: &mut AddBlockCache) {
     for fraud in cache.mempool_frauds.iter_mut() {
         let state = fraud.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
+    }
+}
+
+#[time]
+async fn confirm_mempool_topups(block: &Block, cache: &mut AddBlockCache) {
+    for topup in cache.mempool_topups.iter_mut() {
+        let state = topup.state.as_mut().unwrap();
+        state.block_confirmed = Some(block.details.height);
+
+        let player_state = cache
+            .active_fee_players
+            .get_mut(&topup.details.player_id)
+            .unwrap()
+            .state
+            .as_mut()
+            .unwrap();
+        *player_state.available_fee_balance.as_mut().unwrap() += topup.details.amount;
     }
 }
 
@@ -522,10 +658,11 @@ async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark in cache.active_benchmarks.values() {
+        let settings = &cache.confirmed_precommits[&benchmark.id].settings;
         *num_solutions_by_player_by_challenge
-            .entry(benchmark.settings.player_id.clone())
+            .entry(settings.player_id.clone())
             .or_default()
-            .entry(benchmark.settings.challenge_id.clone())
+            .entry(settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
     }
 
@@ -578,16 +715,17 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     let mut new_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark in cache.active_benchmarks.values() {
+        let settings = &cache.confirmed_precommits[&benchmark.id].settings;
         *num_solutions_by_player_by_challenge
-            .entry(benchmark.settings.player_id.clone())
+            .entry(settings.player_id.clone())
             .or_default()
-            .entry(benchmark.settings.challenge_id.clone())
+            .entry(settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
         if mempool_proof_ids.contains(&benchmark.id) {
             *new_solutions_by_player_by_challenge
-                .entry(benchmark.settings.player_id.clone())
+                .entry(settings.player_id.clone())
                 .or_default()
-                .entry(benchmark.settings.challenge_id.clone())
+                .entry(settings.challenge_id.clone())
                 .or_default() += benchmark.details.num_solutions;
         }
     }
@@ -638,8 +776,54 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
 }
 
 #[time]
-async fn update_base_fees(block: &Block, cache: &mut AddBlockCache) {
-    // FIXME
+async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
+    let config = block.config();
+    let num_precommits_by_challenge = cache.mempool_precommits.iter().fold(
+        HashMap::<String, u32>::new(),
+        |mut map, precommit| {
+            *map.entry(precommit.settings.challenge_id.clone())
+                .or_default() += 1;
+            map
+        },
+    );
+    let target_num_precommits =
+        PreciseNumber::from(config.precommit_submissions.target_num_precommits);
+    let max_fee_percent_delta =
+        PreciseNumber::from_f64(config.precommit_submissions.max_fee_percentage_delta);
+    let one = PreciseNumber::from(1);
+    let zero = PreciseNumber::from(0);
+    for challenge in cache.active_challenges.values_mut() {
+        let num_precommits = PreciseNumber::from(
+            num_precommits_by_challenge
+                .get(&challenge.id)
+                .unwrap_or(&0)
+                .clone(),
+        );
+        let mut percent_delta = num_precommits / target_num_precommits;
+        if num_precommits >= target_num_precommits {
+            percent_delta = percent_delta - one;
+        } else {
+            percent_delta = one - percent_delta;
+        }
+        if percent_delta > max_fee_percent_delta {
+            percent_delta = max_fee_percent_delta;
+        }
+        let current_base_fee = match &cache.prev_challenges.get(&challenge.id).unwrap().block_data {
+            Some(data) => *data.base_fee(),
+            None => zero.clone(),
+        };
+        let mut base_fee = if num_precommits >= target_num_precommits {
+            current_base_fee * (one + percent_delta)
+        } else {
+            current_base_fee * (one - percent_delta)
+        };
+        if base_fee < config.precommit_submissions.min_base_fee {
+            base_fee = config.precommit_submissions.min_base_fee;
+        }
+        let block_data = challenge.block_data.as_mut().unwrap();
+        block_data.base_fee = Some(base_fee);
+        block_data.per_nonce_fee = Some(config.precommit_submissions.min_per_nonce_fee);
+    }
 }
 
 fn find_smallest_range_dimension(points: &Frontier) -> usize {
@@ -696,8 +880,9 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
 
     let mut benchmarks_by_challenge = HashMap::<String, Vec<&Benchmark>>::new();
     for benchmark in cache.active_benchmarks.values() {
+        let settings = &cache.confirmed_precommits[&benchmark.id].settings;
         benchmarks_by_challenge
-            .entry(benchmark.settings.challenge_id.clone())
+            .entry(settings.challenge_id.clone())
             .or_default()
             .push(benchmark);
     }
@@ -725,7 +910,12 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
         let benchmarks = benchmarks_by_challenge.get_mut(challenge_id).unwrap();
         let points = benchmarks
             .iter()
-            .map(|b| b.settings.difficulty.clone())
+            .map(|b| {
+                cache.confirmed_precommits[&b.id]
+                    .settings
+                    .difficulty
+                    .clone()
+            })
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
         for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() {
@@ -734,8 +924,10 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
             }
         }
         benchmarks.sort_by(|a, b| {
-            let a_index = frontier_indexes[&a.settings.difficulty];
-            let b_index = frontier_indexes[&b.settings.difficulty];
+            let a_settings = &cache.confirmed_precommits[&a.id].settings;
+            let b_settings = &cache.confirmed_precommits[&b.id].settings;
+            let a_index = frontier_indexes[&a_settings.difficulty];
+            let b_index = frontier_indexes[&b_settings.difficulty];
             a_index.cmp(&b_index)
         });
 
@@ -749,7 +941,7 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
                 challenge_id,
                 difficulty,
                 ..
-            } = &benchmark.settings;
+            } = &cache.confirmed_precommits[&benchmark.id].settings;
 
             if curr_frontier_index != frontier_indexes[difficulty]
                 && *challenge_data.num_qualifiers() > config.qualifiers.total_qualifiers_threshold
@@ -974,7 +1166,7 @@ async fn update_influence(block: &Block, cache: &mut AddBlockCache) {
 }
 
 #[time]
-async fn update_adoption(block: &Block, cache: &mut AddBlockCache) {
+async fn update_adoption(cache: &mut AddBlockCache) {
     let mut algorithms_by_challenge = HashMap::<String, Vec<&mut Algorithm>>::new();
     for algorithm in cache.active_algorithms.values_mut() {
         algorithms_by_challenge
@@ -1142,6 +1334,11 @@ async fn update_merges(block: &Block, cache: &mut AddBlockCache) {
 
 #[time]
 async fn commit_changes<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlockCache) {
+    for precommit in cache.mempool_precommits.drain(..) {
+        ctx.update_precommit_state(&precommit.benchmark_id, precommit.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_precommit_state error: {:?}", e));
+    }
     for algorithm in cache.mempool_algorithms.drain(..) {
         ctx.update_algorithm_state(&algorithm.id, algorithm.state.unwrap())
             .await
@@ -1171,6 +1368,11 @@ async fn commit_changes<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlock
         ctx.update_wasm_state(&wasm.algorithm_id, wasm.state.unwrap())
             .await
             .unwrap_or_else(|e| panic!("update_wasm_state error: {:?}", e));
+    }
+    for (player_id, player) in cache.active_fee_players.drain() {
+        ctx.update_player_state(&player_id, player.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_player_state error: {:?}", e));
     }
     for (_, algorithm) in cache.active_algorithms.drain() {
         let state = algorithm.state.unwrap();

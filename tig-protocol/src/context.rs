@@ -66,6 +66,13 @@ pub enum ProofsFilter {
     Confirmed { from_block_started: u32 },
 }
 #[derive(Debug, Clone, PartialEq)]
+pub enum TopUpsFilter {
+    TopUpId(String),
+    PlayerId(String),
+    Mempool,
+    Confirmed,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum WasmsFilter {
     AlgorithmId(String),
     Mempool,
@@ -111,6 +118,7 @@ pub trait Context {
         filter: ProofsFilter,
         include_data: bool,
     ) -> ContextResult<Vec<Proof>>;
+    async fn get_topups(&self, filter: TopUpsFilter) -> ContextResult<Vec<TopUp>>;
     async fn get_wasms(&self, filter: WasmsFilter, include_data: bool) -> ContextResult<Vec<Wasm>>;
     async fn verify_solution(
         &self,
@@ -150,7 +158,7 @@ pub trait Context {
         &self,
         benchmark_id: &String,
         details: BenchmarkDetails,
-        solution_idxs: HashSet<u64>,
+        solution_nonces: HashSet<u64>,
     ) -> ContextResult<()>;
     async fn add_precommit_to_mempool(
         &self,
@@ -166,6 +174,11 @@ pub trait Context {
         &self,
         benchmark_id: &String,
         allegation: String,
+    ) -> ContextResult<()>;
+    async fn add_topup_to_mempool(
+        &self,
+        topup_id: &String,
+        details: TopUpDetails,
     ) -> ContextResult<()>;
     async fn add_wasm_to_mempool(
         &self,
@@ -202,6 +215,16 @@ pub trait Context {
         benchmark_id: &String,
         state: BenchmarkState,
     ) -> ContextResult<()>;
+    async fn update_player_state(
+        &self,
+        player_id: &String,
+        state: PlayerState,
+    ) -> ContextResult<()>;
+    async fn update_precommit_state(
+        &self,
+        benchmark_id: &String,
+        state: PrecommitState,
+    ) -> ContextResult<()>;
     async fn update_proof_state(
         &self,
         benchmark_id: &String,
@@ -212,6 +235,7 @@ pub trait Context {
         benchmark_id: &String,
         state: FraudState,
     ) -> ContextResult<()>;
+    async fn update_topup_state(&self, topup_id: &String, state: TopUpState) -> ContextResult<()>;
     async fn update_player_block_data(
         &self,
         player_id: &String,

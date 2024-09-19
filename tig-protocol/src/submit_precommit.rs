@@ -11,19 +11,21 @@ pub(crate) async fn execute<T: Context>(
     num_nonces: u64,
 ) -> ProtocolResult<String> {
     verify_player_owns_benchmark(player, &settings)?;
+    verify_num_nonces(num_nonces)?;
     let block = get_block_by_id(ctx, &settings.block_id).await?;
     verify_sufficient_lifespan(ctx, &block).await?;
     let challenge = get_challenge_by_id(ctx, &settings.challenge_id, &block).await?;
     verify_algorithm(ctx, &settings.algorithm_id, &block).await?;
     verify_benchmark_settings_are_unique(ctx, &settings).await?;
     verify_benchmark_difficulty(&settings.difficulty, &challenge, &block)?;
-    // FIXME verify base_fee
+    let fee_paid = get_fee_paid(&player, num_nonces, &challenge)?;
     let benchmark_id = ctx
         .add_precommit_to_mempool(
             settings,
             PrecommitDetails {
                 block_started: block.details.height,
                 num_nonces,
+                fee_paid,
             },
         )
         .await
@@ -41,6 +43,14 @@ fn verify_player_owns_benchmark(
             actual_player_id: player.id.clone(),
             expected_player_id: settings.player_id.clone(),
         });
+    }
+    Ok(())
+}
+
+#[time]
+fn verify_num_nonces(num_nonces: u64) -> ProtocolResult<()> {
+    if num_nonces == 0 {
+        return Err(ProtocolError::InvalidNumNonces { num_nonces });
     }
     Ok(())
 }
@@ -98,8 +108,8 @@ async fn verify_algorithm<T: Context>(
         .get_algorithms(AlgorithmsFilter::Id(algorithm_id.clone()), None, false)
         .await
         .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
-        .first()
-        .is_some()
+        .pop()
+        .is_some_and(|a| a.state.is_some())
     {
         return Err(ProtocolError::InvalidAlgorithm {
             algorithm_id: algorithm_id.clone(),
@@ -192,4 +202,26 @@ fn verify_benchmark_difficulty(
     }
 
     Ok(())
+}
+
+#[time]
+fn get_fee_paid(
+    player: &Player,
+    num_nonces: u64,
+    challenge: &Challenge,
+) -> ProtocolResult<PreciseNumber> {
+    let num_nonces = PreciseNumber::from(num_nonces);
+    let fee_paid = challenge.block_data().base_fee().clone()
+        + challenge.block_data().per_nonce_fee().clone() * num_nonces;
+    if !player
+        .state
+        .as_ref()
+        .is_some_and(|s| *s.available_fee_balance.as_ref().unwrap() >= fee_paid)
+    {
+        return Err(ProtocolError::InsufficientFeeBalance {
+            fee_paid,
+            available_fee_balance: player.state().available_fee_balance().clone(),
+        });
+    }
+    Ok(fee_paid)
 }
