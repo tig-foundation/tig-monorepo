@@ -109,16 +109,17 @@ pub fn compute_solution(
     // Get runtime signature
     let runtime_signature = store.get_runtime_signature();
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
-    let mut solution_data = OutputData {
+    let solution_data = OutputData {
         nonce,
         runtime_signature,
         fuel_consumed,
-        solution: Solution::new(),
+        solution: match serialized_solution {
+            Some(serialized_solution) => {
+                decompress_obj(&serialized_solution).expect("Failed to decompress solution")
+            }
+            None => Solution::new(),
+        },
     };
-    if let Some(serialized_solution) = serialized_solution {
-        solution_data.solution =
-            decompress_obj(&serialized_solution).expect("Failed to decompress solution");
-    }
     Ok((solution_data, err_msg))
 }
 
