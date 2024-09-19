@@ -7,7 +7,9 @@ use tig_structs::{config::*, core::*};
 pub enum SubmissionType {
     Algorithm,
     Benchmark,
+    Precommit,
     Proof,
+    TopUp,
 }
 
 #[derive(Debug, Clone, PartialEq)]
