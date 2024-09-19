@@ -7,10 +7,10 @@ use tig_utils::*;
 
 #[time]
 pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
-    let (block, mut cache) = create_block(ctx).await;
+    let (mut block, mut cache) = create_block(ctx).await;
     confirm_mempool_challenges(&block, &mut cache).await;
     confirm_mempool_algorithms(&block, &mut cache).await;
-    confirm_mempool_precommits(&block, &mut cache).await;
+    confirm_mempool_precommits(&mut block, &mut cache).await;
     confirm_mempool_benchmarks(&block, &mut cache).await;
     confirm_mempool_proofs(&block, &mut cache).await;
     confirm_mempool_frauds(&block, &mut cache).await;
@@ -402,47 +402,72 @@ async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
         .await
         .unwrap_or_else(|e| panic!("get_config error: {:?}", e));
     let height = latest_block.details.height + 1;
-    let details = BlockDetails {
+    let mut details = BlockDetails {
         prev_block_id: latest_block.id.clone(),
         height,
         round: height / config.rounds.blocks_per_round + 1,
         eth_block_num: Some(ctx.get_latest_eth_block_num().await.unwrap()),
+        fees_paid: Some(PreciseNumber::from(0)),
+        num_confirmed_challenges: None,
+        num_confirmed_algorithms: None,
+        num_confirmed_benchmarks: None,
+        num_confirmed_precommits: None,
+        num_confirmed_proofs: None,
+        num_confirmed_frauds: None,
+        num_confirmed_topups: None,
+        num_confirmed_wasms: None,
+        num_active_challenges: None,
+        num_active_algorithms: None,
+        num_active_benchmarks: None,
+        num_active_players: None,
     };
     let cache = setup_cache(ctx, &details, &config).await;
+    details.num_confirmed_challenges = Some(cache.mempool_challenges.len() as u32);
+    details.num_confirmed_algorithms = Some(cache.mempool_algorithms.len() as u32);
+    details.num_confirmed_benchmarks = Some(cache.mempool_benchmarks.len() as u32);
+    details.num_confirmed_precommits = Some(cache.mempool_precommits.len() as u32);
+    details.num_confirmed_proofs = Some(cache.mempool_proofs.len() as u32);
+    details.num_confirmed_frauds = Some(cache.mempool_frauds.len() as u32);
+    details.num_confirmed_topups = Some(cache.mempool_topups.len() as u32);
+    details.num_confirmed_wasms = Some(cache.mempool_wasms.len() as u32);
+    details.num_active_challenges = Some(cache.active_challenges.len() as u32);
+    details.num_active_algorithms = Some(cache.active_algorithms.len() as u32);
+    details.num_active_benchmarks = Some(cache.active_benchmarks.len() as u32);
+    details.num_active_players = Some(cache.active_players.len() as u32);
 
     let data = BlockData {
-        mempool_challenge_ids: cache
+        confirmed_challenge_ids: cache
             .mempool_challenges
             .iter()
             .map(|c| c.id.clone())
             .collect(),
-        mempool_algorithm_ids: cache
+        confirmed_algorithm_ids: cache
             .mempool_algorithms
             .iter()
             .map(|a| a.id.clone())
             .collect(),
-        mempool_benchmark_ids: cache
+        confirmed_benchmark_ids: cache
             .mempool_benchmarks
             .iter()
             .map(|b| b.id.clone())
             .collect(),
-        mempool_fraud_ids: cache
+        confirmed_fraud_ids: cache
             .mempool_frauds
             .iter()
             .map(|f| f.benchmark_id.clone())
             .collect(),
-        mempool_precommit_ids: cache
+        confirmed_precommit_ids: cache
             .mempool_precommits
             .iter()
             .map(|p| p.benchmark_id.clone())
             .collect(),
-        mempool_proof_ids: cache
+        confirmed_proof_ids: cache
             .mempool_proofs
             .iter()
             .map(|p| p.benchmark_id.clone())
             .collect(),
-        mempool_topup_ids: cache.mempool_topups.iter().map(|t| t.id.clone()).collect(),
-        mempool_wasm_ids: cache
+        confirmed_topup_ids: cache.mempool_topups.iter().map(|t| t.id.clone()).collect(),
+        confirmed_wasm_ids: cache
             .mempool_wasms
             .iter()
             .map(|w| w.algorithm_id.clone())
@@ -487,7 +512,7 @@ async fn confirm_mempool_algorithms(block: &Block, cache: &mut AddBlockCache) {
 }
 
 #[time]
-async fn confirm_mempool_precommits(block: &Block, cache: &mut AddBlockCache) {
+async fn confirm_mempool_precommits(block: &mut Block, cache: &mut AddBlockCache) {
     for precommit in cache.mempool_precommits.iter_mut() {
         let state = precommit.state.as_mut().unwrap();
         state.block_confirmed = Some(block.details.height);
@@ -502,6 +527,7 @@ async fn confirm_mempool_precommits(block: &Block, cache: &mut AddBlockCache) {
             .unwrap();
         *player_state.available_fee_balance.as_mut().unwrap() -= precommit.details.fee_paid;
         *player_state.total_fees_paid.as_mut().unwrap() += precommit.details.fee_paid;
+        *block.details.fees_paid.as_mut().unwrap() += precommit.details.fee_paid;
     }
 }
 
@@ -711,7 +737,7 @@ async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
 async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
-    let mempool_proof_ids = &block.data().mempool_proof_ids;
+    let confirmed_proof_ids = &block.data().confirmed_proof_ids;
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     let mut new_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for benchmark in cache.active_benchmarks.values() {
@@ -721,7 +747,7 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
             .or_default()
             .entry(settings.challenge_id.clone())
             .or_default() += benchmark.details.num_solutions;
-        if mempool_proof_ids.contains(&benchmark.id) {
+        if confirmed_proof_ids.contains(&benchmark.id) {
             *new_solutions_by_player_by_challenge
                 .entry(settings.player_id.clone())
                 .or_default()
