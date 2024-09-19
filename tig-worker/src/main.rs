@@ -87,9 +87,12 @@ fn compute_solution(
     });
 
     match worker::compute_solution(&settings, nonce, wasm.as_slice(), max_memory, max_fuel) {
-        Ok(Some(solution_data)) => {
+        Ok((solution_data, err_msg)) => {
             println!("{}", jsonify(&solution_data));
-            if solution_data.solution.len() == 0 {
+            if let Some(err_msg) = err_msg {
+                eprintln!("Runtime error: {}", err_msg);
+                std::process::exit(1);
+            } else if solution_data.solution.len() == 0 {
                 eprintln!("No solution found");
                 std::process::exit(1);
             }
@@ -102,10 +105,6 @@ fn compute_solution(
                     std::process::exit(1);
                 }
             }
-        }
-        Ok(None) => {
-            eprintln!("No solution found");
-            std::process::exit(1);
         }
         Err(e) => {
             eprintln!("Error: {}", e);

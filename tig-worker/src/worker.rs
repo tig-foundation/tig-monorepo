@@ -11,7 +11,7 @@ pub fn compute_solution(
     wasm: &[u8],
     max_memory: u64,
     max_fuel: u64,
-) -> Result<Option<OutputData>> {
+) -> Result<(OutputData, Option<String>)> {
     let seeds = settings.calc_seeds(nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
         "c001" => {
@@ -81,40 +81,45 @@ pub fn compute_solution(
     memory
         .write(&mut store, challenge_ptr as usize, &serialized_challenge)
         .expect("Failed to write serialized challenge to `memory`");
-    let solution_ptr = entry_point
+
+    let (serialized_solution, err_msg) = match entry_point
         .call(&mut store, (challenge_ptr, challenge_len))
-        .map_err(|e| anyhow!("Failed to call function: {:?}", e))?;
+        .map_err(|e| anyhow!("Failed to call function: {:?}", e))
+    {
+        Ok(solution_ptr) => {
+            // Read solution from memory
+            let mut solution_len_bytes = [0u8; 4];
+            memory
+                .read(&store, solution_ptr as usize, &mut solution_len_bytes)
+                .expect("Failed to read solution length from memory");
+            let solution_len = u32::from_le_bytes(solution_len_bytes);
+            let mut serialized_solution = vec![0u8; solution_len as usize];
+            memory
+                .read(
+                    &store,
+                    (solution_ptr + 4) as usize,
+                    &mut serialized_solution,
+                )
+                .expect("Failed to read solution from memory");
+            (Some(serialized_solution), None)
+        }
+        Err(e) => (None, Some(e.to_string())),
+    };
 
     // Get runtime signature
-    // FIXME read runtime signature on execution error
-    let runtime_signature_u64 = store.get_runtime_signature();
-    let runtime_signature = (runtime_signature_u64 as u32) ^ ((runtime_signature_u64 >> 32) as u32);
+    let runtime_signature = store.get_runtime_signature();
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
-    // Read solution from memory
-    let mut solution_len_bytes = [0u8; 4];
-    memory
-        .read(&store, solution_ptr as usize, &mut solution_len_bytes)
-        .expect("Failed to read solution length from memory");
-    let solution_len = u32::from_le_bytes(solution_len_bytes);
-    let mut serialized_solution = vec![0u8; solution_len as usize];
-    memory
-        .read(
-            &store,
-            (solution_ptr + 4) as usize,
-            &mut serialized_solution,
-        )
-        .expect("Failed to read solution from memory");
     let mut solution_data = OutputData {
         nonce,
         runtime_signature,
         fuel_consumed,
         solution: Solution::new(),
     };
-    if solution_len != 0 {
+    if let Some(serialized_solution) = serialized_solution {
         solution_data.solution =
             decompress_obj(&serialized_solution).expect("Failed to decompress solution");
     }
-    Ok(Some(solution_data))
+    Ok((solution_data, err_msg))
 }
 
 pub fn verify_solution(
