@@ -7,12 +7,13 @@ use wasmi::{Config, Engine, Linker, Module, Store, StoreLimitsBuilder};
 
 pub fn compute_solution(
     settings: &BenchmarkSettings,
+    rand_hash: &String,
     nonce: u64,
     wasm: &[u8],
     max_memory: u64,
     max_fuel: u64,
 ) -> Result<(OutputData, Option<String>)> {
-    let seed = settings.calc_seed(nonce);
+    let seed = settings.calc_seed(rand_hash, nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
@@ -125,10 +126,11 @@ pub fn compute_solution(
 
 pub fn verify_solution(
     settings: &BenchmarkSettings,
+    rand_hash: &String,
     nonce: u64,
     solution: &Solution,
 ) -> Result<()> {
-    let seed = settings.calc_seed(nonce);
+    let seed = settings.calc_seed(rand_hash, nonce);
     match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =

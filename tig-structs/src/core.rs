@@ -129,8 +129,8 @@ serializable_struct_with_getters! {
     }
 }
 impl BenchmarkSettings {
-    pub fn calc_seed(&self, nonce: u64) -> [u8; 32] {
-        u8s_from_str(&format!("{}_{}", jsonify(&self), nonce))
+    pub fn calc_seed(&self, rand_hash: &String, nonce: u64) -> [u8; 32] {
+        u8s_from_str(&format!("{}_{}_{}", jsonify(&self), rand_hash, nonce))
     }
 }
 serializable_struct_with_getters! {

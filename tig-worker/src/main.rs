@@ -19,6 +19,10 @@ fn cli() -> Command {
                     arg!(<SETTINGS> "Settings json string or path to json file")
                         .value_parser(clap::value_parser!(String)),
                 )
+                .arg(
+                    arg!(<RAND_HASH> "A string used in seed generation")
+                        .value_parser(clap::value_parser!(String)),
+                )
                 .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
                 .arg(arg!(<WASM> "Path to a wasm file").value_parser(clap::value_parser!(PathBuf)))
                 .arg(
@@ -39,6 +43,10 @@ fn cli() -> Command {
                     arg!(<SETTINGS> "Settings json string or path to json file")
                         .value_parser(clap::value_parser!(String)),
                 )
+                .arg(
+                    arg!(<RAND_HASH> "A string used in seed generation")
+                        .value_parser(clap::value_parser!(String)),
+                )
                 .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
                 .arg(
                     arg!(<SOLUTION> "Solution json string or path to json file")
@@ -50,6 +58,10 @@ fn cli() -> Command {
                 .about("Computes batch of nonces and generates Merkle proofs")
                 .arg(
                     arg!(<SETTINGS> "Settings json string or path to json file")
+                        .value_parser(clap::value_parser!(String)),
+                )
+                .arg(
+                    arg!(<RAND_HASH> "A string used in seed generation")
                         .value_parser(clap::value_parser!(String)),
                 )
                 .arg(arg!(<START_NONCE> "Starting nonce").value_parser(clap::value_parser!(u64)))
@@ -91,6 +103,7 @@ fn main() {
     if let Err(e) = match matches.subcommand() {
         Some(("compute_solution", sub_m)) => compute_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
+            sub_m.get_one::<String>("RAND_HASH").unwrap().clone(),
             *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u64>("mem").unwrap(),
@@ -98,12 +111,14 @@ fn main() {
         ),
         Some(("verify_solution", sub_m)) => verify_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
+            sub_m.get_one::<String>("RAND_HASH").unwrap().clone(),
             *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<String>("SOLUTION").unwrap().clone(),
         ),
 
         Some(("compute_batch", sub_m)) => compute_batch(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
+            sub_m.get_one::<String>("RAND_HASH").unwrap().clone(),
             *sub_m.get_one::<u64>("START_NONCE").unwrap(),
             *sub_m.get_one::<u64>("NUM_NONCES").unwrap(),
             *sub_m.get_one::<u64>("BATCH_SIZE").unwrap(),
@@ -125,6 +140,7 @@ fn main() {
 
 fn compute_solution(
     settings: String,
+    rand_hash: String,
     nonce: u64,
     wasm_path: PathBuf,
     max_memory: u64,
@@ -133,23 +149,34 @@ fn compute_solution(
     let settings = load_settings(&settings);
     let wasm = load_wasm(&wasm_path);
 
-    let (output_data, err_msg) =
-        worker::compute_solution(&settings, nonce, wasm.as_slice(), max_memory, max_fuel)?;
+    let (output_data, err_msg) = worker::compute_solution(
+        &settings,
+        &rand_hash,
+        nonce,
+        wasm.as_slice(),
+        max_memory,
+        max_fuel,
+    )?;
     println!("{}", jsonify(&output_data));
     if let Some(err_msg) = err_msg {
         return Err(anyhow!("Runtime error: {}", err_msg));
     } else if output_data.solution.len() == 0 {
         return Err(anyhow!("No solution found"));
     }
-    worker::verify_solution(&settings, nonce, &output_data.solution)
+    worker::verify_solution(&settings, &rand_hash, nonce, &output_data.solution)
         .map_err(|e| anyhow!("Invalid solution: {}", e))
 }
 
-fn verify_solution(settings: String, nonce: u64, solution: String) -> Result<()> {
+fn verify_solution(
+    settings: String,
+    rand_hash: String,
+    nonce: u64,
+    solution: String,
+) -> Result<()> {
     let settings = load_settings(&settings);
     let solution = load_solution(&solution);
 
-    match worker::verify_solution(&settings, nonce, &solution) {
+    match worker::verify_solution(&settings, &rand_hash, nonce, &solution) {
         Ok(()) => {
             println!("Solution is valid");
             Ok(())
@@ -160,6 +187,7 @@ fn verify_solution(settings: String, nonce: u64, solution: String) -> Result<()>
 
 fn compute_batch(
     settings: String,
+    rand_hash: String,
     start_nonce: u64,
     num_nonces: u64,
     batch_size: u64,
@@ -204,16 +232,24 @@ fn compute_batch(
             .map(|nonce| {
                 let settings = Arc::clone(&settings);
                 let wasm = Arc::clone(&wasm);
+                let rand_hash = rand_hash.clone();
                 tokio::spawn(async move {
                     let (output_data, err_msg) = worker::compute_solution(
                         &settings,
+                        &rand_hash,
                         nonce,
                         wasm.as_slice(),
                         max_memory,
                         max_fuel,
                     )?;
                     let is_solution = err_msg.is_none()
-                        && worker::verify_solution(&settings, nonce, &output_data.solution).is_ok();
+                        && worker::verify_solution(
+                            &settings,
+                            &rand_hash,
+                            nonce,
+                            &output_data.solution,
+                        )
+                        .is_ok();
                     Ok::<(worker::OutputData, bool), anyhow::Error>((output_data, is_solution))
                 })
             })
