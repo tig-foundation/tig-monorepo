@@ -1376,6 +1376,11 @@ async fn commit_changes<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlock
             .await
             .unwrap_or_else(|e| panic!("update_wasm_state error: {:?}", e));
     }
+    for topup in cache.mempool_topups.drain(..) {
+        ctx.update_topup_state(&topup.id, topup.state.unwrap())
+            .await
+            .unwrap_or_else(|e| panic!("update_topup_state error: {:?}", e));
+    }
     for (player_id, player) in cache.active_fee_players.drain() {
         ctx.update_player_state(&player_id, player.state.unwrap())
             .await
