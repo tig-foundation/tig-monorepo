@@ -263,10 +263,11 @@ async fn setup_cache<T: Context>(
         }
         let proof = proof.unwrap();
         let proof_state = proof.state();
-        let submission_delay = proof_state.submission_delay();
-        let block_confirmed = proof_state.block_confirmed();
+        let submission_delay = *proof_state.submission_delay();
+        let block_confirmed = *proof_state.block_confirmed();
         let block_active = block_confirmed
-            + submission_delay * config.benchmark_submissions.submission_delay_multiplier;
+            + (submission_delay as f64 * config.benchmark_submissions.submission_delay_multiplier)
+                as u32;
         if block_active <= details.height {
             active_benchmarks.insert(benchmark.id.clone(), benchmark);
         }

@@ -30,7 +30,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     BenchmarkSubmissionsConfig {
         min_num_solutions: u32,
-        submission_delay_multiplier: u32,
+        submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
     }

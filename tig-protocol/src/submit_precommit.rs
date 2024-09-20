@@ -64,7 +64,8 @@ async fn verify_sufficient_lifespan<T: Context>(ctx: &T, block: &Block) -> Proto
         .expect("Expecting latest block to exist");
     let config = block.config();
     let submission_delay = latest_block.details.height - block.details.height + 1;
-    if submission_delay * (config.benchmark_submissions.submission_delay_multiplier + 1)
+    if (submission_delay as f64 * (config.benchmark_submissions.submission_delay_multiplier + 1.0))
+        as u32
         >= config.benchmark_submissions.lifespan_period
     {
         return Err(ProtocolError::InsufficientLifespan);
