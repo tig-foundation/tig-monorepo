@@ -11,7 +11,6 @@ pub(crate) async fn execute<T: Context>(
     benchmark_id: &String,
     merkle_proofs: Vec<MerkleProof>,
 ) -> ProtocolResult<Result<(), String>> {
-    verify_no_fraud(ctx, benchmark_id).await?;
     verify_proof_not_already_submitted(ctx, benchmark_id).await?;
     let precommit = get_precommit_by_id(ctx, benchmark_id).await?;
     verify_benchmark_ownership(player, &precommit.settings)?;
@@ -61,22 +60,6 @@ async fn get_benchmark_by_id<T: Context>(
         .ok_or_else(|| ProtocolError::InvalidBenchmark {
             benchmark_id: benchmark_id.to_string(),
         })
-}
-
-#[time]
-async fn verify_no_fraud<T: Context>(ctx: &T, benchmark_id: &String) -> ProtocolResult<()> {
-    if ctx
-        .get_frauds(FraudsFilter::BenchmarkId(benchmark_id.clone()), false)
-        .await
-        .unwrap_or_else(|e| panic!("get_frauds error: {:?}", e))
-        .first()
-        .is_some()
-    {
-        return Err(ProtocolError::FlaggedAsFraud {
-            benchmark_id: benchmark_id.to_string(),
-        });
-    }
-    Ok(())
 }
 
 #[time]

@@ -11,6 +11,7 @@ pub(crate) async fn execute<T: Context>(
     merkle_root: MerkleHash,
     solution_nonces: HashSet<u64>,
 ) -> ProtocolResult<()> {
+    verify_benchmark_not_already_submitted(ctx, benchmark_id).await?;
     let precommit = get_precommit_by_id(ctx, benchmark_id).await?;
     verify_benchmark_ownership(player, &precommit.settings)?;
     verify_nonces(&precommit, &solution_nonces)?;
@@ -24,6 +25,25 @@ pub(crate) async fn execute<T: Context>(
     )
     .await
     .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e));
+    Ok(())
+}
+
+#[time]
+async fn verify_benchmark_not_already_submitted<T: Context>(
+    ctx: &T,
+    benchmark_id: &String,
+) -> ProtocolResult<()> {
+    if ctx
+        .get_benchmarks(BenchmarksFilter::Id(benchmark_id.clone()), false)
+        .await
+        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+        .first()
+        .is_some()
+    {
+        return Err(ProtocolError::DuplicateProof {
+            benchmark_id: benchmark_id.to_string(),
+        });
+    }
     Ok(())
 }
 

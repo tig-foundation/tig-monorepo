@@ -9,6 +9,9 @@ pub enum ProtocolError {
     DifficultyBelowEasiestFrontier {
         difficulty: Vec<i32>,
     },
+    DuplicateBenchmark {
+        benchmark_id: String,
+    },
     DuplicateBenchmarkSettings {
         settings: BenchmarkSettings,
     },
@@ -123,6 +126,9 @@ impl std::fmt::Display for ProtocolError {
                 "Difficulty '{:?}' is below the easiest allowed frontier",
                 difficulty
             ),
+            ProtocolError::DuplicateBenchmark { benchmark_id } => {
+                write!(f, "Benchmark already submitted for precommit '{}'", benchmark_id)
+            }
             ProtocolError::DuplicateBenchmarkSettings { settings }=> {
                 write!(f, "A benchmark with settings '{:?}' has been submitted before.", settings)
             }
