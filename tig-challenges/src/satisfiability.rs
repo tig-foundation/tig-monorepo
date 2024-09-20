@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use ndarray::{Array2, Axis};
 use rand::{
     distributions::{Distribution, Uniform},
-    rngs::SmallRng,
-    SeedableRng,
+    rngs::{SmallRng, StdRng},
+    Rng, SeedableRng,
 };
 use serde::{
     de::{self, SeqAccess, Visitor},
@@ -81,7 +81,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = SmallRng::from_seed(seed);
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
             / 100.0)

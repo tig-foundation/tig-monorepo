@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Result};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{
+    rngs::{SmallRng, StdRng},
+    Rng, SeedableRng,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::collections::HashSet;
@@ -72,7 +75,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng = SmallRng::from_seed(seed);
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
 
         let weights: Vec<u32> = (0..difficulty.num_items)
             .map(|_| rng.gen_range(1..50))

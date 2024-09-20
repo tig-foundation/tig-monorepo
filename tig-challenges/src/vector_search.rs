@@ -2,8 +2,8 @@ use crate::{ChallengeTrait, DifficultyTrait, SolutionTrait};
 use anyhow::{anyhow, Result};
 use rand::{
     distributions::{Distribution, Uniform},
-    rngs::SmallRng,
-    SeedableRng,
+    rngs::{SmallRng, StdRng},
+    Rng, SeedableRng,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
@@ -83,7 +83,7 @@ impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = SmallRng::from_seed(seed);
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let uniform = Uniform::from(0.0..1.0);
         let search_vectors = (0..100000)
             .map(|_| (0..250).map(|_| uniform.sample(&mut rng)).collect())
