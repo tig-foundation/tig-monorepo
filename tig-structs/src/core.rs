@@ -265,7 +265,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
-        num_nonces: Option<u64>,
+        num_nonces: Option<u32>,
         fee_paid: Option<PreciseNumber>,
     }
 }

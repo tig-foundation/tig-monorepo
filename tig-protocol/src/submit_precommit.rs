@@ -8,7 +8,7 @@ pub(crate) async fn execute<T: Context>(
     ctx: &T,
     player: &Player,
     settings: BenchmarkSettings,
-    num_nonces: u64,
+    num_nonces: u32,
 ) -> ProtocolResult<String> {
     verify_player_owns_benchmark(player, &settings)?;
     verify_num_nonces(num_nonces)?;
@@ -48,7 +48,7 @@ fn verify_player_owns_benchmark(
 }
 
 #[time]
-fn verify_num_nonces(num_nonces: u64) -> ProtocolResult<()> {
+fn verify_num_nonces(num_nonces: u32) -> ProtocolResult<()> {
     if num_nonces == 0 {
         return Err(ProtocolError::InvalidNumNonces { num_nonces });
     }
@@ -206,7 +206,7 @@ fn verify_benchmark_difficulty(
 #[time]
 fn get_fee_paid(
     player: &Player,
-    num_nonces: u64,
+    num_nonces: u32,
     challenge: &Challenge,
 ) -> ProtocolResult<PreciseNumber> {
     let num_nonces = PreciseNumber::from(num_nonces);

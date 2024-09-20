@@ -36,7 +36,7 @@ async fn verify_topup_tx<T: Context>(
         .expect("No latest block found");
 
     if ctx
-        .get_topups(TopUpsFilter::TopUpId(tx_hash.clone()))
+        .get_topups(TopUpsFilter::Id(tx_hash.clone()))
         .await
         .unwrap_or_else(|e| panic!("get_topups error: {:?}", e))
         .first()

@@ -68,7 +68,7 @@ pub enum ProofsFilter {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum TopUpsFilter {
-    TopUpId(String),
+    Id(String),
     PlayerId(String),
     Mempool,
     Confirmed,

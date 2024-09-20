@@ -56,7 +56,7 @@ pub enum ProtocolError {
         nonce: u64,
     },
     InvalidNumNonces {
-        num_nonces: u64,
+        num_nonces: u32,
     },
     InvalidPrecommit {
         benchmark_id: String,
