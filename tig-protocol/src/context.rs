@@ -23,7 +23,6 @@ pub enum AlgorithmsFilter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BenchmarksFilter {
     Id(String),
-    Settings(BenchmarkSettings),
     Mempool { from_block_started: u32 },
     Confirmed { from_block_started: u32 },
 }

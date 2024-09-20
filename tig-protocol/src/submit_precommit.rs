@@ -138,11 +138,10 @@ async fn verify_benchmark_settings_are_unique<T: Context>(
     ctx: &T,
     settings: &BenchmarkSettings,
 ) -> ProtocolResult<()> {
-    // FIXME
     if ctx
-        .get_benchmarks(BenchmarksFilter::Settings(settings.clone()), false)
+        .get_precommits(PrecommitsFilter::Settings(settings.clone()))
         .await
-        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+        .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
         .first()
         .is_some()
     {
