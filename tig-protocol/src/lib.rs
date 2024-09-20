@@ -30,6 +30,15 @@ impl<'a, T: Context> Protocol<T> {
         submit_algorithm::execute(&self.ctx, player, details, code).await
     }
 
+    pub async fn submit_precommit(
+        &self,
+        player: &Player,
+        settings: BenchmarkSettings,
+        num_nonces: u32,
+    ) -> ProtocolResult<String> {
+        submit_precommit::execute(&self.ctx, player, settings, num_nonces).await
+    }
+
     pub async fn submit_benchmark(
         &self,
         player: &Player,
