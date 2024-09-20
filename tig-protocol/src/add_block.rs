@@ -44,7 +44,7 @@ struct AddBlockCache {
     pub confirmed_precommits: HashMap<String, Precommit>,
     pub active_challenges: HashMap<String, Challenge>,
     pub active_algorithms: HashMap<String, Algorithm>,
-    pub active_benchmarks: HashMap<String, Benchmark>,
+    pub active_solutions: HashMap<String, (BenchmarkSettings, u32)>,
     pub active_players: HashMap<String, Player>,
     pub active_fee_players: HashMap<String, Player>,
     pub prev_challenges: HashMap<String, Challenge>,
@@ -239,42 +239,44 @@ async fn setup_cache<T: Context>(
             active_algorithms.insert(algorithm.id.clone(), algorithm);
         }
     }
-    let mut active_benchmarks = HashMap::new();
-    for benchmark in ctx
-        .get_benchmarks(BenchmarksFilter::Confirmed { from_block_started }, false)
+    let mut active_solutions = HashMap::new();
+    for proof in ctx
+        .get_proofs(ProofsFilter::Confirmed { from_block_started }, false)
         .await
-        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+        .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
     {
-        let proof = ctx
-            .get_proofs(ProofsFilter::BenchmarkId(benchmark.id.clone()), false)
-            .await
-            .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
-            .pop();
-        if !proof.as_ref().is_some_and(|p| p.state.is_some()) {
-            continue;
-        }
+        let benchmark_id = &proof.benchmark_id;
         let fraud = ctx
-            .get_frauds(FraudsFilter::BenchmarkId(benchmark.id.clone()), false)
+            .get_frauds(FraudsFilter::BenchmarkId(benchmark_id.clone()), false)
             .await
             .unwrap_or_else(|e| panic!("get_frauds error: {:?}", e))
             .pop();
         if fraud.is_some_and(|f| f.state.is_some()) {
             continue;
         }
-        let proof = proof.unwrap();
-        let proof_state = proof.state();
-        let submission_delay = *proof_state.submission_delay();
-        let block_confirmed = *proof_state.block_confirmed();
+        let state = proof.state();
+        let submission_delay = *state.submission_delay();
+        let block_confirmed = *state.block_confirmed();
         let block_active = block_confirmed
             + (submission_delay as f64 * config.benchmark_submissions.submission_delay_multiplier)
                 as u32;
-        if block_active <= details.height {
-            active_benchmarks.insert(benchmark.id.clone(), benchmark);
+        if block_active > details.height {
+            continue;
         }
+        let benchmark = ctx
+            .get_benchmarks(BenchmarksFilter::Id(benchmark_id.clone()), false)
+            .await
+            .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
+            .pop()
+            .unwrap();
+        let settings = &confirmed_precommits[benchmark_id].settings;
+        active_solutions.insert(
+            benchmark_id.clone(),
+            (settings.clone(), benchmark.details.num_solutions),
+        );
     }
     let mut active_players = HashMap::new();
-    for benchmark in active_benchmarks.values() {
-        let settings = &confirmed_precommits[&benchmark.id].settings;
+    for (settings, _) in active_solutions.values() {
         let mut player = ctx
             .get_players(PlayersFilter::Id(settings.player_id.clone()), None)
             .await
@@ -381,7 +383,7 @@ async fn setup_cache<T: Context>(
         confirmed_precommits,
         active_challenges,
         active_algorithms,
-        active_benchmarks,
+        active_solutions,
         active_players,
         active_fee_players,
         prev_challenges,
@@ -432,7 +434,7 @@ async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
     details.num_confirmed_wasms = Some(cache.mempool_wasms.len() as u32);
     details.num_active_challenges = Some(cache.active_challenges.len() as u32);
     details.num_active_algorithms = Some(cache.active_algorithms.len() as u32);
-    details.num_active_benchmarks = Some(cache.active_benchmarks.len() as u32);
+    details.num_active_benchmarks = Some(cache.active_solutions.len() as u32);
     details.num_active_players = Some(cache.active_players.len() as u32);
 
     let data = BlockData {
@@ -474,7 +476,7 @@ async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
             .collect(),
         active_challenge_ids: cache.active_challenges.keys().cloned().collect(),
         active_algorithm_ids: cache.active_algorithms.keys().cloned().collect(),
-        active_benchmark_ids: cache.active_benchmarks.keys().cloned().collect(),
+        active_benchmark_ids: cache.active_solutions.keys().cloned().collect(),
         active_player_ids: cache.active_players.keys().cloned().collect(),
     };
 
@@ -685,13 +687,12 @@ async fn update_cutoffs(block: &Block, cache: &mut AddBlockCache) {
     }
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for benchmark in cache.active_benchmarks.values() {
-        let settings = &cache.confirmed_precommits[&benchmark.id].settings;
+    for (settings, num_solutions) in cache.active_solutions.values() {
         *num_solutions_by_player_by_challenge
             .entry(settings.player_id.clone())
             .or_default()
             .entry(settings.challenge_id.clone())
-            .or_default() += benchmark.details.num_solutions;
+            .or_default() += *num_solutions;
     }
 
     for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
@@ -742,19 +743,18 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
     let confirmed_proof_ids = &block.data().confirmed_proof_ids;
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     let mut new_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for benchmark in cache.active_benchmarks.values() {
-        let settings = &cache.confirmed_precommits[&benchmark.id].settings;
+    for (benchmark_id, (settings, num_solutions)) in cache.active_solutions.iter() {
         *num_solutions_by_player_by_challenge
             .entry(settings.player_id.clone())
             .or_default()
             .entry(settings.challenge_id.clone())
-            .or_default() += benchmark.details.num_solutions;
-        if confirmed_proof_ids.contains(&benchmark.id) {
+            .or_default() += *num_solutions;
+        if confirmed_proof_ids.contains(benchmark_id) {
             *new_solutions_by_player_by_challenge
                 .entry(settings.player_id.clone())
                 .or_default()
                 .entry(settings.challenge_id.clone())
-                .or_default() += benchmark.details.num_solutions;
+                .or_default() += *num_solutions;
         }
     }
 
@@ -913,13 +913,12 @@ fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
 async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
 
-    let mut benchmarks_by_challenge = HashMap::<String, Vec<&Benchmark>>::new();
-    for benchmark in cache.active_benchmarks.values() {
-        let settings = &cache.confirmed_precommits[&benchmark.id].settings;
-        benchmarks_by_challenge
+    let mut solutions_by_challenge = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
+    for (settings, num_solutions) in cache.active_solutions.values() {
+        solutions_by_challenge
             .entry(settings.challenge_id.clone())
             .or_default()
-            .push(benchmark);
+            .push((settings, num_solutions));
     }
 
     let mut max_qualifiers_by_player = HashMap::<String, u32>::new();
@@ -939,18 +938,13 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
     }
 
     for (challenge_id, challenge) in cache.active_challenges.iter_mut() {
-        if !benchmarks_by_challenge.contains_key(challenge_id) {
+        if !solutions_by_challenge.contains_key(challenge_id) {
             continue;
         }
-        let benchmarks = benchmarks_by_challenge.get_mut(challenge_id).unwrap();
-        let points = benchmarks
+        let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
+        let points = solutions
             .iter()
-            .map(|b| {
-                cache.confirmed_precommits[&b.id]
-                    .settings
-                    .difficulty
-                    .clone()
-            })
+            .map(|(settings, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
         for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() {
@@ -958,9 +952,7 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
                 frontier_indexes.insert(point, frontier_index);
             }
         }
-        benchmarks.sort_by(|a, b| {
-            let a_settings = &cache.confirmed_precommits[&a.id].settings;
-            let b_settings = &cache.confirmed_precommits[&b.id].settings;
+        solutions.sort_by(|(a_settings, _), (b_settings, _)| {
             let a_index = frontier_indexes[&a_settings.difficulty];
             let b_index = frontier_indexes[&b_settings.difficulty];
             a_index.cmp(&b_index)
@@ -969,14 +961,14 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
         let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
         let mut curr_frontier_index = 0;
         let challenge_data = challenge.block_data.as_mut().unwrap();
-        for benchmark in benchmarks.iter() {
+        for (settings, &num_solutions) in solutions.iter() {
             let BenchmarkSettings {
                 player_id,
                 algorithm_id,
                 challenge_id,
                 difficulty,
                 ..
-            } = &cache.confirmed_precommits[&benchmark.id].settings;
+            } = settings;
 
             if curr_frontier_index != frontier_indexes[difficulty]
                 && *challenge_data.num_qualifiers() > config.qualifiers.total_qualifiers_threshold
@@ -1009,7 +1001,7 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
                 .unwrap();
 
             let max_qualifiers = max_qualifiers_by_player.get(player_id).unwrap().clone();
-            let num_qualifiers = benchmark.details.num_solutions.min(max_qualifiers);
+            let num_qualifiers = num_solutions.min(max_qualifiers);
             max_qualifiers_by_player.insert(player_id.clone(), max_qualifiers - num_qualifiers);
 
             if num_qualifiers > 0 {
