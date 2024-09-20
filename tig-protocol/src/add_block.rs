@@ -1052,20 +1052,27 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) {
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
             .collect::<Frontier>();
-        let base_frontier = pareto_algorithm(points, true)
-            .pop()
-            .unwrap()
-            .into_iter()
-            .map(|d| d.into_iter().map(|x| -x).collect())
-            .collect::<Frontier>() // mirror the points back;
-            .extend(&min_difficulty, &max_difficulty);
-
-        let scaling_factor = (*block_data.num_qualifiers() as f64
-            / config.qualifiers.total_qualifiers_threshold as f64)
-            .min(config.difficulty.max_scaling_factor);
-        let scaled_frontier = base_frontier
-            .scale(&min_difficulty, &max_difficulty, scaling_factor)
-            .extend(&min_difficulty, &max_difficulty);
+        let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 {
+            let base_frontier: Frontier = vec![min_difficulty.clone()].into_iter().collect();
+            let scaling_factor = 0.0;
+            let scaled_frontier = base_frontier.clone();
+            (base_frontier, scaling_factor, scaled_frontier)
+        } else {
+            let base_frontier = pareto_algorithm(points, true)
+                .pop()
+                .unwrap()
+                .into_iter()
+                .map(|d| d.into_iter().map(|x| -x).collect())
+                .collect::<Frontier>() // mirror the points back;
+                .extend(&min_difficulty, &max_difficulty);
+            let scaling_factor = (*block_data.num_qualifiers() as f64
+                / config.qualifiers.total_qualifiers_threshold as f64)
+                .min(config.difficulty.max_scaling_factor);
+            let scaled_frontier = base_frontier
+                .scale(&min_difficulty, &max_difficulty, scaling_factor)
+                .extend(&min_difficulty, &max_difficulty);
+            (base_frontier, scaling_factor, scaled_frontier)
+        };
 
         block_data.base_frontier = Some(base_frontier);
         block_data.scaled_frontier = Some(scaled_frontier);
