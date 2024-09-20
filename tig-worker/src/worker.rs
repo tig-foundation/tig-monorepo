@@ -83,29 +83,51 @@ pub fn compute_solution(
         .write(&mut store, challenge_ptr as usize, &serialized_challenge)
         .expect("Failed to write serialized challenge to `memory`");
 
-    let (serialized_solution, err_msg) = match entry_point
-        .call(&mut store, (challenge_ptr, challenge_len))
-        .map_err(|e| anyhow!("Failed to call function: {:?}", e))
-    {
-        Ok(solution_ptr) => {
-            // Read solution from memory
-            let mut solution_len_bytes = [0u8; 4];
-            memory
-                .read(&store, solution_ptr as usize, &mut solution_len_bytes)
-                .expect("Failed to read solution length from memory");
-            let solution_len = u32::from_le_bytes(solution_len_bytes);
-            let mut serialized_solution = vec![0u8; solution_len as usize];
-            memory
-                .read(
-                    &store,
-                    (solution_ptr + 4) as usize,
-                    &mut serialized_solution,
-                )
-                .expect("Failed to read solution from memory");
-            (Some(serialized_solution), None)
+    let mut solution = Solution::new();
+    let mut err_msg = None;
+    let solution_ptr = match entry_point.call(&mut store, (challenge_ptr, challenge_len)) {
+        Ok(solution_ptr) => Some(solution_ptr),
+        Err(e) => {
+            err_msg = Some(format!("Error executing algorithm: {:?}", e));
+            None
         }
-        Err(e) => (None, Some(e.to_string())),
     };
+
+    let solution_len = match solution_ptr {
+        Some(solution_ptr) => {
+            let mut solution_len_bytes = [0u8; 4];
+            match memory.read(&store, solution_ptr as usize, &mut solution_len_bytes) {
+                Ok(_) => u32::from_le_bytes(solution_len_bytes),
+                Err(e) => {
+                    err_msg = Some(format!(
+                        "Error reading solution length from memory: {:?}",
+                        e
+                    ));
+                    0
+                }
+            }
+        }
+        None => 0,
+    };
+
+    if solution_len > 0 {
+        let mut serialized_solution = vec![0u8; solution_len as usize];
+        match memory.read(
+            &store,
+            (solution_ptr.unwrap() + 4) as usize,
+            &mut serialized_solution,
+        ) {
+            Ok(_) => match decompress_obj(&serialized_solution) {
+                Ok(s) => solution = s,
+                Err(e) => {
+                    err_msg = Some(format!("Error decompressing solution: {:?}", e));
+                }
+            },
+            Err(e) => {
+                err_msg = Some(format!("Error reading solution from memory: {:?}", e));
+            }
+        }
+    }
 
     // Get runtime signature
     let runtime_signature = store.get_runtime_signature();
@@ -114,12 +136,7 @@ pub fn compute_solution(
         nonce,
         runtime_signature,
         fuel_consumed,
-        solution: match serialized_solution {
-            Some(serialized_solution) => {
-                decompress_obj(&serialized_solution).expect("Failed to decompress solution")
-            }
-            None => Solution::new(),
-        },
+        solution,
     };
     Ok((solution_data, err_msg))
 }
