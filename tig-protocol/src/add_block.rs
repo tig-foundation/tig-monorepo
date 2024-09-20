@@ -841,10 +841,12 @@ async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
         if percent_delta > max_fee_percent_delta {
             percent_delta = max_fee_percent_delta;
         }
-        let current_base_fee = match &cache.prev_challenges.get(&challenge.id).unwrap().block_data {
-            Some(data) => *data.base_fee(),
-            None => zero.clone(),
-        };
+        let current_base_fee =
+            match &cache.prev_challenges.get(&challenge.id).unwrap().block_data {
+                Some(data) => data.base_fee.as_ref().unwrap_or(&zero),
+                None => &zero,
+            }
+            .clone();
         let mut base_fee = if num_precommits >= target_num_precommits {
             current_base_fee * (one + percent_delta)
         } else {
