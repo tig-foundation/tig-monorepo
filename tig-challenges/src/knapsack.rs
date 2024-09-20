@@ -101,9 +101,9 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         // weight for each item. Pair the ratio with the item's weight and index
         let mut value_weight_ratios: Vec<(usize, f32, u32)> = (0..difficulty.num_items)
             .map(|i| {
-                let tot_value = values[i] as i32 + interaction_values[i].iter().sum::<i32>();
+                let total_value = values[i] as i32 + interaction_values[i].iter().sum::<i32>();
                 let weight =  weights[i];
-                let ratio = tot_value as f32 / weight as f32;
+                let ratio = total_value as f32 / weight as f32;
                 (i, ratio, weight)
             })
             .collect();
@@ -119,8 +119,6 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             if total_weight + weight <= max_weight {
                 selected_indices.push(i);
                 total_weight += weight; 
-            } else {
-                break; 
             }
         }
         selected_indices.sort_unstable();
