@@ -806,6 +806,13 @@ async fn update_solution_signature_thresholds(block: &Block, cache: &mut AddBloc
 #[time]
 async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
     let config = block.config();
+    let PrecommitSubmissionsConfig {
+        min_base_fee,
+        min_per_nonce_fee,
+        target_num_precommits,
+        max_fee_percentage_delta,
+        ..
+    } = config.precommit_submissions();
     let num_precommits_by_challenge = cache.mempool_precommits.iter().fold(
         HashMap::<String, u32>::new(),
         |mut map, precommit| {
@@ -814,10 +821,8 @@ async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
             map
         },
     );
-    let target_num_precommits =
-        PreciseNumber::from(config.precommit_submissions.target_num_precommits);
-    let max_fee_percent_delta =
-        PreciseNumber::from_f64(config.precommit_submissions.max_fee_percentage_delta);
+    let target_num_precommits = PreciseNumber::from(*target_num_precommits);
+    let max_fee_percent_delta = PreciseNumber::from_f64(*max_fee_percentage_delta);
     let one = PreciseNumber::from(1);
     let zero = PreciseNumber::from(0);
     for challenge in cache.active_challenges.values_mut() {
@@ -845,12 +850,12 @@ async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
         } else {
             current_base_fee * (one - percent_delta)
         };
-        if base_fee < config.precommit_submissions.min_base_fee {
-            base_fee = config.precommit_submissions.min_base_fee;
+        if base_fee < *min_base_fee {
+            base_fee = *min_base_fee;
         }
         let block_data = challenge.block_data.as_mut().unwrap();
         block_data.base_fee = Some(base_fee);
-        block_data.per_nonce_fee = Some(config.precommit_submissions.min_per_nonce_fee);
+        block_data.per_nonce_fee = Some(min_per_nonce_fee.clone());
     }
 }
 

@@ -8,7 +8,7 @@ serializable_struct_with_getters! {
     ProtocolConfig {
         erc20: ERC20Config,
         benchmark_submissions: BenchmarkSubmissionsConfig,
-        precommit_submissions: PrecommitSubmissionsConfig,
+        precommit_submissions: Option<PrecommitSubmissionsConfig>,
         wasm_vm: WasmVMConfig,
         solution_signature: SolutionSignatureConfig,
         qualifiers: QualifiersConfig,

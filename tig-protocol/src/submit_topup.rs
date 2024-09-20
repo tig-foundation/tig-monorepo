@@ -78,7 +78,7 @@ async fn verify_topup_tx<T: Context>(
         });
     }
 
-    let expected_amount = block.config().precommit_submissions.topup_amount.clone();
+    let expected_amount = block.config().precommit_submissions().topup_amount.clone();
     if transaction.amount != expected_amount {
         return Err(ProtocolError::InvalidTransactionAmount {
             tx_hash: tx_hash.clone(),
