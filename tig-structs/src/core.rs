@@ -168,6 +168,11 @@ impl From<OutputMetaData> for MerkleHash {
         MerkleHash(u8s_from_str(&jsonify(&data)))
     }
 }
+impl From<OutputData> for MerkleHash {
+    fn from(data: OutputData) -> Self {
+        MerkleHash::from(OutputMetaData::from(data))
+    }
+}
 
 // Block child structs
 serializable_struct_with_getters! {
