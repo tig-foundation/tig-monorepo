@@ -1,8 +1,8 @@
 use super::{api, Job, Result};
-use crate::future_utils::Mutex;
 use moka::future::{Cache, CacheBuilder};
 use once_cell::sync::OnceCell;
 use tig_utils::get;
+use tokio::sync::Mutex;
 
 static CACHE: OnceCell<Mutex<Cache<String, Vec<u8>>>> = OnceCell::new();
 

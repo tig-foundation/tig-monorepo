@@ -96,6 +96,15 @@ impl DifficultySampler {
     }
 
     pub fn update_with_solutions(&mut self, difficulty: &Vec<i32>, num_solutions: u32) {
+        if difficulty[0] < self.min_difficulty[0]
+            || difficulty[1] < self.min_difficulty[1]
+            || difficulty[0]
+                >= self.min_difficulty[0] + self.dimensions[0] as i32 + self.padding[0] as i32
+            || difficulty[1]
+                >= self.min_difficulty[1] + self.dimensions[1] as i32 + self.padding[1] as i32
+        {
+            return;
+        }
         let (x, y) = (
             (difficulty[0] - self.min_difficulty[0]) as usize,
             (difficulty[1] - self.min_difficulty[1]) as usize,
@@ -110,13 +119,15 @@ impl DifficultySampler {
                 }
                 let decay = dist * (1.0 - DECAY) + DECAY;
                 let delta = (1.0 - decay) * num_solutions as f32 * SOLUTIONS_MULTIPLIER;
-                self.weights[x + x_offset][y + y_offset].solutions *= decay;
-                self.weights[x + x_offset][y + y_offset].solutions += delta;
-                if x_offset != 0 && x >= x_offset {
+                if x + x_offset < self.weights.len() && y + y_offset < self.weights[x].len() {
+                    self.weights[x + x_offset][y + y_offset].solutions *= decay;
+                    self.weights[x + x_offset][y + y_offset].solutions += delta;
+                }
+                if x_offset != 0 && x >= x_offset && y + y_offset < self.weights[x].len() {
                     self.weights[x - x_offset][y + y_offset].solutions *= decay;
                     self.weights[x - x_offset][y + y_offset].solutions += delta;
                 }
-                if y_offset != 0 && y >= y_offset {
+                if x + x_offset < self.weights.len() && y_offset != 0 && y >= y_offset {
                     self.weights[x + x_offset][y - y_offset].solutions *= decay;
                     self.weights[x + x_offset][y - y_offset].solutions += delta;
                 }

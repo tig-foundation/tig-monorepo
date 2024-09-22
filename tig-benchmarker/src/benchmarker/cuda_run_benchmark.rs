@@ -1,14 +1,14 @@
 use super::{Job, NonceIterator};
-use crate::future_utils;
+use crate::utils::time;
 use cudarc::driver::*;
 use cudarc::nvrtc::{compile_ptx, Ptx};
-use future_utils::{spawn, time, yield_now, Mutex};
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tig_algorithms::{c001, c002, c003, c004, CudaKernel};
 use tig_challenges::ChallengeTrait;
-use tig_worker::{compute_solution, verify_solution, SolutionData};
+use tig_worker::{compute_solution, verify_solution};
+use tokio::{spawn, sync::Mutex, task::yield_now};
 
 static PTX_CACHE: OnceCell<Mutex<HashMap<String, Ptx>>> = OnceCell::new();
 
@@ -18,7 +18,6 @@ pub async fn get_or_compile_cuda(
     dev: &Arc<CudaDevice>,
 ) -> HashMap<&'static str, CudaFunction> {
     if kernel.is_none() {
-        println!("No CUDA optimisations available for '{}'", key);
         return HashMap::new();
     }
     let kernel = kernel.as_ref().unwrap();
@@ -55,31 +54,23 @@ pub async fn get_or_compile_cuda(
         .collect()
 }
 
-pub async fn execute(
-    nonce_iters: Vec<Arc<Mutex<NonceIterator>>>,
-    job: &Job,
-    wasm: &Vec<u8>,
-    solutions_data: Arc<Mutex<Vec<SolutionData>>>,
-    solutions_count: Arc<Mutex<u32>>,
-) {
-    for nonce_iter in nonce_iters {
+pub async fn execute(nonce_iterators: Vec<Arc<Mutex<NonceIterator>>>, job: &Job, wasm: &Vec<u8>) {
+    for nonce_iterator in nonce_iterators {
         let job = job.clone();
         let wasm = wasm.clone();
-        let solutions_data = solutions_data.clone();
-        let solutions_count = solutions_count.clone();
         spawn(async move {
             let mut last_yield = time();
             let dev = CudaDevice::new(0).expect("Failed to create CudaDevice");
             let mut challenge_cuda_funcs: Option<HashMap<&'static str, CudaFunction>> = None;
             let mut algorithm_cuda_funcs: Option<HashMap<&'static str, CudaFunction>> = None;
             loop {
-                match {
-                    let mut nonce_iter = (*nonce_iter).lock().await;
-                    (*nonce_iter).next()
-                } {
+                let now = time();
+                if now >= job.timestamps.end {
+                    break;
+                }
+                match { nonce_iterator.lock().await.next() } {
                     None => break,
                     Some(nonce) => {
-                        let now = time();
                         if now - last_yield > 25 {
                             yield_now().await;
                             last_yield = now;
@@ -12321,15 +12312,11 @@ pub async fn execute(
                             if verify_solution(&job.settings, nonce, &solution_data.solution)
                                 .is_ok()
                             {
-                                {
-                                    let mut solutions_count = (*solutions_count).lock().await;
-                                    *solutions_count += 1;
-                                }
                                 if solution_data.calc_solution_signature()
                                     <= job.solution_signature_threshold
                                 {
-                                    let mut solutions_data = (*solutions_data).lock().await;
-                                    (*solutions_data).push(solution_data);
+                                    let mut solutions_data = job.solutions_data.lock().await;
+                                    (*solutions_data).insert(nonce, solution_data);
                                 }
                             }
                         }
