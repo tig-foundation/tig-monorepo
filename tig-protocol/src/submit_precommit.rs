@@ -220,7 +220,11 @@ fn get_fee_paid(
     {
         return Err(ProtocolError::InsufficientFeeBalance {
             fee_paid,
-            available_fee_balance: player.state().available_fee_balance().clone(),
+            available_fee_balance: player
+                .state
+                .as_ref()
+                .map(|s| s.available_fee_balance().clone())
+                .unwrap_or(PreciseNumber::from(0)),
         });
     }
     Ok(fee_paid)
