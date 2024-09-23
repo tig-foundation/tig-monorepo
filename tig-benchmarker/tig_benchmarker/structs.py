@@ -256,7 +256,6 @@ class Wasm(FromDict):
     algorithm_id: str
     details: WasmDetails
     state: WasmState
-    wasm_blob: Optional[bytes]
 
 @dataclass
 class TopUpDetails(FromDict):

@@ -86,7 +86,6 @@ serializable_struct_with_getters! {
         algorithm_id: String,
         details: WasmDetails,
         state: Option<WasmState>,
-        wasm_blob: Option<Vec<u8>>,
     }
 }
 
@@ -328,7 +327,6 @@ serializable_struct_with_getters! {
     WasmDetails {
         compile_success: bool,
         download_url: Option<String>,
-        checksum: Option<String>,
     }
 }
 serializable_struct_with_getters! {

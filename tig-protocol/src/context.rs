@@ -120,7 +120,7 @@ pub trait Context {
         include_data: bool,
     ) -> ContextResult<Vec<Proof>>;
     async fn get_topups(&self, filter: TopUpsFilter) -> ContextResult<Vec<TopUp>>;
-    async fn get_wasms(&self, filter: WasmsFilter, include_data: bool) -> ContextResult<Vec<Wasm>>;
+    async fn get_wasms(&self, filter: WasmsFilter) -> ContextResult<Vec<Wasm>>;
     async fn verify_solution(
         &self,
         settings: &BenchmarkSettings,
@@ -185,7 +185,6 @@ pub trait Context {
         &self,
         algorithm_id: &String,
         details: WasmDetails,
-        wasm_blob: Option<Vec<u8>>,
     ) -> ContextResult<()>;
 
     // Updates

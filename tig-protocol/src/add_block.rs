@@ -165,7 +165,7 @@ async fn setup_cache<T: Context>(
     }
     let mut mempool_wasms = Vec::new();
     for mut wasm in ctx
-        .get_wasms(WasmsFilter::Mempool, false)
+        .get_wasms(WasmsFilter::Mempool)
         .await
         .unwrap_or_else(|e| panic!("mempool_wasms error: {:?}", e))
     {
@@ -219,7 +219,7 @@ async fn setup_cache<T: Context>(
                 1
             };
         let wasm = ctx
-            .get_wasms(WasmsFilter::AlgorithmId(algorithm.id.clone()), false)
+            .get_wasms(WasmsFilter::AlgorithmId(algorithm.id.clone()))
             .await
             .unwrap_or_else(|e| panic!("get_wasms error: {:?}", e));
         if !state.banned
