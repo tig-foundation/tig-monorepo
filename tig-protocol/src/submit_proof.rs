@@ -135,9 +135,9 @@ fn verify_sampled_nonces(
     let sampled_nonces = benchmark.state().sampled_nonces().clone();
     let proof_nonces: HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
 
-    if sampled_nonces != proof_nonces {
+    if sampled_nonces != proof_nonces || sampled_nonces.len() != merkle_proofs.len() {
         return Err(ProtocolError::InvalidProofNonces {
-            submitted_nonces: proof_nonces.into_iter().collect(),
+            submitted_nonces: merkle_proofs.iter().map(|p| p.leaf.nonce).collect(),
             expected_nonces: sampled_nonces.into_iter().collect(),
         });
     }
