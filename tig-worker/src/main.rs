@@ -4,7 +4,7 @@ use clap::{arg, Command};
 use futures::stream::{self, StreamExt};
 use serde_json::json;
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
-use tig_structs::core::{BenchmarkSettings, MerkleProof, OutputMetaData};
+use tig_structs::core::{BenchmarkSettings, MerkleProof};
 use tig_utils::{dejsonify, jsonify, MerkleHash, MerkleTree};
 use tokio::runtime::Runtime;
 
@@ -233,6 +233,7 @@ fn compute_batch(
                 let settings = Arc::clone(&settings);
                 let wasm = Arc::clone(&wasm);
                 let rand_hash = rand_hash.clone();
+                let sampled_nonces = sampled_nonces.clone();
                 tokio::spawn(async move {
                     let (output_data, err_msg) = worker::compute_solution(
                         &settings,
@@ -250,7 +251,19 @@ fn compute_batch(
                             &output_data.solution,
                         )
                         .is_ok();
-                    Ok::<(worker::OutputData, bool), anyhow::Error>((output_data, is_solution))
+                    let hash = MerkleHash::from(output_data.clone());
+                    // only keep the data if required
+                    let output_data = if sampled_nonces.contains(&nonce) {
+                        Some(output_data)
+                    } else {
+                        None
+                    };
+                    Ok::<(u64, Option<worker::OutputData>, MerkleHash, bool), anyhow::Error>((
+                        nonce,
+                        output_data,
+                        hash,
+                        is_solution,
+                    ))
                 })
             })
             .buffer_unordered(num_workers)
@@ -258,16 +271,14 @@ fn compute_batch(
             .await;
 
         for result in results {
-            let (output_data, is_solution) = result??;
-            let nonce = output_data.nonce;
-            if sampled_nonces.contains(&nonce) {
-                output_data_map.insert(nonce, output_data.clone());
+            let (nonce, output_data, hash, is_solution) = result??;
+            if let Some(output_data) = output_data {
+                output_data_map.insert(nonce, output_data);
             }
             if is_solution {
                 solution_nonces.push(nonce);
             }
-            let metadata = OutputMetaData::from(output_data);
-            *hashes.get_mut((nonce - start_nonce) as usize).unwrap() = MerkleHash::from(metadata);
+            *hashes.get_mut((nonce - start_nonce) as usize).unwrap() = hash;
         }
 
         let tree = MerkleTree::new(hashes, batch_size as usize)?;
