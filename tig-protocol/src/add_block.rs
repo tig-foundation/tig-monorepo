@@ -424,6 +424,13 @@ async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
         num_active_players: None,
     };
     let cache = setup_cache(ctx, &details, &config).await;
+    details.fees_paid = Some(
+        cache
+            .mempool_precommits
+            .iter()
+            .map(|p| p.details.fee_paid().clone())
+            .sum(),
+    );
     details.num_confirmed_challenges = Some(cache.mempool_challenges.len() as u32);
     details.num_confirmed_algorithms = Some(cache.mempool_algorithms.len() as u32);
     details.num_confirmed_benchmarks = Some(cache.mempool_benchmarks.len() as u32);
@@ -530,7 +537,6 @@ async fn confirm_mempool_precommits(block: &mut Block, cache: &mut AddBlockCache
         let fee_paid = *precommit.details.fee_paid.as_ref().unwrap();
         *player_state.available_fee_balance.as_mut().unwrap() -= fee_paid;
         *player_state.total_fees_paid.as_mut().unwrap() += fee_paid;
-        *block.details.fees_paid.as_mut().unwrap() += fee_paid;
     }
 }
 
