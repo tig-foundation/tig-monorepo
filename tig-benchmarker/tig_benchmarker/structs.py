@@ -1,5 +1,5 @@
 from tig_benchmarker.merkle_tree import MerkleHash, MerkleBranch
-from tig_benchmarker.utils import FromDict, u64s_from_str, u8s_from_str, jsonify
+from tig_benchmarker.utils import FromDict, u64s_from_str, u8s_from_str, jsonify, PreciseNumber
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Any, Tuple
 
@@ -24,10 +24,10 @@ class AlgorithmState(FromDict):
 @dataclass
 class AlgorithmBlockData(FromDict):
     num_qualifiers_by_player: Dict[str, int]
-    adoption: int
+    adoption: PreciseNumber
     merge_points: int
-    reward: int
-    round_earnings: int
+    reward: PreciseNumber
+    round_earnings: PreciseNumber
 
 @dataclass
 class Algorithm(FromDict):
@@ -150,7 +150,7 @@ class BlockDetails(FromDict):
     height: int
     round: int
     eth_block_num: Optional[str] # Optional for backwards compatability
-    fees_paid: Optional[int] # Optional for backwards compatability
+    fees_paid: Optional[PreciseNumber] # Optional for backwards compatability
     num_confirmed_challenges: Optional[int] # Optional for backwards compatability
     num_confirmed_algorithms: Optional[int] # Optional for backwards compatability
     num_confirmed_benchmarks: Optional[int] # Optional for backwards compatability
@@ -220,19 +220,19 @@ class PlayerDetails(FromDict):
 class PlayerBlockData(FromDict):
     num_qualifiers_by_challenge: Optional[Dict[str, int]]
     cutoff: Optional[int]
-    deposit: Optional[int]
-    rolling_deposit: Optional[int]
-    qualifying_percent_rolling_deposit: Optional[int]
-    imbalance: Optional[int]
-    imbalance_penalty: Optional[int]
-    influence: Optional[int]
-    reward: Optional[int]
-    round_earnings: int
+    deposit: Optional[PreciseNumber]
+    rolling_deposit: Optional[PreciseNumber]
+    qualifying_percent_rolling_deposit: Optional[PreciseNumber]
+    imbalance: Optional[PreciseNumber]
+    imbalance_penalty: Optional[PreciseNumber]
+    influence: Optional[PreciseNumber]
+    reward: Optional[PreciseNumber]
+    round_earnings: PreciseNumber
 
 @dataclass
 class PlayerState(FromDict):
-    total_fees_paid: int
-    available_fee_balance: int
+    total_fees_paid: PreciseNumber
+    available_fee_balance: PreciseNumber
 
 @dataclass
 class Player(FromDict):
@@ -261,7 +261,7 @@ class Wasm(FromDict):
 @dataclass
 class TopUpDetails(FromDict):
     player_id: str
-    amount: int
+    amount: PreciseNumber
 
 @dataclass
 class TopUpState(FromDict):
@@ -284,23 +284,3 @@ class QueryData(FromDict):
     proofs: Dict[str, Proof]
     frauds: Dict[str, Fraud]
     challenges: Dict[str, Challenge]
-
-@dataclass
-class Job(FromDict):
-    id: str
-    settings: BenchmarkSettings
-    rand_hash: str
-    start_nonce: int
-    num_nonces: int
-    batch_size: int
-    wasm_vm_config: dict
-    sampled_nonces: Optional[List[int]]
-
-# @dataclass
-# class State:
-#     query_data: QueryData
-#     available_jobs: Dict[str, Job]
-#     pending_benchmark_jobs: Dict[str, Job]
-#     pending_proof_jobs: Dict[str, Job]
-#     submitted_proof_ids: Set[str]
-#     difficulty_samplers: dict

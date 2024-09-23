@@ -1,10 +1,9 @@
-import json
+from __future__ import annotations
 from abc import ABC, abstractclassmethod, abstractmethod
 from blake3 import blake3
-from datetime import datetime
 from dataclasses import dataclass, fields, is_dataclass
-from hashlib import md5
 from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, get_args
+import json
 
 T = TypeVar('T', bound='DataclassBase')
 
@@ -50,7 +49,7 @@ class FromDict:
             return field_type.from_dict(value)
         elif hasattr(field_type, 'from_str') and isinstance(value, str):
             return field_type.from_str(value)
-        elif get_origin(field_type) in (list, set):
+        elif get_origin(field_type) in (list, set, tuple):
             elem_type = get_args(field_type)[0]
             return get_origin(field_type)(cls._process_value(item, elem_type) for item in value)
         elif get_origin(field_type) is dict:
@@ -68,7 +67,7 @@ class FromDict:
                     d[field.name] = value.to_dict()
                 elif hasattr(value, 'to_str'):
                     d[field.name] = value.to_str()
-                elif isinstance(value, (list, set)):
+                elif isinstance(value, (list, set, tuple)):
                     d[field.name] = [
                         item.to_dict() if hasattr(item, 'to_dict')
                         else item.to_str() if hasattr(item, 'to_str')
@@ -88,8 +87,103 @@ class FromDict:
                     d[field.name] = value
         return d
 
-def now() -> int:
-    return int(datetime.now().timestamp() * 1000)
+
+class PreciseNumber(FromStr):
+    PRECISION = 10**18  # 18 decimal places of precision
+
+    def __init__(self, value: Union[int, float, str, PreciseNumber]):
+        if isinstance(value, PreciseNumber):
+            self._value = value._value
+        elif isinstance(value, int):
+            self._value = value * self.PRECISION
+        elif isinstance(value, float):
+            self._value = int(value * self.PRECISION)
+        elif isinstance(value, str):
+            self._value = int(value)
+        else:
+            raise TypeError(f"Unsupported type for PreciseNumber: {type(value)}")
+
+    @classmethod
+    def from_str(cls, s: str) -> 'PreciseNumber':
+        return cls(s)
+
+    def to_str(self) -> str:
+        return str(self._value)
+
+    def __repr__(self) -> str:
+        return f"PreciseNumber({self.to_float()})"
+
+    def to_float(self) -> float:
+        return self._value / self.PRECISION
+
+    def __add__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return PreciseNumber(self._value + other._value)
+
+    def __sub__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return PreciseNumber(self._value - other._value)
+
+    def __mul__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return PreciseNumber((self._value * other._value) // self.PRECISION)
+
+    def __truediv__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        if other._value == 0:
+            raise ZeroDivisionError
+        return PreciseNumber((self._value * self.PRECISION) // other._value)
+
+    def __floordiv__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        if other._value == 0:
+            raise ZeroDivisionError
+        return PreciseNumber((self._value * self.PRECISION // other._value))
+
+    def __eq__(self, other: Union[PreciseNumber, int, float]) -> bool:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return self._value == other._value
+
+    def __lt__(self, other: Union[PreciseNumber, int, float]) -> bool:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return self._value < other._value
+
+    def __le__(self, other: Union[PreciseNumber, int, float]) -> bool:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return self._value <= other._value
+
+    def __gt__(self, other: Union[PreciseNumber, int, float]) -> bool:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return self._value > other._value
+
+    def __ge__(self, other: Union[PreciseNumber, int, float]) -> bool:
+        if isinstance(other, (int, float)):
+            other = PreciseNumber(other)
+        return self._value >= other._value
+
+    def __radd__(self, other: Union[int, float]) -> PreciseNumber:
+        return self + other
+
+    def __rsub__(self, other: Union[int, float]) -> PreciseNumber:
+        return PreciseNumber(other) - self
+
+    def __rmul__(self, other: Union[int, float]) -> PreciseNumber:
+        return self * other
+
+    def __rtruediv__(self, other: Union[int, float]) -> PreciseNumber:
+        return PreciseNumber(other) / self
+
+    def __rfloordiv__(self, other: Union[int, float]) -> PreciseNumber:
+        return PreciseNumber(other) // self
 
 def jsonify(obj: Any) -> str:
     if hasattr(obj, 'to_dict'):
@@ -109,7 +203,3 @@ def u64s_from_str(input: str) -> List[int]:
         )
         for i in range(4)
     ]
-
-def u32_from_str(input_str: str) -> int:
-    result = md5(input_str.encode('utf-8')).digest()
-    return int.from_bytes(result[-4:], byteorder='little', signed=False)

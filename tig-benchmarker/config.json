@@ -1,0 +1,35 @@
+{
+    "max_precommits_per_block": 2,
+    "satisfiability": {
+        "algorithm": "schnoing",
+        "num_nonces": 1000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 1
+    },
+    "vehicle_routing": {
+        "algorithm": "clarke_wright",
+        "num_nonces": 1000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 1
+    },
+    "knapsack": {
+        "algorithm": "dynamic",
+        "num_nonces": 1000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 1
+    },
+    "vector_search": {
+        "algorithm": "basic",
+        "num_nonces": 1000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 0
+    }
+}

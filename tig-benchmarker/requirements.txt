@@ -1,6 +1,8 @@
 aiohttp
 asyncio
-quart
-hypercorn
+blake3
 dataclasses
+hypercorn
+numpy
+quart
 randomname

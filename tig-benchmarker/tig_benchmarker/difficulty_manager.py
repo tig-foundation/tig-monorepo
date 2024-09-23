@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List, Tuple
+from tig_benchmarker.data_fetcher import QueryData
 
 PADDING_FACTOR = 0.2
 DECAY = 0.7
@@ -11,7 +12,7 @@ class DifficultySampler:
         self.min_difficulty = None
         self.padding = None
         self.dimensions = None
-        self.weights = np.empty((0,0,3), dtype=float)
+        self.weights = np.empty((0,0,2), dtype=float)
         self.distribution = None
 
     def sample(self):
@@ -37,7 +38,6 @@ class DifficultySampler:
         size = self.dimensions + self.padding
         self.resize_weights(left_pad, size)
 
-        self.update_qualifier_weights(block_data)
         self.update_valid_range(block_data)
         self.update_distributions()
 
@@ -65,8 +65,8 @@ class DifficultySampler:
         self.weights[x_min:x_max + 1, y_min:y_max + 1, 1] += delta
 
     def update_valid_range(self, block_data):
-        lower_cutoff_points = np.array(block_data.base_frontier) - self.min_difficulty
-        upper_cutoff_points = np.array(block_data.scaled_frontier) - self.min_difficulty
+        lower_cutoff_points = np.array(list(block_data.base_frontier)) - self.min_difficulty
+        upper_cutoff_points = np.array(list(block_data.scaled_frontier)) - self.min_difficulty
         
         if block_data.scaling_factor < 1.0:
             lower_cutoff_points, upper_cutoff_points = upper_cutoff_points, lower_cutoff_points
@@ -81,7 +81,7 @@ class DifficultySampler:
             upper_cutoff2 = upper_cutoff_points[upper_cutoff_idx + 1]
         else:
             upper_cutoff2 = upper_cutoff1
-        self.weights[:, :, 2] = 0.0
+        self.weights[:, :, 0] = 0.0
         for i in range(self.weights.shape[0]):
             if lower_cutoff_idx + 1 < len(lower_cutoff_points) and i == lower_cutoff_points[lower_cutoff_idx + 1, 0]:
                 lower_cutoff_idx += 1
@@ -99,68 +99,82 @@ class DifficultySampler:
             else:
                 start = lower_cutoff[1] + 1
             if i <= upper_cutoff2[0]:
-                self.weights[i, start:upper_cutoff2[1] + 1, 2] = 1.0
+                self.weights[i, start:upper_cutoff2[1] + 1, 0] = 1.0
             if i < upper_cutoff2[0]:
-                self.weights[i, start:upper_cutoff1[1], 2] = 1.0
+                self.weights[i, start:upper_cutoff1[1], 0] = 1.0
             if i == upper_cutoff1[0]:
-                self.weights[i, upper_cutoff1[1], 2] = 1.0
+                self.weights[i, upper_cutoff1[1], 0] = 1.0
 
     def update_distributions(self):
         distribution = np.prod(self.weights, axis=2)
         distribution /= np.sum(distribution)
         self.distribution = distribution
 
-    def update_qualifier_weights(self, block_data):
-        cutoff_points = np.array(block_data.cutoff_frontier) - self.min_difficulty
-        cutoff_points = cutoff_points[np.argsort(cutoff_points[:, 0]), :]
-
-        cutoff_idx = 0
-        if len(cutoff_points) > 0:
-            cutoff = cutoff_points[0]
-        else:
-            cutoff = np.array([0, 0])
-        for i in range(self.weights.shape[0]):
-            if cutoff_idx + 1 < len(cutoff_points) and i == cutoff_points[cutoff_idx, 0]:
-                cutoff_idx += 1
-                cutoff = cutoff_points[cutoff_idx]
-            self.weights[i, :, 0] *= 0.9
-            self.weights[i, cutoff[1] + 1:, 0] += 0.1
-            if i >= cutoff[0]:
-                self.weights[i, cutoff[1], 0] += 0.1
-
     def resize_weights(self, left_pad: np.ndarray, size: np.ndarray):
-        default_values = [1.0, INITIAL_SOLUTIONS_WEIGHT, 0.0]
+        default_values = [0.0, INITIAL_SOLUTIONS_WEIGHT]
         if left_pad[0] > 0:
-            pad = np.full((left_pad[0], self.weights.shape[1], 3), default_values)
+            pad = np.full((left_pad[0], self.weights.shape[1], 2), default_values)
             self.weights = np.vstack((pad, self.weights))
         elif left_pad[0] < 0:
             self.weights = self.weights[-left_pad[0]:, :, :]
         if left_pad[1] > 0:
-            pad = np.full((self.weights.shape[0], left_pad[1], 3), default_values)
+            pad = np.full((self.weights.shape[0], left_pad[1], 2), default_values)
             self.weights = np.hstack((pad, self.weights))
         elif left_pad[1] < 0:
             self.weights = self.weights[:, -left_pad[1]:, :]
         right_pad = size - self.weights.shape[:2]
         if right_pad[0] > 0:
-            pad = np.full((right_pad[0], self.weights.shape[1], 3), default_values)
+            pad = np.full((right_pad[0], self.weights.shape[1], 2), default_values)
             self.weights = np.vstack((self.weights, pad))
         elif right_pad[0] < 0:
             self.weights = self.weights[:size[0], :, :]
         if right_pad[1] > 0:
-            pad = np.full((self.weights.shape[0], right_pad[1], 3), default_values)
+            pad = np.full((self.weights.shape[0], right_pad[1], 2), default_values)
             self.weights = np.hstack((self.weights, pad))
         elif right_pad[1] < 0:
             self.weights = self.weights[:, :size[1], :]
 
     def update_dimensions_and_padding(self, block_data):
         hardest_difficulty = np.max([
-            np.max(block_data.scaled_frontier, axis=0),
-            np.max(block_data.base_frontier, axis=0),
+            np.max(list(block_data.scaled_frontier), axis=0),
+            np.max(list(block_data.base_frontier), axis=0),
         ], axis=0)
         if block_data.qualifier_difficulties is not None and len(block_data.qualifier_difficulties) > 0:
             hardest_difficulty = np.max([
                 hardest_difficulty, 
-                np.max(block_data.qualifier_difficulties, axis=0)
+                np.max(list(block_data.qualifier_difficulties), axis=0)
             ], axis=0)
         self.dimensions = hardest_difficulty - self.min_difficulty + 1
         self.padding = np.ceil(self.dimensions * PADDING_FACTOR).astype(int)
+
+class DifficultyManager:
+    def __init__(self):
+        self.samplers = {}
+
+    def update_with_query_data(self, query_data: QueryData):
+        print(f"[difficulty_manager] updating with query data")
+        for challenge in query_data.challenges.values():
+            if challenge.block_data is None:
+                continue
+            name = challenge.details.name
+            if name not in self.samplers:
+                self.samplers[name] = DifficultySampler()
+            print(f"[difficulty_manager] updating sampler for {name} with block data")
+            self.samplers[name].update_with_block_data(
+                min_difficulty=[
+                    param["min_value"]
+                    for param in query_data.block.config["difficulty"]["parameters"][challenge.id]
+                ],
+                block_data=challenge.block_data
+            )
+
+    def update_with_solutions(self, challenge_name: str, difficulty: List[int], num_solutions: int):
+        assert challenge_name in self.samplers, f"No sampler for {challenge_name}"
+        print(f"[difficulty_manager] updating sampler for {challenge_name} @ {difficulty} with {num_solutions} solutions")
+        self.samplers[challenge_name].update_with_solutions(difficulty, num_solutions)
+
+    def sample(self, challenge_name: str):
+        assert challenge_name in self.samplers, f"No sampler for {challenge_name}"
+        ret = self.samplers[challenge_name].sample()
+        print(f"[difficulty_manager] sampled difficulty {ret} for {challenge_name}")
+        return ret
