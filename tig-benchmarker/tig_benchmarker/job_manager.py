@@ -56,7 +56,11 @@ class Job(FromDict):
 
     def merkle_tree(self) -> MerkleTree:
         assert self.benchmark_ready, "Some batches have no results"
-        return MerkleTree([r.merkle_root for r in self.results], len(self.results))
+        num_batches = (self.num_nonces + self.details.batch_size - 1) // self.details.batch_size # ceil division
+        return MerkleTree(
+            [r.merkle_root for r in self.results], 
+            1 << (num_batches - 1).bit_length()
+        )
 
     def merkle_root(self) -> MerkleHash:
         tree = self.merkle_tree()
@@ -64,7 +68,7 @@ class Job(FromDict):
 
     def merkle_proofs(self) -> List[MerkleProof]:
         assert self.proof_ready, "Some sampled nonces have no proofs"
-        depth_offset = (self.num_nonces - 1).bit_length() - (self.details.batch_size - 1).bit_length()
+        depth_offset = (self.details.batch_size - 1).bit_length()
         tree = self.merkle_tree()
         proofs = []
         for batch_idx in set(n // self.details.batch_size for n in self.sampled_nonces):

@@ -79,10 +79,10 @@ The config file (JSON format) should contain the following fields:
 
 ```
 {
-    "max_precommits_per_block": 1,
+    "max_precommits_per_block": 3,
     "satisfiability": {
         "algorithm": "schnoing",
-        "num_nonces": 100000,
+        "num_nonces": 5000,
         "batch_size": 1024,
         "duration_before_batch_retry": 30000,
         "base_fee_limit": "10000000000000000",
@@ -90,7 +90,7 @@ The config file (JSON format) should contain the following fields:
     },
     "vehicle_routing": {
         "algorithm": "clarke_wright",
-        "num_nonces": 100000,
+        "num_nonces": 5000,
         "batch_size": 1024,
         "duration_before_batch_retry": 30000,
         "base_fee_limit": "10000000000000000",
@@ -98,7 +98,7 @@ The config file (JSON format) should contain the following fields:
     },
     "knapsack": {
         "algorithm": "dynamic",
-        "num_nonces": 100000,
+        "num_nonces": 5000,
         "batch_size": 1024,
         "duration_before_batch_retry": 30000,
         "base_fee_limit": "10000000000000000",
@@ -106,11 +106,11 @@ The config file (JSON format) should contain the following fields:
     },
     "vector_search": {
         "algorithm": "basic",
-        "num_nonces": 1000,
+        "num_nonces": 50,
         "batch_size": 128,
         "duration_before_batch_retry": 30000,
         "base_fee_limit": "10000000000000000",
-        "weight": 0
+        "weight": 1
     }
 }
 ```
