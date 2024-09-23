@@ -26,18 +26,13 @@ class FromDict:
         for field in fields(cls):
             value = d.pop(field.name, None)
             field_type = field_types[field.name]
-            origin_type = get_origin(field_type)
-            
-            is_optional = origin_type is Union and type(None) in get_args(field_type)
             
             if value is None:
-                if not is_optional:
+                if cls._is_optional(field_type):
+                    kwargs[field.name] = None
+                else:
                     raise ValueError(f"Missing required field: {field.name}")
-                kwargs[field.name] = None
                 continue
-
-            if is_optional:
-                field_type = next(arg for arg in get_args(field_type) if arg is not type(None))
 
             kwargs[field.name] = cls._process_value(value, field_type)
 
@@ -45,18 +40,30 @@ class FromDict:
 
     @classmethod
     def _process_value(cls, value: Any, field_type: Type) -> Any:
+        origin_type = get_origin(field_type)
+        
+        if cls._is_optional(field_type):
+            if value is None:
+                return None
+            non_none_type = next(arg for arg in get_args(field_type) if arg is not type(None))
+            return cls._process_value(value, non_none_type)
+        
         if hasattr(field_type, 'from_dict') and isinstance(value, dict):
             return field_type.from_dict(value)
         elif hasattr(field_type, 'from_str') and isinstance(value, str):
             return field_type.from_str(value)
-        elif get_origin(field_type) in (list, set, tuple):
+        elif origin_type in (list, set, tuple):
             elem_type = get_args(field_type)[0]
-            return get_origin(field_type)(cls._process_value(item, elem_type) for item in value)
-        elif get_origin(field_type) is dict:
+            return origin_type(cls._process_value(item, elem_type) for item in value)
+        elif origin_type is dict:
             key_type, val_type = get_args(field_type)
-            return {k: cls._process_value(v, val_type) for k, v in value.items()}
+            return {cls._process_value(k, key_type): cls._process_value(v, val_type) for k, v in value.items()}
         else:
             return value
+
+    @staticmethod
+    def _is_optional(field_type: Type) -> bool:
+        return get_origin(field_type) is Union and type(None) in get_args(field_type)
 
     def to_dict(self) -> Dict[str, Any]:
         d = {}
