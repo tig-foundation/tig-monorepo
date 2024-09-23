@@ -135,8 +135,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Benchmarker")
     parser.add_argument("player_id", help="Player ID")
     parser.add_argument("api_key", help="API Key")
-    parser.add_argument("config_path", help="Path to the configuration file")
-    parser.add_argument("jobs_folder", help="Folder to job jobs until their proofs are submitted")
+    parser.add_argument("config_path", help="Path to the configuration JSON file")
+    parser.add_argument("jobs_folder", help="Folder to save jobs until their proofs are submitted (create your own folder)")
     parser.add_argument("--port", type=int, default=5115, help="Port to run the server on (default: 5115)")
     parser.add_argument("--api", default="https://mainnet-api.tig.foundation", help="API URL (default: https://mainnet-api.tig.foundation)")
     

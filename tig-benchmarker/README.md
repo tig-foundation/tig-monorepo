@@ -27,8 +27,8 @@ TIG Benchmarker
 positional arguments:
   player_id    Player ID
   api_key      API Key
-  config_path  Path to the configuration file
-  jobs_folder  Folder to job jobs until their proofs are submitted
+  config_path  Path to the configuration JSON file
+  jobs_folder  Folder to save jobs until their proofs are submitted (create your own folder)
 
 options:
   -h, --help   show this help message and exit
