@@ -1,6 +1,8 @@
 import asyncio
 import argparse
+import os
 import random
+import sys
 from quart import Quart, request, jsonify
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
@@ -72,33 +74,38 @@ async def main(
             submissions = []
             print(f"[main] {num_precommits_submitted} precommits already submitted for block '{latest_block_id}' (max: {config_manager.config.max_precommits_per_block})")
             if num_precommits_submitted < config_manager.config.max_precommits_per_block:
-                challenge_weights = [
-                    (
-                        c.details.name,
-                        getattr(config_manager.config, c.details.name).weight
+                challenge_weights = []
+                for c in query_data.challenges.values():
+                    challenge_config = getattr(config_manager.config, c.details.name)
+                    print(f"[main] challenge: {c.details.name}, base_fee: {c.block_data.base_fee}, config.base_fee_limit: {challenge_config.base_fee_limit}")
+                    if c.block_data.base_fee < challenge_config.base_fee_limit:
+                        challenge_weights.append((
+                            c.details.name,
+                            challenge_config.weight
+                        ))
+                if len(challenge_weights) == 0:
+                    print("[main] no challenges with base_fee below limit")
+                else:
+                    print(f"[main] weighted sampling challenges: {challenge_weights}")
+                    challenge = random.choices(
+                        [c for c, _ in challenge_weights],
+                        weights=[w for _, w in challenge_weights]
+                    )[0]
+                    challenge_config = getattr(config_manager.config, challenge)
+                    print(f"[main] selected challenge: {challenge}, algorithm: {challenge_config.algorithm}, num_nonces: {challenge_config.num_nonces}")
+                    difficulty = difficulty_manager.sample(challenge)
+                    num_precommits_submitted += 1
+                    req = SubmitPrecommitRequest(
+                        settings=BenchmarkSettings(
+                            player_id=player_id,
+                            algorithm_id=next(a.id for a in query_data.algorithms.values() if a.details.name == challenge_config.algorithm),
+                            challenge_id=next(c.id for c in query_data.challenges.values() if c.details.name == challenge),
+                            difficulty=difficulty,
+                            block_id=query_data.block.id
+                        ),
+                        num_nonces=challenge_config.num_nonces
                     )
-                    for c in query_data.challenges.values()
-                ]
-                print(f"[main] weighted sampling challenges: {challenge_weights}")
-                challenge = random.choices(
-                    [c for c, _ in challenge_weights],
-                    weights=[w for _, w in challenge_weights]
-                )[0]
-                challenge_config = getattr(config_manager.config, challenge)
-                print(f"[main] selected challenge: {challenge}, algorithm: {challenge_config.algorithm}, num_nonces: {challenge_config.num_nonces}")
-                difficulty = difficulty_manager.sample(challenge)
-                num_precommits_submitted += 1
-                req = SubmitPrecommitRequest(
-                    settings=BenchmarkSettings(
-                        player_id=player_id,
-                        algorithm_id=next(a.id for a in query_data.algorithms.values() if a.details.name == challenge_config.algorithm),
-                        challenge_id=next(c.id for c in query_data.challenges.values() if c.details.name == challenge),
-                        difficulty=difficulty,
-                        block_id=query_data.block.id
-                    ),
-                    num_nonces=challenge_config.num_nonces
-                )
-                submissions.append(submissions_manager.post(req))
+                    submissions.append(submissions_manager.post(req))
 
             if (job := submissions_manager.find_benchmark_to_submit(query_data, job_manager)) is not None:
                 req = SubmitBenchmarkRequest(
@@ -135,9 +142,16 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
+    if not os.path.exists(args.config_path):
+        print(f"[main] fatal error: config file not found at path: {args.config_path}")
+        sys.exit(1)
+    if not os.path.exists(args.jobs_folder):
+        print(f"[main] fatal error: jobs folder not found at path: {args.jobs_folder}")
+        sys.exit(1)
+
     config = Config()
     config.bind = [f"localhost:{args.port}"]
-    
+
     async def start():
         await asyncio.gather(
             serve(app, config), 

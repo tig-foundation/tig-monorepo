@@ -1,132 +1,135 @@
 # tig-benchmarker
 
-A Rust crate that implements a Benchmarker for TIG. 
+Python scripts that implements a master/slave Benchmarker for TIG. 
 
-## Compiling Your Benchmarker
-
-`tig-benchmarker` can be compiled into an executable for running standalone, or in slave mode (see notes)
-
-There are two ways to start the master benchmarker:
-
-1. Compile into exectuable and then run the executable:
-    ```
-    ALGOS_TO_COMPILE="" # See notes
-    # USE_CUDA="cuda" # See notes
-    cargo build -p tig-benchmarker --release --no-default-features --features "${ALGOS_TO_COMPILE} ${USE_CUDA}"
-    # edit below line for your own algorithm selection
-    SELECTED_ALGORITHMS='{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"basic"}'
-    ./target/release/tig-benchmarker <address> <api_key> $SELECTED_ALGORITHMS
-    ```
-
-2. Compile executable in a docker, and run the docker:
-    ```
-    ALGOS_TO_COMPILE="" # See notes
-    # USE_CUDA="cuda" # See notes
-    docker build -f tig-benchmarker/Dockerfile --build-arg features="${ALGOS_TO_COMPILE} ${USE_CUDA}" -t tig-benchmarker .
-    # edit below line for your own algorithm selection
-    SELECTED_ALGORITHMS='{"satisfiability":"schnoing","vehicle_routing":"clarke_wright","knapsack":"dynamic","vector_search":"optimal_ann"}'
-    docker run -it -v $(pwd):/app tig-benchmarker <address> <api_key> $SELECTED_ALGORITHMS
-    ```
-
-**Notes:**
-
-* Setting `ALGOS_TO_COMPILE` will run the selected algorithms directly in your execution environment to filter for nonces that results in solutions. Nonces that are filtered will then be re-run in the WASM virtual machine to compute the necessary solution data for submission.
-
-    * **WARNING** before setting `ALGOS_TO_COMPILE`, be sure to thoroughly review the algorithm code for malicious routines as it will be ran directly in your execution environment (not within a sandboxed WASM virtual machine)!
-
-    * `ALGOS_TO_COMPILE` is a space separated string of algorithms with format `<challenge_name>_<algorithm_name>`. Example: 
-    
-        ```
-        ALGOS_TO_COMPILE="satisfiability_schnoing vehicle_routing_clarke_wright knapsack_dynamic vector_search_optimal_ann"
-        ```
-
-* You can see available algorithms in the dropdowns of the [Benchmarker UI](https://play.tig.foundation/benchmarker)
-    * Alternatively, you can use [`script\list_algorithms.sh`](../scripts/list_algorithms.sh)
-* `tig-benchmarker` starts a master node by default. The port can be set with `--port <port>` (default 5115)
-* `tig-benchmarker` that are started with the option `--master <hostname>` are ran as slaves and will poll the master for jobs
-    * slaves will ignore any job that doesn't match their algorithm selection
-    * one possible setup is to run the master with `--workers 0`, and then run a separate slave for each challenge with different number of workers
-* `tig-benchmarker` can be executed with `--help` to see all options including setting the number of workers, and setting the duration of a benchmark
-* Uncomment `# USE_CUDA="cuda"` to compile `tig-benchmarker` to use CUDA optimisations where they are available. 
-    * You must have a CUDA compatible GPU with CUDA toolkit installed
-    * You must have set `ALGOS_TO_COMPILE`
-    * Not all algorithms have CUDA optimisations. If they don't, it will default to using the CPU version
-    * CUDA optimisations may or may not be more performant
-
-# Python Master Benchmarker
-
-There is the option of running all your standalone benchmarkers in slave mode, and running `main.py` to act as your master. The key benefits of such a setup is:
-1. Much easier to change settings for specific challenges/algorithms such as benchmark duration, and duration to wait for slaves to submit solutions
-2. Much easier to integrate with dashboards and other tools
-3. Much easier to modify to dump logs and other stats for refining your strategy
-
-## Running Python Master
+# Setting Up
 
 ```
-cd tig-monorepo/tig-benchmarker
-pip3 install -r requirements.txt
-python3 main.py
+# install python requirements
+pip install -r requirements.txt
+# compile tig-worker
+cargo build -p tig-worker --release
 ```
 
-## Customising Your Algorithms
+# Master
 
-Edit [tig-benchmarker/master/config.py](./master/config.py)
+The master node is responsible for submitting precommits/benchmarks/proofs, generating batches for slaves to work on, and managing the overall benchmarking process.
 
-Example:
+The current implementation expects only a single instance of `master.py` per `player_id`.
+
+## Usage
+
 ```
-PLAYER_ID = "0x1234567890123456789012345678901234567890" # your player_id
-API_KEY = "11111111111111111111111111111111" # your api_key
-TIG_WORKER_PATH = "/<path to tig-monorepo>/target/release/tig-worker" # path to executable tig-worker
-TIG_ALGORITHMS_FOLDER = "/<path to tig-monorepo>/tig-algorithms" # path to tig-algorithms folder
-API_URL = "https://mainnet-api.tig.foundation"
+usage: python master.py [-h] [--port PORT] [--api API] player_id api_key config_path jobs_folder
 
-if PLAYER_ID is None or API_KEY is None or TIG_WORKER_PATH is None or TIG_ALGORITHMS_FOLDER is None:
-    raise Exception("Please set the PLAYER_ID, API_KEY, and TIG_WORKER_PATH, TIG_ALGORITHMS_FOLDER variables in 'tig-benchmarker/master/config.py'")
+TIG Benchmarker
 
-PORT = 5115
-JOBS = dict(
-    # add an entry for each challenge you want to benchmark
-    satisfiability=dict(
-        # add an entry for each algorithm you want to benchmark
-        schnoing=dict(
-            benchmark_duration=10000, # amount of time to run the benchmark in milliseconds
-            wait_slave_duration=5000, # amount of time to wait for slaves to post solutions before submitting
-            num_jobs=1, # number of jobs to create. each job will sample its own difficulty
-            weight=1.0, # weight of jobs for this algorithm. more weight = more likely to be picked
-        )
-    ),
-    vehicle_routing=dict(
-        clarke_wright=dict(
-            benchmark_duration=10000,
-            wait_slave_duration=5000,
-            num_jobs=1,
-            weight=1.0,
-        )
-    ),
-    knapsack=dict(
-        dynamic=dict(
-            benchmark_duration=10000,
-            wait_slave_duration=5000,
-            num_jobs=1,
-            weight=1.0,
-        )
-    ),
-    vector_search=dict(
-        optimal_ann=dict(
-            benchmark_duration=30000, # recommend a high duration
-            wait_slave_duration=30000, # recommend a high duration
-            num_jobs=1,
-            weight=1.0,
-        )
-    ),
-)
+positional arguments:
+  player_id    Player ID
+  api_key      API Key
+  config_path  Path to the configuration file
+  jobs_folder  Folder to job jobs until their proofs are submitted
+
+options:
+  -h, --help   show this help message and exit
+  --port PORT  Port to run the server on (default: 5115)
+  --api API    API URL (default: https://mainnet-api.tig.foundation)
 ```
 
-Notes:
-  * `weight` determine how likely a slave will benchmark that algorithm (if your slave is setup with all algorithms). If algorithm A has weight of 10, and algorithm B has weight of 1, algorithm A is 10x more likely to be picked
-  * `num_jobs` can usually be left at `1` unless you are running a lot of slaves and want to spread out your compute across different difficulties
-  * `vector_search` challenge may require longer durations due to its resource requirements
-  * See [tig-worker/README.md](../tig-worker/README.md) for instructions on compiling `tig-worker`
+# Slave
+
+Slave nodes poll the master for batches to work on and process them using `tig-worker`.
+
+## Usage
+
+```
+usage: python slave.py [-h] [--workers WORKERS] [--name NAME] [--port PORT] master_ip tig_worker_path tig_algorithms_folder
+
+TIG Slave Benchmarker
+
+positional arguments:
+  master_ip             IP address of the master
+  tig_worker_path       Path to tig-worker executable
+  tig_algorithms_folder
+                        Path to tig-algorithms folder. Used to save WASMs
+
+options:
+  -h, --help            show this help message and exit
+  --workers WORKERS     Number of workers (default: 8)
+  --name NAME           Name for the slave (default: randomly generated)
+  --port PORT           Port for master (default: 5115)
+```
+
+# Benchmarking Process
+
+1. Master submits a precommit (benchmark settings + num_nonces)
+2. Once precommit is confirmed, master creates a job and generates "batches"
+3. Slaves poll for batches to work on, using `tig-worker` to output the batch merkle_root and nonces for which there are solutions
+4. Slaves submit batch results back to master
+5. Once all batches are complete, the master calculates the top merkle root, collates solution_nonces, and submits it as a Benchmark
+6. When a benchmark is confirmed, master generates priority batches corresponding to the sampled nonces
+    * The master stores batch merkle_roots to minimise re-computation
+7. Slaves working on a priority batch generate the merkle proof for sampled nonces
+8. Slaves submit priority batch results back to master
+9. Once all priority batches are complete, the master calculates the merkle proofs and submits it as a proof
+
+# Configuration
+
+The config file (JSON format) should contain the following fields:
+
+```
+{
+    "max_precommits_per_block": 1,
+    "satisfiability": {
+        "algorithm": "schnoing",
+        "num_nonces": 100000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 1
+    },
+    "vehicle_routing": {
+        "algorithm": "clarke_wright",
+        "num_nonces": 100000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 1
+    },
+    "knapsack": {
+        "algorithm": "dynamic",
+        "num_nonces": 100000,
+        "batch_size": 1024,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 1
+    },
+    "vector_search": {
+        "algorithm": "basic",
+        "num_nonces": 1000,
+        "batch_size": 128,
+        "duration_before_batch_retry": 30000,
+        "base_fee_limit": "10000000000000000",
+        "weight": 0
+    }
+}
+```
+
+* `max_precommits_per_block`: Number of precommits submitted each block
+* For each challenge type:
+    * `algorithm`: Algorithm to use
+    * `num_nonces`: Number of nonces for a precommit
+    * `batch_size`: Must be a power of 2
+    * `duration_before_batch_retry`: Time in milliseconds before a batch is requeued
+    * `base_fee_limit`: Maximum amount of TIG willing to pay for a precommit
+    * `weight`: Used in weighted sampling of a challenge for a precommit
+
+**Important:**
+
+Use `tig-worker compute_batch` to determine an appropiate `num_nonces` and `batch_size`.
+* It is recommended that each batch takes around 5-10 seconds max. 
+* You should target a specific duration for your benchmark
+* Example: if you got `2` slaves, and each slave processes a batch of `1000` in `5s`, setting num_nonces to 10,000 should take `10000 / (1000 x 2) x 5 = 25s`
 
 # Finding your API Key
 

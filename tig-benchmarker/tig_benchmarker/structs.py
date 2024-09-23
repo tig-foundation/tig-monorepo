@@ -203,6 +203,8 @@ class ChallengeBlockData(FromDict):
     base_frontier: Frontier
     scaled_frontier: Frontier
     scaling_factor: float
+    base_fee: Optional[PreciseNumber]
+    per_nonce_fee: Optional[PreciseNumber]
 
 @dataclass
 class Challenge(FromDict):
