@@ -40,7 +40,7 @@ async fn verify_benchmark_not_already_submitted<T: Context>(
         .first()
         .is_some()
     {
-        return Err(ProtocolError::DuplicateProof {
+        return Err(ProtocolError::DuplicateBenchmark {
             benchmark_id: benchmark_id.to_string(),
         });
     }
