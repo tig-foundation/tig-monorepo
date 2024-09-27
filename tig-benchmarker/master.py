@@ -7,10 +7,6 @@ import os
 from tig_benchmarker.event_bus import process_events, emit
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
-logging.basicConfig(
-    format='%(levelname)s - [%(name)s] - %(message)s',
-    level=logging.INFO
-)
 
 async def main(
     player_id: str,
@@ -48,8 +44,14 @@ if __name__ == "__main__":
     parser.add_argument("--api", default="https://mainnet-api.tig.foundation", help="API URL (default: https://mainnet-api.tig.foundation)")
     parser.add_argument("--backup", default="backup", help="Folder to save pending submissions and other data")
     parser.add_argument("--port", type=int, default=5115, help="Port to run the server on (default: 5115)")
+    parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format='%(levelname)s - [%(name)s] - %(message)s',
+        level=logging.DEBUG if args.verbose else logging.INFO
+    )
 
     if not os.path.exists(args.config_path):
         logger.error(f"config file not found at path: {args.config_path}")

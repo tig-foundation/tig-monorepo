@@ -8,10 +8,6 @@ import subprocess
 import time
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
-logging.basicConfig(
-    format='%(levelname)s - [%(name)s] - %(message)s',
-    level=logging.INFO
-)
 
 def main(
     master_ip: str,
@@ -108,7 +104,13 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=8, help="Number of workers (default: 8)")
     parser.add_argument("--name", type=str, default=randomname.get_name(), help="Name for the slave (default: randomly generated)")
     parser.add_argument("--port", type=int, default=5115, help="Port for master (default: 5115)")
+    parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
     
+    logging.basicConfig(
+        format='%(levelname)s - [%(name)s] - %(message)s',
+        level=logging.DEBUG if args.verbose else logging.INFO
+    )
+
     main(args.master_ip, args.tig_worker_path, args.download, args.workers, args.name, args.port)
