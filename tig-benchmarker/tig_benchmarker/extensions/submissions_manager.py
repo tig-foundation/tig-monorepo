@@ -142,7 +142,7 @@ class Extension:
                     submission.request.benchmark_id in kwargs[submission_type + "s"] # is confirmed
                 ):
                     logger.info(f"removing {submission_type} {submission.request.benchmark_id} from pending submissions")
-                    path = os.path.join(self.backup_folder, f"{submission.request.benchmark_id}.json")
+                    path = os.path.join(self.backup_folder, submission_type, f"{submission.request.benchmark_id}.json")
                     if os.path.exists(path):
                         os.remove(path)
                 else:
