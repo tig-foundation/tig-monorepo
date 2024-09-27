@@ -2,14 +2,40 @@
 
 Python scripts that implements a master/slave Benchmarker for TIG. 
 
-# Setting Up
+# Getting Started
 
-```
-# install python requirements
-pip install -r requirements.txt
-# compile tig-worker
-cargo build -p tig-worker --release
-```
+1. Navigate to https://play.tig.foundation/benchmarker
+2. Connect your wallet
+3. Use the UI to Top-Up your Available Fee Balance by burning some TIG
+4. Find your API key: 
+    * Run the following command in the console: `JSON.parse(Cookies.get("account"))`
+    * `address` is your Mainnet `player_id`
+    * `api_key` is your Mainnet API key
+5. Clone this repo
+    ```
+    git clone https://github.com/tig-foundation/tig-monorepo.git
+    ```
+6. Compile `tig-worker`
+    ```
+    cd tig-monorepo
+    cargo build -p tig-worker --release
+    ```
+7. Install python requirements
+    ```
+    # in tig-benchmarker folder
+    pip install -r requirements.txt
+    ```
+8. Run a master
+    ```
+    # in tig-benchmarker folder
+    python3 master.py <player_id> <api_key> <path to config.json>
+    ```
+9. Connect at least 1 slave to your master
+    ```
+    python3 slave.py <master_ip> <path to tig-worker>
+    ```
+    * If running locally, your master_ip should be 0.0.0.0 or localhost
+    * tig-worker binary should be located at `tig-monorepo/target/release/tig-worker`
 
 # Master
 
@@ -22,7 +48,7 @@ The master does no benchmarking! You need to connect slaves
 ## Usage
 
 ```
-usage: master.py [-h] [--api API] [--backup BACKUP] [--port PORT] player_id api_key config_path
+usage: master.py [-h] [--api API] [--backup BACKUP] [--port PORT] [--verbose] player_id api_key config_path
 
 TIG Benchmarker
 
@@ -36,6 +62,7 @@ options:
   --api API        API URL (default: https://mainnet-api.tig.foundation)
   --backup BACKUP  Folder to save pending submissions and other data
   --port PORT      Port to run the server on (default: 5115)
+  --verbose        Print debug logs
 ```
 
 # Slave
@@ -45,21 +72,21 @@ Slave nodes poll the master for batches to work on and process them using `tig-w
 ## Usage
 
 ```
-usage: python slave.py [-h] [--workers WORKERS] [--name NAME] [--port PORT] master_ip tig_worker_path tig_algorithms_folder
+usage: slave.py [-h] [--download DOWNLOAD] [--workers WORKERS] [--name NAME] [--port PORT] [--verbose] master_ip tig_worker_path
 
 TIG Slave Benchmarker
 
 positional arguments:
-  master_ip             IP address of the master
-  tig_worker_path       Path to tig-worker executable
-  tig_algorithms_folder
-                        Path to tig-algorithms folder. Used to save WASMs
+  master_ip            IP address of the master
+  tig_worker_path      Path to tig-worker executable
 
 options:
-  -h, --help            show this help message and exit
-  --workers WORKERS     Number of workers (default: 8)
-  --name NAME           Name for the slave (default: randomly generated)
-  --port PORT           Port for master (default: 5115)
+  -h, --help           show this help message and exit
+  --download DOWNLOAD  Folder to download WASMs to
+  --workers WORKERS    Number of workers (default: 8)
+  --name NAME          Name for the slave (default: randomly generated)
+  --port PORT          Port for master (default: 5115)
+  --verbose            Print debug logs
 ```
 
 # Benchmarking Process
@@ -233,24 +260,6 @@ Manages the submission of precommits, benchmarks, and proofs to the API.
 * `submit_precommit_error`: When a precommit submission fails
 * `submit_benchmark_error`: When a benchmark submission fails
 * `submit_proof_error`: When a proof submission fails
-
-# Finding your API Key
-
-## Mainnet
-
-1. Navigate to https://play.tig.foundation/
-2. Connect your wallet
-3. Run the following command in the console: `JSON.parse(Cookies.get("account"))`
-    * `address` is your Mainnet `player_id`
-    * `api_key` is your Mainnet API key
-
-## Testnet
-
-1. Navigate to https://test.tig.foundation/
-2. Connect your wallet
-3. Run the following command in the console: `JSON.parse(Cookies.get("account"))`
-    * `address` is your Testnet `player_id`
-    * `api_key` is your Testnet API key
 
 # License
 

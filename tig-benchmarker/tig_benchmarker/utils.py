@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractclassmethod, abstractmethod
 from blake3 import blake3
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, asdict
 from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, get_args
 import json
 
