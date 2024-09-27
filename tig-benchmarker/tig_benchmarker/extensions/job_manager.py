@@ -44,12 +44,6 @@ class Extension:
         self.benchmark_ready = set()
         self.proof_ready = set()
         self.lock = True
-        subscribe("new_block", self.on_new_block)
-        subscribe("precommit_confirmed", self.on_precommit_confirmed)
-        subscribe("benchmark_confirmed", self.on_benchmark_confirmed)
-        subscribe("proof_confirmed", self.on_proof_confirmed)
-        subscribe("update", self.on_update)
-        subscribe("batch_result", self.on_batch_result)
         self._restore_jobs()
 
     async def on_new_block(
@@ -121,10 +115,18 @@ class Extension:
             return
         now = int(time.time() * 1000)
         for benchmark_id, job in self.jobs.items():
-            if benchmark_id not in self.proof_ready and len(job.sampled_nonces) > 0 and set(job.sampled_nonces) == set(job.merkle_proofs):
+            if (
+                benchmark_id not in self.proof_ready and 
+                len(job.sampled_nonces) > 0 and 
+                set(job.sampled_nonces) == set(job.merkle_proofs) and 
+                all(x is not None for x in job.batch_merkle_roots)
+            ):
                 self.proof_ready.add(benchmark_id)
                 await self._emit_proof(job)
-            elif benchmark_id not in self.benchmark_ready and all(x is not None for x in job.batch_merkle_roots):
+            elif (
+                benchmark_id not in self.benchmark_ready and 
+                all(x is not None for x in job.batch_merkle_roots)
+            ):
                 self.benchmark_ready.add(benchmark_id)
                 await self._emit_benchmark(job)
             else:
@@ -189,6 +191,10 @@ class Extension:
         self.jobs.pop(job.benchmark_id, None)
         if os.path.exists(path):
             os.remove(path)
+        if job.benchmark_id in self.benchmark_ready:
+            self.benchmark_ready.remove(job.benchmark_id)
+        if job.benchmark_id in self.proof_ready:
+            self.proof_ready.remove(job.benchmark_id)
 
     async def _emit_proof(self, job: Job):
         # join merkle_proof for the job tree (all batches) with merkle_proof of the batch tree

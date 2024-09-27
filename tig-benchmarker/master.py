@@ -4,6 +4,7 @@ import importlib
 import json
 import logging
 import os
+import time
 from tig_benchmarker.event_bus import process_events, emit
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -29,11 +30,14 @@ async def main(
             **config["config"]
         )
 
-    asyncio.create_task(process_events())
-
+    last_update = time.time()
     while True:
-        await emit('update')
-        await asyncio.sleep(5)
+        now = time.time()
+        if now - last_update > 5:
+            last_update = now
+            await emit('update')
+        await process_events(extensions)
+        await asyncio.sleep(0.1)
 
 
 if __name__ == "__main__":

@@ -8,47 +8,41 @@ from typing import Callable, Dict, List, Optional
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-_queue: Queue = Queue()
-_listeners: Dict[str, List[Dict[str, Callable | int]]] = defaultdict(list)
+_queue = []
 
-async def emit(event_name: str, *args, **kwargs) -> None:
-    """Emits an event with arguments."""
-    await _queue.put((event_name, args, kwargs))
+async def emit(event_name: str, **kwargs) -> None:
+    global _queue
+    _queue.append((event_name, kwargs))
 
-def on(event: str, /, *, priority: int = 1) -> Callable:
-    """Decorator to subscribe a method to an event."""
-    def wrapper(callback: Callable) -> Callable:
-        subscribe(event, callback, priority=priority)
-        return callback
-    return wrapper
-
-def subscribe(event: str, callback: Callable, /, *, priority: int = 1) -> None:
-    """Subscribes a method to an event."""
-    _listeners[event].append({"callback": callback, "priority": priority})
-    _listeners[event].sort(key=lambda subscriber: subscriber["priority"], reverse=True)
-
-def unsubscribe(event: str, callback: Callable, /) -> None:
-    """Unsubscribes a method from an event."""
-    if event in _listeners:
-        _listeners[event] = [
-            subscriber for subscriber in _listeners[event]
-            if subscriber["callback"] != callback
-        ]
-
-async def _safe_execute(event_name: str, subscriber: Dict[str, Callable | int], *args, **kwargs) -> None:
-    callback = subscriber['callback']
-    priority = subscriber['priority']
+async def _safe_execute(extension_name: str, event_name: str, handler: Callable, kwargs: dict) -> None:
     try:
-        start = time.time()
-        await callback(*args, **kwargs)
+        logger.debug(f"calling {extension_name}.on_{event_name}")
+        await handler(**kwargs)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        logger.error(f"callback '{callback}' for event '{event_name}': {str(e)}")
+        logger.error(f"'{extension_name}.on_{event_name}': {str(e)}")
 
-async def process_events():
-    while True:
-        event_name, args, kwargs = await _queue.get()
-        for subscriber in _listeners[event_name]:
-            asyncio.create_task(_safe_execute(event_name, subscriber, *args, **kwargs))
-        _queue.task_done()
+async def process_events(extensions: dict):
+    global _queue
+    num_events = len(_queue)
+    event_names = set(
+        _queue[i][0]
+        for i in range(num_events)
+    )
+    handlers = {
+        e: [
+            (ext_name, getattr(ext, f'on_{e}'))
+            for ext_name, ext in extensions.items()
+            if hasattr(ext, f'on_{e}')
+        ]
+        for e in event_names
+    }
+    await asyncio.gather(
+        *[
+            _safe_execute(ext_name, _queue[i][0], h, _queue[i][1])
+            for i in range(num_events)
+            for (ext_name, h) in handlers[_queue[i][0]]
+        ]
+    )
+    _queue = _queue[num_events:]

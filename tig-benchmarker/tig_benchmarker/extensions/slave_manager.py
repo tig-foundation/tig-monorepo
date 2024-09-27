@@ -21,8 +21,6 @@ class Extension:
         self.batches = deque()
         self.priority_batches = deque()
         self._start_server()
-        subscribe("new_batch", self.on_new_batch)
-        subscribe("new_block", self.on_new_block)
 
     def _start_server(self):
         app = Quart(__name__)

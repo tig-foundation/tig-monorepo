@@ -32,10 +32,6 @@ class Extension:
         self.algorithm_name_2_id = {}
         self.challenge_name_2_id = {}
         self.lock = True
-        subscribe("new_block", self.on_new_block)
-        subscribe("submit_precommit_error", self.on_submit_precommit_error)
-        subscribe("difficulty_samples", self.on_difficulty_samples)
-        subscribe("update", self.on_update)
 
     async def on_new_block(self, block: Block, challenges: Dict[str, Challenge], algorithms: Dict[str, Algorithm], **kwargs):
         if self.last_block_id != block.id:

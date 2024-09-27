@@ -31,7 +31,6 @@ class Extension:
         self.player_id = player_id
         self._cache = None
         self.lock = False
-        subscribe("update", self.on_update)
 
     async def on_update(self):
         if self.lock:

@@ -49,11 +49,6 @@ class Extension:
             "proof": []
         }
         self._restore_pending_submissions()
-        subscribe("precommit_ready", self.on_precommit_ready)
-        subscribe("benchmark_ready", self.on_benchmark_ready)
-        subscribe("proof_ready", self.on_proof_ready)
-        subscribe("new_block", self.on_new_block)
-        subscribe("update", self.on_update)
 
     def _restore_pending_submissions(self):
         pending_benchmarks = []
@@ -158,7 +153,6 @@ class Extension:
         logger.info(f"pending submissions: (#precommits: {len(self.pending_submissions['precommit'])}, #benchmarks: {len(self.pending_submissions['benchmark'])}, #proofs: {len(self.pending_submissions['proof'])})")
 
         now = int(time.time() * 1000)
-        submissions = []
         for submission_type in ["precommit", "benchmark", "proof"]:
             if len(self.pending_submissions[submission_type]) > 0:
                 self.pending_submissions[submission_type] = sorted(self.pending_submissions[submission_type], key=lambda x: x.last_retry_time)
@@ -166,13 +160,11 @@ class Extension:
                     logger.info(f"no {submission_type} ready for submission")
                 else:
                     s = self.pending_submissions[submission_type].pop(0)
-                    submissions.append(self.submit(s))
+                    asyncio.create_task(self.submit(s))
                     if submission_type == "precommit":
                         logger.info(f"submitting precommit {s.request}")
                     else:
                         logger.info(f"submitting {submission_type} '{s.request.benchmark_id}'")
-        if len(submissions) > 0:
-            await asyncio.gather(*submissions)
         
     async def submit(
         self,

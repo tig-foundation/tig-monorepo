@@ -162,8 +162,6 @@ class Extension:
         self.config = DifficultySamplerConfig.from_dict(difficulty_sampler)
         self.samplers = {}
         self.lock = True
-        subscribe("new_block", self.on_new_block)
-        subscribe("benchmark_confirmed", self.on_benchmark_confirmed)
 
     async def on_new_block(
         self, 
