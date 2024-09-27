@@ -205,23 +205,23 @@ class Extension:
             job.batch_merkle_roots, 
             1 << (job.num_batches - 1).bit_length()
         )
-        proofs = []
+        proofs = {}
         for batch_idx in job.sampled_nonces_by_batch_idx:
             upper_stems = [
                 (d + depth_offset, h) 
                 for d, h in tree.calc_merkle_branch(batch_idx).stems
             ]
-            for nonce in job.sampled_nonces_by_batch_idx[batch_idx]:
+            for nonce in set(job.sampled_nonces_by_batch_idx[batch_idx]):
                 proof = job.merkle_proofs[nonce]
-                proofs.append(MerkleProof(
+                proofs[nonce] = MerkleProof(
                     leaf=proof.leaf,
                     branch=MerkleBranch(proof.branch.stems + upper_stems)
-                ))
+                )
         logger.info(f"proof {job.benchmark_id} is ready with {len(proofs)} merkle proofs")
         await emit(
             "proof_ready",
             benchmark_id=job.benchmark_id,
-            merkle_proofs=proofs
+            merkle_proofs=list(proofs.values())
         )
 
     async def _emit_benchmark(self, job: Job):
@@ -235,7 +235,7 @@ class Extension:
             "benchmark_ready",
             benchmark_id=job.benchmark_id,
             merkle_root=root,
-            solution_nonces=job.solution_nonces
+            solution_nonces=list(set(job.solution_nonces))
         )
 
     async def _emit_batches(self, job: Job):
