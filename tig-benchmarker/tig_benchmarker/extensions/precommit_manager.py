@@ -56,10 +56,6 @@ class Extension:
     async def on_difficulty_samples(self, challenge_id: str, samples: list, **kwargs):
         self.difficulty_samples[challenge_id] = samples
 
-    async def on_submit_precommit_error(self, request, **kwargs):
-        if request.settings.block_id == self.last_block_id:
-            self.num_precommits_submitted -= 1
-
     async def on_update(self):
         if self.lock or self.num_precommits_submitted >= self.config.max_precommits_per_block:
             return

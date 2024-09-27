@@ -153,7 +153,9 @@ class Extension:
             logger.info(f"validating batch results for {benchmark_id} @ index {batch_idx}")
             assert start_nonce % job.batch_size == 0, "start_nonce not aligned with batch size"
             assert all(start_nonce <= n < start_nonce + job.num_nonces for n in solution_nonces), "solution nonces not in batch"
-            assert set(job.sampled_nonces_by_batch_idx.get(batch_idx, [])) == set(x.leaf.nonce for x in merkle_proofs), "sampled nonces do not match proofs"
+            left = set(job.sampled_nonces_by_batch_idx.get(batch_idx, []))
+            right = set(x.leaf.nonce for x in merkle_proofs)
+            assert left == right, f"sampled nonces {left} do not match proofs {right}"
             assert all(x.branch.calc_merkle_root(
                 hashed_leaf=x.leaf.to_merkle_hash(),
                 branch_idx=x.leaf.nonce - start_nonce, # branch idx of batch tree
