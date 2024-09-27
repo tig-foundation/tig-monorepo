@@ -1,14 +1,24 @@
+import asyncio
+import logging
 import numpy as np
-from typing import List, Tuple
-from tig_benchmarker.data_fetcher import QueryData
+import os
+from tig_benchmarker.event_bus import *
+from tig_benchmarker.structs import *
+from tig_benchmarker.utils import FromDict
+from typing import List, Tuple, Dict
 
-PADDING_FACTOR = 0.2
-DECAY = 0.7
-INITIAL_SOLUTIONS_WEIGHT = 500.0
-SOLUTIONS_MULTIPLIER = 10.0
+logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
+
+class DifficultySamplerConfig(FromDict):
+    num_samples: int = 100
+    padding_factor: float = 0.2
+    decay: float = 0.7
+    initial_solutions_weight: float = 500.0
+    solutions_multiplier: float = 10.0
 
 class DifficultySampler:
-    def __init__(self):
+    def __init__(self, config: DifficultySamplerConfig):
+        self.config = config
         self.min_difficulty = None
         self.padding = None
         self.dimensions = None
@@ -56,8 +66,8 @@ class DifficultySampler:
         )
         position = np.stack((x, y), axis=-1)
         dist = np.linalg.norm((position - center) / self.padding, axis=-1)
-        decay = dist * (1.0 - DECAY) + DECAY
-        delta = (1.0 - decay) * num_solutions * SOLUTIONS_MULTIPLIER
+        decay = dist * (1.0 - self.config.decay) + self.config.decay
+        delta = (1.0 - decay) * num_solutions * self.config.solutions_multiplier
         decay[np.where(dist > 1.0)] = 1.0
         delta[np.where(dist > 1.0)] = 0.0
 
@@ -111,7 +121,7 @@ class DifficultySampler:
         self.distribution = distribution
 
     def resize_weights(self, left_pad: np.ndarray, size: np.ndarray):
-        default_values = [0.0, INITIAL_SOLUTIONS_WEIGHT]
+        default_values = [0.0, self.config.initial_solutions_weight]
         if left_pad[0] > 0:
             pad = np.full((left_pad[0], self.weights.shape[1], 2), default_values)
             self.weights = np.vstack((pad, self.weights))
@@ -145,36 +155,56 @@ class DifficultySampler:
                 np.max(list(block_data.qualifier_difficulties), axis=0)
             ], axis=0)
         self.dimensions = hardest_difficulty - self.min_difficulty + 1
-        self.padding = np.ceil(self.dimensions * PADDING_FACTOR).astype(int)
+        self.padding = np.ceil(self.dimensions * self.config.padding_factor).astype(int)
 
-class DifficultyManager:
-    def __init__(self):
+class Extension:
+    def __init__(self, difficulty_sampler: dict, **kwargs):
+        self.config = DifficultySamplerConfig.from_dict(difficulty_sampler)
         self.samplers = {}
+        self.lock = True
+        subscribe("new_block", self.on_new_block)
+        subscribe("benchmark_confirmed", self.on_benchmark_confirmed)
 
-    def update_with_query_data(self, query_data: QueryData):
-        print(f"[difficulty_manager] updating with query data")
-        for challenge in query_data.challenges.values():
+    async def on_new_block(
+        self, 
+        block: Block, 
+        challenges: Dict[str, Challenge],
+        **kwargs # ignore other data
+    ):
+        logger.debug("new block, updating difficulty samplers")
+        for challenge in challenges.values():
             if challenge.block_data is None:
                 continue
-            name = challenge.details.name
-            if name not in self.samplers:
-                self.samplers[name] = DifficultySampler()
-            print(f"[difficulty_manager] updating sampler for {name} with block data")
-            self.samplers[name].update_with_block_data(
+            if challenge.id not in self.samplers:
+                self.samplers[challenge.id] = (challenge.details.name, DifficultySampler(self.config))
+            logger.debug(f"updating sampler for challenge {challenge.details.name}")
+            self.samplers[challenge.id][1].update_with_block_data(
                 min_difficulty=[
                     param["min_value"]
-                    for param in query_data.block.config["difficulty"]["parameters"][challenge.id]
+                    for param in block.config["difficulty"]["parameters"][challenge.id]
                 ],
                 block_data=challenge.block_data
             )
+            logger.info(f"emitting {self.config.num_samples} difficulty samples for challenge {challenge.details.name}")
+            await emit(
+                "difficulty_samples", 
+                challenge_id=challenge.id,
+                block_id=block.id, 
+                samples=[self.samplers[challenge.id][1].sample() for _ in range(self.config.num_samples)]
+            )
+        self.lock = False
 
-    def update_with_solutions(self, challenge_name: str, difficulty: List[int], num_solutions: int):
-        assert challenge_name in self.samplers, f"No sampler for {challenge_name}"
-        print(f"[difficulty_manager] updating sampler for {challenge_name} @ {difficulty} with {num_solutions} solutions")
-        self.samplers[challenge_name].update_with_solutions(difficulty, num_solutions)
-
-    def sample(self, challenge_name: str):
-        assert challenge_name in self.samplers, f"No sampler for {challenge_name}"
-        ret = self.samplers[challenge_name].sample()
-        print(f"[difficulty_manager] sampled difficulty {ret} for {challenge_name}")
-        return ret
+    async def on_benchmark_confirmed(self, precommit: Precommit, benchmark: Benchmark):
+        while self.lock:
+            await asyncio.sleep(0.5)
+        challenge_id = precommit.settings.challenge_id
+        num_solutions = benchmark.details.num_solutions
+        if challenge_id not in self.samplers:
+            logger.warning(f"no sampler for challenge {challenge_id}")
+        else:
+            challenge_name, sampler = self.samplers[challenge_id]
+            logger.info(f"updating sampler for challenge {challenge_name} with {num_solutions} solutions @ difficulty {precommit.settings.difficulty}")
+            sampler.update_with_solutions(
+                difficulty=precommit.settings.difficulty,
+                num_solutions=num_solutions
+            )

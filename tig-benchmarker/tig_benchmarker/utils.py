@@ -59,7 +59,7 @@ class FromDict:
             key_type, val_type = get_args(field_type)
             return {cls._process_value(k, key_type): cls._process_value(v, val_type) for k, v in value.items()}
         else:
-            return value
+            return field_type(value)
 
     @staticmethod
     def _is_optional(field_type: Type) -> bool:
