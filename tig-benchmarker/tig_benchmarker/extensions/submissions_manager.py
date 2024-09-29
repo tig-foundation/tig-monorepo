@@ -150,6 +150,13 @@ class Extension:
             self.pending_submissions[submission_type] = filtered_submissions
 
     async def on_update(self):
+        if (
+            len(self.pending_submissions['precommit']) == 0 and
+            len(self.pending_submissions['benchmark']) == 0 and
+            len(self.pending_submissions['proof']) == 0
+        ):
+            return
+            
         logger.info(f"pending submissions: (#precommits: {len(self.pending_submissions['precommit'])}, #benchmarks: {len(self.pending_submissions['benchmark'])}, #proofs: {len(self.pending_submissions['proof'])})")
 
         now = int(time.time() * 1000)
