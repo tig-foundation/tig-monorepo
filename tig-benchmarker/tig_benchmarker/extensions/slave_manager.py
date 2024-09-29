@@ -24,8 +24,9 @@ class Status(Enum):
     PRIORITY_FINISHED = 5
 
 class Extension:
-    def __init__(self, port: int, **kwargs):
+    def __init__(self, port: int, exit_event: asyncio.Event, **kwargs):
         self.port = port
+        self.exit_event = exit_event
         self.batch_status = {}
         self.batches = deque()
         self.priority_batches = deque()
@@ -103,7 +104,7 @@ class Extension:
         config = Config()
         config.bind = [f"0.0.0.0:{self.port}"]
 
-        self._server_task = asyncio.create_task(serve(app, config))
+        self._server_task = asyncio.create_task(serve(app, config, shutdown_trigger=self.exit_event.wait))
         logger.info(f"webserver started on {config.bind[0]}")
 
     async def on_new_batch(self, **batch):
