@@ -141,13 +141,16 @@ class Extension:
                     submission.request.benchmark_id not in precommits or # is expired
                     submission.request.benchmark_id in kwargs[submission_type + "s"] # is confirmed
                 ):
-                    logger.info(f"removing {submission_type} {submission.request.benchmark_id} from pending submissions")
-                    path = os.path.join(self.backup_folder, submission_type, f"{submission.request.benchmark_id}.json")
-                    if os.path.exists(path):
-                        os.remove(path)
+                    self._prune_pending_submission(submission_type, submission.request.benchmark_id)
                 else:
                     filtered_submissions.append(submission)
             self.pending_submissions[submission_type] = filtered_submissions
+
+    def _prune_pending_submission(self, submission_type: str, benchmark_id: str):
+        logger.info(f"removing {submission_type} {benchmark_id} from pending submissions")
+        path = os.path.join(self.backup_folder, submission_type, f"{benchmark_id}.json")
+        if os.path.exists(path):
+            os.remove(path)
 
     async def on_update(self):
         if (
@@ -156,7 +159,7 @@ class Extension:
             len(self.pending_submissions['proof']) == 0
         ):
             return
-            
+
         logger.info(f"pending submissions: (#precommits: {len(self.pending_submissions['precommit'])}, #benchmarks: {len(self.pending_submissions['benchmark'])}, #proofs: {len(self.pending_submissions['proof'])})")
 
         now = int(time.time() * 1000)
@@ -199,6 +202,8 @@ class Extension:
                 text = await resp.text()
                 if resp.status == 200:
                     logger.info(f"submitted {submission_type} successfully")
+                    if submission_type != "precommit":
+                        self._prune_pending_submission(submission_type, submission.request.benchmark_id)
                     await emit(f"submit_{submission_type}_success", text=text, **d)
                 else:
                     if resp.headers.get("Content-Type") == "text/plain":
