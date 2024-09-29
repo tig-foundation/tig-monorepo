@@ -80,16 +80,16 @@ class Extension:
             data = await request.json
             is_priority = len(data["merkle_proofs"]) > 0
             if batch_status is None:
-                return "OK"
+                return "Redundant result", 404
             elif is_priority and batch_status == Status.PRIORITY_FINISHED:
-                return "OK"
+                return "Redundant result", 404
             elif not is_priority and batch_status in {
                 Status.FINISHED, 
                 Status.PRIORITY_QUEUED, 
                 Status.PRIORITY_PROCESSING, 
                 Status.PRIORITY_FINISHED
             }:
-                return "OK"
+                return "Redundant result", 404
 
             if is_priority:
                 self.batch_status[benchmark_id][start_nonce] = Status.PRIORITY_FINISHED

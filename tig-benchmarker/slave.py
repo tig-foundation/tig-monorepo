@@ -33,7 +33,7 @@ def main(
             logger.info(f"fetching job from {get_batch_url}")
             resp = requests.get(get_batch_url, headers=headers)
             if resp.status_code != 200:
-                if resp.headers.get("Content-Type") == "text/plain":
+                if resp.headers.get("Content-Type") == "text/html":
                     raise Exception(f"status {resp.status_code} when fetching job: {resp.text}")
                 else:
                     raise Exception(f"status {resp.status_code} when fetching job")
@@ -49,7 +49,7 @@ def main(
                 logger.info(f"downloading WASM from {batch['download_url']}")
                 resp = requests.get(batch['download_url'])
                 if resp.status_code != 200:
-                    if resp.headers.get("Content-Type") == "text/plain":
+                    if resp.headers.get("Content-Type") == "text/html":
                         raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
                     else:
                         raise Exception(f"status {resp.status_code} when downloading WASM")
@@ -86,7 +86,7 @@ def main(
             logger.info(f"posting results to {submit_url}")
             resp = requests.post(submit_url, json=result, headers=headers)
             if resp.status_code != 200:
-                if resp.headers.get("Content-Type") == "text/plain":
+                if resp.headers.get("Content-Type") == "text/html":
                     raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
                 else:
                     raise Exception(f"status {resp.status_code} when downloading WASM")
