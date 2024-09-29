@@ -44,21 +44,25 @@
                 "satisfiability": {
                     "algorithm": "schnoing",
                     "num_nonces": 5000,
+                    "base_fee_limit": "10000000000000000",
                     "weight": 1.0
                 },
                 "vehicle_routing": {
                     "algorithm": "clarke_wright",
                     "num_nonces": 5000,
+                    "base_fee_limit": "10000000000000000",
                     "weight": 1.0
                 },
                 "knapsack": {
                     "algorithm": "dynamic",
                     "num_nonces": 5000,
+                    "base_fee_limit": "10000000000000000",
                     "weight": 1.0
                 },
                 "vector_search": {
                     "algorithm": "basic",
                     "num_nonces": 16,
+                    "base_fee_limit": "10000000000000000",
                     "weight": 1.0
                 }
             }

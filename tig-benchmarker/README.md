@@ -208,6 +208,7 @@ Manages the creation and submission of precommits.
   * `algo_selection`: Algorithm selection configuration for each challenge
     * `algorithm` name of algorithm
     * `num_nonces` number of nonces for that precommit
+    * `base_fee_limit` if a challenge's base fee exceeds this limit, no precommit will be submitted
     * `weight` relative chance of picking this challenge
 
 **Event handlers:**

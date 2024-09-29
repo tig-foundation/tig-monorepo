@@ -15,6 +15,7 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 class AlgorithmSelectionConfig(FromDict):
     algorithm: str
     num_nonces: int
+    base_fee_limit: PreciseNumber
     weight: float
 
 @dataclass
@@ -28,6 +29,7 @@ class Extension:
         self.config = PrecommitManagerConfig.from_dict(precommit_manager)
         self.num_precommits = 0
         self.last_block_id = None
+        self.curr_base_fees = {}
         self.difficulty_samples = {}
         self.algorithm_name_2_id = {}
         self.challenge_name_2_id = {}
@@ -51,6 +53,9 @@ class Extension:
             )
             assert a is not None, f"selected non-existent algorithm {a_name} for challenge {c_name}"
             self.algorithm_name_2_id[f"{c_name}_{a_name}"] = a.id
+            if c.block_data is not None:
+                self.curr_base_fees[c_name] = c.block_data.base_fee
+        logger.info(f"current base fees: {self.curr_base_fees}")
         self.lock = False
 
     async def on_difficulty_samples(self, challenge_id: str, samples: list, **kwargs):
@@ -59,7 +64,14 @@ class Extension:
     async def on_update(self):
         if self.lock or self.num_precommits_submitted >= self.config.max_precommits_per_block:
             return
-        algo_selection = list(self.config.algo_selection.items())
+        algo_selection = [
+            (c_name, selection)
+            for c_name, selection in self.config.algo_selection.items()
+            if self.curr_base_fees[c_name] <= selection.base_fee_limit
+        ]
+        if len(algo_selection) == 0:
+            logger.info("no challenges within base fee limit")
+            return
         logger.debug(f"randomly selecting a challenge + algorithm from {self.config.algo_selection}")
         selection = random.choices(algo_selection, weights=[x[1].weight for x in algo_selection])[0]
         c_name = selection[0]
