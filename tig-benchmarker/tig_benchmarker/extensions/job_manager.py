@@ -155,6 +155,9 @@ class Extension:
             assert all(start_nonce <= n < start_nonce + job.num_nonces for n in solution_nonces), "solution nonces not in batch"
             left = set(job.sampled_nonces_by_batch_idx.get(batch_idx, []))
             right = set(x.leaf.nonce for x in merkle_proofs)
+            if len(left) > 0 and len(right) == 0:
+                logger.warning(f"no merkle proofs for batch {batch_idx} of {benchmark_id}")
+                return
             assert left == right, f"sampled nonces {left} do not match proofs {right}"
             assert all(x.branch.calc_merkle_root(
                 hashed_leaf=x.leaf.to_merkle_hash(),
