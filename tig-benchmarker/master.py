@@ -1,3 +1,4 @@
+import signal
 import argparse
 import asyncio
 import importlib
@@ -17,6 +18,10 @@ async def main(
     api_url: str,
     port: int
 ):
+    exit_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGINT, exit_event.set)
+    loop.add_signal_handler(signal.SIGTERM, exit_event.set)
     extensions = {}
     for ext_name in config["extensions"]:
         logger.info(f"loading extension {ext_name}")
@@ -27,11 +32,12 @@ async def main(
             api_url=api_url,
             backup_folder=backup_folder,
             port=port,
+            exit_event=exit_event,
             **config["config"]
         )
 
     last_update = time.time()
-    while True:
+    while not exit_event.is_set():
         now = time.time()
         if now - last_update > 5:
             last_update = now
