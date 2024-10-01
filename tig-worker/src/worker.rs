@@ -1,40 +1,41 @@
 use anyhow::{anyhow, Result};
 use bincode;
 use tig_challenges::*;
-pub use tig_structs::core::{BenchmarkSettings, Solution, SolutionData};
+pub use tig_structs::core::{BenchmarkSettings, OutputData, Solution};
 use tig_utils::decompress_obj;
 use wasmi::{Config, Engine, Linker, Module, Store, StoreLimitsBuilder};
 
 pub fn compute_solution(
     settings: &BenchmarkSettings,
+    rand_hash: &String,
     nonce: u64,
     wasm: &[u8],
     max_memory: u64,
     max_fuel: u64,
-) -> Result<Option<SolutionData>> {
-    let seeds = settings.calc_seeds(nonce);
+) -> Result<(OutputData, Option<String>)> {
+    let seed = settings.calc_seed(rand_hash, nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
-                satisfiability::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                satisfiability::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c002" => {
             let challenge =
-                vehicle_routing::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vehicle_routing::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c003" => {
             let challenge =
-                knapsack::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                knapsack::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
         "c004" => {
             let challenge =
-                vector_search::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vector_search::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
@@ -81,51 +82,76 @@ pub fn compute_solution(
     memory
         .write(&mut store, challenge_ptr as usize, &serialized_challenge)
         .expect("Failed to write serialized challenge to `memory`");
-    let solution_ptr = entry_point
-        .call(&mut store, (challenge_ptr, challenge_len))
-        .map_err(|e| anyhow!("Failed to call function: {:?}", e))?;
+
+    let mut solution = Solution::new();
+    let mut err_msg = None;
+    let solution_ptr = match entry_point.call(&mut store, (challenge_ptr, challenge_len)) {
+        Ok(solution_ptr) => Some(solution_ptr),
+        Err(e) => {
+            err_msg = Some(format!("Error executing algorithm: {:?}", e));
+            None
+        }
+    };
+
+    let solution_len = match solution_ptr {
+        Some(solution_ptr) => {
+            let mut solution_len_bytes = [0u8; 4];
+            match memory.read(&store, solution_ptr as usize, &mut solution_len_bytes) {
+                Ok(_) => u32::from_le_bytes(solution_len_bytes),
+                Err(e) => {
+                    err_msg = Some(format!(
+                        "Error reading solution length from memory: {:?}",
+                        e
+                    ));
+                    0
+                }
+            }
+        }
+        None => 0,
+    };
+
+    if solution_len > 0 {
+        let mut serialized_solution = vec![0u8; solution_len as usize];
+        match memory.read(
+            &store,
+            (solution_ptr.unwrap() + 4) as usize,
+            &mut serialized_solution,
+        ) {
+            Ok(_) => match decompress_obj(&serialized_solution) {
+                Ok(s) => solution = s,
+                Err(e) => {
+                    err_msg = Some(format!("Error decompressing solution: {:?}", e));
+                }
+            },
+            Err(e) => {
+                err_msg = Some(format!("Error reading solution from memory: {:?}", e));
+            }
+        }
+    }
 
     // Get runtime signature
-    let runtime_signature_u64 = store.get_runtime_signature();
-    let runtime_signature = (runtime_signature_u64 as u32) ^ ((runtime_signature_u64 >> 32) as u32);
+    let runtime_signature = store.get_runtime_signature();
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
-    // Read solution from memory
-    let mut solution_len_bytes = [0u8; 4];
-    memory
-        .read(&store, solution_ptr as usize, &mut solution_len_bytes)
-        .expect("Failed to read solution length from memory");
-    let solution_len = u32::from_le_bytes(solution_len_bytes);
-    let mut serialized_solution = vec![0u8; solution_len as usize];
-    memory
-        .read(
-            &store,
-            (solution_ptr + 4) as usize,
-            &mut serialized_solution,
-        )
-        .expect("Failed to read solution from memory");
-    let mut solution_data = SolutionData {
+    let solution_data = OutputData {
         nonce,
         runtime_signature,
         fuel_consumed,
-        solution: Solution::new(),
+        solution,
     };
-    if solution_len != 0 {
-        solution_data.solution =
-            decompress_obj(&serialized_solution).expect("Failed to decompress solution");
-    }
-    Ok(Some(solution_data))
+    Ok((solution_data, err_msg))
 }
 
 pub fn verify_solution(
     settings: &BenchmarkSettings,
+    rand_hash: &String,
     nonce: u64,
     solution: &Solution,
 ) -> Result<()> {
-    let seeds = settings.calc_seeds(nonce);
+    let seed = settings.calc_seed(rand_hash, nonce);
     match settings.challenge_id.as_str() {
         "c001" => {
             let challenge =
-                satisfiability::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                satisfiability::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate satisfiability instance");
             match satisfiability::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -136,7 +162,7 @@ pub fn verify_solution(
         }
         "c002" => {
             let challenge =
-                vehicle_routing::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vehicle_routing::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate vehicle_routing instance");
             match vehicle_routing::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -147,7 +173,7 @@ pub fn verify_solution(
         }
         "c003" => {
             let challenge =
-                knapsack::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                knapsack::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate knapsack instance");
             match knapsack::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
@@ -158,7 +184,7 @@ pub fn verify_solution(
         }
         "c004" => {
             let challenge =
-                vector_search::Challenge::generate_instance_from_vec(seeds, &settings.difficulty)
+                vector_search::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
                     .expect("Failed to generate vector_search instance");
             match vector_search::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),

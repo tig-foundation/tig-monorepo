@@ -3,7 +3,7 @@ use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     fmt::Display,
     iter::Sum,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
 use uint::construct_uint;
 
@@ -229,6 +229,54 @@ impl<'a, 'b> Div<&'a PreciseNumber> for &'b PreciseNumber {
                 .checked_div(rhs.0)
                 .unwrap(),
         )
+    }
+}
+
+impl AddAssign for PreciseNumber {
+    fn add_assign(&mut self, other: Self) {
+        *self = self.add(&other);
+    }
+}
+
+impl AddAssign<&PreciseNumber> for PreciseNumber {
+    fn add_assign(&mut self, other: &Self) {
+        *self = self.add(other);
+    }
+}
+
+impl SubAssign for PreciseNumber {
+    fn sub_assign(&mut self, other: Self) {
+        *self = self.sub(&other);
+    }
+}
+
+impl SubAssign<&PreciseNumber> for PreciseNumber {
+    fn sub_assign(&mut self, other: &Self) {
+        *self = self.sub(other);
+    }
+}
+
+impl MulAssign for PreciseNumber {
+    fn mul_assign(&mut self, other: Self) {
+        *self = self.mul(&other);
+    }
+}
+
+impl MulAssign<&PreciseNumber> for PreciseNumber {
+    fn mul_assign(&mut self, other: &Self) {
+        *self = self.mul(other);
+    }
+}
+
+impl DivAssign for PreciseNumber {
+    fn div_assign(&mut self, other: Self) {
+        *self = self.div(&other);
+    }
+}
+
+impl DivAssign<&PreciseNumber> for PreciseNumber {
+    fn div_assign(&mut self, other: &Self) {
+        *self = self.div(other);
     }
 }
 

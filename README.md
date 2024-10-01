@@ -13,8 +13,7 @@ This repository contains the implementation of The Innovation Game (TIG).
 ## Repo Contents
 
 * [tig-algorithms](./tig-algorithms/README.md) - A Rust crate that hosts algorithm submissions made by Innovators in TIG
-* [tig-api](./tig-api/README.md) - A Rust crate for making requests to TIG's API
-* [tig-benchmarker](./tig-benchmarker/README.md) - A Rust crate that implements a Benchmarker for TIG that can run in the browser
+* [tig-benchmarker](./tig-benchmarker/README.md) - Python scripts for running TIG's benchmarker in master/slave configuration
 * [tig-challenges](./tig-challenges/README.md) - A Rust crate that contains the implementation of TIG's challenges (computational problems adapted for proof-of-work)
 * [tig-protocol](./tig-protocol/README.md) - A Rust crate that contains the implementation of TIG's core protocol logic.
 * [tig-structs](./tig-structs/README.md) - A Rust crate that contains the definitions of structs used throughout TIG

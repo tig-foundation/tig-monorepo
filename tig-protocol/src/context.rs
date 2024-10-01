@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 pub use anyhow::{Error as ContextError, Result as ContextResult};
 use tig_structs::{config::*, core::*};
 
@@ -5,7 +7,9 @@ use tig_structs::{config::*, core::*};
 pub enum SubmissionType {
     Algorithm,
     Benchmark,
+    Precommit,
     Proof,
+    TopUp,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +23,6 @@ pub enum AlgorithmsFilter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BenchmarksFilter {
     Id(String),
-    Settings(BenchmarkSettings),
     Mempool { from_block_started: u32 },
     Confirmed { from_block_started: u32 },
 }
@@ -51,10 +54,24 @@ pub enum PlayersFilter {
     Innovators,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub enum PrecommitsFilter {
+    BenchmarkId(String),
+    Settings(BenchmarkSettings),
+    Mempool { from_block_started: u32 },
+    Confirmed { from_block_started: u32 },
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProofsFilter {
     BenchmarkId(String),
     Mempool { from_block_started: u32 },
     Confirmed { from_block_started: u32 },
+}
+#[derive(Debug, Clone, PartialEq)]
+pub enum TopUpsFilter {
+    Id(String),
+    PlayerId(String),
+    Mempool,
+    Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum WasmsFilter {
@@ -96,12 +113,14 @@ pub trait Context {
         filter: PlayersFilter,
         block_data: Option<BlockFilter>,
     ) -> ContextResult<Vec<Player>>;
+    async fn get_precommits(&self, filter: PrecommitsFilter) -> ContextResult<Vec<Precommit>>;
     async fn get_proofs(
         &self,
         filter: ProofsFilter,
         include_data: bool,
     ) -> ContextResult<Vec<Proof>>;
-    async fn get_wasms(&self, filter: WasmsFilter, include_data: bool) -> ContextResult<Vec<Wasm>>;
+    async fn get_topups(&self, filter: TopUpsFilter) -> ContextResult<Vec<TopUp>>;
+    async fn get_wasms(&self, filter: WasmsFilter) -> ContextResult<Vec<Wasm>>;
     async fn verify_solution(
         &self,
         settings: &BenchmarkSettings,
@@ -113,7 +132,7 @@ pub trait Context {
         settings: &BenchmarkSettings,
         nonce: u64,
         wasm_vm_config: &WasmVMConfig,
-    ) -> ContextResult<anyhow::Result<SolutionData>>;
+    ) -> ContextResult<anyhow::Result<OutputData>>;
     async fn get_transaction(&self, tx_hash: &String) -> ContextResult<Transaction>;
     async fn get_multisig_owners(&self, address: &String) -> ContextResult<Vec<String>>;
     async fn get_latest_eth_block_num(&self) -> ContextResult<String>;
@@ -138,26 +157,34 @@ pub trait Context {
     ) -> ContextResult<String>;
     async fn add_benchmark_to_mempool(
         &self,
-        settings: BenchmarkSettings,
+        benchmark_id: &String,
         details: BenchmarkDetails,
-        solutions_metadata: Vec<SolutionMetaData>,
-        solution_data: SolutionData,
+        solution_nonces: HashSet<u64>,
+    ) -> ContextResult<()>;
+    async fn add_precommit_to_mempool(
+        &self,
+        settings: BenchmarkSettings,
+        details: PrecommitDetails,
     ) -> ContextResult<String>;
     async fn add_proof_to_mempool(
         &self,
         benchmark_id: &String,
-        solutions_data: Vec<SolutionData>,
+        merkle_proofs: Vec<MerkleProof>,
     ) -> ContextResult<()>;
     async fn add_fraud_to_mempool(
         &self,
         benchmark_id: &String,
         allegation: String,
     ) -> ContextResult<()>;
+    async fn add_topup_to_mempool(
+        &self,
+        topup_id: &String,
+        details: TopUpDetails,
+    ) -> ContextResult<()>;
     async fn add_wasm_to_mempool(
         &self,
         algorithm_id: &String,
         details: WasmDetails,
-        wasm_blob: Option<Vec<u8>>,
     ) -> ContextResult<()>;
 
     // Updates
@@ -188,6 +215,16 @@ pub trait Context {
         benchmark_id: &String,
         state: BenchmarkState,
     ) -> ContextResult<()>;
+    async fn update_player_state(
+        &self,
+        player_id: &String,
+        state: PlayerState,
+    ) -> ContextResult<()>;
+    async fn update_precommit_state(
+        &self,
+        benchmark_id: &String,
+        state: PrecommitState,
+    ) -> ContextResult<()>;
     async fn update_proof_state(
         &self,
         benchmark_id: &String,
@@ -198,6 +235,7 @@ pub trait Context {
         benchmark_id: &String,
         state: FraudState,
     ) -> ContextResult<()>;
+    async fn update_topup_state(&self, topup_id: &String, state: TopUpState) -> ContextResult<()>;
     async fn update_player_block_data(
         &self,
         player_id: &String,

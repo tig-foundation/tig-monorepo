@@ -72,7 +72,7 @@ async fn verify_submission_fee<T: Context>(
         .first()
         .is_some()
     {
-        return Err(ProtocolError::DuplicateSubmissionFeeTx {
+        return Err(ProtocolError::DuplicateTransaction {
             tx_hash: details.tx_hash.clone(),
         });
     }
@@ -92,7 +92,7 @@ async fn verify_submission_fee<T: Context>(
         }
     })?;
     if !valid_senders.contains(&transaction.sender) {
-        return Err(ProtocolError::InvalidSubmissionFeeSender {
+        return Err(ProtocolError::InvalidTransactionSender {
             tx_hash: details.tx_hash.clone(),
             expected_sender: player.id.clone(),
             actual_sender: transaction.sender.clone(),
@@ -100,7 +100,7 @@ async fn verify_submission_fee<T: Context>(
     }
     let burn_address = block.config().erc20.burn_address.clone();
     if transaction.receiver != burn_address {
-        return Err(ProtocolError::InvalidSubmissionFeeReceiver {
+        return Err(ProtocolError::InvalidTransactionReceiver {
             tx_hash: details.tx_hash.clone(),
             expected_receiver: burn_address,
             actual_receiver: transaction.receiver.clone(),
@@ -109,7 +109,7 @@ async fn verify_submission_fee<T: Context>(
 
     let expected_amount = block.config().algorithm_submissions.submission_fee;
     if transaction.amount != expected_amount {
-        return Err(ProtocolError::InvalidSubmissionFeeAmount {
+        return Err(ProtocolError::InvalidTransactionAmount {
             tx_hash: details.tx_hash.clone(),
             expected_amount: jsonify(&expected_amount),
             actual_amount: jsonify(&transaction.amount),

@@ -1,0 +1,71 @@
+{
+    "extensions": [
+        "data_fetcher",
+        "difficulty_sampler",
+        "submissions_manager",
+        "job_manager",
+        "precommit_manager",
+        "slave_manager"
+    ],
+    "config": {
+        "submissions_manager": {
+            "clear_precommits_submission_on_new_block": true,
+            "max_retries": null,
+            "ms_delay_between_retries": 30000
+        },
+        "difficulty_sampler": {
+            "num_samples": 100,
+            "padding_factor": 0.2,
+            "decay": 0.7,
+            "initial_solutions_weight": 500.0,
+            "solutions_multiplier": 10.0
+        },
+        "job_manager": {
+            "satisfiability": {
+                "batch_size": 1024,
+                "ms_delay_between_batch_retries": 30000
+            },
+            "vehicle_routing": {
+                "batch_size": 1024,
+                "ms_delay_between_batch_retries": 30000
+            },
+            "knapsack": {
+                "batch_size": 1024,
+                "ms_delay_between_batch_retries": 30000
+            },
+            "vector_search": {
+                "batch_size": 4,
+                "ms_delay_between_batch_retries": 30000
+            }
+        },
+        "precommit_manager": {
+            "max_precommits_per_block": 1,
+            "algo_selection": {
+                "satisfiability": {
+                    "algorithm": "schnoing",
+                    "num_nonces": 5000,
+                    "base_fee_limit": "10000000000000000",
+                    "weight": 1.0
+                },
+                "vehicle_routing": {
+                    "algorithm": "clarke_wright",
+                    "num_nonces": 5000,
+                    "base_fee_limit": "10000000000000000",
+                    "weight": 1.0
+                },
+                "knapsack": {
+                    "algorithm": "dynamic",
+                    "num_nonces": 5000,
+                    "base_fee_limit": "10000000000000000",
+                    "weight": 1.0
+                },
+                "vector_search": {
+                    "algorithm": "optimal_ann",
+                    "num_nonces": 16,
+                    "base_fee_limit": "10000000000000000",
+                    "weight": 1.0
+                }
+            }
+        }
+    }
+}
