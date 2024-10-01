@@ -70,6 +70,12 @@ if ! is_positive_integer "$num_nonces"; then
     echo "Error: Number of nonces must be a positive integer."
     exit 1
 fi
+read -p "Enter number of workers (default is 1): " num_workers
+num_workers=${num_workers:-1}
+if ! is_positive_integer "$num_workers"; then
+    echo "Error: Number of workers must be a positive integer."
+    exit 1
+fi
 read -p "Enable debug mode? (leave blank to disable) " enable_debug
 if [[ -n $enable_debug ]]; then
     debug_mode=true
@@ -77,10 +83,19 @@ else
     debug_mode=false
 fi
 
+get_closest_power_of_2() {
+    local n=$1
+    local p=1
+    while [ $p -lt $n ]; do
+        p=$((p * 2))
+    done
+    echo $p
+}
+
+
 SETTINGS="{\"challenge_id\":\"$CHALLENGE_ID\",\"difficulty\":$difficulty,\"algorithm_id\":\"\",\"player_id\":\"\",\"block_id\":\"\"}"
 num_solutions=0
 num_invalid=0
-num_errors=0
 total_ms=0
 
 echo "----------------------------------------------------------------------"
@@ -88,43 +103,57 @@ echo "Testing performance of $CHALLENGE/$ALGORITHM"
 echo "Settings: $SETTINGS"
 echo "Starting nonce: $start_nonce"
 echo "Number of nonces: $num_nonces"
+echo "Number of workers: $num_workers"
 echo -ne ""
-for ((nonce=start_nonce; nonce<start_nonce+num_nonces; nonce++)); do
+
+remaining_nonces=$num_nonces
+current_nonce=$start_nonce
+
+while [ $remaining_nonces -gt 0 ]; do
+    nonces_to_compute=$((num_workers < remaining_nonces ? num_workers : remaining_nonces))
+    
+    power_of_2_nonces=$(get_closest_power_of_2 $nonces_to_compute)
+
     start_time=$(date +%s%3N)
     stdout=$(mktemp)
     stderr=$(mktemp)
-    ./target/release/tig-worker compute_solution "$SETTINGS" $nonce $REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm >"$stdout" 2>"$stderr"
+    ./target/release/tig-worker compute_batch "$SETTINGS" "random_string" $current_nonce $nonces_to_compute $power_of_2_nonces $REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm --workers $nonces_to_compute >"$stdout" 2>"$stderr"
     exit_code=$?
     output_stdout=$(cat "$stdout")
     output_stderr=$(cat "$stderr")
     end_time=$(date +%s%3N)
     duration=$((end_time - start_time))
-    total_ms=$((total_ms + duration))
+    total_ms=$((total_ms + (duration * nonces_to_compute)))
+
     if [ $exit_code -eq 0 ]; then
-        num_solutions=$((num_solutions + 1))
-    else
-      if echo "$output_stderr" | grep -q "Invalid solution\|No solution found"; then
-          num_invalid=$((num_invalid + 1))
-      else
-          num_errors=$((num_errors + 1))
-      fi
+        solutions_count=$(echo "$output_stdout" | grep -o '"solution_nonces":\[.*\]' | sed 's/.*\[\(.*\)\].*/\1/' | awk -F',' '{print NF}')
+        invalid_count=$((nonces_to_compute - solutions_count))
+        num_solutions=$((num_solutions + solutions_count))
+        num_invalid=$((num_invalid + invalid_count))
     fi
-    if [ $((num_solutions)) -eq 0 ]; then
+
+    if [ $num_solutions -eq 0 ]; then
         avg_ms_per_solution=0
     else
         avg_ms_per_solution=$((total_ms / num_solutions))
     fi
+
     if [[ $debug_mode == true ]]; then
-        echo "    Nonce: $nonce"
+        echo "    Current nonce: $current_nonce"
+        echo "    Nonces computed: $nonces_to_compute"
         echo "    Exit code: $exit_code"
         echo "    Stdout: $output_stdout"
         echo "    Stderr: $output_stderr"
         echo "    Duration: $duration ms"
-        echo "#instances: $((num_solutions + num_invalid + num_errors)), #solutions: $num_solutions, #invalid: $num_invalid, #errors: $num_errors, average ms/solution: $avg_ms_per_solution"
+        echo "#instances: $((num_solutions + num_invalid)), #solutions: $num_solutions, #invalid: $num_invalid, average ms/solution: $avg_ms_per_solution"
     else
-        echo -ne "#instances: $((num_solutions + num_invalid + num_errors)), #solutions: $num_solutions, #invalid: $num_invalid, #errors: $num_errors, average ms/solution: $avg_ms_per_solution\033[K\r"
+        echo -ne "#instances: $((num_solutions + num_invalid)), #solutions: $num_solutions, #invalid: $num_invalid, average ms/solution: $avg_ms_per_solution\033[K\r"
     fi
+
+    current_nonce=$((current_nonce + nonces_to_compute))
+    remaining_nonces=$((remaining_nonces - nonces_to_compute))
 done
+
 echo
 echo "----------------------------------------------------------------------"
 echo "To re-run this test, run the following commands:"
