@@ -49,10 +49,7 @@ def main(
                 logger.info(f"downloading WASM from {batch['download_url']}")
                 resp = requests.get(batch['download_url'])
                 if resp.status_code != 200:
-                    if resp.headers.get("Content-Type") == "text/html":
-                        raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
-                    else:
-                        raise Exception(f"status {resp.status_code} when downloading WASM")
+                    raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
                 with open(wasm_path, 'wb') as f:
                     f.write(resp.content)
                 logger.debug(f"downloading WASM: took {time.time() - start} seconds")
@@ -86,10 +83,7 @@ def main(
             logger.info(f"posting results to {submit_url}")
             resp = requests.post(submit_url, json=result, headers=headers)
             if resp.status_code != 200:
-                if resp.headers.get("Content-Type") == "text/html":
-                    raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
-                else:
-                    raise Exception(f"status {resp.status_code} when downloading WASM")
+                raise Exception(f"status {resp.status_code} when posting results to master: {resp.text}")
             logger.debug(f"posting results took {time.time() - start} seconds")
             
         except Exception as e:
