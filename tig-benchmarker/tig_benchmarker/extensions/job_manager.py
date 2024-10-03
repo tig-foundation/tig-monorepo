@@ -32,7 +32,7 @@ class Job(FromDict):
 @dataclass
 class JobManagerConfig(FromDict):
     batch_size: int
-    ms_delay_between_batch_retries: int = 30000
+    ms_delay_between_batch_retries: Optional[int] = None
 
 class Extension:
     def __init__(self, backup_folder: str, job_manager: dict, **kwargs):
@@ -249,12 +249,14 @@ class Extension:
         )
 
     async def _emit_batches(self, job: Job):
+        c_name = self.challenge_id_2_name[job.settings.challenge_id]
+        ms_delay_between_batch_retries = self.config[c_name].ms_delay_between_batch_retries or 30000
         now_ = now()
         retry_batch_idxs = [
             batch_idx
             for batch_idx in range(job.num_batches)
             if (
-                now_ - job.last_retry_time[batch_idx] >= self.config[self.challenge_id_2_name[job.settings.challenge_id]].ms_delay_between_batch_retries and
+                now_ - job.last_retry_time[batch_idx] >= ms_delay_between_batch_retries and
                 (
                     job.batch_merkle_roots[batch_idx] is None or (
                         len(job.sampled_nonces) > 0 and

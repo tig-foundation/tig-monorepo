@@ -175,7 +175,7 @@ class Extension:
                     s = self.pending_submissions[submission_type].pop(0)
                     asyncio.create_task(self.submit(s))
                     if submission_type == "precommit":
-                        logger.info(f"submitting precommit {s.request}")
+                        logger.info(f"submitting precommit")
                     else:
                         logger.info(f"submitting {submission_type} '{s.request.benchmark_id}'")
         

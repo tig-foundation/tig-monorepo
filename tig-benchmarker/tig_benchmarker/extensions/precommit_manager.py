@@ -27,6 +27,7 @@ class Extension:
         self.player_id = player_id
         self.config = PrecommitManagerConfig.from_dict(precommit_manager)
         self.last_block_id = None
+        self.num_precommits_this_block = 0
         self.num_unresolved_precommits = None
         self.curr_base_fees = {}
         self.difficulty_samples = {}
@@ -49,6 +50,7 @@ class Extension:
     ):
         if self.last_block_id == block.id:
             return
+        self.num_precommits_this_block = 0
         self.num_unresolved_precommits = sum(1 for benchmark_id in precommits if benchmark_id not in proofs)
         self.last_block_id = block.id
         for c in challenges.values():
@@ -104,7 +106,7 @@ class Extension:
     async def on_update(self):
         if self.lock:
             return
-        if self.num_unresolved_precommits >= self.config.max_unresolved_precommits:
+        if self.num_precommits_this_block + self.num_unresolved_precommits >= self.config.max_unresolved_precommits:
             logger.debug(f"reached max unresolved precommits: {self.config.max_unresolved_precommits}")
             return
         algo_selection = [
@@ -149,6 +151,7 @@ class Extension:
             difficulty=difficulty
         )
         logger.debug(f"created precommit: (settings: {settings}, num_nonces: {num_nonces})")
+        self.num_precommits_this_block += 1
         await emit(
             "precommit_ready",
             settings=settings,
