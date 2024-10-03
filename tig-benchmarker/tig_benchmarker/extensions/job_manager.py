@@ -2,12 +2,11 @@ import asyncio
 import os
 import json
 import logging
-import time
 from dataclasses import dataclass
 from tig_benchmarker.event_bus import *
 from tig_benchmarker.merkle_tree import MerkleHash, MerkleBranch, MerkleTree
 from tig_benchmarker.structs import *
-from tig_benchmarker.utils import FromDict
+from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -28,6 +27,7 @@ class Job(FromDict):
     batch_merkle_roots: List[Optional[MerkleHash]]
     merkle_proofs: Dict[int, MerkleProof]
     last_retry_time: List[int]
+    start_time: int
 
 @dataclass
 class JobManagerConfig(FromDict):
@@ -43,6 +43,7 @@ class Extension:
             assert (batch_size & (batch_size - 1) == 0) and batch_size != 0, f"batch_size {batch_size} for challenge {challenge_name} is not a power of 2"
         self.jobs = {}
         self.wasm_vm_config = {}
+        self.challenge_id_2_name = {}
         self.download_urls = {}
         self.benchmark_ready = set()
         self.proof_ready = set()
@@ -70,15 +71,16 @@ class Extension:
         for job in prune_jobs:
             self._prune_job(job)
         for c in challenges.values():
-            self.config[c.id] = self.config[c.details.name]
+            self.challenge_id_2_name[c.id] = c.details.name
         self.lock = False
 
     async def on_precommit_confirmed(self, precommit: Precommit, **kwargs):
         while self.lock:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.1)
         benchmark_id = precommit.benchmark_id
         if benchmark_id not in self.jobs:
-            batch_size = self.config[precommit.settings.challenge_id].batch_size
+            c_name = self.challenge_id_2_name[precommit.settings.challenge_id]
+            batch_size = self.config[c_name].batch_size
             num_batches = (precommit.details.num_nonces + batch_size - 1) // batch_size
             job = Job(
                 benchmark_id=benchmark_id,
@@ -94,7 +96,8 @@ class Extension:
                 solution_nonces=[],
                 batch_merkle_roots=[None] * num_batches,
                 merkle_proofs={},
-                last_retry_time=[0] * num_batches
+                last_retry_time=[0] * num_batches,
+                start_time=now()
             )
             self.jobs[benchmark_id] = job
             self._save_job(job)
@@ -116,7 +119,6 @@ class Extension:
     async def on_update(self):
         if self.lock:
             return
-        now = int(time.time() * 1000)
         for benchmark_id, job in self.jobs.items():
             if (
                 benchmark_id not in self.proof_ready and 
@@ -153,7 +155,7 @@ class Extension:
             job = self.jobs[benchmark_id]
             batch_idx = start_nonce // job.batch_size
             # validate batch result (does not check the output data)
-            logger.info(f"validating batch results for {benchmark_id} @ index {batch_idx}")
+            logger.debug(f"validating batch results for {benchmark_id} @ index {batch_idx}")
             assert start_nonce % job.batch_size == 0, "start_nonce not aligned with batch size"
             assert all(start_nonce <= n < start_nonce + job.num_nonces for n in solution_nonces), "solution nonces not in batch"
             left = set(job.sampled_nonces_by_batch_idx.get(batch_idx, []))
@@ -195,7 +197,7 @@ class Extension:
 
     def _prune_job(self, job: Job):
         path = os.path.join(self.backup_folder, "jobs", f"{job.benchmark_id}.json")
-        logger.info(f"pruning job {path}")
+        logger.debug(f"pruning job {path}")
         self.jobs.pop(job.benchmark_id, None)
         if os.path.exists(path):
             os.remove(path)
@@ -223,7 +225,8 @@ class Extension:
                     leaf=proof.leaf,
                     branch=MerkleBranch(proof.branch.stems + upper_stems)
                 )
-        logger.info(f"proof {job.benchmark_id} is ready with {len(proofs)} merkle proofs")
+        c_name = self.challenge_id_2_name[job.settings.challenge_id]
+        logger.info(f"proof {job.benchmark_id} ready: (challenge: {c_name}, elapsed: {now() - job.start_time}ms)")
         await emit(
             "proof_ready",
             benchmark_id=job.benchmark_id,
@@ -232,11 +235,12 @@ class Extension:
 
     async def _emit_benchmark(self, job: Job):
         tree = MerkleTree(
-            job.batch_merkle_roots, 
+            job.batch_merkle_roots,
             1 << (job.num_batches - 1).bit_length()
         )
         root = tree.calc_merkle_root()
-        logger.info(f"benchmark {job.benchmark_id} is ready with {len(job.solution_nonces)} solutions")
+        c_name = self.challenge_id_2_name[job.settings.challenge_id]
+        logger.info(f"benchmark {job.benchmark_id} ready: (challenge: {c_name}, num_solutions: {len(job.solution_nonces)}, elapsed: {now() - job.start_time}ms)")
         await emit(
             "benchmark_ready",
             benchmark_id=job.benchmark_id,
@@ -245,12 +249,12 @@ class Extension:
         )
 
     async def _emit_batches(self, job: Job):
-        now = int(time.time() * 1000)
+        now_ = now()
         retry_batch_idxs = [
             batch_idx
             for batch_idx in range(job.num_batches)
             if (
-                now - job.last_retry_time[batch_idx] >= self.config[job.settings.challenge_id].ms_delay_between_batch_retries and
+                now_ - job.last_retry_time[batch_idx] >= self.config[self.challenge_id_2_name[job.settings.challenge_id]].ms_delay_between_batch_retries and
                 (
                     job.batch_merkle_roots[batch_idx] is None or (
                         len(job.sampled_nonces) > 0 and
@@ -259,11 +263,13 @@ class Extension:
                 )
             )
         ]
+        num_finished = sum(x is not None for x in job.batch_merkle_roots)
+        c_name = self.challenge_id_2_name[job.settings.challenge_id]
+        logger.info(f"precommit {job.benchmark_id}: (challenge: {c_name}, progress: {num_finished} of {len(job.batch_merkle_roots)}, elapsed: {now_ - job.start_time}ms)")
         if len(retry_batch_idxs) == 0:
             return
-        logger.info(f"creating {len(retry_batch_idxs)} batches for {job.benchmark_id}")
         for batch_idx in retry_batch_idxs:
-            job.last_retry_time[batch_idx] = now
+            job.last_retry_time[batch_idx] = now_
             await emit(
                 "new_batch",
                 benchmark_id=job.benchmark_id,

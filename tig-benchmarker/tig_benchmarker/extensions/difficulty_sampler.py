@@ -183,7 +183,7 @@ class Extension:
                 ],
                 block_data=challenge.block_data
             )
-            logger.info(f"emitting {self.config.num_samples} difficulty samples for challenge {challenge.details.name}")
+            logger.debug(f"emitting {self.config.num_samples} difficulty samples for challenge {challenge.details.name}")
             await emit(
                 "difficulty_samples", 
                 challenge_id=challenge.id,
@@ -201,7 +201,7 @@ class Extension:
             logger.warning(f"no sampler for challenge {challenge_id}")
         else:
             challenge_name, sampler = self.samplers[challenge_id]
-            logger.info(f"updating sampler for challenge {challenge_name} with {num_solutions} solutions @ difficulty {precommit.settings.difficulty}")
+            logger.debug(f"updating sampler for challenge {challenge_name} with {num_solutions} solutions @ difficulty {precommit.settings.difficulty}")
             sampler.update_with_solutions(
                 difficulty=precommit.settings.difficulty,
                 num_solutions=num_solutions

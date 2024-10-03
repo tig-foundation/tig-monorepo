@@ -39,7 +39,7 @@ async def main(
     last_update = time.time()
     while not exit_event.is_set():
         now = time.time()
-        if now - last_update > 5:
+        if now - last_update > 2:
             last_update = now
             await emit('update')
         await process_events(extensions)
