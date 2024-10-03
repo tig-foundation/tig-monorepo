@@ -51,6 +51,7 @@ class Extension:
             "benchmark": [],
             "proof": []
         }
+        self.last_submit = 0
         self._restore_pending_submissions()
 
     def _restore_pending_submissions(self):
@@ -162,7 +163,11 @@ class Extension:
             len(self.pending_submissions['proof']) == 0
         ):
             return
-
+        now_ = now()
+        if now_ - self.last_submit < 5500:
+            return
+        self.last_submit = now_
+        
         logger.debug(f"pending submissions: (#precommits: {len(self.pending_submissions['precommit'])}, #benchmarks: {len(self.pending_submissions['benchmark'])}, #proofs: {len(self.pending_submissions['proof'])})")
 
         now_ = now()

@@ -42,6 +42,7 @@ class Extension:
         self.batches = {}
         self.priority_batches = {}
         self.challenge_name_2_id = {}
+        self.last_update = 0
         self.lock = True
         self._start_server()
 
@@ -179,6 +180,10 @@ class Extension:
             self.batches.setdefault(challenge_id, deque()).append((batch, now_))
 
     async def on_update(self):
+        now_ = now()
+        if now_ - self.last_update < 10000:
+            return
+        self.last_update = now_
         logger.info(f"#batches in queue (normal: {sum(len(x) for x in self.batches.values())}, priority: {sum(len(x) for x in self.priority_batches.values())})")
 
     async def on_new_block(self, precommits: Dict[str, Precommit], challenges: Dict[str, Challenge], **kwargs):
