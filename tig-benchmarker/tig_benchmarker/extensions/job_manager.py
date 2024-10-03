@@ -32,7 +32,7 @@ class Job(FromDict):
 @dataclass
 class JobManagerConfig(FromDict):
     batch_size: int
-    ms_delay_between_batch_retries: int
+    ms_delay_between_batch_retries: int = 30000
 
 class Extension:
     def __init__(self, backup_folder: str, job_manager: dict, **kwargs):
@@ -264,8 +264,9 @@ class Extension:
             )
         ]
         num_finished = sum(x is not None for x in job.batch_merkle_roots)
-        c_name = self.challenge_id_2_name[job.settings.challenge_id]
-        logger.info(f"precommit {job.benchmark_id}: (challenge: {c_name}, progress: {num_finished} of {len(job.batch_merkle_roots)}, elapsed: {now_ - job.start_time}ms)")
+        if num_finished != len(job.batch_merkle_roots):
+            c_name = self.challenge_id_2_name[job.settings.challenge_id]
+            logger.info(f"precommit {job.benchmark_id}: (challenge: {c_name}, progress: {num_finished} of {len(job.batch_merkle_roots)}, elapsed: {now_ - job.start_time}ms)")
         if len(retry_batch_idxs) == 0:
             return
         for batch_idx in retry_batch_idxs:

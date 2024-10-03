@@ -32,7 +32,6 @@ class SlaveConfig(FromDict):
 @dataclass
 class SlaveManagerConfig(FromDict):
     slaves: List[SlaveConfig]
-    must_be_registered: bool
 
 class Extension:
     def __init__(self, port: int, exit_event: asyncio.Event, slave_manager: dict, **kwargs):
@@ -55,8 +54,8 @@ class Extension:
                 return "Slave manager is not ready", 503
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
-            if self.config.must_be_registered and not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"unregistered slave {slave_name} attempted to get a batch")
+            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
+                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
                 return "Unregistered slave", 403
             
             if (slave := next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)) is not None:
@@ -117,6 +116,8 @@ class Extension:
         async def submit_batch_result(batch_id):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
+            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
+                logger.warning(f"slave {slave_name} does not match any regex. rejecting submit-batch-result request")
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
             batch_status = self.batch_status.get(benchmark_id, {}).get(start_nonce, None)

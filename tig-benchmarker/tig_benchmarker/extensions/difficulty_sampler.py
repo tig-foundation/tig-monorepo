@@ -158,8 +158,11 @@ class DifficultySampler:
         self.padding = np.ceil(self.dimensions * self.config.padding_factor).astype(int)
 
 class Extension:
-    def __init__(self, difficulty_sampler: dict, **kwargs):
-        self.config = DifficultySamplerConfig.from_dict(difficulty_sampler)
+    def __init__(self, **kwargs):
+        if (difficulty_sampler := kwargs.get("difficulty_sampler", None)):
+            self.config = DifficultySamplerConfig.from_dict(difficulty_sampler)
+        else:
+            self.config = DifficultySamplerConfig()
         self.samplers = {}
         self.lock = True
 

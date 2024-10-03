@@ -27,9 +27,9 @@ class SubmitProofRequest(FromDict):
 
 @dataclass
 class SubmissionsManagerConfig(FromDict):
-    clear_precommits_submission_on_new_block: bool
-    max_retries: Optional[int]
-    ms_delay_between_retries: int
+    clear_precommits_submission_on_new_block: bool = True
+    max_retries: Optional[int] = None
+    ms_delay_between_retries: int = 60000
 
 @dataclass
 class PendingSubmission:
@@ -38,11 +38,14 @@ class PendingSubmission:
     request: Union[SubmitPrecommitRequest, SubmitBenchmarkRequest, SubmitProofRequest]
 
 class Extension:
-    def __init__(self, api_url: str, api_key: str, backup_folder: str, submissions_manager: dict, **kwargs):
+    def __init__(self, api_url: str, api_key: str, backup_folder: str, **kwargs):
         self.api_url = api_url
         self.api_key = api_key
         self.backup_folder = backup_folder
-        self.config = SubmissionsManagerConfig.from_dict(submissions_manager)
+        if (submissions_manager := kwargs.get("submissions_manager", None)):
+            self.config = SubmissionsManagerConfig.from_dict(submissions_manager)
+        else:
+            self.config = SubmissionsManagerConfig()
         self.pending_submissions  = {
             "precommit": [],
             "benchmark": [],

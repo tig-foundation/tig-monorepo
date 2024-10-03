@@ -15,7 +15,7 @@ class AlgorithmSelectionConfig(FromDict):
     algorithm: str
     base_fee_limit: PreciseNumber
     num_nonces: int
-    weight: Optional[float]
+    weight: Optional[float] = None
 
 @dataclass
 class PrecommitManagerConfig(FromDict):
