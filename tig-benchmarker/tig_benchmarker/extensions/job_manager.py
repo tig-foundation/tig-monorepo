@@ -38,6 +38,9 @@ class Extension:
     def __init__(self, backup_folder: str, job_manager: dict, **kwargs):
         self.backup_folder = backup_folder
         self.config = {k: JobManagerConfig.from_dict(v) for k, v in job_manager.items()}
+        for challenge_name, config in self.config.items():
+            batch_size = config.batch_size
+            assert (batch_size & (batch_size - 1) == 0) and batch_size != 0, f"batch_size {batch_size} for challenge {challenge_name} is not a power of 2"
         self.jobs = {}
         self.wasm_vm_config = {}
         self.download_urls = {}
