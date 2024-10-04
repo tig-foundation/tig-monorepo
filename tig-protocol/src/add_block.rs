@@ -269,6 +269,9 @@ async fn setup_cache<T: Context>(
             .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
             .pop()
             .unwrap();
+        if benchmark.details.num_solutions == 0 {
+            continue;
+        }
         let settings = &confirmed_precommits[benchmark_id].settings;
         active_solutions.insert(
             benchmark_id.clone(),
