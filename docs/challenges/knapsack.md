@@ -14,6 +14,10 @@ The larger the $num\textunderscore{ }items$, the more number of possible $S_{kna
 
 The weight $w_i$ of each of the $num\textunderscore{ }items$ is an integer, chosen independently, uniformly at random, and such that each of the item weights $1 <= w_i <= 50$, for $i=1,2,...,num\textunderscore{ }items$. The individual values of the items $v_i$ are selected by random from the range $50 <= v_i <= 100$, and the interaction values of pairs of items $V_{ij}$ are selected by random from the range $-50 <= V_{ij} <= 50$.  
 
+The total value of a knapsack is determined by summing up the individual values of items in the knapsack, as well as the interaction values of every pair of items $(i,j)$ where $i > j$ in the knapsack:
+
+$$V_{knapsack} = \sum_{i \in knapsack}{v_i} + \sum_{(i,j)\in knapsack}{V_{ij}}$$
+
 We impose a weight constraint $W(S_{knapsack}) <= 0.5 \cdot W(S_{all})$, where the knapsack can hold at most half the total weight of all items.
 
 
@@ -27,14 +31,14 @@ interaction_values = [  0,  23, -18, -37
                       -18,  42,   0,  32
                       -37, -28,  32,   0]
 max_weight = 60
-min_value = baseline*better_than_baseline = 330
+min_value = baseline*better_than_baseline = 165
 ```
 The objective is to find a set of items where the total weight is at most 60 but has a total value of at least 165.
 
 Now consider the following selection:
 
 ```
-selected_items =  [1, 2, 4]
+selected_items =  [0, 1, 3]
 ```
 
 When evaluating this selection, we can confirm that the total weight is less than 60, and the total value is more than 165, thereby this selection of items is a solution:
