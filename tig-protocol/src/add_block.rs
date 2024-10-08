@@ -222,8 +222,7 @@ async fn setup_cache<T: Context>(
             .get_wasms(WasmsFilter::AlgorithmId(algorithm.id.clone()))
             .await
             .unwrap_or_else(|e| panic!("get_wasms error: {:?}", e));
-        if !state.banned
-            && details.round >= *state.round_pushed.as_ref().unwrap_or(&round_pushed)
+        if details.round >= *state.round_pushed.as_ref().unwrap_or(&round_pushed)
             && wasm.first().is_some_and(|w| w.details.compile_success)
         {
             algorithm.block_data = Some(AlgorithmBlockData {
@@ -1245,10 +1244,13 @@ async fn update_innovator_rewards(block: &Block, cache: &mut AddBlockCache) {
     let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<&mut Algorithm>>::new();
     for algorithm in cache.active_algorithms.values_mut() {
         let is_merged = algorithm.state().round_merged.is_some();
+        let is_banned = algorithm.state().banned.clone();
         let data = algorithm.block_data.as_mut().unwrap();
         data.reward = Some(zero.clone());
 
-        if *data.adoption() >= adoption_threshold || (is_merged && *data.adoption() > zero) {
+        if !is_banned
+            && (*data.adoption() >= adoption_threshold || (is_merged && *data.adoption() > zero))
+        {
             eligible_algorithms_by_challenge
                 .entry(algorithm.details.challenge_id.clone())
                 .or_default()

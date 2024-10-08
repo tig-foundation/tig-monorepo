@@ -168,7 +168,7 @@ impl std::fmt::Display for ProtocolError {
                 min_num_solutions, num_solutions
             ),
             ProtocolError::InvalidAlgorithm { algorithm_id } => {
-                write!(f, "Algorithm '{}' does not exist or is not yet active", algorithm_id)
+                write!(f, "Algorithm '{}' does not exist, is not yet active, or is banned", algorithm_id)
             }
             ProtocolError::InvalidBenchmark { benchmark_id } => {
                 write!(f, "Benchmark '{}' does not exist", benchmark_id)
