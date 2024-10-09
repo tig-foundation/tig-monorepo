@@ -86,17 +86,18 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         let values: Vec<u32> = (0..difficulty.num_items)
             .map(|_| rng.gen_range(50..=100))
             .collect();
-        
+
         // Generate interactive values V_ij in the range [1, 50], with V_ij == V_ji and V_ij where i==j is 0.
-        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; difficulty.num_items]; difficulty.num_items];
+        let mut interaction_values: Vec<Vec<i32>> =
+            vec![vec![0; difficulty.num_items]; difficulty.num_items];
         for i in 0..difficulty.num_items {
             for j in (i + 1)..difficulty.num_items {
-                let value = rngs.get_mut().gen_range(-50..=50);
+                let value = rng.gen_range(-50..=50);
                 interaction_values[i][j] = value;
-                interaction_values[j][i] = value;  
+                interaction_values[j][i] = value;
             }
         }
-        
+
         let max_weight: u32 = weights.iter().sum::<u32>() / 2;
 
         // Precompute the ratio between the total value (value + sum of interactive values) and
@@ -104,7 +105,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         let mut value_weight_ratios: Vec<(usize, f32, u32)> = (0..difficulty.num_items)
             .map(|i| {
                 let total_value = values[i] as i32 + interaction_values[i].iter().sum::<i32>();
-                let weight =  weights[i];
+                let weight = weights[i];
                 let ratio = total_value as f32 / weight as f32;
                 (i, ratio, weight)
             })
@@ -120,11 +121,11 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         for &(i, _, weight) in &value_weight_ratios {
             if total_weight + weight <= max_weight {
                 selected_indices.push(i);
-                total_weight += weight; 
+                total_weight += weight;
             }
         }
         selected_indices.sort_unstable();
-        
+
         let mut min_value = calculate_total_value(&selected_indices, &values, &interaction_values);
         min_value = (min_value as f32 * (1.0 + difficulty.better_than_baseline as f32 / 1000.0))
             .round() as u32;
@@ -153,7 +154,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
                     return Err(anyhow!("Item ({}) is out of bounds", item));
                 }
                 Ok(self.weights[item])
-            }).collect::<Result<Vec<_>, _>>()?
+            })
+            .collect::<Result<Vec<_>, _>>()?
             .iter()
             .sum::<u32>();
 
@@ -164,8 +166,9 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
                 self.max_weight
             ));
         }
-        let selected_items_vec : Vec<usize> = selected_items.into_iter().collect();
-        let total_value = calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
+        let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
+        let total_value =
+            calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
         if total_value < self.min_value {
             Err(anyhow!(
                 "Total value ({}) does not reach minimum value ({})",
@@ -178,7 +181,11 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 }
 
-pub fn calculate_total_value(indices: &Vec<usize>, values: &Vec<u32>, interaction_values: &Vec<Vec<i32>>) -> u32 {
+pub fn calculate_total_value(
+    indices: &Vec<usize>,
+    values: &Vec<u32>,
+    interaction_values: &Vec<Vec<i32>>,
+) -> u32 {
     let mut indices = indices.clone();
     indices.sort_unstable();
 
@@ -200,6 +207,6 @@ pub fn calculate_total_value(indices: &Vec<usize>, values: &Vec<u32>, interactio
 
     match total_value {
         v if v < 0 => 0u32,
-        v => v as u32
+        v => v as u32,
     }
 }
