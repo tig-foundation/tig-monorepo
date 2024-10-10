@@ -114,8 +114,8 @@ language governing permissions and limitations under the License.
                 // num_queries: 10,
                 // better_than_baseline: 350,
             };
-            let seeds = [0; 8]; // change this to generate different instances
-            let challenge = Challenge::generate_instance(seeds, &difficulty).unwrap();
+            let seed = [0u8; 32]; // change this to generate different instances
+            let challenge = Challenge::generate_instance(seed, &difficulty).unwrap();
             match <algorithm_name>::solve_challenge(&challenge) {
                 Ok(Some(solution)) => match challenge.verify_solution(&solution) {
                     Ok(_) => println!("Valid solution"),
@@ -215,9 +215,9 @@ mod cuda_tests {
             // num_queries: 10,
             // better_than_baseline: 350,
         };
-        let seeds = [0; 8]; // change this to generate different instances
+        let seed = [0u8; 32]; // change this to generate different instances
         let challenge =
-            Challenge::cuda_generate_instance(seeds, &difficulty, &dev, challenge_cuda_funcs)
+            Challenge::cuda_generate_instance(seed, &difficulty, &dev, challenge_cuda_funcs)
                 .unwrap();
         match <algorithm_name>::cuda_solve_challenge(&challenge, &dev, algorithm_cuda_funcs) {
             Ok(Some(solution)) => match challenge.verify_solution(&solution) {

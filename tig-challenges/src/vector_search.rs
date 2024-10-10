@@ -73,13 +73,13 @@ pub const KERNEL: Option<CudaKernel> = None;
 impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
     fn cuda_generate_instance(
-        seeds: [u8; 32],
+        seed: [u8; 32],
         difficulty: &Difficulty,
         dev: &Arc<CudaDevice>,
         mut funcs: HashMap<&'static str, CudaFunction>,
     ) -> Result<Self> {
         // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seeds, difficulty)
+        Self::generate_instance(seed, difficulty)
     }
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
