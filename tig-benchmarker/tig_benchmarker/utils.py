@@ -4,6 +4,7 @@ from blake3 import blake3
 from dataclasses import dataclass, fields, is_dataclass, asdict
 from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, get_args
 import json
+import time
 
 T = TypeVar('T', bound='DataclassBase')
 
@@ -210,3 +211,6 @@ def u64s_from_str(input: str) -> List[int]:
         )
         for i in range(4)
     ]
+
+def now():
+    return int(time.time() * 1000)

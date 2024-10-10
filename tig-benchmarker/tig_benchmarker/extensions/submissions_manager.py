@@ -2,9 +2,9 @@ import aiohttp
 import logging
 import json
 import os
-import time
 from tig_benchmarker.event_bus import *
 from tig_benchmarker.structs import *
+from tig_benchmarker.utils import *
 from typing import Union
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -27,9 +27,9 @@ class SubmitProofRequest(FromDict):
 
 @dataclass
 class SubmissionsManagerConfig(FromDict):
-    clear_precommits_submission_on_new_block: bool
-    max_retries: Optional[int]
-    ms_delay_between_retries: int
+    clear_precommits_submission_on_new_block: bool = True
+    max_retries: Optional[int] = None
+    ms_delay_between_retries: int = 60000
 
 @dataclass
 class PendingSubmission:
@@ -38,16 +38,20 @@ class PendingSubmission:
     request: Union[SubmitPrecommitRequest, SubmitBenchmarkRequest, SubmitProofRequest]
 
 class Extension:
-    def __init__(self, api_url: str, api_key: str, backup_folder: str, submissions_manager: dict, **kwargs):
+    def __init__(self, api_url: str, api_key: str, backup_folder: str, **kwargs):
         self.api_url = api_url
         self.api_key = api_key
         self.backup_folder = backup_folder
-        self.config = SubmissionsManagerConfig.from_dict(submissions_manager)
+        if (submissions_manager := kwargs.get("submissions_manager", None)):
+            self.config = SubmissionsManagerConfig.from_dict(submissions_manager)
+        else:
+            self.config = SubmissionsManagerConfig()
         self.pending_submissions  = {
             "precommit": [],
             "benchmark": [],
             "proof": []
         }
+        self.last_submit = 0
         self._restore_pending_submissions()
 
     def _restore_pending_submissions(self):
@@ -131,7 +135,7 @@ class Extension:
         **kwargs
     ):
         if self.config.clear_precommits_submission_on_new_block:
-            logger.info(f"clearing {len(self.pending_submissions['precommit'])} pending precommits")
+            logger.debug(f"clearing {len(self.pending_submissions['precommit'])} pending precommits")
             self.pending_submissions["precommit"].clear()
 
         for submission_type in ["benchmark", "proof"]:
@@ -147,7 +151,7 @@ class Extension:
             self.pending_submissions[submission_type] = filtered_submissions
 
     def _prune_pending_submission(self, submission_type: str, benchmark_id: str):
-        logger.info(f"removing {submission_type} {benchmark_id} from pending submissions")
+        logger.debug(f"removing {submission_type} {benchmark_id} from pending submissions")
         path = os.path.join(self.backup_folder, submission_type, f"{benchmark_id}.json")
         if os.path.exists(path):
             os.remove(path)
@@ -159,20 +163,24 @@ class Extension:
             len(self.pending_submissions['proof']) == 0
         ):
             return
+        now_ = now()
+        if now_ - self.last_submit < 5500:
+            return
+        self.last_submit = now_
+        
+        logger.debug(f"pending submissions: (#precommits: {len(self.pending_submissions['precommit'])}, #benchmarks: {len(self.pending_submissions['benchmark'])}, #proofs: {len(self.pending_submissions['proof'])})")
 
-        logger.info(f"pending submissions: (#precommits: {len(self.pending_submissions['precommit'])}, #benchmarks: {len(self.pending_submissions['benchmark'])}, #proofs: {len(self.pending_submissions['proof'])})")
-
-        now = int(time.time() * 1000)
+        now_ = now()
         for submission_type in ["precommit", "benchmark", "proof"]:
             if len(self.pending_submissions[submission_type]) > 0:
                 self.pending_submissions[submission_type] = sorted(self.pending_submissions[submission_type], key=lambda x: x.last_retry_time)
-                if now - self.pending_submissions[submission_type][0].last_retry_time < self.config.ms_delay_between_retries:
-                    logger.info(f"no {submission_type} ready for submission")
+                if now_ - self.pending_submissions[submission_type][0].last_retry_time < self.config.ms_delay_between_retries:
+                    logger.debug(f"no {submission_type} ready for submission")
                 else:
                     s = self.pending_submissions[submission_type].pop(0)
                     asyncio.create_task(self.submit(s))
                     if submission_type == "precommit":
-                        logger.info(f"submitting precommit {s.request}")
+                        logger.info(f"submitting precommit")
                     else:
                         logger.info(f"submitting {submission_type} '{s.request.benchmark_id}'")
         
@@ -215,6 +223,6 @@ class Extension:
                         submission.retries + 1 < self.config.max_retries
                     ):
                         submission.retries += 1
-                        submission.last_retry_time = int(time.time() * 1000)
+                        submission.last_retry_time = now()
                         self.pending_submissions[submission_type].append(submission)
                     await emit(f"submit_{submission_type}_error", text=text, status=resp.status, request=submission.request)

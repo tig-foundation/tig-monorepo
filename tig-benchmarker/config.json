@@ -8,64 +8,52 @@
         "slave_manager"
     ],
     "config": {
-        "submissions_manager": {
-            "clear_precommits_submission_on_new_block": true,
-            "max_retries": null,
-            "ms_delay_between_retries": 30000
-        },
-        "difficulty_sampler": {
-            "num_samples": 100,
-            "padding_factor": 0.2,
-            "decay": 0.7,
-            "initial_solutions_weight": 500.0,
-            "solutions_multiplier": 10.0
-        },
         "job_manager": {
             "satisfiability": {
-                "batch_size": 1024,
-                "ms_delay_between_batch_retries": 30000
+                "batch_size": 128
             },
             "vehicle_routing": {
-                "batch_size": 1024,
-                "ms_delay_between_batch_retries": 30000
+                "batch_size": 128
             },
             "knapsack": {
-                "batch_size": 1024,
-                "ms_delay_between_batch_retries": 30000
+                "batch_size": 128
             },
             "vector_search": {
-                "batch_size": 4,
-                "ms_delay_between_batch_retries": 30000
+                "batch_size": 4
             }
         },
         "precommit_manager": {
-            "max_precommits_per_block": 1,
+            "max_unresolved_precommits": 5,
             "algo_selection": {
                 "satisfiability": {
                     "algorithm": "schnoing",
-                    "num_nonces": 5000,
-                    "base_fee_limit": "10000000000000000",
-                    "weight": 1.0
+                    "num_nonces": 1000,
+                    "base_fee_limit": "10000000000000000"
                 },
                 "vehicle_routing": {
                     "algorithm": "clarke_wright",
-                    "num_nonces": 5000,
-                    "base_fee_limit": "10000000000000000",
-                    "weight": 1.0
+                    "num_nonces": 1000,
+                    "base_fee_limit": "10000000000000000"
                 },
                 "knapsack": {
                     "algorithm": "dynamic",
-                    "num_nonces": 5000,
-                    "base_fee_limit": "10000000000000000",
-                    "weight": 1.0
+                    "num_nonces": 1000,
+                    "base_fee_limit": "10000000000000000"
                 },
                 "vector_search": {
                     "algorithm": "optimal_ann",
                     "num_nonces": 16,
-                    "base_fee_limit": "10000000000000000",
-                    "weight": 1.0
+                    "base_fee_limit": "10000000000000000"
                 }
             }
+        },
+        "slave_manager": {
+            "slaves": [
+                {
+                    "name_regex": ".*",
+                    "challenge_selection": null
+                }
+            ]
         }
     }
 }

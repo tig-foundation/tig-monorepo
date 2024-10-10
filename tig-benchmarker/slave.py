@@ -9,6 +9,9 @@ import time
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
+def now():
+    return int(time.time() * 1000)
+
 def main(
     master_ip: str,
     tig_worker_path: str,
@@ -28,38 +31,32 @@ def main(
     while True:
         try:
             # Step 1: Query for job
-            start = time.time()
+            start = now()
             get_batch_url = f"http://{master_ip}:{master_port}/get-batch"
             logger.info(f"fetching job from {get_batch_url}")
             resp = requests.get(get_batch_url, headers=headers)
             if resp.status_code != 200:
-                if resp.headers.get("Content-Type") == "text/html":
-                    raise Exception(f"status {resp.status_code} when fetching job: {resp.text}")
-                else:
-                    raise Exception(f"status {resp.status_code} when fetching job")
-            logger.debug(f"fetching job: took {time.time() - start} seconds")
+                raise Exception(f"status {resp.status_code} when fetching job: {resp.text}")
+            logger.debug(f"fetching job: took {now() - start}ms")
             batch = resp.json()
             batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
-            logger.info(f"batch {batch_id}: {batch}")
+            logger.debug(f"batch {batch_id}: {batch}")
             
             # Step 2: Download WASM
             wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
             if not os.path.exists(wasm_path):
-                start = time.time()
+                start = now()
                 logger.info(f"downloading WASM from {batch['download_url']}")
                 resp = requests.get(batch['download_url'])
                 if resp.status_code != 200:
-                    if resp.headers.get("Content-Type") == "text/html":
-                        raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
-                    else:
-                        raise Exception(f"status {resp.status_code} when downloading WASM")
+                    raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
                 with open(wasm_path, 'wb') as f:
                     f.write(resp.content)
-                logger.debug(f"downloading WASM: took {time.time() - start} seconds")
-            logger.info(f"WASM Path: {wasm_path}")
+                logger.debug(f"downloading WASM: took {now() - start}ms")
+            logger.debug(f"WASM Path: {wasm_path}")
             
             # Step 3: Run tig-worker
-            start = time.time()
+            start = now()
             cmd = [
                 tig_worker_path, "compute_batch",
                 json.dumps(batch["settings"]), 
@@ -74,23 +71,20 @@ def main(
             ]
             if batch["sampled_nonces"]:
                 cmd += ["--sampled", *map(str, batch["sampled_nonces"])]
-            logger.info(f"running Command: {' '.join(cmd)}")
+            logger.info(f"computing batch: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             result = json.loads(result.stdout)
-            logger.debug(f"running command took {time.time() - start} seconds")
-            logger.info(f"result: {result}")
+            logger.info(f"computing batch took {now() - start}ms")
+            logger.debug(f"batch result: {result}")
             
             # Step 4: Submit results
-            start = time.time()
+            start = now()
             submit_url = f"http://{master_ip}:{master_port}/submit-batch-result/{batch_id}"
             logger.info(f"posting results to {submit_url}")
             resp = requests.post(submit_url, json=result, headers=headers)
             if resp.status_code != 200:
-                if resp.headers.get("Content-Type") == "text/html":
-                    raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
-                else:
-                    raise Exception(f"status {resp.status_code} when downloading WASM")
-            logger.debug(f"posting results took {time.time() - start} seconds")
+                raise Exception(f"status {resp.status_code} when posting results to master: {resp.text}")
+            logger.debug(f"posting results took {now() - start} seconds")
             
         except Exception as e:
             logger.error(e)

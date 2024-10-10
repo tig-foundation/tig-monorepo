@@ -3,9 +3,9 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime
-from tig_benchmarker.structs import *
 from tig_benchmarker.event_bus import *
+from tig_benchmarker.structs import *
+from tig_benchmarker.utils import *
 from typing import Dict, Any
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -29,20 +29,20 @@ class Extension:
     def __init__(self, api_url: str, player_id: str, **kwargs):
         self.api_url = api_url
         self.player_id = player_id
+        self.last_fetch = 0
         self._cache = None
-        self.lock = False
 
     async def on_update(self):
-        if self.lock:
+        now_ = now()
+        if now_ - self.last_fetch < 10000:
             return
-        self.lock = True
+        self.last_fetch = now_
         logger.debug("fetching latest block")
         block_data = await _get(f"{self.api_url}/get-block")
         block = Block.from_dict(block_data["block"])
 
         if self._cache is not None and block.id == self._cache["block"].id:
             logger.debug("no new block data")
-            self.lock = False
             return
 
         logger.info(f"new block @ height {block.details.height}, fetching data")
@@ -102,4 +102,3 @@ class Extension:
             "challenges": challenges
         }
         await emit("new_block", **self._cache)
-        self.lock = False

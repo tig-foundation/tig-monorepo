@@ -110,7 +110,7 @@ async fn verify_algorithm<T: Context>(
         .await
         .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
         .pop()
-        .is_some_and(|a| a.state.is_some())
+        .is_some_and(|a| a.state.is_some_and(|s| !s.banned))
     {
         return Err(ProtocolError::InvalidAlgorithm {
             algorithm_id: algorithm_id.clone(),

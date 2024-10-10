@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: The Innovation Game API
   description: |-
-    This is the OpenAPI 3.0 specification for The Innovation Game (TIG) API.  You can find out more about TIG [https://tig.foundation](https://tig.foundation). 
+    This is the OpenAPI 3.0 specification for The Innovation Game (TIG) API.  You can find out more about TIG [https://tig.foundation](https://tig.foundation).
     
     Some useful links:
     - [TIG repository](https://github.com/tig-foundation/tig-monorepo)
@@ -19,9 +19,9 @@ servers:
   - url: https://testnet-api.tig.foundation
 tags:
   - name: GET
-    description: There is a rate limit of 60 requests per minute per IP address.
+    description: There is a rate limit per IP address.
   - name: POST
-    description: There is a rate limit of 20 requests per minute per IP address.
+    description: There is a rate limit per IP address.
 paths:
   /get-algorithms:
     get:
@@ -40,7 +40,6 @@ paths:
           * `wasm_blob`: `https://github.com/tig-foundation/tig-monorepo/blob/<branch>/tig-algorithms/wasm/<branch>.wasm`
         
           where `<branch>` is `<challenge_name>/<algorithm_name>`
-          
       parameters:
         - name: block_id
           in: query
@@ -53,20 +52,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  block_id:
-                    $ref: '#/components/schemas/MD5'
-                  block_details:
-                    $ref: '#/components/schemas/BlockDetails'
-                  algorithms:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Algorithm'
-                  wasms:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Wasm'
+                $ref: '#/components/schemas/GetAlgorithmsResponse'
   /get-benchmarks:
     get:
       tags:
@@ -77,12 +63,13 @@ paths:
         
         * Query parameter `<block_id>` must be latest block for **CURRENT** round. Use `/get-block` endpoint
         
-        * Returns all confirmed benchmarks, proofs, and frauds for the player where the benchmark was started within `120` blocks of the latest block.
+        * Query parameter `<player_id>` must be lowercase and start with `0x`
+
+        * Returns all confirmed precommits, benchmarks, proofs, and frauds for the player where the benchmark was started within `120` blocks of the latest block.
       
-        * Fields `benchmark.solutions_meta_data`, `benchmark.solution_data`, `proof.solutions_data`, and `fraud.allegation` will always be `null`
+        * Fields `benchmark.solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
         
             * To retrieve that data, use /get-benchmark-data endpoint
-        
       parameters:
         - name: block_id
           in: query
@@ -101,33 +88,16 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  block_id:
-                    $ref: '#/components/schemas/MD5'
-                  block_details:
-                    $ref: '#/components/schemas/BlockDetails'
-                  benchmarks:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Benchmark'
-                  proofs:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Proof'
-                  frauds:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Fraud'
+                $ref: '#/components/schemas/GetBenchmarksResponse'
   /get-benchmark-data:
     get:
       tags:
         - GET
-      summary: Get all solution related data for a benchmark
+      summary: Get all data for a benchmark
       description: |-
         # Notes
         
-        * Will include data for fields `benchmark.solutions_meta_data`, `benchmark.solution_data`, `proof.solutions_data`, and `fraud.allegation`.
+        * Will include data for fields `benchmark.solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
       parameters:
         - name: benchmark_id
           in: query
@@ -141,14 +111,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  benchmark:
-                    $ref: '#/components/schemas/Benchmark'
-                  proof:
-                    $ref: '#/components/schemas/Proof'
-                  fraud:
-                    $ref: '#/components/schemas/Fraud'
+                $ref: '#/components/schemas/GetBenchmarkDataResponse'
   /get-block:
     get:
       tags:
@@ -179,10 +142,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  block:
-                    $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/GetBlockResponse'
   /get-challenges:
     get:
       tags:
@@ -192,7 +152,6 @@ paths:
         # Notes
         
         * Query parameter `<block_id>` must be latest block for **CURRENT** round. Use `/get-block` endpoint
-        
       parameters:
         - name: block_id
           in: query
@@ -205,16 +164,38 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  block_id:
-                    $ref: '#/components/schemas/MD5'
-                  block_details:
-                    $ref: '#/components/schemas/BlockDetails'
-                  challenges:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Challenge'
+                $ref: '#/components/schemas/GetChallengesResponse'
+  /get-fee-balance:
+    get:
+      tags:
+        - GET
+      summary: Get fee balance for a player
+      description: |-
+        # Notes
+        
+        * Query parameter `<block_id>` must be latest block for **CURRENT** round. Use `/get-block` endpoint
+        
+        * Query parameter `<player_id>` must be lowercase and start with `0x`
+        
+        * Returns current fee balance and all topups for the player
+      parameters:
+        - name: block_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MD5'
+        - name: player_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/Address'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetFeeBalanceResponse'
   /get-players:
     get:
       tags:
@@ -230,7 +211,6 @@ paths:
         * If query parameter `<player_type>` is set to `innovator`, returns players who had active algorithms in this round
         
         * `player.round_earnings` will always have a value. All other fields will be `null` unless the player has active benchmarks
-        
       parameters:
         - name: block_id
           in: query
@@ -252,16 +232,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  block_id:
-                    $ref: '#/components/schemas/MD5'
-                  block_details:
-                    $ref: '#/components/schemas/BlockDetails'
-                  players:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Player'
+                $ref: '#/components/schemas/GetPlayersResponse'
+  /get-wasm-blob:
+    get:
+      tags:
+        - GET
+      summary: Get WASM blob for a specific algorithm
+      parameters:
+        - name: algorithm_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/AlgorithmId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
   /request-api-key:
     post:
       tags:
@@ -280,29 +270,18 @@ paths:
           * The transaction should emit a `ProxyCreation` event. [Example](https://basescan.org/tx/0xa61a5d1e4deaf4f4c42ede0ad412e4ca02f5b3d38ebff61f56e8e8d16153d4e6)
           
           * `<signature>` can be produced by any current owner of the multisig
-        
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                address:
-                  $ref: '#/components/schemas/Address'
-                signature:
-                  $ref: '#/components/schemas/Signature'
-                gnosis_safe_setup_tx_hash:
-                  $ref: '#/components/schemas/TxHash'
+              $ref: '#/components/schemas/RequestApiKeyRequest'
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  api_key:
-                    $ref: '#/components/schemas/MD5'
+                $ref: '#/components/schemas/RequestApiKeyResponse'
   /submit-algorithm:
     post:
       tags:
@@ -315,26 +294,16 @@ paths:
         
         * If an algorithm submission has failed to compile (`wasm.state.compiled_success = false`), you can re-use the same algorithm name.
         
-        * `<tx_hash>` is the id of the transaction that has burnt the required `block.config.algorithm_submissions.submission_fee`
+        * `<tx_hash>` is the id of the transaction that has burnt the required `block.config.algorithm_submissions.submission_fee` TIG to the `block.config.erc20.burn_address`
         
         * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
           
           * If `<api_key>` is invalid, a `401` error will be returned
-        
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  $ref: '#/components/schemas/AlgorithmName'
-                challenge_id:
-                  $ref: '#/components/schemas/ChallengeId'
-                tx_hash:
-                  $ref: '#/components/schemas/TxHash'
-                code:
-                  type: string
+              $ref: '#/components/schemas/SubmitAlgorithmRequest'
       parameters:
         - in: header
           name: X-Api-Key
@@ -344,6 +313,35 @@ paths:
       responses:
         '200':
           description: Success
+  /submit-precommit:
+    post:
+      tags:
+        - POST
+      summary: Submit a precommit
+      description: |-
+        # Notes
+        
+        * This endpoint can only be invoked once every few seconds
+        
+        * When a precommit is confirmed (`precommit.state != null`), a random string will be set (`precommit.state.rand_hash`). This string must be used when generating seeds
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitPrecommitRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitPrecommitResponse'
   /submit-benchmark:
     post:
       tags:
@@ -354,26 +352,14 @@ paths:
         
         * This endpoint can only be invoked once every few seconds
         
-        * Field `solution_data` can be the `solution_data` for any nonce in `solutions_meta_data`
+        * Order of `solution_nonces` does not matter
         
-        * Order of `solutions_meta_data` does not matter
-        
-        * When a benchmark is confirmed (`benchmark.state != null`), up to `3` nonces will be sampled (`benchmark.state.sampled_nonces`) from `benchmark.solutions_meta_data` for which the corresponding `solution_data` must be submitted via `/submit-proof` endpoint
-        
+        * When a benchmark is confirmed (`benchmark.state != null`), up to `3` nonces will be sampled (`benchmark.state.sampled_nonces`) for which the corresponding `merkle_proof` must be submitted via `/submit-proof` endpoint
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                settings:
-                  $ref: '#/components/schemas/BenchmarkSettings'
-                solutions_meta_data:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/SolutionMetaData'
-                solution_data:
-                  $ref: '#/components/schemas/SolutionData'
+              $ref: '#/components/schemas/SubmitBenchmarkRequest'
       parameters:
         - in: header
           name: X-Api-Key
@@ -383,6 +369,10 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitBenchmarkResponse'
   /submit-proof:
     post:
       tags:
@@ -393,20 +383,12 @@ paths:
         
         * This endpoint can only be invoked once every few seconds
         
-        * Order of `solutions_data` does not matter
-        
+        * Order of `merkle_proofs` does not matter
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                benchmark_id:
-                  $ref: '#/components/schemas/MD5'
-                solutions_data:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/SolutionData'
+              $ref: '#/components/schemas/SubmitProofRequest'
       parameters:
         - in: header
           name: X-Api-Key
@@ -416,6 +398,39 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitProofResponse'
+  /submit-topup:
+    post:
+      tags:
+        - POST
+      summary: Submit a topup transaction
+      description: |-
+        # Notes
+        
+        * This endpoint can only be invoked once every few seconds
+        
+        * `<tx_hash>` is the id of the transaction that has burnt the required `block.config.precommit_submissions.topup_amount` TIG to the `block.config.erc20.burn_address`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTopupRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTopupResponse'
 components:
   schemas:
     Address:
@@ -478,6 +493,9 @@ components:
           additionalProperties:
             type: integer
             format: uint32
+          example:
+            "0x100af566d1b9809915fd03ebee5e02e2e7926d98": 10
+            "0x0000000000000000000000000000000000000001": 15
         adoption:
           $ref: '#/components/schemas/PreciseNumber'
         merge_points:
@@ -492,18 +510,15 @@ components:
       properties:
         id:
           type: string
-        settings:
-          $ref: '#/components/schemas/BenchmarkSettings'
         details:
           $ref: '#/components/schemas/BenchmarkDetails'
         state:
           $ref: '#/components/schemas/BenchmarkState'
-        solutions_meta_data:
+        solution_nonces:
           type: array
           items:
-            $ref: '#/components/schemas/SolutionMetaData'
-        solution_data:
-          $ref: '#/components/schemas/SolutionData'
+            type: integer
+            format: uint64
     BenchmarkSettings:
       type: object
       properties:
@@ -520,12 +535,11 @@ components:
     BenchmarkDetails:
       type: object
       properties:
-        block_started:
-          type: integer
-          format: uint32
         num_solutions:
           type: integer
           format: uint32
+        merkle_root:
+          $ref: '#/components/schemas/MerkleHash'
     BenchmarkState:
       type: object
       properties:
@@ -536,7 +550,7 @@ components:
           type: array
           items:
             type: integer
-            format: uint32
+            format: uint64
     Block:
       type: object
       properties:
@@ -562,23 +576,35 @@ components:
     BlockData:
       type: object
       properties:
-        mempool_algorithm_ids:
+        confirmed_challenge_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChallengeId'
+        confirmed_algorithm_ids:
           type: array
           items:
             $ref: '#/components/schemas/AlgorithmId'
-        mempool_benchmark_ids:
+        confirmed_benchmark_ids:
           type: array
           items:
             $ref: '#/components/schemas/MD5'
-        mempool_proof_ids:
+        confirmed_precommit_ids:
           type: array
           items:
             $ref: '#/components/schemas/MD5'
-        mempool_fraud_ids:
+        confirmed_proof_ids:
           type: array
           items:
             $ref: '#/components/schemas/MD5'
-        mempool_wasm_ids:
+        confirmed_fraud_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/MD5'
+        confirmed_topup_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/MD5'
+        confirmed_wasm_ids:
           type: array
           items:
             $ref: '#/components/schemas/AlgorithmId'
@@ -605,6 +631,8 @@ components:
           $ref: '#/components/schemas/ChallengeId'
         details:
           $ref: '#/components/schemas/ChallengeDetails'
+        state:
+          $ref: '#/components/schemas/ChallengeState'
         block_data:
           $ref: '#/components/schemas/ChallengeBlockData'
     ChallengeBlockData:
@@ -621,31 +649,44 @@ components:
           items:
             $ref: '#/components/schemas/Difficulty'
         base_frontier:
-          type: array
-          items:
-            $ref: '#/components/schemas/Difficulty'
+          $ref: '#/components/schemas/Frontier'
         scaled_frontier:
-          type: array
-          items:
-            $ref: '#/components/schemas/Difficulty'
+          $ref: '#/components/schemas/Frontier'
         scaling_factor:
           type: number
           format: double
+        base_fee:
+          $ref: '#/components/schemas/PreciseNumber'
+        per_nonce_fee:
+          $ref: '#/components/schemas/PreciseNumber'
     ChallengeDetails:
       type: object
       properties:
         name:
           type: string
     ChallengeId:
-      type: string
-      pattern: ^c[0-9]{3}$
-      example: c002
+          type: string
+          pattern: ^c[0-9]{3}$
+          example: c002
+    ChallengeState:
+      type: object
+      properties:
+        block_confirmed:
+          type: integer
+          format: uint32
+        round_active:
+          type: integer
+          format: uint32
     Difficulty:
       type: array
       items:
         type: integer
         format: int32
       example: [40, 250]
+    Frontier:
+      type: array
+      items:
+        $ref: '#/components/schemas/Difficulty'
     Player:
       type: object
       properties:
@@ -653,6 +694,8 @@ components:
           $ref: '#/components/schemas/Address'
         details:
           $ref: '#/components/schemas/PlayerDetails'
+        state:
+          $ref: '#/components/schemas/PlayerState'
         block_data:
           $ref: '#/components/schemas/PlayerBlockData'
     PlayerBlockData:
@@ -663,9 +706,19 @@ components:
           additionalProperties:
             type: integer
             format: uint32
+          example:
+            c001: 10
+            c002: 15
+            c003: 20
         cutoff:
           type: integer
           format: uint32
+        deposit:
+          $ref: '#/components/schemas/PreciseNumber'
+        rolling_deposit:
+          $ref: '#/components/schemas/PreciseNumber'
+        qualifying_percent_rolling_deposit:
+          $ref: '#/components/schemas/PreciseNumber'
         imbalance:
           $ref: '#/components/schemas/PreciseNumber'
         imbalance_penalty:
@@ -683,9 +736,53 @@ components:
           $ref: '#/components/schemas/Address'
         is_multisig:
           type: boolean
+    PlayerState:
+      type: object
+      properties:
+        total_fees_paid:
+          $ref: '#/components/schemas/PreciseNumber'
+        available_fee_balance:
+          $ref: '#/components/schemas/PreciseNumber'
     PreciseNumber:
       type: integer
       format: uint256
+    Precommit:
+      type: object
+      properties:
+        benchmark_id:
+          $ref: '#/components/schemas/MD5'
+        details:
+          $ref: '#/components/schemas/PrecommitDetails'
+        settings:
+          $ref: '#/components/schemas/BenchmarkSettings'
+        state:
+          $ref: '#/components/schemas/PrecommitState'
+    PrecommitDetails:
+      type: object
+      properties:
+        block_started:
+          type: integer
+          format: uint32
+        num_nonces:
+          type: integer
+          format: uint32
+        fee_paid:
+          $ref: '#/components/schemas/PreciseNumber'
+    PrecommitState:
+      type: object
+      properties:
+        block_confirmed:
+          type: integer
+          format: uint32
+        rand_hash:
+          type: string
+    MerkleProof:
+      type: object
+      properties:
+        leaf:
+          $ref: '#/components/schemas/OutputData'
+        branch:
+          $ref: '#/components/schemas/MerkleBranch'
     Proof:
       type: object
       properties:
@@ -693,10 +790,10 @@ components:
           $ref: '#/components/schemas/MD5'
         state:
           $ref: '#/components/schemas/ProofState'
-        solutions_data:
+        merkle_proofs:
           type: array
           items:
-            $ref: '#/components/schemas/SolutionData'
+            $ref: '#/components/schemas/MerkleProof'
     ProofState:
       type: object
       properties:
@@ -706,137 +803,20 @@ components:
         submission_delay:
           type: integer
           format: uint32
-    ProtocolConfig:
+    OutputData:
       type: object
       properties:
-        erc20:
+        nonce:
+          type: integer
+          format: uint64
+        runtime_signature:
+          type: integer
+          format: uint64
+        fuel_consumed:
+          type: integer
+          format: uint64
+        solution:
           type: object
-          properties:
-            rpc_url:
-              type: string
-            chain_id:
-              type: string
-            token_address:
-              type: string
-            burn_address:
-              type: string
-        benchmark_submissions:
-          type: object
-          properties:
-            min_num_solutions:
-              type: integer
-              format: uint32
-            submission_delay_multiplier:
-              type: integer
-              format: uint32
-            max_samples:
-              type: integer
-            lifespan_period:
-              type: integer
-              format: uint32
-        wasm_vm:
-          type: object
-          properties:
-            max_memory:
-              type: integer
-              format: int64
-            max_fuel:
-              type: integer
-              format: int64
-        solution_signature:
-          type: object
-          properties:
-            max_percent_delta:
-              type: number
-              format: double
-            equilibrium_rate_multiplier:
-              type: number
-              format: double
-            percent_error_multiplier:
-              type: number
-              format: double
-        qualifiers:
-          type: object
-          properties:
-            cutoff_multiplier:
-              type: number
-              format: double
-            total_qualifiers_threshold:
-              type: integer
-              format: uint32
-        difficulty:
-          type: object
-          properties:
-            max_scaling_factor:
-              type: number
-              format: double
-            parameters:
-              type: object
-              additionalProperties:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    name:
-                      type: string
-                    min_value:
-                      type: integer
-                      format: int32
-                    max_value:
-                      type: integer
-                      format: int32
-        optimisable_proof_of_work:
-          type: object
-          properties:
-            imbalance_multiplier:
-              type: number
-              format: double
-        rounds:
-          type: object
-          properties:
-            blocks_per_round:
-              type: integer
-              format: uint32
-        algorithm_submissions:
-          type: object
-          properties:
-            submission_fee:
-              $ref: '#/components/schemas/PreciseNumber'
-            adoption_threshold:
-              type: number
-              format: double
-            merge_points_threshold:
-              type: integer
-              format: uint32
-            push_delay:
-              type: integer
-              format: uint32
-        rewards:
-          type: object
-          properties:
-            distribution:
-              type: object
-              properties:
-                benchmarkers:
-                  type: number
-                  format: double
-                optimisations:
-                  type: number
-                  format: double
-                breakthroughs:
-                  type: number
-                  format: double
-            schedule:
-              type: array
-              items:
-                type: object
-                properties:
-                  block_reward:
-                    type: number
-                    format: double
-                  round_start:
-                    type: integer
-                    format: uint32
     Fraud:
       type: object
       properties:
@@ -852,39 +832,28 @@ components:
         block_confirmed:
           type: integer
           format: uint32
-    MD5:
-      type: string
-      pattern: ^[a-f0-9]{32}$
-    Signature:
-      type: string
-      pattern: ^0x[a-f0-9]{130}$
-    SolutionData:
+    TopUp:
       type: object
       properties:
-        nonce:
-          type: integer
-          format: uint32
-        runtime_signature:
-          type: integer
-          format: uint32
-        fuel_consumed:
-          type: integer
-          format: int64
-        solution:
-          type: object
-          example: {"variables": [true]}
-    SolutionMetaData:
+        id:
+          $ref: '#/components/schemas/MD5'
+        details:
+          $ref: '#/components/schemas/TopUpDetails'
+        state:
+          $ref: '#/components/schemas/TopUpState'
+    TopUpDetails:
       type: object
       properties:
-        nonce:
+        player_id:
+          $ref: '#/components/schemas/Address'
+        amount:
+          $ref: '#/components/schemas/PreciseNumber'
+    TopUpState:
+      type: object
+      properties:
+        block_confirmed:
           type: integer
           format: uint32
-        solution_signature:
-          type: integer
-          format: uint32
-    TxHash:
-      type: string
-      pattern: ^0x[a-f0-9]{64}$
     Wasm:
       type: object
       properties:
@@ -894,9 +863,6 @@ components:
           $ref: '#/components/schemas/WasmDetails'
         state:
           $ref: '#/components/schemas/WasmState'
-        wasm_blob:
-          type: string
-          format: byte
     WasmDetails:
       type: object
       properties:
@@ -904,11 +870,184 @@ components:
           type: boolean
         download_url:
           type: string
-        checksum:
-          type: string
     WasmState:
       type: object
       properties:
         block_confirmed:
           type: integer
           format: uint32
+    MD5:
+      type: string
+      pattern: ^[a-f0-9]{32}$
+    Signature:
+      type: string
+      pattern: ^0x[a-f0-9]{130}$
+    TxHash:
+      type: string
+      pattern: ^0x[a-f0-9]{64}$
+    MerkleHash:
+      type: string
+      pattern: ^[a-f0-9]{64}$
+    MerkleBranch:
+      type: string
+      pattern: ^([a-f0-9]{66}){0,32}$
+    ProtocolConfig:
+      type: object
+    GetAlgorithmsResponse:
+      type: object
+      properties:
+        block_id:
+          $ref: '#/components/schemas/MD5'
+        block_details:
+          $ref: '#/components/schemas/BlockDetails'
+        algorithms:
+          type: array
+          items:
+            $ref: '#/components/schemas/Algorithm'
+    GetBenchmarksResponse:
+      type: object
+      properties:
+        precommits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Precommit'
+        benchmarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Benchmark'
+        proofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proof'
+        frauds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fraud'
+    GetBenchmarkDataResponse:
+      type: object
+      properties:
+        precommit:
+          $ref: '#/components/schemas/Precommit'
+        benchmark:
+          $ref: '#/components/schemas/Benchmark'
+        proof:
+          $ref: '#/components/schemas/Proof'
+        fraud:
+          $ref: '#/components/schemas/Fraud'
+    GetBlockResponse:
+      type: object
+      properties:
+        block:
+          $ref: '#/components/schemas/Block'
+    GetChallengesResponse:
+      type: object
+      properties:
+        block_id:
+          $ref: '#/components/schemas/MD5'
+        block_details:
+          $ref: '#/components/schemas/BlockDetails'
+        challenges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Challenge'
+    GetPlayersResponse:
+      type: object
+      properties:
+        block_id:
+          $ref: '#/components/schemas/MD5'
+        block_details:
+          $ref: '#/components/schemas/BlockDetails'
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
+    GetFeeBalanceResponse:
+      type: object
+      properties:
+        state:
+          $ref: '#/components/schemas/PlayerState'
+        topups:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopUp'
+    RequestApiKeyRequest:
+      type: object
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        signature:
+          $ref: '#/components/schemas/Signature'
+        gnosis_safe_setup_tx_hash:
+          allOf:
+            - $ref: '#/components/schemas/TxHash'
+          nullable: true
+    RequestApiKeyResponse:
+      type: object
+      properties:
+        api_key:
+          $ref: '#/components/schemas/MD5'
+    SubmitAlgorithmRequest:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/AlgorithmName'
+        challenge_id:
+          $ref: '#/components/schemas/ChallengeId'
+        tx_hash:
+          $ref: '#/components/schemas/TxHash'
+        code:
+          type: string
+    SubmitPrecommitRequest:
+      type: object
+      properties:
+        settings:
+          $ref: '#/components/schemas/BenchmarkSettings'
+        num_nonces:
+          type: integer
+          format: uint32
+    SubmitPrecommitResponse:
+      type: object
+      properties:
+        benchmark_id:
+          $ref: '#/components/schemas/MD5'
+    SubmitBenchmarkRequest:
+      type: object
+      properties:
+        benchmark_id:
+          $ref: '#/components/schemas/MD5'
+        merkle_root:
+          $ref: '#/components/schemas/MerkleHash'
+        solution_nonces:
+          type: array
+          items:
+            type: integer
+            format: uint64
+    SubmitBenchmarkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+    SubmitProofRequest:
+          type: object
+          properties:
+            benchmark_id:
+              $ref: '#/components/schemas/MD5'
+            merkle_proofs:
+              type: array
+              items:
+                $ref: '#/components/schemas/MerkleProof'
+    SubmitProofResponse:
+      type: object
+      properties:
+        verified:
+          type: string
+    SubmitTopupRequest:
+      type: object
+      properties:
+        tx_hash:
+          $ref: '#/components/schemas/TxHash'
+    SubmitTopupResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean

@@ -16,7 +16,6 @@ async def emit(event_name: str, **kwargs) -> None:
 
 async def _safe_execute(extension_name: str, event_name: str, handler: Callable, kwargs: dict) -> None:
     try:
-        logger.debug(f"calling {extension_name}.on_{event_name}")
         await handler(**kwargs)
     except Exception as e:
         import traceback
