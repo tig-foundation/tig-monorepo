@@ -152,9 +152,9 @@ class JobManager:
         
         for job in self.jobs:
             if (
-                any(x is None for x in job.batch_merkle_roots) or
                 len(job.sampled_nonces) == 0 or # benchmark not confirmed
-                len(job.merkle_proofs) == len(job.sampled_nonces) # already processed
+                len(job.merkle_proofs) == len(job.sampled_nonces) or # already processed
+                any(x is None for x in job.batch_merkle_roots)
             ):
                 continue
             logger.info(f"proof {job.benchmark_id}: (merkle_proof: {len(job.batch_merkle_proofs)} of {len(job.sampled_nonces)} ready)")
