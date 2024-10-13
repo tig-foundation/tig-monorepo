@@ -275,13 +275,7 @@ class TopUp(FromDict):
     state: TopUpState
 
 @dataclass
-class QueryData(FromDict):
-    block: Block
-    algorithms: Dict[str, Algorithm]
-    wasms: Dict[str, Wasm]
-    player: Optional[Player]
-    precommits: Dict[str, Precommit]
-    benchmarks: Dict[str, Benchmark]
-    proofs: Dict[str, Proof]
-    frauds: Dict[str, Fraud]
-    challenges: Dict[str, Challenge]
+class DifficultyData(FromDict):
+    num_solutions: int
+    num_nonces: int
+    difficulty: Point

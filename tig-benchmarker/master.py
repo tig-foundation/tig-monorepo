@@ -1,59 +1,63 @@
-import signal
 import argparse
 import asyncio
-import importlib
 import json
 import logging
 import os
-import time
-from tig_benchmarker.event_bus import process_events, emit
+from tig_benchmarker.extensions.data_fetcher import *
+from tig_benchmarker.extensions.difficulty_sampler import *
+from tig_benchmarker.extensions.job_manager import *
+from tig_benchmarker.extensions.precommit_manager import *
+from tig_benchmarker.extensions.slave_manager import *
+from tig_benchmarker.extensions.submissions_manager import *
+from tig_benchmarker.utils import FromDict
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-async def main(
-    player_id: str,
-    api_key: str,
-    config: dict,
-    backup_folder: str, 
-    api_url: str,
-    port: int
-):
-    exit_event = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGINT, exit_event.set)
-    loop.add_signal_handler(signal.SIGTERM, exit_event.set)
-    extensions = {}
-    for ext_name in config["extensions"]:
-        logger.info(f"loading extension {ext_name}")
-        module = importlib.import_module(f"tig_benchmarker.extensions.{ext_name}")
-        extensions[ext_name] = module.Extension(
-            player_id=player_id,
-            api_key=api_key,
-            api_url=api_url,
-            backup_folder=backup_folder,
-            port=port,
-            exit_event=exit_event,
-            **config["config"]
-        )
+@dataclass
+class Config(FromDict):
+    player_id: str
+    api_key: str
+    api_url: str
+    difficulty_sampler_config: DifficultySamplerConfig
+    job_manager_config: JobManagerConfig
+    precommit_manager_config: PrecommitManagerConfig
+    slave_manager_config: SlaveManagerConfig
+    submissions_manager_config: SubmissionsManagerConfig
 
-    last_update = time.time()
-    while not exit_event.is_set():
-        now = time.time()
-        if now - last_update > 1:
-            last_update = now
-            await emit('update')
-        await process_events(extensions)
-        await asyncio.sleep(0.1)
+async def main(config: Config):
+    last_block_id = None
+    jobs = []
 
+    data_fetcher = DataFetcher(config.api_url, config.player_id)
+    difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
+    job_manager = JobManager(config.job_manager_config, jobs)
+    precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id, jobs)
+    submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key, jobs)
+    slave_manager = SlaveManager(config.slave_manager_config, jobs)
+    slave_manager.start()
+
+    while True:
+        try:
+            data = await data_fetcher.run()
+            if data["block"].id != last_block_id:
+                last_block_id = data["block"].id
+                difficulty_sampler.on_new_block(**data)
+                job_manager.on_new_block(**data)
+                precommit_manager.on_new_block(**data)
+            job_manager.run()
+            samples = difficulty_sampler.run()
+            submit_precommit_req = precommit_manager.run(samples)
+            submissions_manager.run(submit_precommit_req)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            logger.error(f"{e}")
+        finally:
+            await asyncio.sleep(5)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Benchmarker")
-    parser.add_argument("player_id", help="Player ID")
-    parser.add_argument("api_key", help="API Key")
     parser.add_argument("config_path", help="Path to the configuration JSON file")
-    parser.add_argument("--api", default="https://mainnet-api.tig.foundation", help="API URL (default: https://mainnet-api.tig.foundation)")
-    parser.add_argument("--backup", default="backup", help="Folder to save pending submissions and other data")
-    parser.add_argument("--port", type=int, default=5115, help="Port to run the server on (default: 5115)")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
@@ -68,8 +72,5 @@ if __name__ == "__main__":
         sys.exit(1)
     with open(args.config_path, "r") as f:
         config = json.load(f)
-    if not os.path.exists(args.backup):
-        logger.info(f"creating backup folder at {args.backup}")
-        os.makedirs(args.backup, exist_ok=True)
-
-    asyncio.run(main(args.player_id, args.api_key, config, args.backup, args.api, args.port))
+        config = Config.from_dict(config)
+    asyncio.run(main(config))

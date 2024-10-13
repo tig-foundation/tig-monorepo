@@ -3,115 +3,109 @@ import os
 import json
 import logging
 import re
-from dataclasses import dataclass
-from collections import deque
-from enum import Enum
+import signal
 from quart import Quart, request, jsonify
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
-from tig_benchmarker.event_bus import *
+from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-class Status(Enum):
-    QUEUED = 0
-    PROCESSING = 1
-    FINISHED = 2
-    PRIORITY_QUEUED = 3
-    PRIORITY_PROCESSING = 4
-    PRIORITY_FINISHED = 5
+@dataclass
+class Batch(FromDict):
+    benchmark_id: str
+    start_nonce: int
+    num_nonces: int
+    settings: BenchmarkSettings
+    sampled_nonces: List[int]
+    wasm_vm_config: dict
+    download_url: str
+    rand_hash: str
+    batch_size: int
+
+@dataclass
+class BatchResult(FromDict):
+    merkle_root: MerkleHash
+    solution_nonces: List[int]
+    merkle_proofs: List[MerkleProof]
 
 @dataclass
 class SlaveConfig(FromDict):
     name_regex: str
-    challenge_selection: Optional[List[str]]
+    max_concurrent_batches: Dict[str, int]
 
 @dataclass
 class SlaveManagerConfig(FromDict):
+    port: int
+    time_before_batch_retry: int
     slaves: List[SlaveConfig]
 
-class Extension:
-    def __init__(self, port: int, exit_event: asyncio.Event, slave_manager: dict, **kwargs):
-        self.port = port
-        self.config = SlaveManagerConfig.from_dict(slave_manager)
-        self.exit_event = exit_event
-        self.batch_status = {}
-        self.batches = {}
-        self.priority_batches = {}
-        self.challenge_name_2_id = {}
-        self.last_update = 0
-        self.lock = True
-        self._start_server()
+class SlaveManager:
+    def __init__(self, config: SlaveManagerConfig, jobs: List[Job]):
+        self.config = config
+        self.jobs = jobs
 
-    def _start_server(self):
+    def start(self):
         app = Quart(__name__)
 
-        @app.route('/get-batch', methods=['GET'])
-        async def get_batch():
-            if self.lock:
-                return "Slave manager is not ready", 503
+        @app.route('/get-batches', methods=['GET'])
+        async def get_batches():
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
+                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
                 return "Unregistered slave", 403
             
-            if (slave := next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)) is not None:
-                challenge_selection = slave.challenge_selection
-            else:
-                challenge_selection = None
-                
-            batch = None
-            while batch is None:
-                if challenge_selection is not None:
-                    for c_name in challenge_selection:
-                        c_id = self.challenge_name_2_id[c_name]
-                        if len(self.priority_batches.get(c_id, [])):
-                            batch, _ = self.priority_batches[c_id].popleft()
-                            break
-                        elif len(self.batches.get(c_id, [])):
-                            batch, _ = self.batches[c_id].popleft()
-                            break
-                    else:
-                        return "No batches available", 404
-                else:
-                    if (non_empty_queues := [q for q in self.priority_batches.values() if q]):
-                        batch, _ = min(non_empty_queues, key=lambda q: q[0][1]).popleft()
-                    elif (non_empty_queues := [q for q in self.batches.values() if q]):
-                        batch, _ = min(non_empty_queues, key=lambda q: q[0][1]).popleft()
-                    else:
-                        return "No batches available", 404
+            slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
 
-                benchmark_id = batch['benchmark_id']
-                start_nonce = batch['start_nonce']
-                is_priority = len(batch['sampled_nonces']) > 0
-                batch_status = self.batch_status.get(benchmark_id, {}).get(start_nonce, None)
-                if batch_status is None:
-                    batch = None
-                elif is_priority and batch_status in {
-                    Status.PRIORITY_FINISHED
-                }: 
-                    batch = None
-                elif not is_priority and batch_status in {
-                    Status.FINISHED, 
-                    Status.PRIORITY_QUEUED,
-                    Status.PRIORITY_PROCESSING,
-                    Status.PRIORITY_FINISHED
-                }:
-                    batch = None
+            now = int(time.time() * 1000)
+            batches = []
+            selected_challenge = None
+            max_concurrent_batches = None
+            for job in self.jobs:
+                if (
+                    job.challenge not in slave.max_concurrent_batches or 
+                    (selected_challenge is not None and job.challenge != selected_challenge)
+                ):
+                    continue
+                sampled_nonces_by_batch_idx = job.sampled_nonces_by_batch_idx
+                for batch_idx in range(job.num_batches):
+                    if not (
+                        now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
+                        (
+                            job.batch_merkle_roots[batch_idx] is None or
+                            not set(sampled_nonces_by_batch_idx.get(batch_idx, [])).issubset(job.merkle_proofs)
+                        )
+                    ):
+                        continue
+                    selected_challenge = job.challenge
+                    max_concurrent_batches = slave.max_concurrent_batches[job.challenge]
+                    start_nonce = batch_idx * job.batch_size
+                    batches.append(Batch(
+                        benchmark_id=job.benchmark_id,
+                        start_nonce=start_nonce,
+                        num_nonces=min(job.batch_size, job.num_nonces - start_nonce),
+                        settings=job.settings.to_dict(),
+                        sampled_nonces=sampled_nonces_by_batch_idx.get(batch_idx, []),
+                        wasm_vm_config=job.wasm_vm_config,
+                        download_url=job.download_url,
+                        rand_hash=job.rand_hash,
+                        batch_size=job.batch_size
+                    ))
+                    if len(batches) >= max_concurrent_batches:
+                        break
+                if len(batches) >= max_concurrent_batches:
+                    break
 
-            batch_id = f"{benchmark_id}_{start_nonce}"
-            if is_priority:
-                self.batch_status[benchmark_id][start_nonce] = Status.PRIORITY_PROCESSING
-                logger.debug(f"{slave_name} got priority batch {batch_id}")
+            if len(batches) == 0:
+                logger.debug(f"{slave_name} get-batches: None available")
+                return "No batches available", 503
             else:
-                self.batch_status[benchmark_id][start_nonce] = Status.PROCESSING
-                logger.debug(f"{slave_name} got batch {batch_id}")
-            
-            return jsonify(batch)
+                logger.debug(f"{slave_name} get-batches: Assigning {len(batches)} {selected_challenge} batches")
+                return jsonify([b.to_dict() for b in batches])
 
         @app.route('/submit-batch-result/<batch_id>', methods=['POST'])
         async def submit_batch_result(batch_id):
@@ -121,81 +115,27 @@ class Extension:
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting submit-batch-result request")
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
-            batch_status = self.batch_status.get(benchmark_id, {}).get(start_nonce, None)
-            data = await request.json
-            is_priority = len(data["merkle_proofs"]) > 0
-            if batch_status is None:
-                return "Redundant result", 404
-            elif is_priority and batch_status == Status.PRIORITY_FINISHED:
-                return "Redundant result", 404
-            elif not is_priority and batch_status in {
-                Status.FINISHED, 
-                Status.PRIORITY_QUEUED, 
-                Status.PRIORITY_PROCESSING, 
-                Status.PRIORITY_FINISHED
-            }:
-                return "Redundant result", 404
-
-            if is_priority:
-                self.batch_status[benchmark_id][start_nonce] = Status.PRIORITY_FINISHED
-                logger.debug(f"{slave_name} returned priority batch {batch_id}")
-            else:
-                self.batch_status[benchmark_id][start_nonce] = Status.FINISHED
-                logger.debug(f"{slave_name} returned batch {batch_id}")
-            await emit("batch_result", benchmark_id=benchmark_id, start_nonce=start_nonce, **data)
+            result = BatchResult.from_dict(await request.json)
+            job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
+            logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)}, #proofs: {len(result.merkle_proofs)})")
+            if job is None:
+                logger.warning(f"{slave_name} submit-batch-result: no job found with benchmark_id {benchmark_id}")
+                return "Invalid benchmark_id", 400
+            batch_idx = start_nonce // job.batch_size
+            job.batch_merkle_roots[batch_idx] = result.merkle_root
+            job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
+            job.batch_merkle_proofs.update({
+                x.nonce: x
+                for x in result.merkle_proofs
+            })
             return "OK"
 
         config = Config()
-        config.bind = [f"0.0.0.0:{self.port}"]
+        config.bind = [f"0.0.0.0:{self.config.port}"]
 
-        self._server_task = asyncio.create_task(serve(app, config, shutdown_trigger=self.exit_event.wait))
+        exit_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGINT, exit_event.set)
+        loop.add_signal_handler(signal.SIGTERM, exit_event.set)
+        asyncio.create_task(serve(app, config, shutdown_trigger=exit_event.wait))
         logger.info(f"webserver started on {config.bind[0]}")
-
-    async def on_new_batch(self, **batch):
-        benchmark_id = batch['benchmark_id']
-        start_nonce = batch['start_nonce']
-        challenge_id = batch['settings']['challenge_id']
-        is_priority = len(batch['sampled_nonces']) > 0
-        batch_status = self.batch_status.get(benchmark_id, {}).get(start_nonce, None)
-        if is_priority and batch_status in {
-            Status.PRIORITY_QUEUED, 
-            Status.PRIORITY_FINISHED
-        }:
-            return
-        elif not is_priority and batch_status in {
-            Status.QUEUED, 
-            Status.FINISHED, 
-            Status.PRIORITY_QUEUED, 
-            Status.PRIORITY_PROCESSING, 
-            Status.PRIORITY_FINISHED
-        }:
-            return
-
-        now_ = now()
-        if is_priority:
-            self.batch_status.setdefault(benchmark_id, {})[start_nonce] = Status.PRIORITY_QUEUED
-            self.priority_batches.setdefault(challenge_id, deque()).append((batch, now_))
-        else:
-            self.batch_status.setdefault(benchmark_id, {})[start_nonce] = Status.QUEUED
-            self.batches.setdefault(challenge_id, deque()).append((batch, now_))
-
-    async def on_update(self):
-        now_ = now()
-        if now_ - self.last_update < 10000:
-            return
-        self.last_update = now_
-        logger.info(f"#batches in queue (normal: {sum(len(x) for x in self.batches.values())}, priority: {sum(len(x) for x in self.priority_batches.values())})")
-
-    async def on_new_block(self, precommits: Dict[str, Precommit], challenges: Dict[str, Challenge], **kwargs):
-        for benchmark_id in list(self.batch_status):
-            if benchmark_id in precommits:
-                continue
-            self.batch_status.pop(benchmark_id)
-
-        self.challenge_name_2_id = {c.details.name: c.id for c in challenges.values()}
-        challenge_names = set(self.challenge_name_2_id)
-        for slave in self.config.slaves:
-            if slave.challenge_selection is None:
-                continue
-            assert set(slave.challenge_selection).issubset(challenge_names), f"challenge_selection for slave regex '{slave.name_regex}' is not a subset of {challenge_names}"
-        self.lock = False

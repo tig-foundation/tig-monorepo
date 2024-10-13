@@ -3,7 +3,6 @@ import asyncio
 import json
 import logging
 import os
-from tig_benchmarker.event_bus import *
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, Any
@@ -25,25 +24,21 @@ async def _get(url: str) -> Dict[str, Any]:
                 logger.error(err_msg)
                 raise Exception(err_msg)
 
-class Extension:
-    def __init__(self, api_url: str, player_id: str, **kwargs):
+class DataFetcher:
+    def __init__(self, api_url: str, player_id: str):
         self.api_url = api_url
         self.player_id = player_id
         self.last_fetch = 0
         self._cache = None
 
-    async def on_update(self):
-        now_ = now()
-        if now_ - self.last_fetch < 10000:
-            return
-        self.last_fetch = now_
+    async def run(self) -> dict:
         logger.debug("fetching latest block")
         block_data = await _get(f"{self.api_url}/get-block")
         block = Block.from_dict(block_data["block"])
 
         if self._cache is not None and block.id == self._cache["block"].id:
             logger.debug("no new block data")
-            return
+            return self._cache
 
         logger.info(f"new block @ height {block.details.height}, fetching data")
         tasks = [
@@ -63,32 +58,18 @@ class Extension:
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data["precommits"]}
         benchmarks = {b["id"]: Benchmark.from_dict(b) for b in benchmarks_data["benchmarks"]}
         proofs = {p["benchmark_id"]: Proof.from_dict(p) for p in benchmarks_data["proofs"]}
-        frauds = {f["benchmark_id"]: Fraud.from_dict(f) for f in benchmarks_data["frauds"]}
-        for benchmark_id, precommit in precommits.items():
-            benchmark = benchmarks.get(benchmark_id, None)
-            proof = proofs.get(benchmark_id, None)
-            if proof is not None:
-                if  self._cache is None or benchmark_id not in self._cache["proofs"]:
-                    await emit(
-                        "proof_confirmed", 
-                        precommit=precommit,
-                        benchmark=benchmark,
-                        proof=proof,
-                    )
-            elif benchmark is not None:
-                if  self._cache is None or benchmark_id not in self._cache["benchmarks"]:
-                    await emit(
-                        "benchmark_confirmed", 
-                        precommit=precommit,
-                        benchmark=benchmark,
-                    )
-            elif self._cache is None or benchmark_id not in self._cache["precommits"]:
-                await emit(
-                    "precommit_confirmed", 
-                    precommit=precommit
-                )        
-        
+        frauds = {f["benchmark_id"]: Fraud.from_dict(f) for f in benchmarks_data["frauds"]}        
         challenges = {c["id"]: Challenge.from_dict(c) for c in challenges_data["challenges"]}
+        
+        tasks = [
+            _get(f"{self.api_url}/get-difficulty-data?block_id={block.id}&challenge_id={c_id}")
+            for c_id in challenges
+        ]
+        difficulty_data = await asyncio.gather(*tasks)
+        difficulty_data = {
+            c_id: [DifficultyData.from_dict(x) for x in d["data"]]
+            for c_id, d in zip(challenges, difficulty_data)
+        }
 
         self._cache = {
             "block": block,
@@ -99,6 +80,7 @@ class Extension:
             "benchmarks": benchmarks,
             "proofs": proofs,
             "frauds": frauds,
-            "challenges": challenges
+            "challenges": challenges,
+            "difficulty_data": difficulty_data
         }
-        await emit("new_block", **self._cache)
+        return self._cache
