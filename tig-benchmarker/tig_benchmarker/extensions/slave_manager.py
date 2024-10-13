@@ -105,7 +105,7 @@ class SlaveManager:
                 logger.debug(f"{slave_name} get-batches: None available")
                 return "No batches available", 503
             else:
-                logger.debug(f"{slave_name} get-batches: Assigning {len(batches)} {selected_challenge} batches")
+                logger.debug(f"{slave_name} get-batches: (challenge: {selected_challenge}, #batches: {len(batches)}, batch_ids: {[b.benchmark_id for b in batches]})")
                 return jsonify([b.to_dict() for b in batches])
 
         @app.route('/submit-batch-result/<batch_id>', methods=['POST'])
