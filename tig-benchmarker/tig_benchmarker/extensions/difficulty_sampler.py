@@ -12,28 +12,25 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 Point = List[int]
 Frontier = List[Point]
 
-def calc_valid_difficulties(block_data: ChallengeBlockData) -> List[Point]:
+def calc_valid_difficulties(a, upper_frontier: List[Point], lower_frontier: List[Point]) -> List[Point]:
     """
     Calculates a list of all difficulty combinations within the base and scaled frontiers
     """
-    hardest_difficulty = np.max([
-        np.max(list(block_data.scaled_frontier), axis=0),
-        np.max(list(block_data.base_frontier), axis=0),
-    ], axis=0)
-    min_difficulty = np.max([
-        np.min(list(block_data.scaled_frontier), axis=0),
-        np.min(list(block_data.base_frontier), axis=0),
-    ], axis=0)
+    hardest_difficulty = np.max(upper_frontier, axis=0)
+    min_difficulty = np.min(lower_frontier, axis=0)
+
     weights = np.zeros(hardest_difficulty - min_difficulty + 1, dtype=float)
-    lower_cutoff_points = np.array(list(block_data.base_frontier)) - min_difficulty
-    upper_cutoff_points = np.array(list(block_data.scaled_frontier)) - min_difficulty
-    if block_data.scaling_factor < 1.0:
-        lower_cutoff_points, upper_cutoff_points = upper_cutoff_points, lower_cutoff_points
+    lower_cutoff_points = np.array(lower_frontier) - min_difficulty
+    upper_cutoff_points = np.array(upper_frontier) - min_difficulty
 
     lower_cutoff_points = lower_cutoff_points[np.argsort(lower_cutoff_points[:, 0]), :]
     upper_cutoff_points = upper_cutoff_points[np.argsort(upper_cutoff_points[:, 0]), :]
     lower_cutoff_idx = 0
-    lower_cutoff = lower_cutoff_points[lower_cutoff_idx]
+    lower_cutoff1 = lower_cutoff_points[lower_cutoff_idx]
+    if len(lower_cutoff_points) > 1:
+        lower_cutoff2 = lower_cutoff_points[lower_cutoff_idx + 1]
+    else:
+        lower_cutoff2 = lower_cutoff1
     upper_cutoff_idx = 0
     upper_cutoff1 = upper_cutoff_points[upper_cutoff_idx]
     if len(upper_cutoff_points) > 1:
@@ -44,7 +41,11 @@ def calc_valid_difficulties(block_data: ChallengeBlockData) -> List[Point]:
     for i in range(weights.shape[0]):
         if lower_cutoff_idx + 1 < len(lower_cutoff_points) and i == lower_cutoff_points[lower_cutoff_idx + 1, 0]:
             lower_cutoff_idx += 1
-            lower_cutoff = lower_cutoff_points[lower_cutoff_idx]
+            lower_cutoff1 = lower_cutoff_points[lower_cutoff_idx]
+            if lower_cutoff_idx + 1 < len(lower_cutoff_points):
+                lower_cutoff2 = lower_cutoff_points[lower_cutoff_idx + 1]
+            else:
+                lower_cutoff2 = lower_cutoff1
         if upper_cutoff_idx + 1 < len(upper_cutoff_points) and i == upper_cutoff_points[upper_cutoff_idx + 1, 0]:
             upper_cutoff_idx += 1
             upper_cutoff1 = upper_cutoff_points[upper_cutoff_idx]
@@ -52,16 +53,22 @@ def calc_valid_difficulties(block_data: ChallengeBlockData) -> List[Point]:
                 upper_cutoff2 = upper_cutoff_points[upper_cutoff_idx + 1]
             else:
                 upper_cutoff2 = upper_cutoff1
-        if i >= lower_cutoff[0]:
-            start = lower_cutoff[1]
+        if i > lower_cutoff1[0] and lower_cutoff1[0] != lower_cutoff2[0]:
+            start = lower_cutoff2[1] + 1
         else:
-            start = lower_cutoff[1] + 1
+            start = lower_cutoff1[1]
         if i <= upper_cutoff2[0]:
             weights[i, start:upper_cutoff2[1] + 1] = 1.0
         if i < upper_cutoff2[0]:
             weights[i, start:upper_cutoff1[1]] = 1.0
         if i == upper_cutoff1[0]:
             weights[i, upper_cutoff1[1]] = 1.0
+
+    with open(f"{a}.csv", "w") as f:
+        f.write("\n".join([
+            ",".join([str(x) for x in row])
+            for row in weights.tolist()
+        ]))
 
     valid_difficulties = np.stack(np.where(weights), axis=1) + min_difficulty
     return valid_difficulties.tolist()
@@ -129,7 +136,11 @@ class DifficultySampler:
             if c.block_data is None:
                 continue
             logger.debug(f"Calculating valid difficulties and frontiers for challenge {c.details.name}")
-            self.valid_difficulties[c.details.name] = calc_valid_difficulties(c.block_data)
+            if c.block_data.scaling_factor >= 1:
+                upper_frontier, lower_frontier = c.block_data.scaled_frontier, c.block_data.base_frontier
+            else:
+                upper_frontier, lower_frontier = c.block_data.base_frontier, c.block_data.scaled_frontier
+            self.valid_difficulties[c.details.name] = calc_valid_difficulties(c.details.name, list(upper_frontier), list(lower_frontier))
             self.frontiers[c.details.name] = calc_all_frontiers(self.valid_difficulties[c.details.name])
 
     def run(self) -> Dict[str, Point]:
