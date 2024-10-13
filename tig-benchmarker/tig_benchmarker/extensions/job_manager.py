@@ -152,7 +152,7 @@ class JobManager:
         
         for job in self.jobs:
             if (
-                job.merkle_root is None or
+                any(x is None for x in job.batch_merkle_roots) or
                 len(job.sampled_nonces) == 0 or # benchmark not confirmed
                 len(job.merkle_proofs) == len(job.sampled_nonces) # already processed
             ):
