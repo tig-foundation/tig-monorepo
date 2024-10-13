@@ -76,12 +76,15 @@ class PrecommitManager:
             benchmark_stats_by_challenge[c_name]["nonces"] += precommit.details.num_nonces
 
         if player is not None:
-            logger.info(f"player earnings: (latest: {player.block_data.reward.to_float()}, round: {player.block_data.round_earnings.to_float()})")
+            reward = 0.0 if player.block_data.reward is None else player.block_data.reward.to_float()
+            logger.info(f"player earnings: (latest: {reward}, round: {player.block_data.round_earnings.to_float()})")
             logger.info(f"player stats: (cutoff: {player.block_data.cutoff}, imbalance: {player.block_data.imbalance.to_float() * 100}%)")
             for c_id, num_qualifiers in player.block_data.num_qualifiers_by_challenge.items():
                 c_name = challenges[c_id].details.name
                 benchmark_stats_by_challenge[c_name]["qualifiers"] = num_qualifiers
-                
+            if player.state is not None:
+                logger.info(f"player fee balance: (available: {player.state.available_fee_balance.to_float()}, paid: {player.state.total_fees_paid.to_float()})")
+
         for c_name, x in benchmark_stats_by_challenge.items():
             avg_nonces_per_solution = (x["nonces"] // x["solutions"]) if x["solutions"] > 0 else 0
             logger.info(f"benchmark stats for {c_name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, #qualifiers: {x['qualifiers']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
