@@ -81,6 +81,7 @@ class SlaveManager:
                         )
                     ):
                         continue
+                    job.last_batch_retry_time[batch_idx] = now
                     selected_challenge = job.challenge
                     max_concurrent_batches = slave.max_concurrent_batches[job.challenge]
                     start_nonce = batch_idx * job.batch_size
@@ -97,7 +98,7 @@ class SlaveManager:
                     ))
                     if len(batches) >= max_concurrent_batches:
                         break
-                if len(batches) >= max_concurrent_batches:
+                if max_concurrent_batches is not None and len(batches) >= max_concurrent_batches:
                     break
 
             if len(batches) == 0:
@@ -125,7 +126,7 @@ class SlaveManager:
             job.batch_merkle_roots[batch_idx] = result.merkle_root
             job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
             job.batch_merkle_proofs.update({
-                x.nonce: x
+                x.leaf.nonce: x
                 for x in result.merkle_proofs
             })
             return "OK"
