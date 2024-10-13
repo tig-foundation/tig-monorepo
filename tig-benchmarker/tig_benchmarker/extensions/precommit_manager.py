@@ -77,8 +77,9 @@ class PrecommitManager:
 
         if player is not None:
             reward = 0.0 if player.block_data.reward is None else player.block_data.reward.to_float()
+            imbalance = 0.0 if player.block_data.imbalance is None else player.block_data.imbalance.to_float()
             logger.info(f"player earnings: (latest: {reward}, round: {player.block_data.round_earnings.to_float()})")
-            logger.info(f"player stats: (cutoff: {player.block_data.cutoff}, imbalance: {player.block_data.imbalance.to_float() * 100}%)")
+            logger.info(f"player stats: (cutoff: {player.block_data.cutoff}, imbalance: {imbalance * 100}%)")
             for c_id, num_qualifiers in player.block_data.num_qualifiers_by_challenge.items():
                 c_name = challenges[c_id].details.name
                 benchmark_stats_by_challenge[c_name]["qualifiers"] = num_qualifiers
