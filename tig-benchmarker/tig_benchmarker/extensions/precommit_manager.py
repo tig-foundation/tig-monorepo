@@ -82,7 +82,7 @@ class Extension:
             }
         else:
             self.percent_qualifiers_by_challenge = {
-                c.details.name: player.block_data.num_qualifiers_by_challenge.get(c.id, 0) / c.block_data.num_qualifiers
+                c.details.name: (player.block_data.num_qualifiers_by_challenge.get(c.id, 0) / c.block_data.num_qualifiers) if c.block_data.num_qualifiers > 0 else 0
                 for c in challenges.values()
                 if c.block_data is not None
             }
