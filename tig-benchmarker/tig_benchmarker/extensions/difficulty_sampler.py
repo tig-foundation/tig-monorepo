@@ -12,7 +12,7 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 Point = List[int]
 Frontier = List[Point]
 
-def calc_valid_difficulties(a, upper_frontier: List[Point], lower_frontier: List[Point]) -> List[Point]:
+def calc_valid_difficulties(upper_frontier: List[Point], lower_frontier: List[Point]) -> List[Point]:
     """
     Calculates a list of all difficulty combinations within the base and scaled frontiers
     """
@@ -63,12 +63,6 @@ def calc_valid_difficulties(a, upper_frontier: List[Point], lower_frontier: List
             weights[i, start:upper_cutoff1[1]] = 1.0
         if i == upper_cutoff1[0]:
             weights[i, upper_cutoff1[1]] = 1.0
-
-    with open(f"{a}.csv", "w") as f:
-        f.write("\n".join([
-            ",".join([str(x) for x in row])
-            for row in weights.tolist()
-        ]))
 
     valid_difficulties = np.stack(np.where(weights), axis=1) + min_difficulty
     return valid_difficulties.tolist()
@@ -140,7 +134,7 @@ class DifficultySampler:
                 upper_frontier, lower_frontier = c.block_data.scaled_frontier, c.block_data.base_frontier
             else:
                 upper_frontier, lower_frontier = c.block_data.base_frontier, c.block_data.scaled_frontier
-            self.valid_difficulties[c.details.name] = calc_valid_difficulties(c.details.name, list(upper_frontier), list(lower_frontier))
+            self.valid_difficulties[c.details.name] = calc_valid_difficulties(list(upper_frontier), list(lower_frontier))
             self.frontiers[c.details.name] = calc_all_frontiers(self.valid_difficulties[c.details.name])
 
     def run(self) -> Dict[str, Point]:
