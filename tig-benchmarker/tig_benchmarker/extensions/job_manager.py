@@ -80,34 +80,16 @@ class JobManager:
             j.benchmark_id: idx 
             for idx, j in enumerate(self.jobs)
         }
-
-        # prune jobs from confirmed proofs
-        prune_idxs = [
-            job_idxs[benchmark_id]
-            for benchmark_id in proofs
-            if benchmark_id in job_idxs
-        ] + [
-            job_idxs[benchmark_id]
-            for benchmark_id in job_idxs
-            if benchmark_id not in precommits
-        ]
-        for idx in sorted(set(prune_idxs), reverse=True):
-            job = self.jobs.pop(idx)
-            logger.info(f"pruning job {job.benchmark_id}")
-            if os.path.exists(f"{self.config.backup_folder}/{job.benchmark_id}.json"):
-                os.remove(f"{self.config.backup_folder}/{job.benchmark_id}.json")
-
-        job_idxs = {
-            j.benchmark_id: idx 
-            for idx, j in enumerate(self.jobs)
-        }
         # create jobs from confirmed precommits
         challenge_id_2_name = {
             c.id: c.details.name
             for c in challenges.values()
         }
         for benchmark_id, x in precommits.items():
-            if benchmark_id in job_idxs:
+            if (
+                benchmark_id in job_idxs or
+                benchmark_id in proofs
+            ):
                 continue
             logger.info(f"creating job from confirmed precommit {benchmark_id}")
             c_name = challenge_id_2_name[x.settings.challenge_id]
@@ -126,14 +108,32 @@ class JobManager:
 
         # update jobs from confirmed benchmarks
         for benchmark_id, x in benchmarks.items():
+            if benchmark_id in proofs:
+                continue
+            job = self.jobs[job_idxs[benchmark_id]]
             if len(job.sampled_nonces) > 0:
                 continue
             logger.info(f"updating job from confirmed benchmark {benchmark_id}")
-            job = self.jobs[job_idxs[benchmark_id]]
             job.sampled_nonces = x.state.sampled_nonces
             for batch_idx in job.sampled_nonces_by_batch_idx:
                 job.last_batch_retry_time[batch_idx] = 0
 
+        # prune jobs from confirmed proofs
+        prune_idxs = [
+            job_idxs[benchmark_id]
+            for benchmark_id in proofs
+            if benchmark_id in job_idxs
+        ] + [
+            job_idxs[benchmark_id]
+            for benchmark_id in job_idxs
+            if benchmark_id not in precommits
+        ]
+        for idx in sorted(set(prune_idxs), reverse=True):
+            job = self.jobs.pop(idx)
+            logger.info(f"pruning job {job.benchmark_id}")
+            if os.path.exists(f"{self.config.backup_folder}/{job.benchmark_id}.json"):
+                os.remove(f"{self.config.backup_folder}/{job.benchmark_id}.json")
+                
     def run(self):
         now = int(time.time() * 1000)
         for job in self.jobs:
@@ -154,12 +154,14 @@ class JobManager:
         for job in self.jobs:
             if (
                 len(job.sampled_nonces) == 0 or # benchmark not confirmed
-                len(job.merkle_proofs) == len(job.sampled_nonces) or # already processed
-                any(x is None for x in job.batch_merkle_roots)
+                len(job.merkle_proofs) == len(job.sampled_nonces) # already processed
             ):
                 continue
             logger.info(f"proof {job.benchmark_id}: (merkle_proof: {len(job.batch_merkle_proofs)} of {len(job.sampled_nonces)} ready)")
-            if len(job.batch_merkle_proofs) != len(job.sampled_nonces):  # not finished
+            if (
+                len(job.batch_merkle_proofs) != len(job.sampled_nonces) or # not finished
+                any(x is None for x in job.batch_merkle_roots)
+            ):
                 continue
             logger.info(f"proof {job.benchmark_id}: ready")
             depth_offset = (job.batch_size - 1).bit_length()
