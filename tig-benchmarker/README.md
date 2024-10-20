@@ -128,6 +128,24 @@ options:
   --verbose            Print debug logs
 ```
 
+# Finding your API Key
+
+## Mainnet
+
+1. Navigate to https://play.tig.foundation/
+2. Connect your wallet
+3. Run the following command in the console: `JSON.parse(Cookies.get("account"))`
+    * `address` is your Mainnet `player_id`
+    * `api_key` is your Mainnet API key
+
+## Testnet
+
+1. Navigate to https://test.tig.foundation/
+2. Connect your wallet
+3. Run the following command in the console: `JSON.parse(Cookies.get("account"))`
+    * `address` is your Testnet `player_id`
+    * `api_key` is your Testnet API key
+
 # License
 
 [End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)
