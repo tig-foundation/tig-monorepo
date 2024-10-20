@@ -25,12 +25,13 @@ Python scripts that implements a master/slave Benchmarker for TIG.
     # in tig-benchmarker folder
     pip install -r requirements.txt
     ```
-8. Run a master
+8. Edit config.json with your `player_id` and `api_key`
+9. Run a master
     ```
     # in tig-benchmarker folder
-    python3 master.py <player_id> <api_key> <path to config.json>
+    python3 master.py <path to config.json>
     ```
-9. Connect at least 1 slave to your master
+10. Connect at least 1 slave to your master
     ```
     python3 slave.py <master_ip> <path to tig-worker>
     ```
@@ -52,40 +53,33 @@ Python scripts that implements a master/slave Benchmarker for TIG.
 
 # Optimising your Config
 
-1. Your master should generate enough batches for your slaves to be always busy. But at the same time, you should minimise the delay between your precommit and proof submissions. Observe the elapsed ms of your benchmarks and adjust parameters accordingly to target a particular duration per benchmark (e.g. 15s)
-    * `max_unresolved_precommits` - how many precommits can be in progress
-    * `num_nonces` - number of nonces for a precommit for a particular challenge
-    * Increasing/decreasing above will lead to more/less batches in your backlog
+1. `difficulty_sampler_config` allows you to set the `difficulty_range` for each challenge. 
+    * Every block, each challenge recalculates its `base_frontier` and `scaled_frontier`
+    * The difficulties within these 2 frontiers are "sorted" into easiest to hardest (0.0 is easiest, 1.0 is hardest)
+    * Benchmarkers can set the `difficulty_range` from which to sample a difficulty. Examples:
+        * `[0.0, 1.0]` samples the full range of valid difficulties
+        * `[0.0, 0.1]` samples the easiest 10% of valid difficulties
+    * Key consideration: easier difficulties may result in more solutions given the same compute, but might not be a qualifier for long if the frontiers get harder
 
-2. You want your slaves to be at 100% CPU utilization, but at the same time, batches should be "cheap" to repeat if a slave has issues. Observe the elapsed ms of batches and adjust parameters accordingly to target a particular duration per batch (e.g. 2s)
-    * `batch_size` - how many nonces are processed in a batch for a particular challenge. Must be a power of 2
+2. `job_manager_config` allows you to set the `batch_size` for each challenge.
+    * `batch_size` is the number of nonces that are part of a batch. Must be a power of 2
+    * Recommend to pick a `batch_size` for your slave with lowest `num_workers` such that it takes a few seconds to compute (e.g. 5 seconds)
+    * `batch_size` shouldn't be too small, or else network latency between master and slave will affect performance
+    * To support slaves with different `num_workers`, see `slave_manager_config` below
 
-3. Slaves on different compute may be better suited for certain challenges. You can define the challenge selection for a slave based on name patterns (patterns are checked in order):
-    * Any slave, any challenge (this should be the last entry)
-    ```
-    {
-        "name_regex": ".*",
-        "challenge_selection": null
-    }
-    ```
-    * Example: only vector_search
-    ```
-    {
-        "name_regex": "vector_search-slave-.*",
-        "challenge_selection": ["vector_search"]
-    }
-    ```
+3. `precommit_manager_config` allows you to control your benchmarks:
+    * `max_pending_benchmarks` is the maximum number of pending benchmarks
+    * Key consideration: you want batches to always be available for your slaves, but at the same time if you submit benchmarks too slowly, it will have large delays before it will be active
+    * `num_nonces` is the number of nonces to compute per benchmark. Recommend to adjust based on the logs which tells you the average number of nonces to find a solution. Example log:
+        * `global qualifier difficulty stats for vehicle_routing: (#nonces: 43739782840, #solutions: 22376, avg_nonces_per_solution: 1954763)`
+    * `weight` affects how likely the challenge will be picked (weight of 0 will never be picked). Recommend to adjust if the logs warns you to benchmark a specific challenge to increase your cutoff. Example log:
+        * `recommend finding more solutions for challenge knapsack to avoid being cut off`
 
-4. By default, the benchmarker uses smart challenge selection to maximise your cutoff and to minimise your imbalance. However, if you want to control the chance of a particular challenge being selected, you can set the weight in the algo_selection:
-    * Example:
-    ```
-    "vehicle_routing": {
-        "algorithm": "clarke_wright",
-        "num_nonces": 1000,
-        "base_fee_limit": "10000000000000000",
-        "weight": 1.0 <--- weight is relative to other challenges. If other challenge's weights are null/undefined, then this challenge will always be picked
-    }
-    ```
+4. `slave_manager_config` allows you to control your slaves:
+    * When a slave makes a request, the manager iterates through each slave config one at a time until it finds a regex match. The most specific regexes should be earlier in the list, and the more general regexes should be latter in the list.
+    * `max_concurrent_batches` determines how many batches of that challenge a slave can fetch & process concurrently
+    * `max_concurrent_batches` also serves as a whitelist of challenges for that slave. If you don't want a slave to benchmark a specific challenge, remove its entry from the list. Example:
+        * `{"vector_search": 1}` means the slave will only be given `vector_search` batches
 
 # Master
 
@@ -98,20 +92,15 @@ The master does no benchmarking! You need to connect slaves
 ## Usage
 
 ```
-usage: master.py [-h] [--api API] [--backup BACKUP] [--port PORT] [--verbose] player_id api_key config_path
+usage: master.py [-h] [--verbose] config_path
 
 TIG Benchmarker
 
 positional arguments:
-  player_id        Player ID
-  api_key          API Key
   config_path      Path to the configuration JSON file
 
 options:
   -h, --help       show this help message and exit
-  --api API        API URL (default: https://mainnet-api.tig.foundation)
-  --backup BACKUP  Folder to save pending submissions and other data
-  --port PORT      Port to run the server on (default: 5115)
   --verbose        Print debug logs
 ```
 

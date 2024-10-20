@@ -3,7 +3,8 @@ import os
 import logging
 import random
 from dataclasses import dataclass
-from tig_benchmarker.event_bus import *
+from tig_benchmarker.extensions.job_manager import Job
+from tig_benchmarker.extensions.submissions_manager import SubmitPrecommitRequest
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
@@ -15,146 +16,126 @@ class AlgorithmSelectionConfig(FromDict):
     algorithm: str
     base_fee_limit: PreciseNumber
     num_nonces: int
-    weight: Optional[float] = None
+    weight: float
 
 @dataclass
 class PrecommitManagerConfig(FromDict):
-    max_unresolved_precommits: int
+    max_pending_benchmarks: int
     algo_selection: Dict[str, AlgorithmSelectionConfig]
 
-class Extension:
-    def __init__(self, player_id: str, backup_folder: str, precommit_manager: dict, **kwargs):
+class PrecommitManager:
+    def __init__(self, config: PrecommitManagerConfig, player_id: str, jobs: List[Job]):
+        self.config = config
         self.player_id = player_id
-        self.config = PrecommitManagerConfig.from_dict(precommit_manager)
+        self.jobs = jobs
         self.last_block_id = None
-        self.num_precommits_this_block = 0
-        self.num_unresolved_precommits = None
-        self.curr_base_fees = {}
-        self.difficulty_samples = {}
+        self.num_precommits_submitted = 0
         self.algorithm_name_2_id = {}
         self.challenge_name_2_id = {}
-        self.percent_qualifiers_by_challenge = {}
-        self.num_solutions_by_challenge = {}
-        self.lock = True
+        self.curr_base_fees = {}
 
-    async def on_new_block(
-        self, 
-        block: Block, 
-        challenges: Dict[str, Challenge], 
-        algorithms: Dict[str, Algorithm], 
-        precommits: Dict[str, Precommit], 
+    def on_new_block(
+        self,
+        block: Block,
+        precommits: Dict[str, Precommit],
         benchmarks: Dict[str, Benchmark],
-        proofs: Dict[str, Proof],
+        challenges: Dict[str, Challenge],
+        algorithms: Dict[str, Algorithm],
         player: Optional[Player],
+        difficulty_data: Dict[str, List[DifficultyData]],
         **kwargs
     ):
-        if self.last_block_id == block.id:
-            return
-        self.num_precommits_this_block = 0
-        self.num_unresolved_precommits = sum(1 for benchmark_id in precommits if benchmark_id not in proofs)
         self.last_block_id = block.id
-        for c in challenges.values():
-            c_name = c.details.name
-            assert c_name in self.config.algo_selection, f"missing algorithm selection for challenge {c_name}"
-            self.challenge_name_2_id[c_name] = c.id
-            a_name = self.config.algo_selection[c_name].algorithm
-            a = next(
-                (
-                    a for a in algorithms.values()
-                    if a.details.challenge_id == c.id and a.details.name == a_name
-                ),
-                None
-            )
-            assert a is not None, f"selected non-existent algorithm {a_name} for challenge {c_name}"
-            self.algorithm_name_2_id[f"{c_name}_{a_name}"] = a.id
-            if c.block_data is not None:
-                self.curr_base_fees[c_name] = c.block_data.base_fee
-        logger.info(f"current base_fees: {self.curr_base_fees}")
-        if (
-            player is None or 
-            player.block_data is None or 
-            player.block_data.num_qualifiers_by_challenge is None
-        ):
-            self.percent_qualifiers_by_challenge = {
-                c.details.name: 0
-                for c in challenges.values()
-                if c.block_data is not None
-            }
-        else:
-            self.percent_qualifiers_by_challenge = {
-                c.details.name: (player.block_data.num_qualifiers_by_challenge.get(c.id, 0) / c.block_data.num_qualifiers) if c.block_data.num_qualifiers > 0 else 0
-                for c in challenges.values()
-                if c.block_data is not None
-            }
-        logger.info(f"percent_qualifiers_by_challenge: {self.percent_qualifiers_by_challenge}")
-        self.num_solutions_by_challenge = {
-            c.details.name: 0
+        self.num_precommits_submitted = 0
+        self.challenge_name_2_id = {
+            c.details.name: c.id
+            for c in challenges.values()
+        }
+        self.algorithm_name_2_id = {
+            f"{challenges[a.details.challenge_id].details.name}_{a.details.name}": a.id
+            for a in algorithms.values()
+        }
+        self.curr_base_fees = {
+            c.details.name: c.block_data.base_fee
             for c in challenges.values()
             if c.block_data is not None
         }
-        for benchmark_id, benchmark in benchmarks.items():
-            precommit = precommits[benchmark_id]
+        benchmark_stats_by_challenge = {
+            c.details.name: {
+                "solutions": 0,
+                "nonces": 0,
+                "qualifiers": 0
+            }
+            for c in challenges.values()
+            if c.block_data is not None
+        }
+        for benchmark in benchmarks.values():
+            precommit = precommits[benchmark.id]
             c_name = challenges[precommit.settings.challenge_id].details.name
-            num_solutions = benchmark.details.num_solutions
-            self.num_solutions_by_challenge[c_name] += num_solutions
-        logger.info(f"num_solutions_by_challenge: {self.num_solutions_by_challenge}")
-        self.lock = False
+            benchmark_stats_by_challenge[c_name]["solutions"] += benchmark.details.num_solutions
+            benchmark_stats_by_challenge[c_name]["nonces"] += precommit.details.num_nonces
 
-    async def on_difficulty_samples(self, challenge_id: str, samples: list, **kwargs):
-        self.difficulty_samples[challenge_id] = samples
+        if player is not None and player.block_data.reward is not None:
+            logger.info(f"player earnings: (latest: {player.block_data.reward.to_float()}, round: {player.block_data.round_earnings.to_float()})")
+            logger.info(f"player stats: (cutoff: {player.block_data.cutoff}, imbalance: {player.block_data.imbalance.to_float() * 100}%)")
+            for c_id, num_qualifiers in player.block_data.num_qualifiers_by_challenge.items():
+                c_name = challenges[c_id].details.name
+                benchmark_stats_by_challenge[c_name]["qualifiers"] = num_qualifiers
 
-    async def on_update(self):
-        if self.lock:
+        if player is not None and player.state is not None:
+            logger.info(f"player fee balance: (available: {player.state.available_fee_balance.to_float()}, paid: {player.state.total_fees_paid.to_float()})")
+
+        for c_name, x in benchmark_stats_by_challenge.items():
+            avg_nonces_per_solution = (x["nonces"] // x["solutions"]) if x["solutions"] > 0 else 0
+            logger.info(f"benchmark stats for {c_name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, #qualifiers: {x['qualifiers']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
+
+        if player is not None and any(x['qualifiers'] == player.block_data.cutoff for x in benchmark_stats_by_challenge.values()):
+            c_name = min(benchmark_stats_by_challenge, key=lambda x: benchmark_stats_by_challenge[x]['solutions'])
+            logger.warning(f"recommend finding more solutions for challenge {c_name} to avoid being cut off")
+
+        aggregate_difficulty_data = {
+            c_id: {
+                "nonces": sum(
+                    x.num_nonces if x.difficulty in challenges[c_id].block_data.qualifier_difficulties else 0
+                    for x in difficulty_data
+                ),
+                "solutions": sum(
+                    x.num_solutions if x.difficulty in challenges[c_id].block_data.qualifier_difficulties else 0
+                    for x in difficulty_data
+                ),
+            }
+            for c_id, difficulty_data in difficulty_data.items()
+        }
+        for c_id, x in aggregate_difficulty_data.items():
+            avg_nonces_per_solution = (x["nonces"] // x["solutions"]) if x["solutions"] > 0 else 0
+            logger.info(f"global qualifier difficulty stats for {challenges[c_id].details.name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
+
+    def run(self, difficulty_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
+        num_pending_benchmarks = sum(1 for job in self.jobs if job.merkle_root is None) + self.num_precommits_submitted
+        if  num_pending_benchmarks >= self.config.max_pending_benchmarks:
+            logger.debug(f"number of pending benchmarks has reached max of {self.config.max_pending_benchmarks}")
             return
-        if self.num_precommits_this_block + self.num_unresolved_precommits >= self.config.max_unresolved_precommits:
-            logger.debug(f"reached max unresolved precommits: {self.config.max_unresolved_precommits}")
-            return
-        algo_selection = [
-            (c_name, selection)
-            for c_name, selection in self.config.algo_selection.items()
-            if self.curr_base_fees[c_name] <= selection.base_fee_limit
+        selections = [
+            (c_name, x) for c_name, x in self.config.algo_selection.items()
+            if self.curr_base_fees[c_name] <= x.base_fee_limit
         ]
-        if len(algo_selection) == 0:
-            logger.warning("no challenges within base fee limit")
-            return
-        if any(x[1].weight is not None for x in algo_selection):
-            logger.debug(f"using config weights to randomly select a challenge + algorithm: {self.config.algo_selection}")
-            selection = random.choices(algo_selection, weights=[x[1].weight or 1e-12 for x in algo_selection])[0]
-        elif (max_percent := max(v for v in self.percent_qualifiers_by_challenge.values())) > 0:
-            logger.debug(f"using percent qualifiers to randomly select a challenge + algorithm: {self.percent_qualifiers_by_challenge}")
-            selection = random.choices(
-                algo_selection,
-                weights=[max_percent - self.percent_qualifiers_by_challenge.get(x[0], 0) + 1e-12 for x in algo_selection]
-            )[0]
-        else:
-            logger.debug(f"using number of solutions to randomly select a challenge + algorithm: {self.num_solutions_by_challenge}")
-            max_solution = max(v for v in self.num_solutions_by_challenge.values())
-            selection = random.choices(
-                algo_selection,
-                weights=[max_solution - self.num_solutions_by_challenge.get(x[0], 0) + 1e-12 for x in algo_selection]
-            )[0]
-        c_name = selection[0]
-        c_id = self.challenge_name_2_id[c_name]
-        a_name = selection[1].algorithm
-        a_id = self.algorithm_name_2_id[f"{c_name}_{a_name}"]
-        num_nonces = selection[1].num_nonces
-
-        difficulty_samples = self.difficulty_samples.get(c_id, [])
-        if len(difficulty_samples) == 0:
-            return
-        difficulty = difficulty_samples.pop()
-        settings = BenchmarkSettings(
-            player_id=self.player_id,
-            block_id=self.last_block_id,
-            algorithm_id=a_id,
-            challenge_id=c_id,
-            difficulty=difficulty
+        if len(selections) == 0:
+            logger.warning("No challenges under base fee limit")
+            return None
+        logger.debug(f"Selecting challenge from: {[(c_name, x.weight) for c_name, x in selections]}")
+        selection = random.choices(selections, weights=[x.weight for _, x in selections])[0]
+        c_id = self.challenge_name_2_id[selection[0]]
+        a_id = self.algorithm_name_2_id[f"{selection[0]}_{selection[1].algorithm}"]
+        self.num_precommits_submitted += 1
+        req = SubmitPrecommitRequest(
+            settings=BenchmarkSettings(
+                challenge_id=c_id,
+                algorithm_id=a_id,
+                player_id=self.player_id,
+                block_id=self.last_block_id,
+                difficulty=difficulty_samples[selection[0]]
+            ),
+            num_nonces=selection[1].num_nonces
         )
-        logger.debug(f"created precommit: (settings: {settings}, num_nonces: {num_nonces})")
-        self.num_precommits_this_block += 1
-        await emit(
-            "precommit_ready",
-            settings=settings,
-            num_nonces=num_nonces
-        )
-        
+        logger.info(f"Created precommit (challenge: {selection[0]}, algorithm: {selection[1].algorithm}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
+        return req
