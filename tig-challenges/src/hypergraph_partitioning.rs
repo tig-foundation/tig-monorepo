@@ -77,6 +77,38 @@ pub struct Challenge
 #[cfg(feature = "cuda")]
 pub const KERNEL:                                   Option<CudaKernel> = None;
 
+fn get_init_values(
+    difficulty:                         &Difficulty, 
+    seed:                               [u8; 32]
+)                                                   -> (Vec<u64>, Vec<u64>, Vec<Vec<u64>>)
+{
+    let mut rng                                     = SmallRng::from_seed(StdRng::from_seed(seed).gen());
+
+    let mut hyperedge_indices                       = Vec::with_capacity(((difficulty.num_nodes * difficulty.num_edges)+1) / difficulty.num_edges + 1);
+    for i in (0..(difficulty.num_nodes * difficulty.num_edges)+1).step_by(difficulty.num_edges)
+    {
+        hyperedge_indices.push(i as u64);
+    }
+
+    let vertices                                    : Vec<u64> = (0..difficulty.num_vertices as u64).collect();
+
+    let mut hyperedges                              = Vec::with_capacity(difficulty.num_nodes);
+    for i in 0..difficulty.num_nodes
+    {
+        let mut vec                                 = Vec::with_capacity(difficulty.num_edges);
+        for j in 0..difficulty.num_edges
+        {
+            vec.push(
+                vertices[(rng.next_u32()%difficulty.num_vertices as u32) as usize]
+            );
+        }
+
+        hyperedges.push(vec);
+    }
+
+    return (vertices, hyperedge_indices, hyperedges);
+}
+
 impl crate::ChallengeTrait<Solution, Difficulty, 3> for Challenge 
 {
     #[cfg(feature = "cuda")]
@@ -96,32 +128,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 3> for Challenge
         difficulty:                     &Difficulty
     )                                               -> Result<Challenge> 
     {
-        let mut rng                                 = SmallRng::from_seed(StdRng::from_seed(seed).gen());
-
-        let mut hyperedge_indices                   = Vec::with_capacity(((difficulty.num_nodes * difficulty.num_edges)+1) / difficulty.num_edges);
-        let mut cur_idx                             = 0;
-        for i in (0..(difficulty.num_nodes * difficulty.num_edges)+1).step_by(difficulty.num_edges)
-        {
-            hyperedge_indices[cur_idx]              = i as u64 * difficulty.num_nodes as u64;
-
-            cur_idx                                 += 1;
-        }
-
-        let vertices                                : Vec<u64> = (0..difficulty.num_vertices as u64).collect();
-
-        let mut hyperedges                          = Vec::with_capacity(difficulty.num_nodes);
-        for i in 0..difficulty.num_nodes
-        {
-            let mut vec                             = Vec::with_capacity(difficulty.num_edges);
-            for j in 0..difficulty.num_edges
-            {
-                vec[j]                              = vertices[(rng.next_u32()%difficulty.num_vertices as u32) as usize];
-            }
-
-            hyperedges[i]                           = vec;
-        }
-
-        panic!("seed = {:?}\ndiff = {:?}\nvert = {:?}\nheid = {:?}\nedge = {:?}", seed, difficulty, vertices, hyperedge_indices, hyperedges);
+        let (vertices, hyperedge_indices, hyperedges) = get_init_values(difficulty, seed);
 
         return Ok(Challenge
         {

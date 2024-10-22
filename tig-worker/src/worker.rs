@@ -204,11 +204,11 @@ pub fn verify_solution(
         {
             let challenge =
                 hypergraph_partitioning::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
-                    .expect("Failed to generate vector_search instance");
+                    .expect("Failed to generate hypergraph_partitioning instance");
             match hypergraph_partitioning::Solution::try_from(solution.clone()) {
                 Ok(solution) => challenge.verify_solution(&solution),
                 Err(_) => Err(anyhow!(
-                    "Invalid solution. Cannot convert to vector_search::Solution"
+                    "Invalid solution. Cannot convert to hypergraph_partitioning::Solution"
                 )),
             }
         }
