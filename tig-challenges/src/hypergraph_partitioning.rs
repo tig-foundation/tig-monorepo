@@ -98,26 +98,27 @@ impl crate::ChallengeTrait<Solution, Difficulty, 3> for Challenge
     {
         let mut rng                                 = SmallRng::from_seed(StdRng::from_seed(seed).gen());
 
-        let mut hyperedge_indices                   = Vec::new();
+        let mut hyperedge_indices                   = Vec::with_capacity(((difficulty.num_nodes * difficulty.num_edges)+1) / difficulty.num_edges);
+        let mut cur_idx                             = 0;
         for i in (0..(difficulty.num_nodes * difficulty.num_edges)+1).step_by(difficulty.num_edges)
         {
-            hyperedge_indices.push(i as u64 * difficulty.num_nodes as u64);
+            hyperedge_indices[cur_idx]              = i as u64 * difficulty.num_nodes as u64;
+
+            cur_idx                                 += 1;
         }
 
         let vertices                                : Vec<u64> = (0..difficulty.num_vertices as u64).collect();
 
-        let mut hyperedges                          = Vec::new();
+        let mut hyperedges                          = Vec::with_capacity(difficulty.num_nodes);
         for i in 0..difficulty.num_nodes
         {
-            let mut vec                             = Vec::new();
+            let mut vec                             = Vec::with_capacity(difficulty.num_edges);
             for j in 0..difficulty.num_edges
             {
-                vec.push(
-                    vertices[(rng.next_u32()%difficulty.num_vertices as u32) as usize]
-                );
+                vec[j]                              = vertices[(rng.next_u32()%difficulty.num_vertices as u32) as usize];
             }
 
-            hyperedges.push(vec);
+            hyperedges[i]                           = vec;
         }
 
         return Ok(Challenge
