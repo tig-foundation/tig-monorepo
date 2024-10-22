@@ -205,12 +205,12 @@ fn solve_greedy_bipartition(
     num_partitions:                     Option<usize>
 )                                                   -> Vec<i32>
 {
-    let depth                           = num_partitions.unwrap_or(16).ilog2();
-    let M                               = solve_shape(hyperedges).0;
+    let depth                                       = num_partitions.unwrap_or(16).ilog2();
+    let M                                           = solve_shape(hyperedges).0;
 
     // Preprocessing: Build mappings
     // vertex_to_hyperedges[v] will contain the hyperedge indices that include vertex v
-    let mut vertex_to_hyperedges:       Vec<Vec<usize>> = Vec::with_capacity(vertices.len());
+    let mut vertex_to_hyperedges                    : Vec<Vec<usize>> = vec![Vec::with_capacity(hyperedges.len()); vertices.len()];
     for i in 0..hyperedges.len()
     {
         for j in hyperedges[i].iter()
@@ -219,7 +219,7 @@ fn solve_greedy_bipartition(
         }
     }
 
-    let mut partitions                  = vec![-1 as i32; vertices.len()];
+    let mut partitions                              = vec![-1 as i32; vertices.len()];
     recursive_bipartition(vertices, &mut partitions, 0, depth, num_partitions.unwrap_or(16));
 
     return partitions;
