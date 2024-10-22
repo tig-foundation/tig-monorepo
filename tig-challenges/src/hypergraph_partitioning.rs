@@ -121,6 +121,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 3> for Challenge
             hyperedges[i]                           = vec;
         }
 
+        panic!("seed = {:?}\ndiff = {:?}\nvert = {:?}\nheid = {:?}\nedge = {:?}", seed, difficulty, vertices, hyperedge_indices, hyperedges);
+
         return Ok(Challenge
         {
             seed:                                   seed,
