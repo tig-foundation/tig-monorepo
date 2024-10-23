@@ -29,6 +29,9 @@ mod web3_feature {
         Ok(format!("0x{}", address.encode_hex::<String>()))
     }
 
+    pub const ERC20_TRANSFER_TOPIC: &str =
+        "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
     pub async fn get_transaction(
         rpc_url: &str,
         erc20_address: &str,
@@ -42,30 +45,43 @@ mod web3_feature {
             .transaction_receipt(tx_hash)
             .await?
             .ok_or_else(|| anyhow!("Receipt for transaction {} not found", tx_hash))?;
+
         if !receipt.status.is_some_and(|x| x.as_u64() == 1) {
             return Err(anyhow!("Transaction not confirmed"));
         }
-        let to = format!(
-            "{:?}",
-            receipt.to.ok_or_else(|| anyhow!("Receiver not found"))?
-        );
-        if to != erc20_address {
-            return Err(anyhow!(
-                "Transaction not interacting with erc20 contract '{}'",
-                erc20_address
-            ));
+
+        // Find the Transfer event log
+        let erc20_address = H160::from_str(erc20_address.trim_start_matches("0x")).unwrap();
+        let transfer_topic = H256::from_slice(&hex::decode(ERC20_TRANSFER_TOPIC)?);
+        let transfer_log = receipt
+            .logs
+            .iter()
+            .find(|log| {
+                log.address == erc20_address
+                    && !log.topics.is_empty()
+                    && log.topics[0] == transfer_topic
+            })
+            .ok_or_else(|| anyhow!("No ERC20 transfer event found"))?;
+
+        if transfer_log.topics.len() != 3 {
+            return Err(anyhow!("Invalid Transfer event format"));
         }
-        let tx = eth
-            .transaction(TransactionId::Hash(tx_hash))
-            .await?
-            .ok_or_else(|| anyhow!("Transaction {} not found", tx_hash))?;
-        if hex::encode(&tx.input.0[0..4]) != "a9059cbb" {
-            return Err(anyhow!("Not a ERC20 transfer transaction"));
-        };
+
+        // Extract transfer details from the event
+        let sender = format!(
+            "0x{}",
+            hex::encode(&transfer_log.topics[1].as_bytes()[12..])
+        );
+        let receiver = format!(
+            "0x{}",
+            hex::encode(&transfer_log.topics[2].as_bytes()[12..])
+        );
+        let amount = PreciseNumber::from_hex_str(&hex::encode(&transfer_log.data.0))?;
+
         Ok(super::Transaction {
-            sender: format!("{:?}", tx.from.ok_or_else(|| anyhow!("Sender not found"))?),
-            receiver: format!("0x{}", hex::encode(&tx.input.0[16..36])),
-            amount: PreciseNumber::from_hex_str(&hex::encode(&tx.input.0[36..68]))?,
+            sender,
+            receiver,
+            amount,
         })
     }
 
