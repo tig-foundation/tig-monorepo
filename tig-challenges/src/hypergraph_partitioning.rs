@@ -242,8 +242,14 @@ fn bipartition(
         degrees.push(vertex_to_hyperedges[*v as usize].len() as i64 * -1);
     }
 
-    let mut sorted_vertices                             = vertices_subset.clone();
-    sorted_vertices.sort_by_key(|&i| degrees[i as usize]);
+    let mut indices                                     : Vec<usize> = (0..vertices_subset.len()).collect();
+    indices.sort_by_key(|&i| degrees[i as usize]);
+
+    let mut sorted_vertices                             : Vec<u64> = Vec::with_capacity(vertices_subset.len());
+    for v in vertices_subset
+    {
+        sorted_vertices.push(*v);
+    }
 
     let mut left                                        : Vec<u64> = Vec::with_capacity(target_left);
     let mut right                                       : Vec<u64> = Vec::with_capacity(target_right);
