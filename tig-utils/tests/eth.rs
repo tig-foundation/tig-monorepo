@@ -13,68 +13,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_gnosis_safe_address() {
-        assert_eq!(
-            tig_utils::get_gnosis_safe_address(
-                "https://mainnet.base.org",
-                "0x0111ed72b3cd75e786083cf5d5db3a5ef0317891712315547fe49b3a16eebb16"
-            )
-            .await
-            .unwrap(),
-            "0x6ab6dffdee6efc0e60b34ef4685b40784c497af8".to_string()
-        );
-        assert_eq!(
-            tig_utils::get_gnosis_safe_address(
-                "https://mainnet.base.org",
-                "0xbe95f21a4172d16cbf243ed6082e6c1cc132ec5ac3011a8b5289283f9059b8ce",
-            )
-            .await
-            .unwrap(),
-            "0xb787d8059689402dabc0a05832be526f79aa6b57".to_string()
-        );
-        assert_eq!(
-            tig_utils::get_gnosis_safe_address(
+    async fn test_is_valid_gnosis_safe_sig() {
+        assert!(
+            tig_utils::is_valid_gnosis_safe_sig(
                 "https://sepolia.base.org",
-                "0x90453a4f4ffffedeb70f144ce25d7ca74214f159ce394f0d929fda1d004d8ed0",
+                "0x0C4ee0f015a47767E74AcC6F913d446867F2D571",
+                "Test message...",
+                "0xf1f2b72cdb594550c3c4f4d5825f092aed803d8182b0a2e9095fab81f08829e51aa52dbe8cd42d7a9e68ebb31578a4a3f761112c2c80e1ff455e348a904fb4061b"
             )
-            .await
-            .unwrap(),
-            "0x0112fb82f8041071d7000fb9e4782668e8cbd05f".to_string()
+            .await.is_ok()
         );
-    }
-
-    #[tokio::test]
-    async fn test_get_gnosis_safe_owners() {
-        assert_eq!(
-            tig_utils::get_gnosis_safe_owners(
-                "https://mainnet.base.org",
-                "0x6ab6dffdee6efc0e60b34ef4685b40784c497af8"
-            )
-            .await
-            .unwrap(),
-            vec!["0x7adc19694782c61132bcc38accaf1156d13c80d1".to_string()]
-        );
-        assert_eq!(
-            tig_utils::get_gnosis_safe_owners(
-                "https://mainnet.base.org",
-                "0xb787d8059689402dabc0a05832be526f79aa6b57",
-            )
-            .await
-            .unwrap(),
-            vec![
-                "0x9e10de6645d81823561aa4c91bef26c00b6c4d81".to_string(),
-                "0xa327948a93000c6a37cac11b4239d7422a47c882".to_string(),
-                "0x7a73bec3a56f935687dd30d0ff7c4bc632558c8b".to_string()
-            ]
-        );
-        assert_eq!(
-            tig_utils::get_gnosis_safe_owners(
+        assert!(
+            tig_utils::is_valid_gnosis_safe_sig(
                 "https://sepolia.base.org",
-                "0x0112fb82f8041071d7000fb9e4782668e8cbd05f",
+                "0x0C4ee0f015a47767E74AcC6F913d446867F2D571",
+                "EXPECT FAIL",
+                "0xf1f2b72cdb594550c3c4f4d5825f092aed803d8182b0a2e9095fab81f08829e51aa52dbe8cd42d7a9e68ebb31578a4a3f761112c2c80e1ff455e348a904fb4061b"
             )
             .await
-            .unwrap(),
-            vec!["0x38d57e70513503c851f0a997fc1c8ab41cd2fca2".to_string()]
+            .is_err()
+        );
+        assert!(
+            tig_utils::is_valid_gnosis_safe_sig(
+                "https://mainnet.base.org",
+                "0x4664DF248d0cb2035316B41428013fe1cc48d054",
+                "Test message...",
+                "0x8ad0762136c7451850fce873b977008ac0c8b4e2397269c192f298b69362d38f2da89a3e7bc846f4f227f3311109c3ec1f11eef1257eef13a75588d5884183ec1b553d8c2a6a3df85ac002fb87efb7f61d229ab7eada526f12ba513f9d5addfb3c6cea4892c9cb5496dd9546202ec0e936782fe3805790b2724c057f210e6ae8651c"
+            )
+            .await
+            .is_ok()
+        );
+        assert!(
+            tig_utils::is_valid_gnosis_safe_sig(
+                "https://mainnet.base.org",
+                "0x4664DF248d0cb2035316B41428013fe1cc48d054",
+                "EXPECT FAIL",
+                "0x8ad0762136c7451850fce873b977008ac0c8b4e2397269c192f298b69362d38f2da89a3e7bc846f4f227f3311109c3ec1f11eef1257eef13a75588d5884183ec1b553d8c2a6a3df85ac002fb87efb7f61d229ab7eada526f12ba513f9d5addfb3c6cea4892c9cb5496dd9546202ec0e936782fe3805790b2724c057f210e6ae8651c"
+            )
+            .await
+            .is_err()
         );
     }
 

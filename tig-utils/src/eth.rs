@@ -69,27 +69,37 @@ mod web3_feature {
         })
     }
 
-    pub const PROXY_CREATION_TOPIC_ID: &str =
-        "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235";
-    pub const GNOSIS_SAFE_PROXY_CONTRACT_ADDRESS: &str =
-        "0xc22834581ebc8527d974f8a1c97e1bea4ef910bc";
     pub const GNOSIS_SAFE_ABI: &str = r#"[
         {
-            "inputs":[],
-            "name":"getOwners",
-            "outputs":[
-                {
-                    "internalType":"address[]",
-                    "name":"",
-                    "type":"address[]"
-                }
+            "inputs": [
+            {
+                "name": "_dataHash",
+                "type": "bytes32"
+            },
+            {
+                "name": "_signature",
+                "type": "bytes"
+            }
             ],
-            "stateMutability":"view",
-            "type":"function"
+            "name": "isValidSignature",
+            "outputs": [
+            {
+                "name": "",
+                "type": "bytes4"
+            }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
         }
     ]"#;
 
-    pub async fn get_gnosis_safe_owners(rpc_url: &str, address: &str) -> Result<Vec<String>> {
+    pub async fn is_valid_gnosis_safe_sig(
+        rpc_url: &str,
+        address: &str,
+        msg: &str,
+        sig: &str,
+    ) -> Result<()> {
         let transport = web3::transports::Http::new(rpc_url)?;
         let eth = web3::Web3::new(transport).eth();
 
@@ -99,43 +109,21 @@ mod web3_feature {
             GNOSIS_SAFE_ABI.as_bytes(),
         )
         .unwrap();
-        let owners: Vec<Address> = gnosis_safe
-            .query("getOwners", (), None, Options::default(), None)
-            .await
-            .map_err(|e| anyhow!("Failed query getOwners: {:?}", e))?;
-        Ok(owners.iter().map(|x| format!("{:?}", x)).collect())
-    }
-
-    pub async fn get_gnosis_safe_address(rpc_url: &str, tx_hash: &str) -> Result<String> {
-        let transport = web3::transports::Http::new(rpc_url)?;
-        let eth = web3::Web3::new(transport).eth();
-
-        let tx_hash = H256::from_slice(hex::decode(tx_hash.trim_start_matches("0x"))?.as_slice());
-        let receipt = eth
-            .transaction_receipt(tx_hash)
-            .await?
-            .ok_or_else(|| anyhow!("Receipt for transaction {} not found", tx_hash))?;
-        if !receipt.status.is_some_and(|x| x.as_u64() == 1) {
-            return Err(anyhow!("Transaction not confirmed"));
-        }
-        if !receipt
-            .to
-            .is_some_and(|x| format!("{:?}", x) == GNOSIS_SAFE_PROXY_CONTRACT_ADDRESS)
-        {
-            return Err(anyhow!("Not a Create Gnosis Safe transaction"));
-        }
-        match receipt
-            .logs
-            .iter()
-            .find(|log| {
-                log.topics
-                    .iter()
-                    .any(|topic| format!("{:?}", topic) == PROXY_CREATION_TOPIC_ID)
-            })
-            .map(|log| format!("0x{}", hex::encode(&log.data.0.as_slice()[12..32])))
-        {
-            None => Err(anyhow!("No ProxyCreation event found")),
-            Some(gnosis_safe_address) => Ok(gnosis_safe_address),
+        let result: Result<Vec<u8>, _> = gnosis_safe
+            .query(
+                "isValidSignature",
+                (
+                    hash_message(msg.as_bytes()),
+                    hex::decode(sig.trim_start_matches("0x"))?,
+                ),
+                None,
+                Options::default(),
+                None,
+            )
+            .await;
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!("Failed query isValidSignature: {:?}", e)),
         }
     }
 }

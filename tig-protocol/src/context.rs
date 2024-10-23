@@ -134,7 +134,6 @@ pub trait Context {
         wasm_vm_config: &WasmVMConfig,
     ) -> ContextResult<anyhow::Result<OutputData>>;
     async fn get_transaction(&self, tx_hash: &String) -> ContextResult<Transaction>;
-    async fn get_multisig_owners(&self, address: &String) -> ContextResult<Vec<String>>;
     async fn get_latest_eth_block_num(&self) -> ContextResult<String>;
     async fn get_player_deposit(
         &self,

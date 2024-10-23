@@ -46,15 +46,6 @@ async fn verify_topup_tx<T: Context>(
             tx_hash: tx_hash.clone(),
         });
     }
-    let mut valid_senders = HashSet::<String>::new();
-    valid_senders.insert(player.id.clone());
-    if player.details.is_multisig {
-        let multisig_owners = ctx
-            .get_multisig_owners(&player.id)
-            .await
-            .unwrap_or_else(|e| panic!("get_multisig_owners error: {:?}", e));
-        valid_senders.extend(multisig_owners.into_iter());
-    }
 
     let transaction =
         ctx.get_transaction(&tx_hash)
@@ -62,7 +53,7 @@ async fn verify_topup_tx<T: Context>(
             .map_err(|_| ProtocolError::InvalidTransaction {
                 tx_hash: tx_hash.clone(),
             })?;
-    if !valid_senders.contains(&transaction.sender) {
+    if player.id != transaction.sender {
         return Err(ProtocolError::InvalidTransactionSender {
             tx_hash: tx_hash.clone(),
             expected_sender: player.id.clone(),
