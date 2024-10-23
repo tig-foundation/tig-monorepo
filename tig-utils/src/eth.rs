@@ -88,21 +88,21 @@ mod web3_feature {
     pub const GNOSIS_SAFE_ABI: &str = r#"[
         {
             "inputs": [
-            {
-                "name": "_dataHash",
-                "type": "bytes32"
-            },
-            {
-                "name": "_signature",
-                "type": "bytes"
-            }
+                {
+                    "name": "_dataHash",
+                    "type": "bytes32"
+                },
+                {
+                    "name": "_signature",
+                    "type": "bytes"
+                }
             ],
             "name": "isValidSignature",
             "outputs": [
-            {
-                "name": "",
-                "type": "bytes4"
-            }
+                {
+                    "name": "",
+                    "type": "bytes4"
+                }
             ],
             "payable": false,
             "stateMutability": "view",
@@ -141,6 +141,53 @@ mod web3_feature {
             Ok(_) => Ok(()),
             Err(e) => Err(anyhow!("Failed query isValidSignature: {:?}", e)),
         }
+    }
+
+    pub const ENS_REVERSE_RECORDS_ADDRESS: &str = "0x3671aE578E63FdF66ad4F3E12CC0c0d71Ac7510C";
+    pub const ENS_REVERSE_RECORDS_ABI: &str = r#"[
+        {
+            "inputs": [
+                {
+                    "internalType": "address[]",
+                    "name": "addresses",
+                    "type": "address[]"
+                }
+            ],
+            "name": "getNames",
+            "outputs": [
+                {
+                    "internalType": "string[]",
+                    "name": "r",
+                    "type": "string[]"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ]"#;
+
+    pub async fn lookup_ens_name(rpc_url: &str, address: &str) -> Result<String> {
+        let transport = web3::transports::Http::new(rpc_url)?;
+        let eth = web3::Web3::new(transport).eth();
+
+        let reverse_records = Contract::from_json(
+            eth.clone(),
+            H160::from_str(ENS_REVERSE_RECORDS_ADDRESS)?,
+            ENS_REVERSE_RECORDS_ABI.as_bytes(),
+        )?;
+
+        let addresses = vec![H160::from_str(address.trim_start_matches("0x"))?];
+
+        let names: Vec<String> = reverse_records
+            .query("getNames", (addresses,), None, Options::default(), None)
+            .await?;
+
+        // Return first name or address if empty
+        Ok(if !names[0].is_empty() {
+            names[0].clone()
+        } else {
+            address.to_string()
+        })
     }
 }
 

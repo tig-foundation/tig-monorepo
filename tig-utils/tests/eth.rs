@@ -89,4 +89,35 @@ mod tests {
             }
         );
     }
+
+    #[tokio::test]
+    async fn test_lookup_ens_name() {
+        assert_eq!(
+            tig_utils::lookup_ens_name(
+                "https://eth-mainnet.public.blastapi.io",
+                "0x225f137127d9067788314bc7fcc1f36746a3c3B5",
+            )
+            .await
+            .unwrap(),
+            "luc.eth".to_string()
+        );
+        assert_eq!(
+            tig_utils::lookup_ens_name(
+                "https://eth-mainnet.public.blastapi.io",
+                "0x0532d3971666953bc2db8619b89d546b3938a535",
+            )
+            .await
+            .unwrap(),
+            "harrisandtrotter.eth".to_string()
+        );
+        assert_eq!(
+            tig_utils::lookup_ens_name(
+                "https://eth-mainnet.public.blastapi.io",
+                "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+            )
+            .await
+            .unwrap(),
+            "vitalik.eth".to_string()
+        );
+    }
 }
