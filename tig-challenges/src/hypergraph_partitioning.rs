@@ -246,10 +246,12 @@ fn bipartition(
     indices.sort_by_key(|&i| degrees[i as usize]);
 
     let mut sorted_vertices                             : Vec<u64> = Vec::with_capacity(vertices_subset.len());
-    for v in vertices_subset
+    for i in indices
     {
-        sorted_vertices.push(*v);
+        sorted_vertices.push(vertices_subset[i]);
     }
+
+    panic!("{:?}", sorted_vertices);
 
     let mut left                                        : Vec<u64> = Vec::with_capacity(target_left);
     let mut right                                       : Vec<u64> = Vec::with_capacity(target_right);
