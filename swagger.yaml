@@ -264,12 +264,6 @@ paths:
           ```
           I am signing this message to prove that I control address <address>
           ```
-        
-        * If `<address>` is a gnosis safe multisig:
-          * `<gnosis_safe_setup_tx_hash>` should be the transaction that created the `<address>`. 
-          * The transaction should emit a `ProxyCreation` event. [Example](https://basescan.org/tx/0xa61a5d1e4deaf4f4c42ede0ad412e4ca02f5b3d38ebff61f56e8e8d16153d4e6)
-          
-          * `<signature>` can be produced by any current owner of the multisig
       requestBody:
         content:
           application/json:
@@ -881,7 +875,7 @@ components:
       pattern: ^[a-f0-9]{32}$
     Signature:
       type: string
-      pattern: ^0x[a-f0-9]{130}$
+      pattern: ^0x([a-f0-9]{130})+$
     TxHash:
       type: string
       pattern: ^0x[a-f0-9]{64}$
@@ -977,15 +971,13 @@ components:
           $ref: '#/components/schemas/Address'
         signature:
           $ref: '#/components/schemas/Signature'
-        gnosis_safe_setup_tx_hash:
-          allOf:
-            - $ref: '#/components/schemas/TxHash'
-          nullable: true
     RequestApiKeyResponse:
       type: object
       properties:
         api_key:
           $ref: '#/components/schemas/MD5'
+        name:
+          type: string
     SubmitAlgorithmRequest:
       type: object
       properties:
