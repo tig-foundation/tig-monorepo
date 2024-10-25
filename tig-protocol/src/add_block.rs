@@ -918,10 +918,11 @@ fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
 }
 
 #[time]
-async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
+async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) 
+{
     let config = block.config();
 
-    let mut solutions_by_challenge = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
+    let mut solutions_by_challenge              = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
     for (settings, num_solutions) in cache.active_solutions.values() {
         solutions_by_challenge
             .entry(settings.challenge_id.clone())
@@ -929,48 +930,66 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
             .push((settings, num_solutions));
     }
 
-    let mut max_qualifiers_by_player = HashMap::<String, u32>::new();
-    for challenge in cache.active_challenges.values_mut() {
-        let block_data = challenge.block_data.as_mut().unwrap();
-        block_data.num_qualifiers = Some(0);
-        block_data.qualifier_difficulties = Some(HashSet::new());
-    }
-    for algorithm in cache.active_algorithms.values_mut() {
-        let block_data = algorithm.block_data.as_mut().unwrap();
-        block_data.num_qualifiers_by_player = Some(HashMap::new());
-    }
-    for player in cache.active_players.values_mut() {
-        let block_data = player.block_data.as_mut().unwrap();
-        max_qualifiers_by_player.insert(player.id.clone(), *block_data.cutoff());
-        block_data.num_qualifiers_by_challenge = Some(HashMap::new());
+    let mut max_qualifiers_by_player            = HashMap::<String, u32>::new();
+    for challenge in cache.active_challenges.values_mut() 
+    {
+        let block_data                          = challenge.block_data.as_mut().unwrap();
+        block_data.num_qualifiers               = Some(0);
+        block_data.qualifier_difficulties       = Some(HashSet::new());
     }
 
-    for (challenge_id, challenge) in cache.active_challenges.iter_mut() {
-        if !solutions_by_challenge.contains_key(challenge_id) {
+    for algorithm in cache.active_algorithms.values_mut() 
+    {
+        let block_data                          = algorithm.block_data.as_mut().unwrap();
+        block_data.num_qualifiers_by_player     = Some(HashMap::new());
+    }
+
+    for player in cache.active_players.values_mut() 
+    {
+        let block_data                          = player.block_data.as_mut().unwrap();
+        block_data.num_qualifiers_by_challenge  = Some(HashMap::new());
+
+        max_qualifiers_by_player.insert(player.id.clone(), *block_data.cutoff());
+    }
+
+    for (challenge_id, challenge) in cache.active_challenges.iter_mut() 
+    {
+        if !solutions_by_challenge.contains_key(challenge_id) 
+        {
             continue;
         }
-        let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
-        let points = solutions
+
+        let solutions                           = solutions_by_challenge.get_mut(challenge_id).unwrap();
+        let points                              = solutions
             .iter()
             .map(|(settings, _)| settings.difficulty.clone())
             .collect::<Frontier>();
-        let mut frontier_indexes = HashMap::<Point, usize>::new();
-        for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() {
-            for point in frontier {
+            
+        let mut frontier_indexes                = HashMap::<Point, usize>::new();
+        for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() 
+        {
+            for point in frontier 
+            {
                 frontier_indexes.insert(point, frontier_index);
             }
         }
-        solutions.sort_by(|(a_settings, _), (b_settings, _)| {
-            let a_index = frontier_indexes[&a_settings.difficulty];
-            let b_index = frontier_indexes[&b_settings.difficulty];
+
+        solutions.sort_by(
+        |(a_settings, _), (b_settings, _)| 
+        {
+            let a_index                         = frontier_indexes[&a_settings.difficulty];
+            let b_index                         = frontier_indexes[&b_settings.difficulty];
+
             a_index.cmp(&b_index)
         });
 
-        let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
-        let mut curr_frontier_index = 0;
-        let challenge_data = challenge.block_data.as_mut().unwrap();
-        for (settings, &num_solutions) in solutions.iter() {
-            let BenchmarkSettings {
+        let mut max_qualifiers_by_player        = max_qualifiers_by_player.clone();
+        let mut curr_frontier_index             = 0;
+        let challenge_data                      = challenge.block_data.as_mut().unwrap();
+        for (settings, &num_solutions) in solutions.iter() 
+        {
+            let BenchmarkSettings 
+            {
                 player_id,
                 algorithm_id,
                 challenge_id,
@@ -983,24 +1002,27 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
             {
                 break;
             }
-            let difficulty_parameters = &config.difficulty.parameters[challenge_id];
-            let min_difficulty = difficulty_parameters.min_difficulty();
-            let max_difficulty = difficulty_parameters.max_difficulty();
+
+            let difficulty_parameters           = &config.difficulty.parameters[challenge_id];
+            let min_difficulty                  = difficulty_parameters.min_difficulty();
+            let max_difficulty                  = difficulty_parameters.max_difficulty();
             if (0..difficulty.len())
                 .into_iter()
                 .any(|i| difficulty[i] < min_difficulty[i] || difficulty[i] > max_difficulty[i])
             {
                 continue;
             }
-            curr_frontier_index = frontier_indexes[difficulty];
-            let player_data = cache
+
+            curr_frontier_index                 = frontier_indexes[difficulty];
+            let player_data                     = cache
                 .active_players
                 .get_mut(player_id)
                 .unwrap()
                 .block_data
                 .as_mut()
                 .unwrap();
-            let algorithm_data = cache
+
+            let algorithm_data                  = cache
                 .active_algorithms
                 .get_mut(algorithm_id)
                 .unwrap()
@@ -1008,25 +1030,31 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
                 .as_mut()
                 .unwrap();
 
-            let max_qualifiers = max_qualifiers_by_player.get(player_id).unwrap().clone();
-            let num_qualifiers = num_solutions.min(max_qualifiers);
+            let max_qualifiers                  = max_qualifiers_by_player.get(player_id).unwrap().clone();
+            let num_qualifiers                  = num_solutions.min(max_qualifiers);
             max_qualifiers_by_player.insert(player_id.clone(), max_qualifiers - num_qualifiers);
 
-            if num_qualifiers > 0 {
+            if num_qualifiers > 0 
+            {
                 *player_data
                     .num_qualifiers_by_challenge
                     .as_mut()
                     .unwrap()
                     .entry(challenge_id.clone())
-                    .or_default() += num_qualifiers;
+                    .or_default()               += num_qualifiers;
+
                 *algorithm_data
                     .num_qualifiers_by_player
                     .as_mut()
                     .unwrap()
                     .entry(player_id.clone())
-                    .or_default() += num_qualifiers;
-                *challenge_data.num_qualifiers.as_mut().unwrap() += num_qualifiers;
+                    .or_default()               += num_qualifiers;
+                    
+                *challenge_data.num_qualifiers
+                    .as_mut()
+                    .unwrap()                   += num_qualifiers;
             }
+
             challenge_data
                 .qualifier_difficulties
                 .as_mut()
@@ -1037,46 +1065,55 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) {
 }
 
 #[time]
-async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) {
-    let config = block.config();
+async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) 
+{
+    let config                                  = block.config();
 
-    for challenge in cache.active_challenges.values_mut() {
-        let block_data = challenge.block_data.as_mut().unwrap();
+    for challenge in cache.active_challenges.values_mut() 
+    {
+        let block_data                          = challenge.block_data.as_mut().unwrap();
 
-        let difficulty_parameters = &config.difficulty.parameters[&challenge.id];
-        let min_difficulty = difficulty_parameters.min_difficulty();
-        let max_difficulty = difficulty_parameters.max_difficulty();
+        let difficulty_parameters               = &config.difficulty.parameters[&challenge.id];
+        let min_difficulty                      = difficulty_parameters.min_difficulty();
+        let max_difficulty                      = difficulty_parameters.max_difficulty();
 
         let points = block_data
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
             .collect::<Frontier>();
-        let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 {
-            let base_frontier: Frontier = vec![min_difficulty.clone()].into_iter().collect();
-            let scaling_factor = 0.0;
-            let scaled_frontier = base_frontier.clone();
+        let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
+        {
+            let base_frontier: Frontier         = vec![min_difficulty.clone()].into_iter().collect();
+            let scaling_factor                  = 0.0;
+            let scaled_frontier                 = base_frontier.clone();
+            
             (base_frontier, scaling_factor, scaled_frontier)
-        } else {
-            let base_frontier = pareto_algorithm(points, true)
+        } 
+        else 
+        {
+            let base_frontier                   = pareto_algorithm(points, true)
                 .pop()
                 .unwrap()
                 .into_iter()
                 .map(|d| d.into_iter().map(|x| -x).collect())
                 .collect::<Frontier>() // mirror the points back;
                 .extend(&min_difficulty, &max_difficulty);
-            let scaling_factor = (*block_data.num_qualifiers() as f64
+
+            let scaling_factor                  = (*block_data.num_qualifiers() as f64
                 / config.qualifiers.total_qualifiers_threshold as f64)
                 .min(config.difficulty.max_scaling_factor);
-            let scaled_frontier = base_frontier
+
+            let scaled_frontier                 = base_frontier
                 .scale(&min_difficulty, &max_difficulty, scaling_factor)
                 .extend(&min_difficulty, &max_difficulty);
+
             (base_frontier, scaling_factor, scaled_frontier)
         };
 
-        block_data.base_frontier = Some(base_frontier);
-        block_data.scaled_frontier = Some(scaled_frontier);
-        block_data.scaling_factor = Some(scaling_factor);
+        block_data.base_frontier                = Some(base_frontier);
+        block_data.scaled_frontier              = Some(scaled_frontier);
+        block_data.scaling_factor               = Some(scaling_factor);
     }
 }
 
