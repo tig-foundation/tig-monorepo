@@ -72,8 +72,6 @@ pub struct Challenge
     pub vertices:                                       Vec<u64>,
     pub hyperedge_indices:                              Vec<u64>,
     pub hyperedges:                                     Vec<Vec<u64>>,
-    pub node_weights:                                   Vec<f32>,
-    pub edge_weights:                                   Vec<f32>,
 }
 
 // TIG dev bounty available for a GPU optimisation for instance generation!
@@ -172,7 +170,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
     {
         let (vertices, hyperedge_indices, hyperedges)   = get_init_values(difficulty, seed);
 
-        let result                                      = solve_greedy_bipartition(&vertices, &hyperedges, Some(difficulty.num_blocks));
+        let partition                                   = solve_greedy_bipartition(&vertices, &hyperedges, Some(difficulty.num_blocks));
+        let connectivity                                = calculate_connectivity(&partition, &hyperedges);
 
         return Ok(Challenge
         {
@@ -180,9 +179,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
             difficulty:                                 difficulty.clone(),
             vertices:                                   vertices,
             hyperedge_indices:                          hyperedge_indices,
-            hyperedges:                                 hyperedges,
-            node_weights:                               vec![1.0f32; difficulty.num_vertices as usize],
-            edge_weights:                               vec![1.0f32; difficulty.num_edges as usize],
+            hyperedges:                                 hyperedges
         });
     }
 
@@ -190,6 +187,30 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
     {
         return Ok(());
     }
+}
+
+fn calculate_connectivity(
+    partition_mapping:                      &Vec<i32>, 
+    hyperedges:                             &Vec<Vec<u64>>
+)                                                   -> usize
+{
+    let mut connectivity                                = 0;
+
+    for i in 0..hyperedges.len()
+    {
+        let mut parts_in_h                              = Vec::with_capacity(hyperedges[i].len());
+        for j in 0..hyperedges[i].len()
+        {
+            if !parts_in_h.contains(&partition_mapping[hyperedges[i][j] as usize])
+            {
+                parts_in_h.push(partition_mapping[hyperedges[i][j] as usize]);
+            }
+        }
+
+        connectivity                                    += parts_in_h.len() - 1;
+    }
+     
+    return connectivity;
 }
 
 fn recursive_bipartition(
@@ -204,9 +225,9 @@ fn recursive_bipartition(
 {
     if current_depth == 0
     {
-        for i in 0..vertices_subset.len()
+        for i in vertices_subset
         {
-            partitions[i]                               = current_id;
+            partitions[*i as usize]                     = current_id;
         }
 
         return;
@@ -250,8 +271,6 @@ fn bipartition(
     {
         sorted_vertices.push(vertices_subset[i]);
     }
-
-    panic!("{:?}", sorted_vertices);
 
     let mut left                                        : Vec<u64> = Vec::with_capacity(target_left);
     let mut right                                       : Vec<u64> = Vec::with_capacity(target_right);
