@@ -47,7 +47,7 @@ impl crate::DifficultyTrait<4> for Difficulty
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Solution 
 {
-    pub items:                                          Vec<usize>,
+    pub partitions                                      : Vec<i32>
 }
 
 impl crate::SolutionTrait for Solution 
@@ -94,7 +94,7 @@ fn get_hyperedges(
         for j in 0..difficulty.num_edges
         {
             let mut r_vtx;
-            while
+            while // do while
             {
                 r_vtx                                   = rng.next_u32() as usize % vertices.len();
 
@@ -170,9 +170,6 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
     {
         let (vertices, hyperedge_indices, hyperedges)   = get_init_values(difficulty, seed);
 
-        let partition                                   = solve_greedy_bipartition(&vertices, &hyperedges, Some(difficulty.num_blocks));
-        let connectivity                                = calculate_connectivity(&partition, &hyperedges);
-
         return Ok(Challenge
         {
             seed:                                       seed,
@@ -183,8 +180,31 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
         });
     }
 
-    fn verify_solution(&self, solution: &Solution)  -> Result<()> 
+    fn verify_solution(&self, solution: &Solution) -> Result<()> 
     {
+        if self.vertices.len() != solution.partitions.len()
+        {
+            return Err(anyhow!("self.vertices.len() != solution.partitions.len()"));
+        }
+
+        for part in &solution.partitions
+        {
+            if *part < 0 || *part as usize >= self.vertices.len()
+            {
+                return Err(anyhow!("part < 0 || part >= self.vertices.len()"));
+            }
+        }
+
+        let partition                                   = solve_greedy_bipartition(&self.vertices, &self.hyperedges, Some(self.difficulty.num_blocks));
+        let greedy_connectivity                         = calculate_connectivity(&partition, &self.hyperedges);
+
+        let connectivity                                = calculate_connectivity(&partition, &self.hyperedges);
+
+        if connectivity < greedy_connectivity
+        {
+            return Err(anyhow!("connectivity < greedy_connectivity"));
+        }
+        
         return Ok(());
     }
 }
@@ -265,7 +285,7 @@ fn bipartition(
 
     let mut indices                                     : Vec<usize> = (0..vertices_subset.len()).collect();
     indices.sort_by_key(|&i| degrees[i as usize]);
-
+    
     let mut sorted_vertices                             : Vec<u64> = Vec::with_capacity(vertices_subset.len());
     for i in indices
     {
