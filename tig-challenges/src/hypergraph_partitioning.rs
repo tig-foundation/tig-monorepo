@@ -189,9 +189,9 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
 
         for part in &solution.partitions
         {
-            if *part < 0 || *part as usize >= self.vertices.len()
+            if *part < 0 || *part as usize >= self.difficulty.num_blocks      
             {
-                return Err(anyhow!("part < 0 || part >= self.vertices.len()"));
+                return Err(anyhow!("part < 0 || part >= self.difficulty.num_blocks"));
             }
         }
 
