@@ -198,7 +198,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 4> for Challenge
         let partition                                   = solve_greedy_bipartition(&self.vertices, &self.hyperedges, Some(self.difficulty.num_blocks));
         let greedy_connectivity                         = calculate_connectivity(&partition, &self.hyperedges);
 
-        let connectivity                                = calculate_connectivity(&partition, &self.hyperedges);
+        let connectivity                                = calculate_connectivity(&solution.partitions, &self.hyperedges);
 
         if connectivity < greedy_connectivity
         {
