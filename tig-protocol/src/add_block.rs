@@ -886,7 +886,7 @@ fn find_smallest_range_dimension(points: &Frontier) -> usize {
         .unwrap()
 }
 
-fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
+pub(crate) fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
     if points.is_empty() {
         return Vec::new();
     }
