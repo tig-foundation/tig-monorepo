@@ -16,5 +16,13 @@ serde_json = { version = "1.0.113" }
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name        = "block_perf"
+harness     = false
+path        = "src/benches/block_perf.rs"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
