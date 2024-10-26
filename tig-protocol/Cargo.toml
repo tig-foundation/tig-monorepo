@@ -18,6 +18,10 @@ tig-utils = { path = "../tig-utils" }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+rand = { version = "0.8.5", default-features = false, features = [
+    "std_rng",
+    "small_rng",
+] }
 
 [[bench]]
 name        = "block_perf"
