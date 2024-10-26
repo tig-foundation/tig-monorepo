@@ -15,19 +15,6 @@ use tig_structs::core::*;
 use crate::context::Context;
 use crate::add_block::AddBlockCache;
 
-pub struct Protocol<T: Context> 
-{
-    pub ctx: T,
-}
-
-impl<'a, T: Context> Protocol<T> 
-{
-    pub fn new(ctx: T) -> Self 
-    {
-        Self { ctx }
-    }
-}
-
 struct BenchmarkContext
 {
 }
@@ -49,7 +36,7 @@ pub fn criterion_benchmark(c: &mut Criterion)
     {
         let (block, cache)  = add_block::create_block(&ctx).await;
 
-        b.iter(|| bench_update_qualifiers(&ctx, &block, &cache))
+        b.iter(|| bench_update_qualifiers(&ctx, &block, &mut cache))
     });
 }
 
