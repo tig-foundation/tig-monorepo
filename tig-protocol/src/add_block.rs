@@ -920,10 +920,11 @@ fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
     result
 }
 
-fn get_solutions_by_challenge(cache: &AddBlockCache)
-                                                    -> HashMap::<&String, Vec<(&BenchmarkSettings, &u32)>>   
+fn get_solutions_by_challenge(
+    cache:                          &AddBlockCache
+)                                           -> HashMap::<&String, Vec<(&BenchmarkSettings, &u32)>>   
 {                                        
-    let mut solutions_by_challenge                      = HashMap::<&String, Vec<(&BenchmarkSettings, &u32)>>::new();
+    let mut solutions_by_challenge              = HashMap::<&String, Vec<(&BenchmarkSettings, &u32)>>::new();
     for (settings, num_solutions) in cache.active_solutions.values()
     {
         solutions_by_challenge.entry(&settings.challenge_id).or_default().push(
@@ -934,7 +935,9 @@ fn get_solutions_by_challenge(cache: &AddBlockCache)
     return solutions_by_challenge;
 }
 
-fn init_cache(cache: &mut AddBlockCache)    
+fn init_cache(
+    cache:                          &mut AddBlockCache
+)    
 {
     for challenge in cache.active_challenges.values_mut() 
     {
@@ -956,8 +959,9 @@ fn init_cache(cache: &mut AddBlockCache)
     }
 }
 
-fn get_max_qualifiers(cache: &AddBlockCache)
-                                            -> HashMap::<String, u32>
+fn get_max_qualifiers(
+    cache:                          &AddBlockCache
+)                                           -> HashMap::<String, u32>
 {
     let mut max_qualifiers_by_player            = HashMap::<String, u32>::new();
     for player in cache.active_players.values() 
@@ -977,13 +981,13 @@ fn get_frontier_indices(
     max_qualifiers_by_player:       &HashMap::<String, u32>
 )                                           -> HashMap::<Point, usize>
 {
-    let solutions                           = solutions_by_challenge.get(challenge_id).unwrap();
-    let points                              = solutions
+    let solutions                               = solutions_by_challenge.get(challenge_id).unwrap();
+    let points                                  = solutions
         .iter()
         .map(|(settings, _)| settings.difficulty.clone())
         .collect::<Frontier>();
     
-    let mut frontier_indexes                = HashMap::<Point, usize>::new();
+    let mut frontier_indexes                    = HashMap::<Point, usize>::new();
     for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() 
     {
         for point in frontier 
@@ -996,19 +1000,30 @@ fn get_frontier_indices(
 }
 
 #[time]
-async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache) 
+async fn update_qualifiers(
+    block:                          &Block, 
+    cache:                          &mut AddBlockCache
+) 
 {
     let config                                          = block.config();
+    let _cache                                          = Arc::new(cache);
     
-    init_cache(cache);
+    init_cache(Arc::<>::into_inner(_cache.clone()).unwrap());
 
-    let solutions_by_challenge                          = get_solutions_by_challenge(cache);
-    let mut max_qualifiers_by_player                    = get_max_qualifiers(cache);
+    let solutions_by_challenge                          = get_solutions_by_challenge(Arc::<>::into_inner(_cache.clone()).unwrap());
+    let mut max_qualifiers_by_player                    = get_max_qualifiers(Arc::<>::into_inner(_cache.clone()).unwrap());
 
-    let mut frontier_indices                            = Arc::new(Mutex::new(Vec::with_capacity(cache.active_challenges.len())));
+    let mut frontier_indices                            = Arc::new(
+        Mutex::new(
+            Vec::with_capacity(
+                Arc::<>::into_inner(_cache.clone()).unwrap().active_challenges.len()
+            )
+        )
+    );
+    
     thread::scope(|s|
     {
-        for (challenge_id, challenge) in cache.active_challenges.iter()
+        for (challenge_id, challenge) in Arc::<>::into_inner(_cache.clone()).unwrap().active_challenges.iter()
         {
             if !solutions_by_challenge.contains_key(challenge_id) 
             {
@@ -1029,7 +1044,7 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache)
     });
 
     let mut cur_idx                                     = 0;
-    for (challenge_id, challenge) in cache.active_challenges.iter() 
+    for (challenge_id, challenge) in Arc::<>::into_inner(_cache.clone()).unwrap().active_challenges.iter_mut() 
     {
         if !solutions_by_challenge.contains_key(challenge_id) 
         {
@@ -1050,7 +1065,7 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache)
 
         let mut max_qualifiers_by_player                = max_qualifiers_by_player.clone();
         let mut curr_frontier_index                     = 0;
-        let challenge_data                              = &challenge.block_data.as_ref().unwrap();
+        let mut challenge_data                          = challenge.block_data.as_mut().unwrap();
         for (settings, &num_solutions) in solutions.iter() 
         {
             let BenchmarkSettings 
@@ -1079,21 +1094,6 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache)
             }
 
             curr_frontier_index                         = frontier_indexes[difficulty];
-            let player_data                             = cache
-                .active_players
-                .get(player_id)
-                .unwrap()
-                .block_data
-                .as_ref()
-                .unwrap();
-
-            let algorithm_data                          = cache
-                .active_algorithms
-                .get(algorithm_id)
-                .unwrap()
-                .block_data
-                .as_ref()
-                .unwrap();
 
             let max_qualifiers                          = max_qualifiers_by_player.get(player_id).unwrap().clone();
             let num_qualifiers                          = num_solutions.min(max_qualifiers);
@@ -1101,32 +1101,46 @@ async fn update_qualifiers(block: &Block, cache: &mut AddBlockCache)
 
             if num_qualifiers > 0 
             {
-                /*
-                *player_data
+
+                *Arc::<>::into_inner(_cache.clone()).unwrap()
+                    .active_players
+                    .get_mut(player_id)
+                    .unwrap()
+                    .block_data
+                    .as_mut()
+                    .unwrap()
                     .num_qualifiers_by_challenge
                     .as_mut()
                     .unwrap()
                     .entry(challenge_id.clone())
-                    .or_default()               += num_qualifiers;
+                    .or_default()                       += num_qualifiers;
 
-                *algorithm_data
+                *Arc::<>::into_inner(_cache.clone()).unwrap()
+                    .active_algorithms
+                    .get_mut(algorithm_id)
+                    .unwrap()
+                    .block_data
+                    .as_mut()
+                    .unwrap()
                     .num_qualifiers_by_player
                     .as_mut()
                     .unwrap()
                     .entry(player_id.clone())
-                    .or_default()               += num_qualifiers;
-                    
-                *challenge_data.num_qualifiers
+                    .or_default()                       += num_qualifiers;
+
+                
+
+                *challenge_data
+                    .num_qualifiers
                     .as_mut()
-                    .unwrap()                   += num_qualifiers;
-                */
+                    .unwrap()                           += num_qualifiers;
             }
 
-            /*challenge_data
+            challenge_data
                 .qualifier_difficulties
                 .as_mut()
                 .unwrap()
-                .insert(difficulty.clone());*/
+                .insert(difficulty.clone());
         }
         
         cur_idx                                         += 1;
@@ -1146,7 +1160,7 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache)
         let min_difficulty                              = difficulty_parameters.min_difficulty();
         let max_difficulty                              = difficulty_parameters.max_difficulty();
 
-        let points = block_data
+        let points                                      = block_data
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
