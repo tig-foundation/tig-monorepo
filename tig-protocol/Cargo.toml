@@ -22,7 +22,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name        = "block_perf"
 harness     = false
-path        = "src/benches/block_perf.rs"
+path        = "src/block_perf.rs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

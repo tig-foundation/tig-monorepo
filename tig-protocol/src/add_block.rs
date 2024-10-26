@@ -35,7 +35,7 @@ pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
     block.id
 }
 
-struct AddBlockCache {
+pub(crate) struct AddBlockCache {
     pub mempool_challenges: Vec<Challenge>,
     pub mempool_algorithms: Vec<Algorithm>,
     pub mempool_benchmarks: Vec<Benchmark>,
@@ -398,7 +398,7 @@ async fn setup_cache<T: Context>(
 }
 
 #[time]
-async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
+pub(crate) async fn create_block<T: Context>(ctx: &T) -> (Block, AddBlockCache) {
     let latest_block = ctx
         .get_block(BlockFilter::Latest, false)
         .await
@@ -1000,7 +1000,7 @@ fn get_frontier_indices(
 }
 
 #[time]
-async fn update_qualifiers(
+pub(crate) async fn update_qualifiers(
     block:                          &Block, 
     cache:                          &mut AddBlockCache
 ) 
