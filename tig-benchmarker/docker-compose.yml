@@ -1,24 +1,34 @@
 services:
-  master:
-    build:
-      context: .
-      dockerfile: Dockerfile.master
-    volumes:
-      - ./config.json:/app/config.json
-    ports:
-      - 5115:5115
-
-  web:
-
-
   db:
-    image: postgres:9.6
+    image: postgres:latest
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres  
       - POSTGRES_DB=benchmarker
+    networks:
+      - tig-benchmarker
 
-  slave:
+  master:
     build:
-      context: ..
-      dockerfile: ./tig-benchmarker/Dockerfile.slave
+      context: ./master
+      dockerfile: Dockerfile
+    networks:
+      - tig-benchmarker
+    ports:
+      - 5115:5115
+    depends_on:
+      - db
+
+  ui:
+    build: 
+      context: ./ui
+      dockerfile: Dockerfile
+    networks:
+      - tig-benchmarker
+    ports:
+      - 8083:80
+    depends_on:
+      - master
+
+networks:
+  tig-benchmarker:
