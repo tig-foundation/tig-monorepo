@@ -1,0 +1,24 @@
+services:
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile.master
+    volumes:
+      - ./config.json:/app/config.json
+    ports:
+      - 5115:5115
+
+  web:
+
+
+  db:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres  
+      - POSTGRES_DB=benchmarker
+
+  slave:
+    build:
+      context: ..
+      dockerfile: ./tig-benchmarker/Dockerfile.slave
