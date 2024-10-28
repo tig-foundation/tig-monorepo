@@ -208,24 +208,13 @@ fn get_o_pareto_points()
     return costs;
 }
 
-fn o_pareto_algorithm(
-    points:                                 ArrayView2<i32>, 
-    only_one:                               bool
-)                                                   
-{
-    let old_len                                         = points.len();
-    let ranks                                           = tig_utils::o_nondominated_rank(points, None);
-
-    panic!("{:?} {:?}", old_len, ranks.len());
-}
-
 fn get_uo_pareto_points()
                                                     -> Vec<Point>
 {
     let mut rng                                         = SmallRng::seed_from_u64(1337);
     let mut points                                      = Vec::new();
 
-    for i in 0..2048
+    for i in 0..4096*2
     {
         let (x, y)                                      = (rng.gen_range(0..256), rng.gen_range(0..256));            
 
@@ -233,6 +222,14 @@ fn get_uo_pareto_points()
     }
 
     return points;
+}
+
+fn o_pareto_algorithm(
+    points:                                 ArrayView2<i32>, 
+    only_one:                               bool
+)                                                   
+{
+    let ranks                                           = tig_utils::o_nondominated_rank(points, None);
 }
 
 fn uo_pareto_algorithm(
@@ -254,7 +251,7 @@ pub fn criterion_benchmark(
 {
     let challenges                                      = get_points();
 
-    c.bench_function("update_qualifiers_singlethread", |b|
+    /*c.bench_function("update_qualifiers_singlethread", |b|
     {
         b.iter(|| bench_update_qualifiers_st(&challenges));
     });
@@ -262,7 +259,7 @@ pub fn criterion_benchmark(
     c.bench_function("update_qualifiers_multithread", |b|
     {
         b.iter(|| bench_update_qualifiers_mt(&challenges));
-    });
+    });*/
 
     let o_pareto_points                                 = get_o_pareto_points();
     c.bench_function("o_pareto_algorithm", |b|
