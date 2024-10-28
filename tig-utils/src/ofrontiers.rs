@@ -146,7 +146,8 @@ pub fn is_pareto_front(
     }
 }
 
-fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize> {
+fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize> 
+{
     let (n_observations, n_obj)                         = costs.dim();
     
     if n_obj == 1 
@@ -173,6 +174,8 @@ fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize> {
 
     while !indices.is_empty() 
     {
+        let indices_len                                 = indices.len();
+
         let on_front                                    = is_pareto_front(costs.view(), None, true);
         for (idx, &is_front) in indices.iter().zip(on_front.iter()) 
         {
@@ -198,7 +201,7 @@ fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize> {
         }
 
         indices                                         = Vec::new();
-        for idx in 0..indices.len()
+        for idx in 0..indices_len
         {
             if !on_front[idx]
             {
@@ -208,23 +211,6 @@ fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize> {
 
         costs                                           = costs.select(Axis(0), &indices);
         rank                                            += 1;
-        
-        /*
-        let not_on_front                                : Vec<bool> = on_front.iter().map(|&x| !x).collect();
-        indices                                         = indices
-            .into_iter()
-            .zip(not_on_front.iter())
-            .filter(|&(_, &b)| b)
-            .map(|(i, _)| i)
-            .collect();
-
-        costs = if !indices.is_empty() {
-            costs.select(Axis(0), &indices)
-        } else {
-            Array2::zeros((0, costs.shape()[1]))
-        };
-        rank                                            += 1;
-        */
     }
 
     return ranks;
@@ -241,8 +227,6 @@ pub fn o_nondominated_rank(
     
     let (unique_costs, order_inv)                       = unique_with_indices(costs.view());
     let ranks                                           = _nondominated_rank(unique_costs.view());
-
-    //panic!("{:?}", ranks);
 
     return order_inv.iter().map(|&i| ranks[i]).collect();
 }
