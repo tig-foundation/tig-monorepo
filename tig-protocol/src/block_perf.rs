@@ -196,13 +196,13 @@ fn bench_update_qualifiers_mt(
 fn get_o_pareto_points()
                                                     -> Array2<i32>
 {
-    let n_observations                  = 2048;
+    let n_observations                  = 4096*2;
     let n_objectives                    = 2;
     let mut rng                         = SmallRng::seed_from_u64(1337);
 
     let costs: Array2<i32> = Array2::from_shape_fn((n_observations, n_objectives), |_| 
     {
-        rng.gen_range(0..1000)
+        rng.gen_range(0..256)
     });
 
     return costs;
@@ -213,9 +213,10 @@ fn o_pareto_algorithm(
     only_one:                               bool
 )                                                   
 {
+    let old_len                                         = points.len();
     let ranks                                           = tig_utils::o_nondominated_rank(points, None);
 
-    panic!("{:?}", ranks);
+    panic!("{:?} {:?}", old_len, ranks.len());
 }
 
 fn get_uo_pareto_points()
@@ -226,7 +227,7 @@ fn get_uo_pareto_points()
 
     for i in 0..2048
     {
-        let (x, y)                                      = (rng.gen_range(0..1000), rng.gen_range(0..1000));            
+        let (x, y)                                      = (rng.gen_range(0..256), rng.gen_range(0..256));            
 
         points.push([x, y].to_vec());
     }
@@ -245,8 +246,6 @@ fn uo_pareto_algorithm(
             .collect::<Frontier>();
 
     let ranks                                           = points.pareto_frontier();
-
-    panic!("{:?}", ranks);
 }
 
 pub fn criterion_benchmark(

@@ -63,7 +63,7 @@ fn is_pareto_front_2d(
     {
         on_front[i]                                     = cummin_value1[i] < cummin_value1[i-1];
     }
-    
+
     return on_front;
 }
 
@@ -185,21 +185,6 @@ fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize>
             }
         }
         
-
-        let mut indices_to_remove                       = Vec::new();
-
-        let not_on_front                                : Vec<bool> = on_front.iter().map(|&x| !x).collect();
-        for (idx, &not_front) in indices.iter().zip(not_on_front.iter()) 
-        {
-            if not_front
-            {
-                continue;
-            }
-
-            indices_to_remove.push(not_front);
-            // pop latest frontiers
-        }
-
         indices                                         = Vec::new();
         for idx in 0..indices_len
         {
@@ -264,47 +249,5 @@ fn unique_with_indices(
     )
     .unwrap();
 
-    (unique_arr, inverse)
+    return (unique_arr, inverse);
 }
-
-
-/*
-fn change_directions(
-    frontier:                               &mut Frontier<Point>
-)
-{
-    let objectives                                      = frontier.iter().nth(0).unwrap().len();
-}
-
-fn unique_values_and_inverted_indices(
-    frontier:                               &mut Frontier<Point>
-)
-                                                    -> Vec<usize>
-{
-    let inverse_indices                                 = Vec::with_capacity(frontier.iter().len());
-
-    return inverse_indices;
-}
-
-fn nondominated_rank(
-    frontier:                               &mut Frontier<Point>
-)
-{
-
-}
-
-fn o_pareto_frontier(
-    frontier:                               &Frontier<Point>)
-                                                    -> Frontier<Point>
-{
-    let mut frontier_                                   = Arc::new(Mutex::new(frontier.clone()));
-
-    let total_frontiers                                 = frontier.len();
-    change_directions(&mut frontier_.lock().unwrap());
-
-    let reconstr_indices                                = unique_values_and_inverted_indices(&mut frontier_.lock().unwrap());  
-    let ranks                                           = nondominated_rank(&mut frontier_.lock().unwrap());
-
-    return Arc::try_unwrap(frontier_).unwrap().into_inner().unwrap();
-}
-*/
