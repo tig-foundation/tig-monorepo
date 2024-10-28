@@ -16,3 +16,11 @@ Cargo.lock
 .vscode/
 
 __pycache__/
+
+# Ignore these. 
+.env
+db_data/
+db_replica_data/
+db_backup/
+backups/
+failover.sh

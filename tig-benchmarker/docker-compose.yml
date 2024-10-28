@@ -1,34 +1,124 @@
 services:
   db:
-    image: postgres:latest
+    image: bitnami/postgresql:latest
+    container_name: db
+    restart: unless-stopped
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres  
-      - POSTGRES_DB=benchmarker
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_USERNAME=${POSTGRES_USER}
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRESQL_DATABASE=${POSTGRES_DB}
+      - POSTGRESQL_REPLICATION_USER=${POSTGRES_REPLICATION_USER}
+      - POSTGRESQL_REPLICATION_PASSWORD=${POSTGRES_REPLICATION_PASSWORD}
+    volumes:
+      - ./db_data:/bitnami/postgresql
     networks:
       - tig-benchmarker
+    expose:
+      - "5432"
+
+  db_replica:
+    image: bitnami/postgresql:latest
+    container_name: db_replica
+    restart: unless-stopped
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_MASTER_HOST=db
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+      - POSTGRESQL_REPLICATION_USER=${POSTGRES_REPLICATION_USER}
+      - POSTGRESQL_REPLICATION_PASSWORD=${POSTGRES_REPLICATION_PASSWORD}
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
+      - ALLOW_PROMOTE_REPLICA=yes
+    volumes:
+      - ./db_replica_data:/bitnami/postgresql
+    networks:
+      - tig-benchmarker
+    expose:
+      - "5432"
+    depends_on:
+      - db
+
+  pgpool:
+    image: bitnami/pgpool:latest
+    container_name: pgpool
+    restart: unless-stopped
+    environment:
+      - PGPOOL_BACKEND_NODES=0:db:5432;1:db_replica:5432
+      - PGPOOL_BACKEND_APPLICATION_NAMES=db,db_replica
+      - PGPOOL_LOG_MIN_MESSAGES=DEBUG
+      - PGPOOL_SR_CHECK_USER=${POSTGRES_USER}
+      - PGPOOL_SR_CHECK_PASSWORD=${POSTGRES_PASSWORD}
+      - PGPOOL_POSTGRES_USERNAME=${POSTGRES_USER}
+      - PGPOOL_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGPOOL_ADMIN_USERNAME=admin
+      - PGPOOL_ADMIN_PASSWORD=admin_password
+      - PGPOOL_NUM_INIT_CHILDREN=50
+      - PGPOOL_ENABLE_LOAD_BALANCING=yes
+      - PGPOOL_HEALTH_CHECK_PERIOD=5
+      - PGPOOL_HEALTH_CHECK_TIMEOUT=20
+      - PGPOOL_HEALTH_CHECK_MAX_RETRIES=3
+      - PGPOOL_HEALTH_CHECK_RETRY_DELAY=5
+      - PGPOOL_AUTO_FAILOVER=yes
+      - PGPOOL_AUTO_FAILBACK=yes
+      - PGPOOL_FAILOVER_ON_BACKEND_ERROR=yes
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGPOOL_USER_CONF_FILE=/opt/bitnami/pgpool/conf/pgpool_custom.conf
+    ports:
+      - "5432:5432"
+    networks:
+      - tig-benchmarker
+    depends_on:
+      - db
+      - db_replica
+    volumes:
+      - ./failover.sh:/opt/bitnami/pgpool/failover.sh
+      - ./config/pgpool.conf:/opt/bitnami/pgpool/conf/pgpool_custom.conf
 
   master:
     build:
       context: ./master
       dockerfile: Dockerfile
+    container_name: master
+    restart: unless-stopped
     networks:
       - tig-benchmarker
     ports:
       - 5115:5115
     depends_on:
-      - db
+      - pgpool
 
   ui:
+    container_name: ui
     build: 
       context: ./ui
       dockerfile: Dockerfile
+    restart: unless-stopped
     networks:
       - tig-benchmarker
     ports:
       - 8083:80
     depends_on:
       - master
+
+  db_backup:
+    container_name: db_backup
+    build:
+      context: ./db_backup
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./backups:/backups
+    networks:
+      - tig-benchmarker
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
 
 networks:
   tig-benchmarker:
