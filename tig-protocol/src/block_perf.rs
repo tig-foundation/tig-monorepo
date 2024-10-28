@@ -16,6 +16,7 @@ use
     },
     rand::
     {
+        Rng,
         RngCore,
         SeedableRng,
         rngs::
@@ -37,6 +38,15 @@ use
             Point,
             Frontier
         }
+    },
+    tig_utils::
+    {
+        FrontierOps
+    },
+    ndarray::
+    {
+        Array2,
+        ArrayView2
     }
 };
 
@@ -183,6 +193,62 @@ fn bench_update_qualifiers_mt(
     return Arc::try_unwrap(frontiers).unwrap().into_inner().unwrap();
 }
 
+fn get_o_pareto_points()
+                                                    -> Array2<i32>
+{
+    let n_observations                  = 2048;
+    let n_objectives                    = 2;
+    let mut rng                         = SmallRng::seed_from_u64(1337);
+
+    let costs: Array2<i32> = Array2::from_shape_fn((n_observations, n_objectives), |_| 
+    {
+        rng.gen_range(0..1000)
+    });
+
+    return costs;
+}
+
+fn o_pareto_algorithm(
+    points:                                 ArrayView2<i32>, 
+    only_one:                               bool
+)                                                   
+{
+    let ranks                                           = tig_utils::o_nondominated_rank(points, None);
+
+    panic!("{:?}", ranks);
+}
+
+fn get_uo_pareto_points()
+                                                    -> Vec<Point>
+{
+    let mut rng                                         = SmallRng::seed_from_u64(1337);
+    let mut points                                      = Vec::new();
+
+    for i in 0..2048
+    {
+        let (x, y)                                      = (rng.gen_range(0..1000), rng.gen_range(0..1000));            
+
+        points.push([x, y].to_vec());
+    }
+
+    return points;
+}
+
+fn uo_pareto_algorithm(
+    points:                                 &Vec<Point>, 
+    only_one:                               bool
+)                                                   
+{
+    let points                                      = points
+            .iter()
+            .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+            .collect::<Frontier>();
+
+    let ranks                                           = points.pareto_frontier();
+
+    panic!("{:?}", ranks);
+}
+
 pub fn criterion_benchmark(
     c:                                      &mut Criterion
 ) 
@@ -197,6 +263,18 @@ pub fn criterion_benchmark(
     c.bench_function("update_qualifiers_multithread", |b|
     {
         b.iter(|| bench_update_qualifiers_mt(&challenges));
+    });
+
+    let o_pareto_points                                 = get_o_pareto_points();
+    c.bench_function("o_pareto_algorithm", |b|
+    {
+        b.iter(|| o_pareto_algorithm(o_pareto_points.view(), false));
+    });
+
+    let uo_pareto_points                                = get_uo_pareto_points();
+    c.bench_function("uo_pareto_algorithm", |b|
+    {
+        b.iter(|| uo_pareto_algorithm(&uo_pareto_points, false));
     });
 }
 

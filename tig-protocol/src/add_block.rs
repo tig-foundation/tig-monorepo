@@ -872,7 +872,7 @@ async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
     }
 }
 
-fn find_smallest_range_dimension(points: &Frontier) -> usize {
+pub(crate) fn find_smallest_range_dimension(points: &Frontier) -> usize {
     (0..2)
         .min_by_key(|&d| {
             let (min, max) = points
