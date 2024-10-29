@@ -38,7 +38,7 @@ async def main(config: Config):
 
     while True:
         try:
-            data = await data_fetcher.run()
+            data = data_fetcher.run()
             if data["block"].id != last_block_id:
                 last_block_id = data["block"].id
                 difficulty_sampler.on_new_block(**data)
