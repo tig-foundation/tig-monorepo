@@ -1,3 +1,5 @@
+// optimized pareto impl
+
 use
 {
     std::
@@ -52,16 +54,40 @@ fn is_pareto_front_2d(
 )                                                   -> Vec<bool> 
 {
     let n_observations                                  = costs.shape()[0];
-    let mut cummin_value1                               = costs.slice(s![.., 1]).to_vec();
-    for i in 1..n_observations 
+    if n_observations == 0 
     {
-        cummin_value1[i]                                = cummin_value1[i].min(cummin_value1[i-1]);
+        return vec![];
     }
-    
+
+    let mut indices                                     : Vec<usize> = (0..n_observations).collect();
+    indices.sort_by_key(|&i| costs[[i, 0]]);
+
     let mut on_front                                    = vec![true; n_observations];
-    for i in 1..n_observations 
+    let mut stack                                       = Vec::with_capacity(n_observations);
+    for &curr_idx in indices.iter() 
     {
-        on_front[i]                                     = cummin_value1[i] < cummin_value1[i-1];
+        // Remove points from stack that are dominated by current point
+        while let Some(&top_idx) = stack.last() 
+        {
+            if costs[[top_idx, 1]] <= costs[[curr_idx, 1]] 
+            {
+                break;
+            }
+
+            stack.pop();
+        }
+        
+        // If stack is not empty, current point is dominated
+        if let Some(&top_idx) = stack.last() 
+        {
+            if costs[[top_idx, 1]] <= costs[[curr_idx, 1]] 
+            {
+                on_front[curr_idx]                      = false;
+            }
+        }
+        
+        // Add current point to stack
+        stack.push(curr_idx);
     }
 
     return on_front;
@@ -107,7 +133,7 @@ fn is_pareto_front_nd(
     return on_front;
 }
 
-pub fn is_pareto_front(
+pub fn o_is_pareto_front(
     costs:                                  ArrayView2<i32>,
     larger_is_better_objectives:            Option<&[usize]>,
     assume_unique_lexsorted:                bool
@@ -176,9 +202,9 @@ fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize>
     {
         let indices_len                                 = indices.len();
 
-        let on_front                                    = is_pareto_front(costs.view(), None, true);
+        let on_front                                    = o_is_pareto_front(costs.view(), None, true);
         for (idx, &is_front) in indices.iter().zip(on_front.iter()) 
-        {
+        { 
             if is_front 
             {
                 ranks[*idx]                             = rank;
