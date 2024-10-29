@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import json
 import logging
 import os
@@ -24,7 +23,7 @@ class Config(FromDict):
     slave_manager_config: SlaveManagerConfig
     submissions_manager_config: SubmissionsManagerConfig
 
-async def main(config: Config):
+def main(config: Config):
     last_block_id = None
     jobs = []
 
@@ -53,7 +52,7 @@ async def main(config: Config):
             traceback.print_exc()
             logger.error(f"{e}")
         finally:
-            await asyncio.sleep(5)
+            time.sleep(5)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Benchmarker")
@@ -73,4 +72,4 @@ if __name__ == "__main__":
     with open(args.config_path, "r") as f:
         config = json.load(f)
         config = Config.from_dict(config)
-    asyncio.run(main(config))
+    main(config)

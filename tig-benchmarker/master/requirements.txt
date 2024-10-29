@@ -6,3 +6,5 @@ hypercorn
 numpy
 quart
 randomname
+uvicorn
+fastapi
