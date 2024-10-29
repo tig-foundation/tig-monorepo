@@ -93,46 +93,6 @@ fn is_pareto_front_2d(
     return on_front;
 }
 
-fn is_pareto_front_nd(
-    costs:                                  ArrayView2<i32>
-) 
-                                                    -> Vec<bool> 
-{
-    let n_observations                                  = costs.shape()[0];
-    let mut on_front                                    = vec![false; n_observations];
-    let mut nondominated_indices                        : Vec<usize> = (0..n_observations).collect();
-    let mut costs                                       = costs.to_owned();
-
-    while !costs.is_empty() 
-    {
-        let nondominated_and_not_top                    : Vec<bool> = costs
-            .axis_iter(Axis(0))
-            .map(|row| row.iter().zip(costs.row(0).iter()).any(|(a, b)| a < b))
-            .collect();
-
-        on_front[nondominated_indices[0]]               = true;
-
-        let mut __idx                                   = Vec::with_capacity(nondominated_and_not_top.len());
-        for i in 0..nondominated_and_not_top.len()
-        {
-            if nondominated_and_not_top[i]
-            {
-                __idx.push(i);
-            }
-        }
-        
-        costs                                           = costs.select(Axis(0), &__idx);
-        nondominated_indices                            = nondominated_indices
-            .into_iter()
-            .zip(nondominated_and_not_top)
-            .filter(|&(_, b)| b)
-            .map(|(i, _)| i)
-            .collect();
-    }
-
-    return on_front;
-}
-
 pub fn o_is_pareto_front(
     costs:                                  ArrayView2<i32>,
     larger_is_better_objectives:            Option<&[usize]>,
@@ -153,23 +113,13 @@ pub fn o_is_pareto_front(
         (costs.to_owned(), None)
     };
 
-    let on_front                                        = if costs.shape()[1] == 2 
-    {
-        is_pareto_front_2d(unique_costs.view())
-    } 
-    else 
-    {
-        is_pareto_front_nd(unique_costs.view())
-    };
-
+    let on_front                                        = is_pareto_front_2d(unique_costs.view());
     if let Some(inv) = order_inv 
     {
         return inv.iter().map(|&i| on_front[i]).collect();
     } 
-    else 
-    {
-        return on_front;
-    }
+    
+    return on_front;
 }
 
 fn _nondominated_rank(costs: ArrayView2<i32>) -> Vec<usize> 

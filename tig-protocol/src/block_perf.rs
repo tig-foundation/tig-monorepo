@@ -46,7 +46,8 @@ use
     ndarray::
     {
         Array2,
-        ArrayView2
+        ArrayView2,
+        Axis
     }
 };
 
@@ -128,6 +129,28 @@ fn get_points()
     return challenges;
 }
 
+fn get_o_points() -> Vec<Array2<i32>>
+{
+    let challenges                  = get_points();
+    let mut o_challenges            : Vec<Array2<i32>> = Vec::with_capacity(challenges.len());
+
+    for challenge in challenges
+    {
+        let mut o_points            = Array2::<i32>::default((challenge.len(), 2));
+        for (i, mut row) in o_points.axis_iter_mut(Axis(0)).enumerate() 
+        {
+            for (j, col) in row.iter_mut().enumerate() 
+            {
+                *col                = challenge[i][j];
+            }
+        }
+
+        o_challenges.push(o_points);
+    }
+
+    return o_challenges;
+}
+
 #[inline]
 fn bench_update_qualifiers_st(
     challenges:                             &Vec<Vec<Point>>
@@ -193,37 +216,28 @@ fn bench_update_qualifiers_mt(
     return Arc::try_unwrap(frontiers).unwrap().into_inner().unwrap();
 }
 
-fn get_o_pareto_points()
-                                                    -> Array2<i32>
+fn bench_update_qualifiers_o_mt(
+    challenges:                             &Vec<Array2<i32>>
+)                                                   -> Vec<Vec<Vec<Vec<i32>>>>
 {
-    let n_observations                  = 4096*2;
-    let n_objectives                    = 2;
-    let mut rng                         = SmallRng::seed_from_u64(1337);
+    let frontiers                                       = Arc::new(Mutex::new(Vec::new()));
 
-    let costs: Array2<i32> = Array2::from_shape_fn((n_observations, n_objectives), |_| 
+    thread::scope(|s|
     {
-        rng.gen_range(0..256)
+        for challenge_data in challenges
+        {
+            //let frontiers_                              = frontiers.clone();
+            s.spawn(||
+            {
+                let x                                   = add_block::o_pareto_algorithm(challenge_data.view(), false);
+            });
+        }
     });
 
-    return costs;
+    return Arc::try_unwrap(frontiers).unwrap().into_inner().unwrap();
 }
 
-fn get_uo_pareto_points()
-                                                    -> Vec<Point>
-{
-    let mut rng                                         = SmallRng::seed_from_u64(1337);
-    let mut points                                      = Vec::new();
-
-    for i in 0..4096*2
-    {
-        let (x, y)                                      = (rng.gen_range(0..256), rng.gen_range(0..256));            
-
-        points.push([x, y].to_vec());
-    }
-
-    return points;
-}
-
+/*
 fn o_pareto_algorithm(
     points:                                 ArrayView2<i32>, 
     only_one:                               bool
@@ -243,35 +257,111 @@ fn uo_pareto_algorithm(
             .collect::<Frontier>();
 
     let ranks                                           = points.pareto_frontier();
+    //panic!("{:?}", ranks);
 }
+
+fn get_o_pareto_points()
+                                                    -> Array2<i32>
+{
+    let n_observations                                  = 8192*2;
+    let n_objectives                                    = 2;
+    let mut rng                                         = SmallRng::seed_from_u64(1337);
+
+    let costs: Array2<i32>                              = Array2::from_shape_fn((n_observations, n_objectives), |_| 
+    {
+        rng.gen_range(0..1024)
+    });
+
+    return costs;
+}
+
+fn get_uo_pareto_points()
+                                                    -> Vec<Point>
+{
+    let mut rng                                         = SmallRng::seed_from_u64(1337);
+    let mut points                                      = Vec::new();
+
+    for i in 0..8192*2
+    {
+        let (x, y)                                      = (rng.gen_range(0..1024), rng.gen_range(0..1024));            
+
+        points.push([x, y].to_vec());
+    }
+
+    return points;
+}
+*/
+
+/*
+fn get_test_points() -> Array2<i32>
+{
+    let n_observations                  = 256;
+    let n_objectives                    = 2;
+    let mut rng                         = SmallRng::seed_from_u64(1337);
+
+    let costs: Array2<i32> = Array2::from_shape_fn((n_observations, n_objectives), |_| 
+    {
+        rng.gen_range(0..128)
+    });
+
+    return costs;
+}
+
+fn get_u_test_points() -> Vec<Point>
+{
+    let mut rng                                         = SmallRng::seed_from_u64(1337);
+    let mut points                                      = Vec::new();
+
+    for i in 0..256
+    {
+        let (x, y)                                      = (rng.gen_range(0..128), rng.gen_range(0..128));            
+
+        points.push([x, y].to_vec());
+    }
+
+    return points;
+}
+
+
+fn add_block_o_pareto_algorithm(points: ArrayView2<i32>) -> Vec<Vec<Point>>
+{
+    return add_block::o_pareto_algorithm(points, false);
+}
+
+fn add_block_pareto_algorithm(points: &Vec<Point>) -> Vec<Frontier<Point>>
+{
+    let points_                                     = points
+            .iter()
+            .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+            .collect::<Frontier>();
+
+    return add_block::pareto_algorithm(points_, false);
+}
+*/
 
 pub fn criterion_benchmark(
     c:                                      &mut Criterion
 ) 
 {
-    let challenges                                      = get_points();
-
-    /*c.bench_function("update_qualifiers_singlethread", |b|
+    c.bench_function("update_qualifiers_st", |b|
     {
+        let challenges                                  = get_points();
         b.iter(|| bench_update_qualifiers_st(&challenges));
     });
-
-    c.bench_function("update_qualifiers_multithread", |b|
+    
+    c.bench_function("update_qualifiers_mt", |b|
     {
+        let challenges                              = get_points();
         b.iter(|| bench_update_qualifiers_mt(&challenges));
+    });
+
+    // need to optimize add_block::o_pareto_algorithm first
+    /*c.bench_function("update_qualifiers_o_mt", |b|
+    {
+        let pareto_points                           = get_o_points();
+
+        b.iter(|| bench_update_qualifiers_o_mt(&pareto_points));
     });*/
-
-    let o_pareto_points                                 = get_o_pareto_points();
-    c.bench_function("o_pareto_algorithm", |b|
-    {
-        b.iter(|| o_pareto_algorithm(o_pareto_points.view(), false));
-    });
-
-    let uo_pareto_points                                = get_uo_pareto_points();
-    c.bench_function("uo_pareto_algorithm", |b|
-    {
-        b.iter(|| uo_pareto_algorithm(&uo_pareto_points, false));
-    });
 }
 
 criterion_group!(benches, criterion_benchmark);
