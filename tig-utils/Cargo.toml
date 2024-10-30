@@ -30,7 +30,6 @@ web-sys = { version = "0.3.68", optional = true, features = [
     'Response',
     'Window',
 ] }
-ndarray = "0.16.1"
 
 [dev-dependencies]
 tokio = { version = "1.37.0", features = ["full"] }

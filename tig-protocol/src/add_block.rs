@@ -7,7 +7,6 @@ use tig_structs::{config::*, core::*};
 use tig_utils::*;
 use std::sync::Arc;
 use std::sync::Mutex;
-use ndarray::{Array1, Array2, ArrayView2, array};
 
 #[time]
 pub(crate) async fn execute<T: Context>(ctx: &T) -> String {
@@ -921,7 +920,6 @@ pub(crate) fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier
     result
 }
 
-//code here can likely be optimized further
 pub(crate) fn o_pareto_algorithm(
     points:                                 &Vec<Vec<i32>>, 
     only_one:                               bool

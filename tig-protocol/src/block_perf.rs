@@ -42,12 +42,6 @@ use
     tig_utils::
     {
         FrontierOps
-    },
-    ndarray::
-    {
-        Array2,
-        ArrayView2,
-        Axis
     }
 };
 
@@ -127,28 +121,6 @@ fn get_points()
     }
     
     return challenges;
-}
-
-fn get_o_points() -> Vec<Array2<i32>>
-{
-    let challenges                  = get_points();
-    let mut o_challenges            : Vec<Array2<i32>> = Vec::with_capacity(challenges.len());
-
-    for challenge in challenges
-    {
-        let mut o_points            = Array2::<i32>::default((challenge.len(), 2));
-        for (i, mut row) in o_points.axis_iter_mut(Axis(0)).enumerate() 
-        {
-            for (j, col) in row.iter_mut().enumerate() 
-            {
-                *col                = challenge[i][j];
-            }
-        }
-
-        o_challenges.push(o_points);
-    }
-
-    return o_challenges;
 }
 
 #[inline]
@@ -358,14 +330,6 @@ pub fn criterion_benchmark(
     c:                                      &mut Criterion
 ) 
 {
-    let points                              = vec![vec![0, 0], vec![1, 0], vec![0, 2], vec![3, 3]];
-    let points_                             = points
-                    .iter()
-                    .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-                    .collect::<HashSet<Vec<i32>>>();
-
-    //panic!("{:?}", tig_utils::o_is_pareto_front(&points_, false));
-
     c.bench_function("update_qualifiers_st", |b|
     {
         let challenges                              = get_points();
@@ -381,9 +345,8 @@ pub fn criterion_benchmark(
     // need to optimize add_block::o_pareto_algorithm first
     c.bench_function("update_qualifiers_o_mt", |b|
     {
-        let pareto_points                           = get_points();
-
-        b.iter(|| bench_update_qualifiers_o_mt(&pareto_points));
+        let challenges                              = get_points();
+        b.iter(|| bench_update_qualifiers_o_mt(&challenges));
     });
 }
 

@@ -15,7 +15,6 @@ serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
-ndarray = "0.16.1"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

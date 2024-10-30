@@ -1,47 +1,10 @@
 // optimized pareto impl
 
-use std::collections::HashSet;
-use std::cmp::Ordering;
-
-fn change_directions(
-    costs:                          &mut Vec<Vec<i32>>,
-    larger_is_better_objectives:    Option<&[usize]>
-) 
-{
-    if costs.is_empty() 
-    {
-        return;
-    }
-
-    let n_objectives                            = costs[0].len();
-
-    if let Some(larger_is_better) = larger_is_better_objectives 
-    {
-        if larger_is_better.is_empty() 
-        {
-            return;
-        }
-
-        if larger_is_better.iter().any(|&i| i >= n_objectives) 
-        {
-            panic!("The indices specified in larger_is_better_objectives must be in [0, n_objectives(={})), but got {:?}", n_objectives, larger_is_better);
-        }
-
-        for point in costs.iter_mut() 
-        {
-            for &i in larger_is_better 
-            {
-                point[i]                        = -point[i];
-            }
-        }
-    }
-}
-
 fn is_pareto_front_2d(
     costs:                          &Vec<Vec<i32>>
 )                                           -> Vec<bool> 
 {
-    let n_observations = costs.len();
+    let n_observations                          = costs.len();
     if n_observations == 0 
     {
         return vec![];
@@ -92,13 +55,10 @@ pub fn o_is_pareto_front(
     assume_unique_lexsorted:        bool
 )                                           -> Vec<bool> 
 {
-    //let mut costs_copy                                  = costs.clone();
-    //change_directions(&mut costs_copy, larger_is_better_objectives);
-    
-    let apply_unique                                    = !assume_unique_lexsorted;
-    let (unique_costs, order_inv)                       = if apply_unique 
+    let apply_unique                            = !assume_unique_lexsorted;
+    let (unique_costs, order_inv)               = if apply_unique 
     {
-        let (unique, indices)                           = unique_with_indices(costs);
+        let (unique, indices)                   = unique_with_indices(costs);
         
         (Some(unique), Some(indices))
     } 
@@ -107,7 +67,7 @@ pub fn o_is_pareto_front(
         (None, None)
     };
 
-    let on_front                                        = if unique_costs.is_some() 
+    let on_front                                = if unique_costs.is_some() 
     { 
         is_pareto_front_2d(&unique_costs.unwrap())
     }
@@ -126,13 +86,13 @@ pub fn o_is_pareto_front(
 
 use std::collections::HashMap;
 pub fn unique_with_indices(
-    arr: &Vec<Vec<i32>>
-) -> (Vec<Vec<i32>>, Vec<usize>) 
+    arr:                                &Vec<Vec<i32>>
+)                                           -> (Vec<Vec<i32>>, Vec<usize>) 
 {
-    let n                                                   = arr.len();
-    let mut unique                                          = Vec::with_capacity(n);
-    let mut indices                                         = Vec::with_capacity(n);
-    let mut seen                                            = HashMap::with_capacity(n);
+    let n                                       = arr.len();
+    let mut unique                              = Vec::with_capacity(n);
+    let mut indices                             = Vec::with_capacity(n);
+    let mut seen                                = HashMap::with_capacity(n);
     
     for (i, point) in arr.iter().enumerate() 
     {
