@@ -923,7 +923,7 @@ pub(crate) fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier
 
 //code here can likely be optimized further
 pub(crate) fn o_pareto_algorithm(
-    points:                                 ArrayView2<i32>, 
+    points:                                 HashSet<Vec<i32>>, 
     only_one:                               bool
 )                                                   -> Vec<Vec<Point>>
 {
@@ -933,19 +933,15 @@ pub(crate) fn o_pareto_algorithm(
     }
 
     let mut frontiers                                   = Vec::new();
-    let mut remaining_points                            = points.to_owned();
+    let mut remaining_points                            : Vec<usize> = (0..points.len()).collect();
 
     while remaining_points.len() > 0 
     {
-        let on_front = tig_utils::o_is_pareto_front(
-            remaining_points.view(),
-            None,
-            false
-        );
+        let on_front = tig_utils::o_is_pareto_front(&points);
 
         // Extract frontier points
-        let frontier                                    : Vec<_> = remaining_points
-            .outer_iter()
+        let frontier                                    : Vec<_> = points
+            .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| is_front)
             .map(|(point, _)| point.to_vec())
@@ -953,8 +949,8 @@ pub(crate) fn o_pareto_algorithm(
 
         frontiers.push(frontier);
 
-        let new_points: Vec<_>                          = remaining_points
-            .outer_iter()
+        let new_points: Vec<_>                          = points
+            .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| !is_front)
             .map(|(point, _)| point.to_vec())
@@ -965,15 +961,12 @@ pub(crate) fn o_pareto_algorithm(
             break;
         }
 
-        remaining_points                                = Array2::from_shape_vec(
-            (new_points.len(), 2),
-            new_points.into_iter().flatten().collect()
-        ).unwrap();
-
         if only_one 
         {
             break;
         }
+
+        break;
     }
 
     return frontiers;

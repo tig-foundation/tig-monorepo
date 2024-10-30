@@ -217,24 +217,10 @@ fn bench_update_qualifiers_mt(
 }
 
 fn bench_update_qualifiers_o_mt(
-    challenges:                             &Vec<Array2<i32>>
+    points:                                 &Vec<Vec<i32>>
 )                                                   -> Vec<Vec<Vec<Vec<i32>>>>
 {
-    let frontiers                                       = Arc::new(Mutex::new(Vec::new()));
-
-    thread::scope(|s|
-    {
-        for challenge_data in challenges
-        {
-            //let frontiers_                              = frontiers.clone();
-            s.spawn(||
-            {
-                let x                                   = add_block::o_pareto_algorithm(challenge_data.view(), false);
-            });
-        }
-    });
-
-    return Arc::try_unwrap(frontiers).unwrap().into_inner().unwrap();
+    return vec![];
 }
 
 /*
