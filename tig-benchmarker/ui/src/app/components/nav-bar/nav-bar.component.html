@@ -205,6 +205,7 @@
       icon="pi pi-home"
       [rounded]="true"
       [outlined]="true"
+      (click)="router.navigate(['/'])"
     />
     <p-button
       label="Job Manager"
@@ -215,6 +216,7 @@
       icon="pi pi-microchip"
       [rounded]="true"
       [outlined]="true"
+      (click)="router.navigate(['/jobs'])"
     />
     <p-button
       label="Slave Manager"
@@ -225,16 +227,7 @@
       icon="pi pi-server"
       [rounded]="true"
       [outlined]="true"
-    />
-    <p-button
-      label="Delegation Manager"
-      [style]="{
-        width: '100%',
-        margin: '5px'
-      }"
-      icon="pi pi-sparkles"
-      [rounded]="true"
-      [outlined]="true"
+      (click)="router.navigate(['/slaves'])"
     />
     <p-button
       label="Settings"
@@ -245,6 +238,7 @@
       icon="pi pi-cog"
       [rounded]="true"
       [outlined]="true"
+      (click)="router.navigate(['/settings'])"
     />
   </div>
 

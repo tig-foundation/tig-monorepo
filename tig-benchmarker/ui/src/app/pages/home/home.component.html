@@ -1,1 +1,238 @@
-<p>home works!</p>
+<p-card header="Benchmarks">
+  <p class="m-0">
+    Table of player’s benchmarks (more detailed version of
+    play.tig.foundation..) Display difficulty, and submission delay
+    @if(benchmarks()){
+        <p-table
+        #benchmarksTable
+        [value]="benchmarks()"
+        [tableStyle]="{ 'min-width': '50rem' }"
+        styleClass="p-datatable-striped"
+        [paginator]="true"
+        [rows]="5"
+        [rowsPerPageOptions]="[5, 10, 20]"
+        [globalFilterFields]="[
+          'challenge',
+          'algorithm',
+          'status',
+          'age',
+          'solutions',
+          'difficulty',
+          'submission_delay'
+        ]"
+      >
+        <ng-template pTemplate="caption">
+          <div class="flex">
+            <p-iconField iconPosition="left" class="ml-auto">
+              <p-inputIcon>
+                <i class="pi pi-search"></i>
+              </p-inputIcon>
+              <input
+                pInputText
+                type="text"
+                (input)="
+                  benchmarksTable.filterGlobal(
+                    $any($event.target).value || '',
+                    'contains'
+                  )
+                "
+                placeholder="Search keyword"
+              />
+            </p-iconField>
+          </div>
+        </ng-template>
+        <ng-template pTemplate="header">
+          <tr>
+            <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
+            <th pSortableColumn="challenge">
+              Challenge <p-sortIcon field="challenge" />
+            </th>
+            <th pSortableColumn="algorithm">
+              Algorithm <p-sortIcon field="algorithm" />
+            </th>
+            <th pSortableColumn="solutions">
+              # Solutions <p-sortIcon field="solutions" />
+            </th>
+            <th pSortableColumn="difficulty">
+              Difficulty <p-sortIcon field="difficulty" />
+            </th>
+            <th pSortableColumn="submission_delay">
+              Submission Delay <p-sortIcon field="submission_delay" />
+            </th>
+            <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-benchmark>
+          <tr>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                {{ benchmark.age }}
+              </div>
+            </td>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                {{ benchmark.challenge }}
+              </div>
+            </td>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                {{ benchmark.algorithm }}
+              </div>
+            </td>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                {{ benchmark.solutions }}
+              </div>
+            </td>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                {{ benchmark.difficulty }}
+              </div>
+            </td>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                {{ benchmark.submission_delay }}
+              </div>
+            </td>
+            <td>
+              <div class="flex justify-content-center align-items-center">
+                <p-tag
+                  [severity]="
+                    benchmark.status == 'Completed'
+                      ? 'success'
+                      : benchmark.status == 'In Progress'
+                      ? 'warning'
+                      : 'info'
+                  "
+                  [value]="benchmark.status"
+                />
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
+    @else {
+        <div class="flex w-full justify-content-center align-items-center">
+            <p-progressSpinner 
+    styleClass="w-4rem h-4rem" 
+    strokeWidth="8" 
+    fill="var(--surface-ground)" 
+    animationDuration="1.5s" />
+        </div>
+    }
+
+  </p>
+</p-card>
+<br>
+<p-card header="Solutions">
+    Summary table of solutions #Solutions & cutoff Qualifiers, imbalance
+    @if(solutions()){
+    <p-table
+      #solutionsTable
+      [value]="solutions()"
+      [tableStyle]="{ 'min-width': '50rem' }"
+      styleClass="p-datatable-striped"
+      [paginator]="true"
+      [rows]="5"
+      [rowsPerPageOptions]="[5, 10, 20]"
+      [globalFilterFields]="[
+        'age',
+        'solutions',
+        'difficulty',
+        'qualifiers',
+        'imbalance'
+      ]"
+    >
+      <ng-template pTemplate="caption">
+        <div class="flex">
+          <p-iconField iconPosition="left" class="ml-auto">
+            <p-inputIcon>
+              <i class="pi pi-search"></i>
+            </p-inputIcon>
+            <input
+              pInputText
+              type="text"
+              (input)="
+                solutionsTable.filterGlobal(
+                  $any($event.target).value || '',
+                  'contains'
+                )
+              "
+              placeholder="Search keyword"
+            />
+          </p-iconField>
+        </div>
+      </ng-template>
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
+          <th pSortableColumn="solutions">
+            # Solutions <p-sortIcon field="solutions" />
+          </th>
+          <th pSortableColumn="difficulty">
+            Difficulty <p-sortIcon field="difficulty" />
+          </th>
+          <th pSortableColumn="qualifiers">
+            # Qualifiers <p-sortIcon field="qualifiers" />
+          </th>
+          <th pSortableColumn="imbalance">Imbalance <p-sortIcon field="imbalance" /></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-benchmark>
+        <tr>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.age }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.solutions }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.difficulty }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.qualifiers }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              <p-tag
+                [severity]="
+                  benchmark.imbalance >= 1
+                    ? 'success'
+                    : benchmark.imbalance > 0.5
+                    ? 'warning'
+                    : 'info'
+                "
+                [value]="benchmark.imbalance"
+              />
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+}
+@else {
+    <div class="flex w-full justify-content-center align-items-center">
+        <p-progressSpinner 
+styleClass="w-4rem h-4rem" 
+strokeWidth="8" 
+fill="var(--surface-ground)" 
+animationDuration="1.5s" />
+    </div>
+}
+</p-card>
+<br>
+<p-card header="Delegation">
+  <p class="m-0">
+    Summary of delegation Showing how much block rewards you are sharing with
+    people How many tokens have been delegated to you
+  </p>
+</p-card>

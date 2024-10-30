@@ -1,0 +1,434 @@
+<p-card header="Settings  Configuration" class="w-full">
+  @if(settings()){
+  <form [formGroup]="formGroup">
+    <div class="grid">
+      <div class="col-6">
+        <h1>General</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">IP Address</label>
+            <input
+              type="text"
+              pInputText
+              formControlName="ip_address"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Port</label>
+            <input
+              type="text"
+              pInputText
+              formControlName="port"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Pre Commits</label>
+            <input
+              type="text"
+              pInputText
+              formControlName="precommits"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <h1>Batch Sizes</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="satisfiability_batch_size"
+              [style]="{ width: '100%' }"
+              formControlName="satisfiability_batch_size"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="vehicle_routing_batch_size"
+              [style]="{ width: '100%' }"
+              formControlName="vehicle_routing_batch_size"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="knapsack_batch_size"
+              [style]="{ width: '100%' }"
+              formControlName="knapsack_batch_size"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="vector_search_batch_size"
+              [style]="{ width: '100%' }"
+              formControlName="vector_search_batch_size"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <h1>Algos</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <input
+              type="text"
+              pInputText
+              inputId="satisfiability_algorithm"
+              [style]="{ width: '100%' }"
+              formControlName="satisfiability_algorithm"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <input
+              type="text"
+              pInputText
+              inputId="vehicle_routing_algorithm"
+              [style]="{ width: '100%' }"
+              formControlName="vehicle_routing_algorithm"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <input
+              type="text"
+              pInputText
+              inputId="knapsack_algorithm"
+              [style]="{ width: '100%' }"
+              formControlName="knapsack_algorithm"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <input
+              type="text"
+              pInputText
+              inputId="vector_search_algorithm"
+              formControlName="vector_search_algorithm"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <h1>Number of Nonces</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="satisfiability_num_nonces"
+              formControlName="satisfiability_num_nonces"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="vehicle_routing_num_nonces"
+              formControlName="vehicle_routing_num_nonces"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="knapsack_num_nonces"
+              formControlName="knapsack_num_nonces"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="vector_search_num_nonces"
+              formControlName="vector_search_num_nonces"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <h1>Weight</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="satisfiability_weight"
+              [maxFractionDigits]="1"
+              formControlName="satisfiability_weight"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="vehicle_routing_weight"
+              [maxFractionDigits]="1"
+              formControlName="vehicle_routing_weight"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="knapsack_weight"
+              [maxFractionDigits]="1"
+              formControlName="knapsack_weight"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="vector_search_weight"
+              [maxFractionDigits]="1"
+              formControlName="vector_search_weight"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-6">
+        <h1>Difficulty</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="satisfiability_difficulty"
+              [maxFractionDigits]="1"
+              formControlName="satisfiability_difficulty"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="vehicle_routing_difficulty"
+              [maxFractionDigits]="1"
+              formControlName="vehicle_routing_difficulty"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="knapsack_difficulty"
+              [maxFractionDigits]="1"
+              formControlName="knapsack_difficulty"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="vector_search_difficulty"
+              [maxFractionDigits]="1"
+              formControlName="vector_search_difficulty"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-3">
+        <h1>Micro Slave Settings</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="micro_slave_satisfiability"
+              formControlName="micro_slave_satisfiability"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="micro_slave_vehicle_routing"
+              formControlName="micro_slave_vehicle_routing"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="micro_slave_knapsack"
+              formControlName="micro_slave_knapsack"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="micro_slave_vector_search"
+              formControlName="micro_slave_vector_search"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-3">
+        <h1>Small Slave Settings</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="small_slave_satisfiability"
+              formControlName="small_slave_satisfiability"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="small_slave_vehicle_routing"
+              formControlName="small_slave_vehicle_routing"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="small_slave_knapsack"
+              formControlName="small_slave_knapsack"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="small_slave_vector_search"
+              formControlName="small_slave_vector_search"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-3">
+        <h1>Medium Slave Settings</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="medium_slave_satisfiability"
+              formControlName="medium_slave_satisfiability"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="medium_slave_vehicle_routing"
+              formControlName="medium_slave_vehicle_routing"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="medium_slave_knapsack"
+              formControlName="medium_slave_knapsack"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="medium_slave_vector_search">Vector Search</label>
+            <p-inputNumber
+              inputId="medium_slave_vector_search"
+              formControlName="medium_slave_vector_search"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-3">
+        <h1>Big Slave Settings</h1>
+        <div class="p-5">
+          <div class="field">
+            <label for="big_slave_satisfiability">Satisfiability</label>
+            <p-inputNumber
+              inputId="big_slave_satisfiability"
+              formControlName="big_slave_satisfiability"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="big_slave_vehicle_routing">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="big_slave_vehicle_routing"
+              formControlName="big_slave_vehicle_routing"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="big_slave_knapsack">Knapsack</label>
+            <p-inputNumber
+              inputId="big_slave_knapsack"
+              formControlName="big_slave_knapsack"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="big_slave_vector_search">Vector Search</label>
+            <p-inputNumber
+              inputId="big_slave_vector_search"
+              formControlName="big_slave_vector_search"
+              [style]="{ width: '100%' }"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+  <div class="flex justify-content-end">
+    <button
+      (click)="saveForm()"
+      pButton
+      pRipple
+      label="Save"
+      class="p-button-success"
+    ></button>
+  </div>
+  }@else {nope}
+</p-card>
