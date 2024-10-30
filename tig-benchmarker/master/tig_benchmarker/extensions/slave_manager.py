@@ -1,12 +1,12 @@
-import asyncio
 import os
 import json
 import logging
 import re
 import signal
+import threading
+import uvicorn
+from fastapi import FastAPI
 from quart import Quart, request, jsonify
-from hypercorn.config import Config
-from hypercorn.asyncio import serve
 from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
@@ -49,10 +49,10 @@ class SlaveManager:
         self.jobs = jobs
 
     def start(self):
-        app = Quart(__name__)
+        app = app = FastAPI()
 
         @app.route('/get-batches', methods=['GET'])
-        async def get_batches():
+        def get_batches():
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
@@ -109,14 +109,14 @@ class SlaveManager:
                 return jsonify([b.to_dict() for b in batches])
 
         @app.route('/submit-batch-result/<batch_id>', methods=['POST'])
-        async def submit_batch_result(batch_id):
+        def submit_batch_result(batch_id):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting submit-batch-result request")
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
-            result = BatchResult.from_dict(await request.json)
+            result = BatchResult.from_dict(request.json)
             job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
             logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)}, #proofs: {len(result.merkle_proofs)})")
             if job is None:
@@ -131,12 +131,9 @@ class SlaveManager:
             })
             return "OK"
 
-        config = Config()
-        config.bind = [f"0.0.0.0:{self.config.port}"]
+        def start_server():
+            uvicorn.run(app, host="0.0.0.0", port=self.config.port)
 
-        exit_event = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        loop.add_signal_handler(signal.SIGINT, exit_event.set)
-        loop.add_signal_handler(signal.SIGTERM, exit_event.set)
-        asyncio.create_task(serve(app, config, shutdown_trigger=exit_event.wait))
-        logger.info(f"webserver started on {config.bind[0]}")
+        api_thread = threading.Thread(target=start_server)
+        api_thread.start()
+        logger.info(f"webserver started on {f"0.0.0.0:{self.config.port}"}")

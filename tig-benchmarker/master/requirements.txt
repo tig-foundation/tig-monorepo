@@ -6,3 +6,7 @@ hypercorn
 numpy
 quart
 randomname
+uvicorn
+fastapi
+sqlalchemy
+psycopg2
