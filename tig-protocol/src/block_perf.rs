@@ -194,7 +194,7 @@ fn bench_update_qualifiers_mt(
             let frontiers_                              = frontiers.clone();
             s.spawn(||
             {
-                let points                                      = challenge_data
+                let points                              = challenge_data
                     .iter()
                     .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
                     .collect::<Frontier>();
@@ -229,13 +229,14 @@ fn bench_update_qualifiers_o_mt(
             s.spawn(||
             {
                 let frontiers_                          = frontiers.clone();
-                let points                              = challenge_data
+
+                let points_                             = challenge_data
                     .iter()
                     .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-                    .collect::<HashSet<Point>>();
-        
+                    .collect::<Vec<Point>>();
+
                 let mut frontier_indexes                = HashMap::<Point, usize>::new();
-                for (frontier_index, frontier) in add_block::o_pareto_algorithm(points, false).into_iter().enumerate() 
+                for (frontier_index, frontier) in add_block::o_pareto_algorithm(challenge_data, false).into_iter().enumerate() 
                 {
                     for point in frontier 
                     {
@@ -357,6 +358,14 @@ pub fn criterion_benchmark(
     c:                                      &mut Criterion
 ) 
 {
+    let points                              = vec![vec![0, 0], vec![1, 0], vec![0, 2], vec![3, 3]];
+    let points_                             = points
+                    .iter()
+                    .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+                    .collect::<HashSet<Vec<i32>>>();
+
+    //panic!("{:?}", tig_utils::o_is_pareto_front(&points_, false));
+
     c.bench_function("update_qualifiers_st", |b|
     {
         let challenges                              = get_points();

@@ -38,7 +38,7 @@ fn change_directions(
 }
 
 fn is_pareto_front_2d(
-    costs:                          &HashSet<Vec<i32>>
+    costs:                          &Vec<Vec<i32>>
 )                                           -> Vec<bool> 
 {
     let n_observations = costs.len();
@@ -48,7 +48,7 @@ fn is_pareto_front_2d(
     }
 
     let mut indices                             : Vec<usize> = (0..n_observations).collect();
-    indices.sort_by_key(|&i| costs.iter().nth(i).unwrap()[0]);
+    indices.sort_by_key(|&i| costs[i][0]);
 
     let mut on_front                            = vec![true; n_observations];
     let mut stack                               = Vec::with_capacity(n_observations);
@@ -57,7 +57,10 @@ fn is_pareto_front_2d(
         // Remove points from stack that are dominated by current point
         while let Some(&top_idx) = stack.last() 
         {
-            if costs.iter().nth(top_idx).unwrap()[1] <= costs.iter().nth(curr_idx).unwrap()[1]
+            let cost1: &Vec<i32>                = &costs[top_idx];
+            let cost2: &Vec<i32>                = &costs[curr_idx];
+
+            if cost1[1] <= cost2[1]
             {
                 break;
             }
@@ -68,7 +71,10 @@ fn is_pareto_front_2d(
         // If stack is not empty, current point is dominated
         if let Some(&top_idx) = stack.last() 
         {
-            if costs.iter().nth(top_idx).unwrap()[1] <= costs.iter().nth(curr_idx).unwrap()[1]
+            let cost1: &Vec<i32>                = &costs[top_idx];
+            let cost2: &Vec<i32>                = &costs[curr_idx];
+
+            if cost1[1] <= cost2[1]
             {
                 on_front[curr_idx]              = false;
             }
@@ -80,20 +86,19 @@ fn is_pareto_front_2d(
 
     return on_front;
 }
+
 pub fn o_is_pareto_front(
-    costs:                          &HashSet<Vec<i32>>,
+    costs:                          &Vec<Vec<i32>>,
     assume_unique_lexsorted:        bool
 )                                           -> Vec<bool> 
 {
     //let mut costs_copy                                  = costs.clone();
     //change_directions(&mut costs_copy, larger_is_better_objectives);
-
-    let costs_copy                                      = costs;
-
+    
     let apply_unique                                    = !assume_unique_lexsorted;
     let (unique_costs, order_inv)                       = if apply_unique 
     {
-        let (unique, indices)                           = unique_with_indices(&costs_copy);
+        let (unique, indices)                           = unique_with_indices(costs);
         
         (Some(unique), Some(indices))
     } 
@@ -120,14 +125,14 @@ pub fn o_is_pareto_front(
 }
 
 use std::collections::HashMap;
-fn unique_with_indices(
-    arr:                            &HashSet<Vec<i32>>
-)                                           -> (HashSet<Vec<i32>>, Vec<usize>) 
+pub fn unique_with_indices(
+    arr: &Vec<Vec<i32>>
+) -> (Vec<Vec<i32>>, Vec<usize>) 
 {
-    let n                                       = arr.len();
-    let mut unique                              = HashSet::with_capacity(n);
-    let mut indices                             = Vec::with_capacity(n);
-    let mut seen                                = HashMap::with_capacity(n);
+    let n                                                   = arr.len();
+    let mut unique                                          = Vec::with_capacity(n);
+    let mut indices                                         = Vec::with_capacity(n);
+    let mut seen                                            = HashMap::with_capacity(n);
     
     for (i, point) in arr.iter().enumerate() 
     {
@@ -138,8 +143,7 @@ fn unique_with_indices(
         else 
         {
             seen.insert(point, i);
-            unique.insert(point.clone());
-            
+            unique.push(point.clone());
             indices.push(i);
         }
     }

@@ -923,7 +923,7 @@ pub(crate) fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier
 
 //code here can likely be optimized further
 pub(crate) fn o_pareto_algorithm(
-    points:                                 HashSet<Vec<i32>>, 
+    points:                                 &Vec<Vec<i32>>, 
     only_one:                               bool
 )                                                   -> Vec<Vec<Point>>
 {
@@ -933,14 +933,11 @@ pub(crate) fn o_pareto_algorithm(
     }
 
     let mut frontiers                                   = Vec::new();
-    let mut remaining_points                            : HashSet<Vec<i32>> = points.clone();
-    let mut init_l                                      = true;
+    let (mut remaining_points, mut indices)             = tig_utils::unique_with_indices(&points.clone());
 
-    while init_l || remaining_points.len() > 0
+    while true
     {
-        init_l                                          = false;
-
-        let on_front                                    = tig_utils::o_is_pareto_front(&remaining_points, false);
+        let on_front                                    = tig_utils::o_is_pareto_front(&remaining_points, true);
 
         // Extract frontier points
         let frontier                                    : Vec<_> = remaining_points
@@ -952,7 +949,7 @@ pub(crate) fn o_pareto_algorithm(
 
         frontiers.push(frontier);
 
-        let new_points: HashSet<_>                      = remaining_points
+        let new_points: Vec<_>                          = remaining_points
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| !is_front)
