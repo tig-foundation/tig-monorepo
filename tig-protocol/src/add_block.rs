@@ -931,7 +931,7 @@ pub(crate) fn o_pareto_algorithm(
     }
 
     let mut frontiers                                   = Vec::new();
-    let (mut remaining_points, mut indices)             = tig_utils::unique_with_indices(&points.clone());
+    let (mut remaining_points, mut indices)             = tig_utils::unique_with_indices(&points);
 
     while true
     {
@@ -947,7 +947,7 @@ pub(crate) fn o_pareto_algorithm(
 
         frontiers.push(frontier);
 
-        let new_points: Vec<_>                          = remaining_points
+        let new_points                                  : Vec<_> = remaining_points
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| !is_front)
