@@ -80,41 +80,69 @@ fn is_pareto_front_2d(
 
     return on_front;
 }
-
 pub fn o_is_pareto_front(
-    costs:                          &HashSet<Vec<i32>>
+    costs:                          &HashSet<Vec<i32>>,
+    assume_unique_lexsorted:        bool
 )                                           -> Vec<bool> 
 {
-    return is_pareto_front_2d(costs);
+    //let mut costs_copy                                  = costs.clone();
+    //change_directions(&mut costs_copy, larger_is_better_objectives);
+
+    let costs_copy                                      = costs;
+
+    let apply_unique                                    = !assume_unique_lexsorted;
+    let (unique_costs, order_inv)                       = if apply_unique 
+    {
+        let (unique, indices)                           = unique_with_indices(&costs_copy);
+        
+        (Some(unique), Some(indices))
+    } 
+    else 
+    {
+        (None, None)
+    };
+
+    let on_front                                        = if unique_costs.is_some() 
+    { 
+        is_pareto_front_2d(&unique_costs.unwrap())
+    }
+    else
+    {
+        is_pareto_front_2d(costs)
+    };
+
+    if let Some(inv) = order_inv 
+    {
+        return inv.iter().map(|&i| on_front[i]).collect();
+    } 
+    
+    return on_front;
 }
 
+use std::collections::HashMap;
 fn unique_with_indices(
     arr:                            &HashSet<Vec<i32>>
 )                                           -> (HashSet<Vec<i32>>, Vec<usize>) 
 {
-    let mut unique_vec                          : Vec<(Vec<i32>, usize)> = Vec::new();
-    let mut inverse                             = vec![0; arr.len()];
-    let arr_vec: Vec<_>                         = arr.iter().collect();
-
-    for (i, row) in arr_vec.iter().enumerate() 
+    let n                                       = arr.len();
+    let mut unique                              = HashSet::with_capacity(n);
+    let mut indices                             = Vec::with_capacity(n);
+    let mut seen                                = HashMap::with_capacity(n);
+    
+    for (i, point) in arr.iter().enumerate() 
     {
-        match unique_vec.iter().position(|(v, _)| v == *row) 
+        if let Some(&idx) = seen.get(point) 
         {
-            Some(pos) => 
-            {
-                inverse[i]                      = pos;
-            },
-
-            None => 
-            {
-                inverse[i]                      = unique_vec.len();
-                unique_vec.push(((*row).clone(), i));
-            }
+            indices.push(idx);
+        } 
+        else 
+        {
+            seen.insert(point, i);
+            unique.insert(point.clone());
+            
+            indices.push(i);
         }
     }
-
-    unique_vec.sort_by(|a, b| a.1.cmp(&b.1));
-    let unique_arr: HashSet<_>                  = unique_vec.into_iter().map(|(v, _)| v).collect();
-
-    return (unique_arr, inverse);
+    
+    return (unique, indices);
 }

@@ -217,10 +217,38 @@ fn bench_update_qualifiers_mt(
 }
 
 fn bench_update_qualifiers_o_mt(
-    points:                                 &Vec<Vec<i32>>
-)                                                   -> Vec<Vec<Vec<Vec<i32>>>>
+    challenges:                             &Vec<Vec<Point>>
+)                                                   -> Vec<HashMap<Point, usize>>
 {
-    return vec![];
+    let frontiers                                       = Arc::new(Mutex::new(Vec::new()));
+
+    thread::scope(|s|
+    {
+        for challenge_data in challenges
+        {
+            s.spawn(||
+            {
+                let frontiers_                          = frontiers.clone();
+                let points                              = challenge_data
+                    .iter()
+                    .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+                    .collect::<HashSet<Point>>();
+        
+                let mut frontier_indexes                = HashMap::<Point, usize>::new();
+                for (frontier_index, frontier) in add_block::o_pareto_algorithm(points, false).into_iter().enumerate() 
+                {
+                    for point in frontier 
+                    {
+                        frontier_indexes.insert(point, frontier_index);
+                    }
+                }
+        
+                frontiers_.lock().unwrap().push(frontier_indexes);
+            });
+        }
+    });
+
+    return Arc::try_unwrap(frontiers).unwrap().into_inner().unwrap();
 }
 
 /*
@@ -331,7 +359,7 @@ pub fn criterion_benchmark(
 {
     c.bench_function("update_qualifiers_st", |b|
     {
-        let challenges                                  = get_points();
+        let challenges                              = get_points();
         b.iter(|| bench_update_qualifiers_st(&challenges));
     });
     
@@ -342,12 +370,12 @@ pub fn criterion_benchmark(
     });
 
     // need to optimize add_block::o_pareto_algorithm first
-    /*c.bench_function("update_qualifiers_o_mt", |b|
+    c.bench_function("update_qualifiers_o_mt", |b|
     {
-        let pareto_points                           = get_o_points();
+        let pareto_points                           = get_points();
 
         b.iter(|| bench_update_qualifiers_o_mt(&pareto_points));
-    });*/
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);

@@ -933,14 +933,17 @@ pub(crate) fn o_pareto_algorithm(
     }
 
     let mut frontiers                                   = Vec::new();
-    let mut remaining_points                            : Vec<usize> = (0..points.len()).collect();
+    let mut remaining_points                            : HashSet<Vec<i32>> = points.clone();
+    let mut init_l                                      = true;
 
-    while remaining_points.len() > 0 
+    while init_l || remaining_points.len() > 0
     {
-        let on_front = tig_utils::o_is_pareto_front(&points);
+        init_l                                          = false;
+
+        let on_front                                    = tig_utils::o_is_pareto_front(&remaining_points, false);
 
         // Extract frontier points
-        let frontier                                    : Vec<_> = points
+        let frontier                                    : Vec<_> = remaining_points
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| is_front)
@@ -949,7 +952,7 @@ pub(crate) fn o_pareto_algorithm(
 
         frontiers.push(frontier);
 
-        let new_points: Vec<_>                          = points
+        let new_points: HashSet<_>                      = remaining_points
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| !is_front)
@@ -961,12 +964,12 @@ pub(crate) fn o_pareto_algorithm(
             break;
         }
 
+        remaining_points                                = new_points;
+
         if only_one 
         {
             break;
         }
-
-        break;
     }
 
     return frontiers;
