@@ -3,7 +3,8 @@ pub type Point      = Vec<i32>;
 pub type Frontier   = Vec<Point>;
 
 fn is_pareto_front_2d(
-    costs:                          &Vec<Vec<i32>>
+    costs:                          &Vec<Vec<i32>>,
+    pre_sorted_along_x:             bool
 )                                           -> Vec<bool> 
 {
     let n_observations                          = costs.len();
@@ -13,7 +14,10 @@ fn is_pareto_front_2d(
     }
 
     let mut indices                             : Vec<usize> = (0..n_observations).collect();
-    indices.sort_by_key(|&i| costs[i][0]);
+    if !pre_sorted_along_x
+    {
+        indices.sort_by_key(|&i| costs[i][0]);
+    }
 
     let mut on_front                            = vec![true; n_observations];
     let mut stack                               = Vec::with_capacity(n_observations);
@@ -54,7 +58,8 @@ fn is_pareto_front_2d(
 
 pub fn o_is_pareto_front(
     costs:                          &Vec<Vec<i32>>,
-    assume_unique_lexsorted:        bool
+    assume_unique_lexsorted:        bool,
+    pre_sorted_along_x:             Option<bool>  
 )                                           -> Vec<bool> 
 {
     let apply_unique                            = !assume_unique_lexsorted;
@@ -71,11 +76,11 @@ pub fn o_is_pareto_front(
 
     let on_front                                = if unique_costs.is_some() 
     { 
-        is_pareto_front_2d(&unique_costs.unwrap())
+        is_pareto_front_2d(&unique_costs.unwrap(), pre_sorted_along_x.unwrap_or(false))
     }
     else
     {
-        is_pareto_front_2d(costs)
+        is_pareto_front_2d(costs, pre_sorted_along_x.unwrap_or(false))
     };
 
     if let Some(inv) = order_inv 
@@ -251,9 +256,11 @@ pub fn o_pareto_algorithm(
     let mut frontiers                       = Vec::new();
     let (mut remaining_points, indices)     = unique_with_indices(points);
 
+    remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
+
     while true
     {
-        let on_front                        = o_is_pareto_front(&remaining_points, true);
+        let on_front                        = o_is_pareto_front(&remaining_points, true, Some(true));
 
         // Extract frontier points
         let frontier                        : Vec<_> = remaining_points
