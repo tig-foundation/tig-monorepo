@@ -872,57 +872,6 @@ async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
     }
 }
 
-pub(crate) fn o_pareto_algorithm(
-    points:                                 &Vec<Vec<i32>>, 
-    only_one:                               bool
-)                                                   -> Vec<Vec<Point>>
-{
-    if points.len() == 0
-    {
-        return vec![];
-    }
-
-    let mut frontiers                                   = Vec::new();
-    let mut remaining_points                            : Option<Vec<Vec<i32>>> = None;
-
-    while true
-    {
-        let points_                                     = if remaining_points.is_some() { &remaining_points.unwrap() } else { points };
-        let on_front                                    = tig_utils::o_is_pareto_front(points_, false);
-
-        // Extract frontier points
-        let frontier                                    : Vec<_> = points_
-            .iter()
-            .zip(on_front.iter())
-            .filter(|(_, &is_front)| is_front)
-            .map(|(point, _)| point.to_vec())
-            .collect();
-
-        frontiers.push(frontier);
-
-        let new_points                                  : Vec<_> = points_
-            .iter()
-            .zip(on_front.iter())
-            .filter(|(_, &is_front)| !is_front)
-            .map(|(point, _)| point.to_vec())
-            .collect();
-
-        if new_points.is_empty() 
-        {
-            break;
-        }
-
-        remaining_points                                = Some(new_points);
-
-        if only_one 
-        {
-            break;
-        }
-    }
-
-    return frontiers;
-}
-
 fn get_solutions_by_challenge(
     cache:                          &AddBlockCache
 )                                           -> HashMap::<&String, Vec<(&BenchmarkSettings, &u32)>>   
@@ -1151,59 +1100,103 @@ pub(crate) async fn update_qualifiers(
 }
 
 #[time]
-async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) 
+async fn update_frontiers(
+    block:                          &Block, 
+    cache:                          &mut AddBlockCache
+) 
 {
-    /*
-    let config                                          = block.config();
+    let config                                  = block.config();
+    let _cache                                  = Arc::new(cache);
+    
+    let frontier_results                        = Arc::new(
+        Mutex::new(
+            Vec::with_capacity(
+                Arc::<>::into_inner(_cache.clone()).unwrap().active_challenges.len()
+            )
+        )
+    );
 
-    for challenge in cache.active_challenges.values_mut() 
+    thread::scope(|s| 
     {
-        let block_data                                  = challenge.block_data.as_mut().unwrap();
-
-        let difficulty_parameters                       = &config.difficulty.parameters[&challenge.id];
-        let min_difficulty                              = difficulty_parameters.min_difficulty();
-        let max_difficulty                              = difficulty_parameters.max_difficulty();
-
-        let points                                      = block_data
-            .qualifier_difficulties()
-            .iter()
-            .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-            .collect::<Vec<Vec<i32>>>();
-
-        let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
+        for (challenge_id, challenge) in Arc::<>::into_inner(_cache.clone()).unwrap().active_challenges.iter() 
         {
-            let base_frontier: Frontier                 = vec![min_difficulty.clone()].into_iter().collect();
-            let scaling_factor                          = 0.0;
-            let scaled_frontier                         = base_frontier.clone();
-            
-            (base_frontier, scaling_factor, scaled_frontier)
-        } 
-        else 
-        {
-            let base_frontier                           = o_pareto_algorithm(&points, true)
-                .pop()
-                .unwrap()
-                .into_iter()
-                .map(|d| d.into_iter().map(|x| -x).collect())
-                .collect::<Frontier>() // mirror the points back;
-                .extend(&min_difficulty, &max_difficulty);
+            let block_data                      = challenge.block_data.as_ref().unwrap();
+            let config                          = &config;
+            let frontier_results                = frontier_results.clone();
 
-            let scaling_factor                          = (*block_data.num_qualifiers() as f64
-                / config.qualifiers.total_qualifiers_threshold as f64)
-                .min(config.difficulty.max_scaling_factor);
+            s.spawn(move || 
+            {
+                let difficulty_parameters       = &config.difficulty.parameters[challenge_id];
+                let min_difficulty              = difficulty_parameters.min_difficulty();
+                let max_difficulty              = difficulty_parameters.max_difficulty();
 
-            let scaled_frontier                         = base_frontier
-                .scale(&min_difficulty, &max_difficulty, scaling_factor)
-                .extend(&min_difficulty, &max_difficulty);
+                let points                      = block_data
+                    .qualifier_difficulties()
+                    .iter()
+                    .map(|d| d.iter().map(|x| -x).collect())
+                    .collect::<Vec<Vec<i32>>>();
 
-            (base_frontier, scaling_factor, scaled_frontier)
-        };
+                let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
+                {
+                    let base_frontier           : Frontier = vec![min_difficulty.clone()].into_iter().collect();
+                    let scaling_factor          = 0.0;
+                    let scaled_frontier         = base_frontier.clone();
+                    
+                    (base_frontier, scaling_factor, scaled_frontier)
+                } 
+                else 
+                {
+                    let mut base_frontier       = o_pareto_algorithm(&points, true)
+                        .pop()
+                        .unwrap()
+                        .into_iter()
+                        .map(|d| d.into_iter().map(|x| -x).collect())
+                        .collect::<Frontier>();
 
-        block_data.base_frontier                        = Some(base_frontier);
-        block_data.scaled_frontier                      = Some(scaled_frontier);
-        block_data.scaling_factor                       = Some(scaling_factor);
+                    base_frontier.extend([min_difficulty.clone(), max_difficulty.clone()]);
+
+                    let scaling_factor          = (*block_data.num_qualifiers() as f64
+                        / config.qualifiers.total_qualifiers_threshold as f64)
+                        .min(config.difficulty.max_scaling_factor);
+
+                    let mut scaled_frontier     = scale_frontier(
+                        &base_frontier, 
+                        &min_difficulty, 
+                        &max_difficulty, 
+                        scaling_factor
+                    );
+
+                    scaled_frontier.extend([min_difficulty.clone(), max_difficulty.clone()]);
+
+                    (base_frontier, scaling_factor, scaled_frontier)
+                };
+
+                frontier_results.lock().unwrap().push((
+                    challenge_id.clone(),
+                    base_frontier,
+                    scaling_factor,
+                    scaled_frontier
+                ));
+            });
+        }
+    });
+
+    let results                                 = frontier_results.lock().unwrap();
+    for (challenge_id, base_frontier, scaling_factor, scaled_frontier) in results.iter() 
+    {
+        let block_data                          = Arc::<>::into_inner(_cache.clone())
+            .unwrap()
+            .active_challenges
+            .get_mut(challenge_id)
+            .unwrap()
+            .block_data
+            .as_mut()
+            .unwrap();
+
+        block_data.base_frontier                = Some(base_frontier.clone());
+        block_data.scaled_frontier              = Some(scaled_frontier.clone());
+        block_data.scaling_factor               = Some(*scaling_factor);
     }
-    */
 }
 
 #[time]

@@ -125,7 +125,7 @@ fn bench_update_qualifiers_o_mt(
                 let frontiers_                          = frontiers.clone();
 
                 let mut frontier_indexes                = HashMap::<Point, usize>::new();
-                for (frontier_index, frontier) in add_block::o_pareto_algorithm(challenge_data, false).into_iter().enumerate() 
+                for (frontier_index, frontier) in tig_utils::o_pareto_algorithm(challenge_data, false).into_iter().enumerate() 
                 {
                     for point in frontier 
                     {

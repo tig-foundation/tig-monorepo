@@ -187,3 +187,112 @@ pub fn pareto_within(
 
     return PointCompareFrontiers::Within;
 }
+
+pub fn scale_point(
+    point:                          &Point,
+    min_point:                      &Point,
+    max_point:                      &Point,
+    multiplier:                     f64
+)                                           -> Point
+{
+    return point.iter()
+        .enumerate()
+        .map(|(i, value)|
+        {
+            let offset                          = ((value - min_point[i] + 1) as f64) * multiplier;
+            (min_point[i] + offset.ceil() as i32 - 1).clamp(min_point[i], max_point[i])   
+        })
+        .collect();
+}
+
+pub fn scale_frontier(
+    frontier:                       &Frontier,
+    min_point:                      &Point,
+    max_point:                      &Point,
+    multiplier:                     f64
+)                                           -> Frontier
+{
+    if frontier.is_empty()
+    {
+        return vec![];
+    }
+
+    let scaled_frontier                         = frontier
+        .iter()
+        .map(|point| scale_point(&point, min_point, max_point, multiplier))
+        .collect();
+
+    if multiplier > 1.0
+    {
+        return pareto_frontier(&scaled_frontier);
+    }
+
+    let mirrored_frontier                      = scaled_frontier
+        .into_iter()
+        .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+        .collect::<Frontier>();
+
+    return pareto_frontier(&mirrored_frontier)
+        .iter()
+        .map(|d| d.iter().map(|x| -x).collect())
+        .collect();
+}
+
+pub fn o_pareto_algorithm(
+    points:                         &Vec<Vec<i32>>, 
+    only_one:                       bool
+)                                       -> Vec<Vec<Point>>
+{
+    if points.len() == 0
+    {
+        return vec![];
+    }
+
+    let mut frontiers               = Vec::new();
+    let mut remaining_points        : Option<Vec<Vec<i32>>> = None;
+
+    while true
+    {
+        let points_                 = if remaining_points.is_some() { &remaining_points.unwrap() } else { points };
+        let on_front                = o_is_pareto_front(points_, false);
+
+        // Extract frontier points
+        let frontier                : Vec<_> = points_
+            .iter()
+            .zip(on_front.iter())
+            .filter(|(_, &is_front)| is_front)
+            .map(|(point, _)| point.to_vec())
+            .collect();
+
+        frontiers.push(frontier);
+
+        let new_points              : Vec<_> = points_
+            .iter()
+            .zip(on_front.iter())
+            .filter(|(_, &is_front)| !is_front)
+            .map(|(point, _)| point.to_vec())
+            .collect();
+
+        if new_points.is_empty() 
+        {
+            break;
+        }
+
+        remaining_points            = Some(new_points);
+
+        if only_one 
+        {
+            break;
+        }
+    }
+
+    return frontiers;
+}
+
+pub fn pareto_frontier(
+    frontier:                       &Frontier,
+)
+                                            -> Frontier
+{
+    return o_pareto_algorithm(frontier, true).first().unwrap().to_vec();
+}
