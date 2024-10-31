@@ -1,4 +1,6 @@
 // optimized pareto impl
+pub type Point      = Vec<i32>;
+pub type Frontier   = Vec<Point>;
 
 fn is_pareto_front_2d(
     costs:                          &Vec<Vec<i32>>
@@ -84,6 +86,7 @@ pub fn o_is_pareto_front(
     return on_front;
 }
 
+// will be about 1.3x faster if we use this and cache it somehow instead of calling it repeatedely on the same points
 use std::collections::HashMap;
 pub fn unique_with_indices(
     arr:                                &Vec<Vec<i32>>
@@ -102,11 +105,85 @@ pub fn unique_with_indices(
         } 
         else 
         {
-            seen.insert(point, i);
+            seen.insert(point, unique.len());
             unique.push(point.clone());
-            indices.push(i);
+            indices.push(unique.len() - 1);
         }
     }
     
     return (unique, indices);
+}
+
+#[derive(PartialEq)]
+pub enum ParetoCompare
+{
+    ADominatesB,
+    Equal,
+    BDominatesA
+}
+
+pub fn pareto_compare(
+    point:                          &Point, 
+    other:                          &Point
+)                                           -> ParetoCompare 
+{
+    let mut a_dominate_b = false;
+    let mut b_dominate_a = false;
+    for (a_val, b_val) in point.iter().zip(other) 
+    {
+        if a_val < b_val 
+        {
+            b_dominate_a                        = true;
+        } 
+        else if a_val > b_val 
+        {
+            a_dominate_b                        = true;
+        }
+    }
+
+    if a_dominate_b == b_dominate_a 
+    {
+        return ParetoCompare::Equal;
+    } 
+    else if a_dominate_b 
+    {
+        return ParetoCompare::ADominatesB;
+    } 
+    else 
+    {
+        return ParetoCompare::BDominatesA;
+    }
+}
+
+#[derive(PartialEq)]
+pub enum PointCompareFrontiers
+{
+    Below,
+    Within,
+    Above
+}
+
+pub fn pareto_within(
+    point:                          &Vec<Point>,
+    lower_frontier:                 &Frontier,
+    upper_frontier:                 &Frontier
+)                                           -> PointCompareFrontiers
+{
+    for point_ in lower_frontier
+    {
+        if pareto_compare(point, point_) == ParetoCompare::BDominatesA
+        {
+            return PointCompareFrontiers::Below;
+        }
+    }
+
+    for point_ in upper_frontier
+    {
+        if pareto_compare(point, point_) == ParetoCompare::ADominatesB
+        {
+            return PointCompareFrontiers::Above;
+        }
+    }
+
+    return PointCompareFrontiers::Within;
 }

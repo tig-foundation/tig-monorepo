@@ -1,7 +1,5 @@
 mod eth;
 pub use eth::*;
-mod frontiers;
-pub use frontiers::*;
 mod hash;
 pub use hash::*;
 mod json;

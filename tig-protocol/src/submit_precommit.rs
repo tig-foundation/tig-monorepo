@@ -187,7 +187,7 @@ fn verify_benchmark_difficulty(
             challenge_data.base_frontier(),
         )
     };
-    match difficulty.within(lower_frontier, upper_frontier) {
+    match pareto_within(difficulty, lower_frontier, upper_frontier) {
         PointCompareFrontiers::Above => {
             return Err(ProtocolError::DifficultyAboveHardestFrontier {
                 difficulty: difficulty.clone(),

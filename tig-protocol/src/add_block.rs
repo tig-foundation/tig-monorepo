@@ -872,54 +872,6 @@ async fn update_fees(block: &Block, cache: &mut AddBlockCache) {
     }
 }
 
-pub(crate) fn find_smallest_range_dimension(points: &Frontier) -> usize {
-    (0..2)
-        .min_by_key(|&d| {
-            let (min, max) = points
-                .iter()
-                .map(|p| p[d])
-                .fold((i32::MAX, i32::MIN), |(min, max), val| {
-                    (min.min(val), max.max(val))
-                });
-            max - min
-        })
-        .unwrap()
-}
-
-pub(crate) fn pareto_algorithm(points: Frontier, only_one: bool) -> Vec<Frontier> {
-    if points.is_empty() {
-        return Vec::new();
-    };
-    let dimension = find_smallest_range_dimension(&points);
-    let sort_dimension = 1 - dimension;
-
-    let mut buckets: HashMap<i32, Vec<Point>> = HashMap::new();
-    for point in points {
-        buckets.entry(point[dimension]).or_default().push(point);
-    }
-    for (_, group) in buckets.iter_mut() {
-        // sort descending
-        group.sort_unstable_by(|a, b| b[sort_dimension].cmp(&a[sort_dimension]));
-    }
-    let mut result = Vec::new();
-    while !buckets.is_empty() {
-        let points: HashSet<Point> = buckets.values().map(|group| group[0].clone()).collect();
-        let frontier = points.pareto_frontier();
-        for point in frontier.iter() {
-            let bucket = buckets.get_mut(&point[dimension]).unwrap();
-            bucket.remove(0);
-            if bucket.is_empty() {
-                buckets.remove(&point[dimension]);
-            }
-        }
-        result.push(frontier);
-        if only_one {
-            break;
-        }
-    }
-    result
-}
-
 pub(crate) fn o_pareto_algorithm(
     points:                                 &Vec<Vec<i32>>, 
     only_one:                               bool
@@ -931,14 +883,15 @@ pub(crate) fn o_pareto_algorithm(
     }
 
     let mut frontiers                                   = Vec::new();
-    let (mut remaining_points, mut indices)             = tig_utils::unique_with_indices(&points);
+    let mut remaining_points                            : Option<Vec<Vec<i32>>> = None;
 
     while true
     {
-        let on_front                                    = tig_utils::o_is_pareto_front(&remaining_points, true);
+        let points_                                     = if remaining_points.is_some() { &remaining_points.unwrap() } else { points };
+        let on_front                                    = tig_utils::o_is_pareto_front(points_, false);
 
         // Extract frontier points
-        let frontier                                    : Vec<_> = remaining_points
+        let frontier                                    : Vec<_> = points_
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| is_front)
@@ -947,7 +900,7 @@ pub(crate) fn o_pareto_algorithm(
 
         frontiers.push(frontier);
 
-        let new_points                                  : Vec<_> = remaining_points
+        let new_points                                  : Vec<_> = points_
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| !is_front)
@@ -959,7 +912,7 @@ pub(crate) fn o_pareto_algorithm(
             break;
         }
 
-        remaining_points                                = new_points;
+        remaining_points                                = Some(new_points);
 
         if only_one 
         {
@@ -1035,10 +988,10 @@ fn get_frontier_indices(
     let points                                  = solutions
         .iter()
         .map(|(settings, _)| settings.difficulty.clone())
-        .collect::<Frontier>();
+        .collect::<Vec<Vec<i32>>>();
     
     let mut frontier_indexes                    = HashMap::<Point, usize>::new();
-    for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() 
+    for (frontier_index, frontier) in o_pareto_algorithm(&points, false).into_iter().enumerate() 
     {
         for point in frontier 
         {
@@ -1200,6 +1153,7 @@ pub(crate) async fn update_qualifiers(
 #[time]
 async fn update_frontiers(block: &Block, cache: &mut AddBlockCache) 
 {
+    /*
     let config                                          = block.config();
 
     for challenge in cache.active_challenges.values_mut() 
@@ -1214,7 +1168,8 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache)
             .qualifier_difficulties()
             .iter()
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-            .collect::<Frontier>();
+            .collect::<Vec<Vec<i32>>>();
+
         let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
         {
             let base_frontier: Frontier                 = vec![min_difficulty.clone()].into_iter().collect();
@@ -1225,7 +1180,7 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache)
         } 
         else 
         {
-            let base_frontier                           = pareto_algorithm(points, true)
+            let base_frontier                           = o_pareto_algorithm(&points, true)
                 .pop()
                 .unwrap()
                 .into_iter()
@@ -1248,6 +1203,7 @@ async fn update_frontiers(block: &Block, cache: &mut AddBlockCache)
         block_data.scaled_frontier                      = Some(scaled_frontier);
         block_data.scaling_factor                       = Some(scaling_factor);
     }
+    */
 }
 
 #[time]
