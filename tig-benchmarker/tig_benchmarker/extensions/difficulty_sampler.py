@@ -107,7 +107,7 @@ def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
     
     while True:
         points_             = remaining_points if remaining_points is not None else points
-        frontier, on_front  = o_calc_pareto_frontier(points_)
+        frontier, on_front  = calc_pareto_frontier(points_)
 
         frontiers.append(frontier)
         
