@@ -39,6 +39,13 @@ pub fn compute_solution(
                     .unwrap();
             bincode::serialize(&challenge).unwrap()
         }
+        "c005" =>
+        {
+            let challenge =
+                hypergraph_partitioning::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                    .unwrap();
+            bincode::serialize(&challenge).unwrap()
+        }
         _ => panic!("Unknown challenge"),
     };
 
@@ -190,6 +197,18 @@ pub fn verify_solution(
                 Ok(solution) => challenge.verify_solution(&solution),
                 Err(_) => Err(anyhow!(
                     "Invalid solution. Cannot convert to vector_search::Solution"
+                )),
+            }
+        }
+        "c005" => 
+        {
+            let challenge =
+                hypergraph_partitioning::Challenge::generate_instance_from_vec(seed, &settings.difficulty)
+                    .expect("Failed to generate hypergraph_partitioning instance");
+            match hypergraph_partitioning::Solution::try_from(solution.clone()) {
+                Ok(solution) => challenge.verify_solution(&solution),
+                Err(_) => Err(anyhow!(
+                    "Invalid solution. Cannot convert to hypergraph_partitioning::Solution"
                 )),
             }
         }
