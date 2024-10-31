@@ -164,12 +164,12 @@ pub enum PointCompareFrontiers
 }
 
 pub fn pareto_within(
-    point:                          &Vec<Point>,
+    point:                          &Point,
     lower_frontier:                 &Frontier,
     upper_frontier:                 &Frontier
 )                                           -> PointCompareFrontiers
 {
-    for point_ in lower_frontier
+    for point_ in lower_frontier.iter()
     {
         if pareto_compare(point, point_) == ParetoCompare::BDominatesA
         {
@@ -177,7 +177,7 @@ pub fn pareto_within(
         }
     }
 
-    for point_ in upper_frontier
+    for point_ in upper_frontier.iter()
     {
         if pareto_compare(point, point_) == ParetoCompare::ADominatesB
         {

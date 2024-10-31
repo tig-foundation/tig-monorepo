@@ -38,24 +38,11 @@ use
             Point,
             Frontier
         }
-    },
-    tig_utils::
-    {
-        FrontierOps
     }
 };
 
 mod context;
 mod add_block;
-
-/*
-struct BenchmarkContext
-{
-}
-
-impl Context for BenchmarkContext
-{
-}*/
 
 fn get_points()
                                                     -> Vec<Vec<Point>>
@@ -123,71 +110,6 @@ fn get_points()
     return challenges;
 }
 
-#[inline]
-fn bench_update_qualifiers_st(
-    challenges:                             &Vec<Vec<Point>>
-)                                                   -> Vec<HashMap<Point, usize>>
-{
-    let mut frontiers                                   = Vec::new();
-
-    for challenge_data in challenges
-    {
-        let points                                      = challenge_data
-            .iter()
-            .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-            .collect::<Frontier>();
-
-        let mut frontier_indexes    = HashMap::<Point, usize>::new();
-        for (frontier_index, frontier) in add_block::pareto_algorithm(points, false).into_iter().enumerate() 
-        {
-            for point in frontier 
-            {
-                frontier_indexes.insert(point, frontier_index);
-            }
-        }
-
-        frontiers.push(frontier_indexes);
-    }
-
-    return frontiers;
-}
-
-#[inline]
-fn bench_update_qualifiers_mt(
-    challenges:                             &Vec<Vec<Point>>
-)                                                   -> Vec<HashMap<Point, usize>>
-{
-    let frontiers                                       = Arc::new(Mutex::new(Vec::new()));
-
-    thread::scope(|s|
-    {
-        for challenge_data in challenges
-        {
-            let frontiers_                              = frontiers.clone();
-            s.spawn(||
-            {
-                let points                              = challenge_data
-                    .iter()
-                    .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
-                    .collect::<Frontier>();
-        
-                let mut frontier_indexes    = HashMap::<Point, usize>::new();
-                for (frontier_index, frontier) in add_block::pareto_algorithm(points, false).into_iter().enumerate() 
-                {
-                    for point in frontier 
-                    {
-                        frontier_indexes.insert(point, frontier_index);
-                    }
-                }
-        
-                frontiers.lock().unwrap().push(frontier_indexes);
-            });
-        }
-    });
-
-    return Arc::try_unwrap(frontiers).unwrap().into_inner().unwrap();
-}
-
 fn bench_update_qualifiers_o_mt(
     challenges:                             &Vec<Vec<Point>>
 )                                                   -> Vec<HashMap<Point, usize>>
@@ -223,18 +145,6 @@ pub fn criterion_benchmark(
     c:                                      &mut Criterion
 )                                                   -> ()
 {
-    c.bench_function("update_qualifiers_st", |b|
-    {
-        let challenges                                  = get_points();
-        b.iter(|| bench_update_qualifiers_st(&challenges));
-    });
-    
-    c.bench_function("update_qualifiers_mt", |b|
-    {
-        let challenges                                  = get_points();
-        b.iter(|| bench_update_qualifiers_mt(&challenges));
-    });
-
     c.bench_function("update_qualifiers_o_mt", |b|
     {
         let challenges                              = get_points();
