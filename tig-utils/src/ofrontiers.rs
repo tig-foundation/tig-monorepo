@@ -248,16 +248,15 @@ pub fn o_pareto_algorithm(
         return vec![];
     }
 
-    let mut frontiers               = Vec::new();
-    let mut remaining_points        : Option<Vec<Vec<i32>>> = None;
+    let mut frontiers                       = Vec::new();
+    let (mut remaining_points, indices)     = unique_with_indices(points);
 
     while true
     {
-        let points_                 = if remaining_points.is_some() { &remaining_points.unwrap() } else { points };
-        let on_front                = o_is_pareto_front(points_, false);
+        let on_front                        = o_is_pareto_front(&remaining_points, true);
 
         // Extract frontier points
-        let frontier                : Vec<_> = points_
+        let frontier                        : Vec<_> = remaining_points
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| is_front)
@@ -266,7 +265,7 @@ pub fn o_pareto_algorithm(
 
         frontiers.push(frontier);
 
-        let new_points              : Vec<_> = points_
+        let new_points                      : Vec<_> = remaining_points
             .iter()
             .zip(on_front.iter())
             .filter(|(_, &is_front)| !is_front)
@@ -278,7 +277,7 @@ pub fn o_pareto_algorithm(
             break;
         }
 
-        remaining_points            = Some(new_points);
+        remaining_points                    = new_points;
 
         if only_one 
         {
@@ -292,7 +291,7 @@ pub fn o_pareto_algorithm(
 pub fn pareto_frontier(
     frontier:                       &Frontier,
 )
-                                            -> Frontier
+                                        -> Frontier
 {
     return o_pareto_algorithm(frontier, true).first().unwrap().to_vec();
 }
