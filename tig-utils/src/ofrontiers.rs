@@ -3,8 +3,7 @@ pub type Point      = Vec<i32>;
 pub type Frontier   = Vec<Point>;
 
 fn is_pareto_front_2d(
-    costs:                          &Vec<Vec<i32>>,
-    pre_sorted_along_x:             bool
+    costs:                          &Vec<Vec<i32>>
 )                                           -> Vec<bool> 
 {
     let n_observations                          = costs.len();
@@ -13,44 +12,75 @@ fn is_pareto_front_2d(
         return vec![];
     }
 
-    let mut indices                             : Vec<usize> = (0..n_observations).collect();
-    if !pre_sorted_along_x
+    let mut indices: Vec<usize>                 = (0..n_observations).collect();
+
+    // sort by y, then x 
+    indices.sort_by(|&a, &b| 
     {
-        indices.sort_by_key(|&i| costs[i][0]);
-    }
+        costs[a][1].cmp(&costs[b][1])
+            .then(costs[a][0].cmp(&costs[b][0]))
+    });
 
     let mut on_front                            = vec![true; n_observations];
-    let mut stack                               = Vec::with_capacity(n_observations);
-    for &curr_idx in indices.iter() 
+    let mut stack                               = Vec::new();
+
+    // First pass: check dominance based on x-coordinate
+    for &curr_idx in &indices 
     {
-        // Remove points from stack that are dominated by current point
         while let Some(&top_idx) = stack.last() 
         {
-            let cost1: &Vec<i32>                = &costs[top_idx];
-            let cost2: &Vec<i32>                = &costs[curr_idx];
+            let cost1                         : &Vec<i32> = &costs[top_idx];
+            let cost2                         : &Vec<i32> = &costs[curr_idx];
 
-            if cost1[1] <= cost2[1]
+            if cost1[0] <= cost2[0] 
             {
                 break;
             }
 
             stack.pop();
         }
-        
-        // If stack is not empty, current point is dominated
+
         if let Some(&top_idx) = stack.last() 
         {
-            let cost1: &Vec<i32>                = &costs[top_idx];
-            let cost2: &Vec<i32>                = &costs[curr_idx];
+            let cost1                         : &Vec<i32> = &costs[top_idx];
+            let cost2                         : &Vec<i32> = &costs[curr_idx];
 
-            if cost1[1] <= cost2[1]
+            if cost1[0] <= cost2[0] 
             {
                 on_front[curr_idx]              = false;
             }
         }
-        
-        // Add current point to stack
+
         stack.push(curr_idx);
+    }
+
+    // Second pass: handle points with equal y-coordinates
+    let mut i                                   = 0;
+    while i < indices.len() 
+    {
+        let mut j                               = i + 1;
+        while j < indices.len() && costs[indices[j]][1] == costs[indices[i]][1] 
+        {
+            j                                   += 1;
+        }
+
+        if j - i > 1 
+        {
+            let min_x_idx = indices[i..j]
+                .iter()
+                .min_by_key(|&&k| costs[k][0])
+                .unwrap();
+
+            for &k in &indices[i..j] 
+            {
+                if k != *min_x_idx 
+                {
+                    on_front[k]                 = false;
+                }
+            }
+        }
+
+        i                                       = j;
     }
 
     return on_front;
@@ -76,11 +106,11 @@ pub fn o_is_pareto_front(
 
     let on_front                                = if unique_costs.is_some() 
     { 
-        is_pareto_front_2d(&unique_costs.unwrap(), pre_sorted_along_x.unwrap_or(false))
+        is_pareto_front_2d(&unique_costs.unwrap())
     }
     else
     {
-        is_pareto_front_2d(costs, pre_sorted_along_x.unwrap_or(false))
+        is_pareto_front_2d(costs)
     };
 
     if let Some(inv) = order_inv 

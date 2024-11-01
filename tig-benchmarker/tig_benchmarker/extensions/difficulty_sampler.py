@@ -67,33 +67,43 @@ def calc_valid_difficulties(upper_frontier: List[Point], lower_frontier: List[Po
     valid_difficulties = np.stack(np.where(weights), axis=1) + min_difficulty
     return valid_difficulties.tolist()
 
-def calc_pareto_frontier(points: List[Point]) -> Frontier:
-    """
-    Optimized Pareto frontier calculation using 2D sorting approach
-    """
+def calc_pareto_frontier(points: List[Point]) -> Tuple[Frontier, List[bool]]:
     if not points:
-        return []
+        return [], []
+
+    indices                     = list(range(len(points)))
+    indices.sort(key=lambda i: (points[i][1], points[i][0]))
     
-    # Sort indices by first dimension
-    indices                 = list(range(len(points)))
-    indices.sort(key=lambda i: points[i][0])
-    
-    on_front                = [True] * len(points)
-    stack                   = []
+    on_front                    = [True] * len(points)
+    stack                       = []
     
     for curr_idx in indices:
-        # Remove points from stack that are dominated by current point
-        while stack and points[stack[-1]][1] > points[curr_idx][1]:
+        while stack and points[stack[-1]][0] > points[curr_idx][0]:
             stack.pop()
+
+        if stack and points[stack[-1]][0] <= points[curr_idx][0]:
+            on_front[curr_idx]  = False
             
-        # If stack not empty, current point is dominated
-        if stack and points[stack[-1]][1] <= points[curr_idx][1]:
-            on_front[curr_idx] = False
-            
-        # Add current point to stack
         stack.append(curr_idx)
-        
-    return [points[i] for i in range(len(points)) if on_front[i]], on_front
+
+    i                           = 0
+    while i < len(indices):
+        j                       = i + 1
+        while j < len(indices) and points[indices[j]][1] == points[indices[i]][1]:
+            j                   += 1
+
+        if j - i > 1:
+            min_x_idx           = min(indices[i:j], key=lambda k: points[k][0])
+            for k in indices[i:j]:
+                if k != min_x_idx:
+                    on_front[k] = False
+                    
+        i                       = j
+    
+    frontier                    = [points[i] for i in range(len(points)) if on_front[i]]
+    
+    return frontier, on_front
+
 
 def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
     """
@@ -102,17 +112,17 @@ def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
     if not points:
         return []
     
-    frontiers               = []
-    remaining_points        = None
+    frontiers                   = []
+    remaining_points            = None
     
     while True:
-        points_             = remaining_points if remaining_points is not None else points
-        frontier, on_front  = calc_pareto_frontier(points_)
+        points_                 = remaining_points if remaining_points is not None else points
+        frontier, on_front      = calc_pareto_frontier(points_)
 
         frontiers.append(frontier)
         
         # Get remaining points not on frontier
-        remaining_points    = [points_[i] for i in range(len(points_)) if not on_front[i]]
+        remaining_points        = [points_[i] for i in range(len(points_)) if not on_front[i]]
         
         # Break if no more points to process
         if not remaining_points:
