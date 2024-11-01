@@ -286,7 +286,7 @@ pub fn o_pareto_algorithm(
     let mut frontiers                       = Vec::new();
     let (mut remaining_points, indices)     = unique_with_indices(points);
 
-    remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
+    //remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
 
     while true
     {
