@@ -506,3 +506,68 @@ class TopUpModel(Base):
             details=details,
             state=state
         )
+        
+#JobModel
+class JobModel(Base):
+    __tablename__ = 'jobs'
+    
+    benchmark_id = Column(String, primary_key=True)
+    settings = Column(JSON, nullable=False)
+    num_nonces = Column(Integer, nullable=False)
+    rand_hash = Column(String, nullable=False)
+    wasm_vm_config = Column(JSON, nullable=False)
+    download_url = Column(String, nullable=False)
+    batch_size = Column(Integer, nullable=False)
+    challenge = Column(String, nullable=False)
+    sampled_nonces = Column(JSON, nullable=True)
+    merkle_root = Column(String, nullable=True)
+    solution_nonces = Column(JSON, nullable=True)
+    merkle_proofs = Column(JSON, nullable=True)
+    batch_merkle_proofs = Column(JSON, nullable=True)
+    batch_merkle_roots = Column(JSON, nullable=True)
+    last_benchmark_submit_time = Column(Integer, nullable=False)
+    last_proof_submit_time = Column(Integer, nullable=False)
+    last_batch_retry_time = Column(JSON, nullable=False)
+    
+    def to_dataclass(self) -> Job:
+        return Job(
+            benchmark_id=self.benchmark_id,
+            settings=BenchmarkSettings.from_dict(self.settings),
+            num_nonces=self.num_nonces,
+            rand_hash=self.rand_hash,
+            wasm_vm_config=self.wasm_vm_config,
+            download_url=self.download_url,
+            batch_size=self.batch_size,
+            challenge=self.challenge,
+            sampled_nonces=self.sampled_nonces,
+            merkle_root=self.merkle_root,
+            solution_nonces=self.solution_nonces,
+            merkle_proofs={int(k): MerkleProof.from_dict(v) for k, v in self.merkle_proofs.items()},
+            batch_merkle_proofs={int(k): MerkleProof.from_dict(v) for k, v in self.batch_merkle_proofs.items()},
+            batch_merkle_roots=[MerkleHash.from_string(root) if root else None for root in self.batch_merkle_roots],
+            last_benchmark_submit_time=self.last_benchmark_submit_time,
+            last_proof_submit_time=self.last_proof_submit_time,
+            last_batch_retry_time=self.last_batch_retry_time
+        )
+    
+    @classmethod
+    def from_dataclass(cls, job: Job):
+        return cls(
+            benchmark_id=job.benchmark_id,
+            settings=job.settings.to_dict(),
+            num_nonces=job.num_nonces,
+            rand_hash=job.rand_hash,
+            wasm_vm_config=job.wasm_vm_config,
+            download_url=job.download_url,
+            batch_size=job.batch_size,
+            challenge=job.challenge,
+            sampled_nonces=job.sampled_nonces,
+            merkle_root=str(job.merkle_root) if job.merkle_root else None,
+            solution_nonces=list(job.solution_nonces),
+            merkle_proofs={k: v.to_dict() for k, v in job.merkle_proofs.items()},
+            batch_merkle_proofs={k: v.to_dict() for k, v in job.batch_merkle_proofs.items()},
+            batch_merkle_roots=[str(root) if root else None for root in job.batch_merkle_roots],
+            last_benchmark_submit_time=job.last_benchmark_submit_time,
+            last_proof_submit_time=job.last_proof_submit_time,
+            last_batch_retry_time=job.last_batch_retry_time
+        )
