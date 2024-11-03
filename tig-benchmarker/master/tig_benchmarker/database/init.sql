@@ -139,6 +139,27 @@ CREATE TABLE topups (
     block_confirmed INTEGER NOT NULL
 );
 
+-- Create jobs table
+CREATE TABLE jobs (
+    benchmark_id VARCHAR PRIMARY KEY,
+    settings JSONB NOT NULL,
+    num_nonces INTEGER NOT NULL,
+    rand_hash VARCHAR NOT NULL,
+    wasm_vm_config JSONB NOT NULL,
+    download_url VARCHAR NOT NULL,
+    batch_size INTEGER NOT NULL,
+    challenge VARCHAR NOT NULL,
+    sampled_nonces JSONB,
+    merkle_root VARCHAR,
+    solution_nonces JSONB,
+    merkle_proofs JSONB,
+    batch_merkle_proofs JSONB,
+    batch_merkle_roots JSONB,
+    last_benchmark_submit_time INTEGER NOT NULL,
+    last_proof_submit_time INTEGER NOT NULL,
+    last_batch_retry_time JSONB NOT NULL
+);
+
 -- Create indexes for foreign keys to improve query performance
 CREATE INDEX idx_algorithms_player_id ON algorithms(player_id);
 CREATE INDEX idx_algorithms_challenge_id ON algorithms(challenge_id);
@@ -154,3 +175,5 @@ CREATE INDEX idx_proofs_player_id ON proofs(player_id);
 CREATE INDEX idx_frauds_player_id ON frauds(player_id);
 
 CREATE INDEX idx_wasms_algorithm_id ON wasms(algorithm_id);
+
+CREATE INDEX idx_jobs_challenge ON jobs(challenge);
