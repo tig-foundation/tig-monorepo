@@ -9,6 +9,10 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
 
+from database import SessionLocal
+from database.models import JobModel
+from sqlalchemy.exc import SQLAlchemyError
+
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 @dataclass
@@ -27,12 +31,14 @@ class PrecommitManager:
     def __init__(self, config: PrecommitManagerConfig, player_id: str, jobs: List[Job]):
         self.config = config
         self.player_id = player_id
-        self.jobs = jobs
         self.last_block_id = None
         self.num_precommits_submitted = 0
         self.algorithm_name_2_id = {}
         self.challenge_name_2_id = {}
         self.curr_base_fees = {}
+        # Initialize database session
+        self.db_session = SessionLocal()
+        logger.info("PrecommitManager initialized and connected to the database.")
 
     def on_new_block(
         self,
@@ -111,31 +117,41 @@ class PrecommitManager:
             logger.info(f"global qualifier difficulty stats for {challenges[c_id].details.name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
 
     def run(self, difficulty_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
-        num_pending_benchmarks = sum(1 for job in self.jobs if job.merkle_root is None) + self.num_precommits_submitted
-        if  num_pending_benchmarks >= self.config.max_pending_benchmarks:
-            logger.debug(f"number of pending benchmarks has reached max of {self.config.max_pending_benchmarks}")
-            return
-        selections = [
-            (c_name, x) for c_name, x in self.config.algo_selection.items()
-            if self.curr_base_fees[c_name] <= x.base_fee_limit
-        ]
-        if len(selections) == 0:
-            logger.warning("No challenges under base fee limit")
+        try:
+            # Fetch all pending jobs (i.e. Merkle Root is None)
+            pending_jobs = self.db_session.query(JobModel).filter_by(merkle_root=None).all()
+            num_pending_benchmarks = len(pending_jobs) + self.num_precommits_submitted
+            if  num_pending_benchmarks >= self.config.max_pending_benchmarks:
+                logger.debug(f"number of pending benchmarks has reached max of {self.config.max_pending_benchmarks}")
+                return
+            selections = [
+                (c_name, x) for c_name, x in self.config.algo_selection.items()
+                if self.curr_base_fees[c_name] <= x.base_fee_limit
+            ]
+            if len(selections) == 0:
+                logger.warning("No challenges under base fee limit")
+                return None
+            logger.debug(f"Selecting challenge from: {[(c_name, x.weight) for c_name, x in selections]}")
+            selection = random.choices(selections, weights=[x.weight for _, x in selections])[0]
+            c_id = self.challenge_name_2_id[selection[0]]
+            a_id = self.algorithm_name_2_id[f"{selection[0]}_{selection[1].algorithm}"]
+            self.num_precommits_submitted += 1
+            req = SubmitPrecommitRequest(
+                settings=BenchmarkSettings(
+                    challenge_id=c_id,
+                    algorithm_id=a_id,
+                    player_id=self.player_id,
+                    block_id=self.last_block_id,
+                    difficulty=difficulty_samples[selection[0]]
+                ),
+                num_nonces=selection[1].num_nonces
+            )
+            logger.info(f"Created precommit (challenge: {selection[0]}, algorithm: {selection[1].algorithm}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
+            return req
+        except SQLAlchemyError as e:
+                self.db_session.rollback()
+                logger.error(f"Database error during run: {e}")
+                return None
+        except Exception as e:
+            logger.error(f"Unexpected error during run: {e}")
             return None
-        logger.debug(f"Selecting challenge from: {[(c_name, x.weight) for c_name, x in selections]}")
-        selection = random.choices(selections, weights=[x.weight for _, x in selections])[0]
-        c_id = self.challenge_name_2_id[selection[0]]
-        a_id = self.algorithm_name_2_id[f"{selection[0]}_{selection[1].algorithm}"]
-        self.num_precommits_submitted += 1
-        req = SubmitPrecommitRequest(
-            settings=BenchmarkSettings(
-                challenge_id=c_id,
-                algorithm_id=a_id,
-                player_id=self.player_id,
-                block_id=self.last_block_id,
-                difficulty=difficulty_samples[selection[0]]
-            ),
-            num_nonces=selection[1].num_nonces
-        )
-        logger.info(f"Created precommit (challenge: {selection[0]}, algorithm: {selection[1].algorithm}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
-        return req
