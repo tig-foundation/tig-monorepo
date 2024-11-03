@@ -1,3 +1,50 @@
+@if(tigService.latest_block()){
+  <div class="grid p-3">
+    <div class="col-4 p-4">
+      <p-card header="Price" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.price_info()){
+            <p>Price : <b>{{tigService.price_info().priceUsd | currency}}</b></p>
+            <p>24 Hour Volume : <b>{{tigService.price_info().volume.h24 | currency}}</b></p>
+          }
+         @else {
+          <p>Could not get Price Info</p>
+         }
+        </div>
+      </p-card>
+    </div>  
+    <div class="col-4 p-4">
+      <p-card header="Earnings" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.player_stats()){
+            <p>Round Earnings : <b>{{tigService.player_stats().round_earnings| number : '1.2-2'}}</b></p>
+            <p>Latest Earnings : <b>{{tigService.player_stats().reward | number : '1.2-2'}}</b></p>
+          }
+         @else {
+          <p>Could not get Earnings Info</p>
+         }
+        </div>
+      </p-card>
+     
+    </div>  
+    <div class="col-4 p-4">
+      <p-card header="Fees" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.player_stats()){
+            <p>Available Fees : <b>{{tigService.player_stats().available_fee_balance| number : '1.2-2'}}</b></p>
+            <p-button label="Top Up" [rounded]="true"></p-button>
+          }
+         @else {
+          <p>Could not get Fee Info</p>
+         }         
+        </div>
+      </p-card>
+     
+    </div>  
+    </div>
+}
+
+
 <p-card header="Benchmarks">
   <p class="m-0">
     Table of player’s benchmarks (more detailed version of
@@ -23,6 +70,7 @@
       >
         <ng-template pTemplate="caption">
           <div class="flex">
+            <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
             <p-iconField iconPosition="left" class="ml-auto">
               <p-inputIcon>
                 <i class="pi pi-search"></i>
@@ -125,6 +173,39 @@
   </p>
 </p-card>
 <br>
+@if(tigService.latest_block()){
+  <div class="grid p-3">
+    <div class="col-6 p-4">
+      <p-card header="Cutoff" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.player_stats()){
+            <p>Cutoff : <b>{{tigService.player_stats().cutoff| number : '1.2-2'}}</b></p>
+            <p>Influence : <b>{{tigService.player_stats().influence | number : '1.2-2'}}</b></p>
+          }
+         @else {
+          <p>Could not get Cutoff Info</p>
+         }
+        </div>
+      </p-card>
+     
+    </div>  
+    <div class="col-6 p-4">
+      <p-card header="Imbalance" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.player_stats()){
+            <p>Imbalance : <b>{{tigService.player_stats().imbalance| number : '1.2-2'}}</b></p>
+            <p>Imbalance Penalty : <b>{{tigService.player_stats().imbalance_penalty | number : '1.2-2'}}</b></p>
+          }
+         @else {
+          <p>Could not get Imbalance Info</p>
+         }         
+        </div>
+      </p-card>
+     
+    </div>  
+    </div>
+}
+
 <p-card header="Solutions">
     Summary table of solutions #Solutions & cutoff Qualifiers, imbalance
     @if(solutions()){
@@ -145,7 +226,8 @@
       ]"
     >
       <ng-template pTemplate="caption">
-        <div class="flex">
+        <div class="flex justify-content-end">
+          <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
           <p-iconField iconPosition="left" class="ml-auto">
             <p-inputIcon>
               <i class="pi pi-search"></i>
@@ -230,9 +312,49 @@ animationDuration="1.5s" />
 }
 </p-card>
 <br>
-<p-card header="Delegation">
-  <p class="m-0">
-    Summary of delegation Showing how much block rewards you are sharing with
-    people How many tokens have been delegated to you
-  </p>
-</p-card>
+@if(tigService.latest_block()){
+  <div class="grid p-3">
+    <div class="col-4 p-4">
+      <p-card header="Deposit" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.price_info()){
+            <p>Locked  : <b>{{tigService.player_stats().available_fee_balance| number : '1.2-2'}}</b></p>
+            <p-button label="Deposit Now" [rounded]="true"></p-button>
+          }
+         @else {
+          <p>Could not get Price Info</p>
+         }
+        </div>
+      </p-card>
+    </div>  
+    <div class="col-4 p-4">
+      <p-card header="Delegate" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.player_stats()){
+            <p>Total Delegated : <b>{{tigService.player_stats().round_earnings| number : '1.2-2'}}</b></p>
+            <p-button label="Change Fee" [rounded]="true"></p-button>
+          }
+         @else {
+          <p>Could not get Earnings Info</p>
+         }
+        </div>
+      </p-card>
+     
+    </div>  
+    <div class="col-4 p-4">
+      <p-card header="Delegators" class="w-full ">
+        <div class="flex flex-column  justify-content-center align-items-center">
+          @if(tigService.player_stats()){
+            <p>Delegator 1</p>
+            <p>Delegator 2</p>
+          }
+         @else {
+          <p>Could not get Fee Info</p>
+         }         
+        </div>
+      </p-card>
+     
+    </div>  
+    </div>
+}
+

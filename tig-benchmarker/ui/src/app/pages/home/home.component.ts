@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { IconFieldModule } from 'primeng/iconfield';
@@ -7,6 +7,12 @@ import { InputTextModule } from 'primeng/inputtext';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TagModule } from 'primeng/tag';
+import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
+import { SettingsComponent } from '../settings/settings.component';
+import { EditSettingsDialogComponent } from '../../components/edit-settings-dialog/edit-settings-dialog.component';
+import { TigApisService } from '../../services/tig-apis.service';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -15,16 +21,21 @@ import { TagModule } from 'primeng/tag';
     TableModule,
     TagModule,
     InputTextModule,
+    ButtonModule,
     InputIconModule,
     ProgressSpinnerModule,
     IconFieldModule,
     FormsModule,
     ReactiveFormsModule,
+    EditSettingsDialogComponent,
+    CurrencyPipe,
+    DecimalPipe,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
 export class HomeComponent {
+  tigService = inject(TigApisService);
   benchmarks: any = signal(null);
   solutions: any = signal(null);
   delegation: any = signal(null);

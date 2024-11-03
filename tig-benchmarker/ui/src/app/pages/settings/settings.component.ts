@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, input, signal } from '@angular/core';
 import {
   FormControl,
   FormGroup,
@@ -30,7 +30,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 export class SettingsComponent {
   settings: any = signal(null);
   formGroup!: FormGroup;
-
+  view: any = input<string>('all');
   ngOnInit() {
     this.setCurrentConfig({});
   }
@@ -129,7 +129,7 @@ export class SettingsComponent {
       big_slave_vector_search: new FormControl(data.big_slave_vector_search),
     });
 
-    this.settings.set(data)
+    this.settings.set(data);
   }
 
   async saveForm() {

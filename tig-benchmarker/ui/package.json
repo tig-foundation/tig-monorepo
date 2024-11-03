@@ -21,6 +21,8 @@
     "@coinbase/wallet-sdk": "^4.1.0",
     "@walletconnect/client": "^1.8.0",
     "@walletconnect/qrcode-modal": "^1.8.0",
+    "axios": "^1.7.7",
+    "bignumber.js": "^9.1.2",
     "ethers": "^6.13.4",
     "primeflex": "^3.3.1",
     "primeicons": "^7.0.0",

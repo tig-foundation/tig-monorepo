@@ -1,9 +1,11 @@
-<p-card header="Settings  Configuration" class="w-full">
-  @if(settings()){
-  <form [formGroup]="formGroup">
-    <div class="grid">
-      <div class="col-6">
-        <h1>General</h1>
+@if(view() == 'all'){
+<h1>Settings</h1>
+} @if(settings()){
+<form [formGroup]="formGroup">
+  <div class="grid">
+    @if(view() == 'all' || view() == 'general'){
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <p-card header="General" class="w-full h-full">
         <div class="p-5">
           <div class="field">
             <label for="firstname1">IP Address</label>
@@ -33,9 +35,11 @@
             />
           </div>
         </div>
-      </div>
-      <div class="col-6">
-        <h1>Batch Sizes</h1>
+      </p-card>
+    </div>
+    } @if(view() == 'all' || view() == 'batch_sizes'){
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <p-card header="Batch Sizes" class="w-full">
         <div class="p-5">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
@@ -74,9 +78,11 @@
             />
           </div>
         </div>
-      </div>
-      <div class="col-6">
-        <h1>Algos</h1>
+      </p-card>
+    </div>
+    } @if(view() == 'all' || view() == 'algos'){
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <p-card header="Algos" class="w-full">
         <div class="p-5">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
@@ -123,9 +129,11 @@
             />
           </div>
         </div>
-      </div>
-      <div class="col-6">
-        <h1>Number of Nonces</h1>
+      </p-card>
+    </div>
+    } @if(view() == 'all' || view() == 'number_nonces'){
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <p-card header="Number of Nonces" class="w-full">
         <div class="p-5">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
@@ -164,9 +172,11 @@
             />
           </div>
         </div>
-      </div>
-      <div class="col-6">
-        <h1>Weight</h1>
+      </p-card>
+    </div>
+    } @if(view() == 'all' || view() == 'weight'){
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <p-card header="Weight" class="w-full">
         <div class="p-5">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
@@ -209,9 +219,11 @@
             />
           </div>
         </div>
-      </div>
-      <div class="col-6">
-        <h1>Difficulty</h1>
+      </p-card>
+    </div>
+    } @if(view() == 'all' || view() == 'difficulty'){
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <p-card header="Difficulty" class="w-full">
         <div class="p-5">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
@@ -254,9 +266,11 @@
             />
           </div>
         </div>
-      </div>
+      </p-card>
+    </div>
+    } @if(view() == 'all' || view() == 'slaves'){
+    <!-- <p-card header="Micro Slave Settings" class="w-full">
       <div class="col-3">
-        <h1>Micro Slave Settings</h1>
         <div class="p-5">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
@@ -419,16 +433,17 @@
           </div>
         </div>
       </div>
-    </div>
-  </form>
-  <div class="flex justify-content-end">
-    <button
-      (click)="saveForm()"
-      pButton
-      pRipple
-      label="Save"
-      class="p-button-success"
-    ></button>
+    </p-card> -->
+    }
   </div>
-  }@else {nope}
-</p-card>
+</form>
+<div class="flex justify-content-end">
+  <button
+    (click)="saveForm()"
+    pButton
+    pRipple
+    label="Save"
+    class="p-button-success"
+  ></button>
+</div>
+}@else {nope}
