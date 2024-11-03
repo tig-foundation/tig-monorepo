@@ -173,7 +173,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
                     }
 
                     // Don't check the weight if there is enough remaining capacity
-                    if min_weight < 0
+                    if min_weight >= 0
                     {
                         // Skip a remove_item if the remaining capacity after removal is insufficient to push a new_item
                         let removed_item_weight = weights[remove_item] as i32;
