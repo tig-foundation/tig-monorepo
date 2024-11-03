@@ -1,11 +1,12 @@
 import os
 import json
 import logging
+import random
 import re
 import signal
 import threading
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from quart import Quart, request, jsonify
 from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
@@ -30,6 +31,9 @@ class Batch(FromDict):
 class BatchResult(FromDict):
     merkle_root: MerkleHash
     solution_nonces: List[int]
+
+@dataclass
+class BatchMerkleProof(FromDict):
     merkle_proofs: List[MerkleProof]
 
 @dataclass
@@ -41,6 +45,7 @@ class SlaveConfig(FromDict):
 class SlaveManagerConfig(FromDict):
     port: int
     time_before_batch_retry: int
+    num_nonces_to_sample: float
     slaves: List[SlaveConfig]
 
 class SlaveManager:
@@ -48,17 +53,20 @@ class SlaveManager:
         self.config = config
         self.jobs = jobs
 
+    def authCheck(self, request):
+        if (slave_name := request.headers.get('User-Agent', None)) is None:
+            return "User-Agent header is required", 403
+        if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
+            logger.warning(f"slave {slave_name} does not match any regex. rejecting request")
+            return "Unregistered slave", 403
+        return slave_name
+
     def start(self):
         app = app = FastAPI()
 
-        @app.route('/get-batches', methods=['GET'])
-        def get_batches():
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                return "User-Agent header is required", 403
-            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
-                return "Unregistered slave", 403
-            
+        @app.get('/get-batches')
+        def get_batches(request: Request):
+            slave_name = self.authCheck(request)
             slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
 
             now = int(time.time() * 1000)
@@ -108,27 +116,47 @@ class SlaveManager:
                 logger.debug(f"{slave_name} get-batches: (challenge: {selected_challenge}, #batches: {len(batches)}, batch_ids: {[b.benchmark_id for b in batches]})")
                 return jsonify([b.to_dict() for b in batches])
 
-        @app.route('/submit-batch-result/<batch_id>', methods=['POST'])
-        def submit_batch_result(batch_id):
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                return "User-Agent header is required", 403
-            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting submit-batch-result request")
+        @app.post('/submit-batch-result/{batch_id}')
+        def submit_batch_result(batch_id, result: BatchResult):
+            slave_name = self.authCheck(request)
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
-            result = BatchResult.from_dict(request.json)
             job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
-            logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)}, #proofs: {len(result.merkle_proofs)})")
+            logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)})")
             if job is None:
                 logger.warning(f"{slave_name} submit-batch-result: no job found with benchmark_id {benchmark_id}")
                 return "Invalid benchmark_id", 400
             batch_idx = start_nonce // job.batch_size
             job.batch_merkle_roots[batch_idx] = result.merkle_root
             job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
+
+            if job.sampled_nonces is not None:
+                return {"sampled": job.sampled_nonces }
+
+            non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
+            random.shuffle(result.solution_nonces)
+            random.shuffle(non_solution_nonces)
+            num_nonces_to_sample  = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
+            sampled = (result.solution_nonces + non_solution_nonces)[:num_nonces_to_sample]
+
+            return {"sampled": sampled }
+        
+        @app.post('/merkle-proofs/{batch_id}')
+        def get_merkle_proofs(batch_id, result: BatchMerkleProof):
+            slave_name = self.authCheck(request)
+            benchmark_id, start_nonce = batch_id.split("_")
+            start_nonce = int(start_nonce)
+            job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
+            logger.debug(f"{slave_name} merkle-proofs: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #proofs: {len(result.merkle_proofs)})")
+            if job is None:
+                logger.warning(f"{slave_name} merkle-proofs: no job found with benchmark_id {benchmark_id}")
+                return "Invalid benchmark_id", 400
+
             job.batch_merkle_proofs.update({
                 x.leaf.nonce: x
                 for x in result.merkle_proofs
-            })
+            })  
+
             return "OK"
 
         def start_server():
