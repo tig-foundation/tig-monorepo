@@ -7,6 +7,9 @@ mod submit_precommit;
 mod submit_proof;
 mod submit_topup;
 mod verify_proof;
+
+mod contract_benchmark;
+
 use context::*;
 pub use error::*;
 use std::collections::HashSet;
