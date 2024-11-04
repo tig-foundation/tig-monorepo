@@ -22,52 +22,46 @@ use
     }
 };
 
-pub struct AlgorithmsContext;
-impl Context for AlgorithmsContext {}
-
-pub trait IAlgorithmsContract
+pub struct AlgorithmsContract<T: Context>
 {
-    fn verify_algorithm(
-        &self, 
-        ctx:                            &AlgorithmsContext,
-        algorithm_id:                   &String,
-        block:                          &Block
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<()>>>>;
+    _phantom: std::marker::PhantomData<T>
 }
 
-impl dyn IAlgorithmsContract
+impl<T: Context> AlgorithmsContract<T>
 {
-    fn verify_algorithm(
-        &self, 
-        ctx:                            &AlgorithmsContext,
-        algorithm_id:                   &String,
-        block:                          &Block
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<()>>>>
+    pub fn new()                                -> Self 
     {
-        Box::pin(async move 
+        return Self { _phantom: std::marker::PhantomData };
+    }
+
+    pub async fn verify_algorithm<'a>(
+        &'a self, 
+        ctx:                            &'a T,
+        algorithm_id:                   &'a String,
+        block:                          &'a Block
+    )                                           -> ProtocolResult<()>
+    {
+        if !ctx
+            .get_algorithms(AlgorithmsFilter::Id(algorithm_id.clone()), None, false)
+            .await
+            .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
+            .pop()
+            .is_some_and(|a| a.state.is_some_and(|s| !s.banned))
         {
-            if !ctx
-                .get_algorithms(AlgorithmsFilter::Id(algorithm_id.clone()), None, false)
-                .await
-                .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
-                .pop()
-                .is_some_and(|a| a.state.is_some_and(|s| !s.banned))
+            return Err(ProtocolError::InvalidAlgorithm 
             {
-                return Err(ProtocolError::InvalidAlgorithm 
-                {
-                    algorithm_id                    : algorithm_id.clone(),
-                });
-            }
+                algorithm_id                    : algorithm_id.clone(),
+            });
+        }
 
-            if !block.data().active_algorithm_ids.contains(algorithm_id) 
+        if !block.data().active_algorithm_ids.contains(algorithm_id) 
+        {
+            return Err(ProtocolError::InvalidAlgorithm 
             {
-                return Err(ProtocolError::InvalidAlgorithm 
-                {
-                    algorithm_id                    : algorithm_id.clone(),
-                });
-            }
+                algorithm_id                    : algorithm_id.clone(),
+            });
+        }
 
-            return Ok(());  
-        })
+        return Ok(());  
     }
 }

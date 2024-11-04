@@ -17,13 +17,20 @@ pub use error::*;
 use std::collections::HashSet;
 use tig_structs::core::*;
 
+use contract_benchmark::BenchmarksContract;
+use contract_algorithms::AlgorithmsContract;
+use contract_challenges::ChallengesContract;
+
 pub struct Protocol<T: Context> {
     pub ctx: T,
+    pub benchmarks: BenchmarksContract<T>,
+    pub algorithms: AlgorithmsContract<T>,
+    pub challenges: ChallengesContract<T>,
 }
 
 impl<'a, T: Context> Protocol<T> {
     pub fn new(ctx: T) -> Self {
-        Self { ctx }
+        Self { ctx, benchmarks: BenchmarksContract::new(), algorithms: AlgorithmsContract::new(), challenges: ChallengesContract::new() }
     }
 
     pub async fn submit_algorithm(
@@ -42,7 +49,7 @@ impl<'a, T: Context> Protocol<T> {
         num_nonces: u32,
     ) -> ProtocolResult<String> {
         submit_precommit::execute(&self.ctx, player, settings, num_nonces).await
-    }
+    } 
 
     pub async fn submit_benchmark(
         &self,
@@ -80,5 +87,22 @@ impl<'a, T: Context> Protocol<T> {
 
     pub async fn add_block(&self) -> String {
         add_block::execute(&self.ctx).await
+    }
+
+    pub async fn execute_benchmark(&self, player: &Player, settings: BenchmarkSettings, num_nonces: u32) -> ProtocolResult<String> 
+    {
+        //self.benchmarks.execute(player, &settings, num_nonces).await
+
+        self.benchmarks.verify_player_owns_benchmark(player, &settings)?;
+        self.benchmarks.verify_num_nonces(num_nonces)?;
+        let block = submit_precommit::get_block_by_id(&self.ctx, &settings.block_id).await?;
+        self.benchmarks.verify_sufficient_lifespan(&self.ctx, &block).await?;
+        //let challenge = get_challenge_by_id(ctx, &settings.challenge_id, &block).await?;
+        //self.algorithms.verify_algorithm(ctx, &settings.algorithm_id, &block).await?;
+        //self.benchmarks.verify_benchmark_settings_are_unique(ctx, &settings).await?;
+        //self.benchmarks.verify_benchmark_difficulty(&settings.difficulty, &challenge, &block)?;
+        //let fee_paid = self.benchmarks.get_fee_paid(&player, num_nonces, &challenge)?;
+
+        Ok(String::from(""))
     }
 }

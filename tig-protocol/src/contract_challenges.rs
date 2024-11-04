@@ -23,50 +23,44 @@ use
     }
 };
 
-pub struct ChallengesContext;
-impl Context for ChallengesContext {}
-
-pub trait IChallengesContract
+pub struct ChallengesContract<T: Context>
 {
-    fn get_challenge_by_id(
-        &self,
-        ctx:                            &ChallengesContext,
-        challenge_id:                   &String,
-        block:                          &Block,
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<Challenge>>>>;
+    _phantom: std::marker::PhantomData<T>
 }
 
-impl dyn IChallengesContract
+impl<T: Context> ChallengesContract<T>
 {
-    fn get_challenge_by_id(
-        &self,
-        ctx:                            &ChallengesContext,
-        challenge_id:                   &String,
-        block:                          &Block,
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<Challenge>>>>
+    pub fn new()                                -> Self 
     {
-        Box::pin(async move 
+        return Self { _phantom: std::marker::PhantomData };
+    }
+
+    pub async fn get_challenge_by_id<'a>(
+        &'a self,
+        ctx:                            &'a T,
+        challenge_id:                   &'a String,
+        block:                          &'a Block,
+    )                                           -> ProtocolResult<Challenge>
+    {
+        if !block.data().active_challenge_ids.contains(challenge_id) 
         {
-            if !block.data().active_challenge_ids.contains(challenge_id) 
+            return Err(ProtocolError::InvalidChallenge 
             {
-                return Err(ProtocolError::InvalidChallenge 
-                {
-                    challenge_id                    : challenge_id.clone(),
-                });
-            }
-
-            let challenge = ctx
-                .get_challenges(ChallengesFilter::Id(challenge_id.clone()), Some(BlockFilter::Id(block.id.clone())))
-                .await
-                .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
-                .first()
-                .map(|x| x.to_owned())
-                .ok_or_else(|| ProtocolError::InvalidChallenge 
-                {
-                    challenge_id                    : challenge_id.clone(),
-                })?;
-
-            return Ok(challenge);
-        })
+                challenge_id                    : challenge_id.clone(),
+            });
+        }
+    
+        let challenge = ctx
+            .get_challenges(ChallengesFilter::Id(challenge_id.clone()), Some(BlockFilter::Id(block.id.clone())))
+            .await
+            .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+            .first()
+            .map(|x| x.to_owned())
+            .ok_or_else(|| ProtocolError::InvalidChallenge 
+            {
+                challenge_id                    : challenge_id.clone(),
+            })?;
+    
+        return Ok(challenge);
     }
 }

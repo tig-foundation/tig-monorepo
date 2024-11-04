@@ -125,7 +125,7 @@ async fn verify_algorithm<T: Context>(
 }
 
 #[time]
-async fn get_block_by_id<T: Context>(ctx: &T, block_id: &String) -> ProtocolResult<Block> {
+pub(crate) async fn get_block_by_id<T: Context>(ctx: &T, block_id: &String) -> ProtocolResult<Block> {
     ctx.get_block(BlockFilter::Id(block_id.clone()), true)
         .await
         .unwrap_or_else(|e| panic!("get_block error: {:?}", e))

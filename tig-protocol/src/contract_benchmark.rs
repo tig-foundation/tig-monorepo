@@ -6,7 +6,8 @@ use
         BlockFilter,
         Context,
         ProtocolResult,
-        ProtocolError
+        ProtocolError,
+        PrecommitsFilter
     },
     tig_structs::
     {
@@ -36,65 +37,19 @@ use
     }
 };
 
-pub struct BenchmarkContext;
-impl Context for BenchmarkContext {}
-
-pub trait IBenchmarksContract
+pub struct BenchmarksContract<T: Context>
 {
-    fn verify_player_owns_benchmark(
-        &self, 
-        player:                         &Player, 
-        settings:                       &BenchmarkSettings
-    )                                           -> ProtocolResult<()>;
-
-    fn verify_num_nonces(
-        &self, 
-        num_nonces:                     u32
-    )                                           -> ProtocolResult<()>;
-
-    fn verify_sufficient_lifespan(
-        &self,  
-        ctx:                            &BenchmarkContext,
-        block:                          &Block
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<()>>>>;
-
-    fn get_challenge_by_id(
-        &self, 
-        challenge_id:                   &String,
-        block:                          &Block
-    )                                           -> ();
-
-    fn verify_benchmark_difficulty(
-        &self, 
-        difficulty:                     &Vec<i32>,
-        challenge:                      &Challenge,
-        block:                          &Block
-    )                                           -> ProtocolResult<()>;
-
-    fn verify_benchmark_settings_are_unique(
-        &self, 
-        ctx:                            &BenchmarkContext,
-        settings:                       &BenchmarkSettings
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<()>>>>;
-
-    fn get_fee_paid(
-        &self, 
-        player:                         &Player,
-        num_nonces:                     u32,
-        challenge:                      &Challenge
-    )                                           -> ProtocolResult<PreciseNumber>;
-
-    fn submit_precommit(
-        &self
-    )                                           -> ();
-
-    fn submit_benchmark(&self)  -> ();
-    fn submit_proof(&self)      -> ();
+    _phantom:                           std::marker::PhantomData<T>
 }
 
-impl dyn IBenchmarksContract 
+impl<T: Context> BenchmarksContract<T>
 {
-    fn verify_player_owns_benchmark(
+    pub fn new()                                -> Self 
+    {
+        return Self { _phantom: std::marker::PhantomData };
+    }
+
+    pub fn verify_player_owns_benchmark(
         &self, 
         player:                         &Player, 
         settings:                       &BenchmarkSettings
@@ -111,8 +66,8 @@ impl dyn IBenchmarksContract
 
         return Ok(());
     }
-    
-    fn verify_num_nonces(
+
+    pub fn verify_num_nonces(
         &self, 
         num_nonces:                     u32
     )                                           -> ProtocolResult<()>
@@ -128,34 +83,31 @@ impl dyn IBenchmarksContract
         return Ok(());
     }
 
-    fn verify_sufficient_lifespan(
-        &self,  
-        ctx:                            &BenchmarkContext,
-        block:                          &Block
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<()>>>>
+    pub async fn verify_sufficient_lifespan<'a>(
+        &'a self,  
+        ctx:                            &'a T,
+        block:                          &'a Block
+    )                                           -> ProtocolResult<()>
     {
-        Box::pin(async move 
+        let latest_block                        = ctx
+        .get_block(BlockFilter::Latest, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
+        .expect("Expecting latest block to exist");
+
+        let config                              = block.config();
+        let submission_delay                    = latest_block.details.height - block.details.height + 1;
+        if (submission_delay as f64 * (config.benchmark_submissions.submission_delay_multiplier + 1.0))
+            as u32
+            >= config.benchmark_submissions.lifespan_period
         {
-            let latest_block                        = ctx
-            .get_block(BlockFilter::Latest, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
-            .expect("Expecting latest block to exist");
+            return Err(ProtocolError::InsufficientLifespan);
+        }
 
-            let config                              = block.config();
-            let submission_delay                    = latest_block.details.height - block.details.height + 1;
-            if (submission_delay as f64 * (config.benchmark_submissions.submission_delay_multiplier + 1.0))
-                as u32
-                >= config.benchmark_submissions.lifespan_period
-            {
-                return Err(ProtocolError::InsufficientLifespan);
-            }
-
-            return Ok(());
-        })
+        return Ok(());
     }
 
-    fn verify_benchmark_difficulty(
+    pub fn verify_benchmark_difficulty(
         &self, 
         difficulty:                     &Vec<i32>,
         challenge:                      &Challenge,
@@ -214,78 +166,25 @@ impl dyn IBenchmarksContract
         return Ok(());
     }
 
-    fn verify_benchmark_settings_are_unique(
-        &self, 
-        ctx:                            &BenchmarkContext,
-        settings:                       &BenchmarkSettings
-    )                                           -> Pin<Box<dyn Future<Output = ProtocolResult<()>>>>
+    pub async fn verify_benchmark_settings_are_unique<'a>(
+        &'a self, 
+        ctx:                            &'a T,
+        settings:                       &'a BenchmarkSettings
+    )                                           -> ProtocolResult<()>
     {
-        Box::pin(async move 
+        if ctx
+            .get_precommits(PrecommitsFilter::Settings(settings.clone()))
+            .await
+            .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
+            .first()
+            .is_some()
         {
-            if ctx
-                .get_precommits(PrecommitsFilter::Settings(settings.clone()))
-                .await
-                .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
-                .first()
-                .is_some()
+            return Err(ProtocolError::DuplicateBenchmarkSettings 
             {
-                return Err(ProtocolError::DuplicateBenchmarkSettings 
-                {
-                    settings                        : settings.clone(),
-                });
-            }
-
-            return Ok(());
-        })
-    }
-
-    fn get_fee_paid(
-        &self, 
-        player:                         &Player,
-        num_nonces:                     u32,
-        challenge:                      &Challenge
-    )                                           -> ProtocolResult<PreciseNumber>
-    {
-        let num_nonces                              = PreciseNumber::from(num_nonces);
-        let fee_paid                                = challenge.block_data().base_fee().clone()
-                                                        + challenge.block_data().per_nonce_fee().clone() * num_nonces;
-        if !player
-            .state
-            .as_ref()
-            .is_some_and(|s| *s.available_fee_balance.as_ref().unwrap() >= fee_paid)
-        {
-            return Err(ProtocolError::InsufficientFeeBalance 
-            {
-                fee_paid,
-                available_fee_balance: player
-                    .state
-                    .as_ref()
-                    .map(|s| s.available_fee_balance().clone())
-                    .unwrap_or(PreciseNumber::from(0)),
+                settings                        : settings.clone(),
             });
         }
-
-        return Ok(fee_paid);
-    }
-
-    pub fn submit_precommit(
-        &self
-    )                                           -> ()
-    {
-
-    }
-
-    pub fn submit_benchmark(
-        &self
-    )                                           -> ()
-    {
-
-    }
-
-    pub fn submit_proof(
-        &self
-    )                                           -> ()
-    {
-
+    
+        return Ok(());
     }
 }
