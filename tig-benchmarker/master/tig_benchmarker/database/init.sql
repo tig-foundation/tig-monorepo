@@ -160,6 +160,30 @@ CREATE TABLE jobs (
     last_batch_retry_time JSONB NOT NULL
 );
 
+-- Create assigned_batches table
+CREATE TABLE assigned_batches (
+    id SERIAL PRIMARY KEY,
+    benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id),
+    batch_idx INTEGER NOT NULL,
+    assigned_slave VARCHAR NOT NULL,
+    submitted_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    completed_timestamp TIMESTAMP,
+    batch_result_id INTEGER REFERENCES batch_results(id),
+    UNIQUE (benchmark_id, batch_idx)
+);
+
+-- Create batch_results table
+CREATE TABLE batch_results (
+    id SERIAL PRIMARY KEY,
+    benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id),
+    start_nonce INTEGER NOT NULL,
+    merkle_root VARCHAR NOT NULL,
+    solution_nonces JSONB NOT NULL,
+    merkle_proofs JSONB NOT NULL,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    assigned_batch_id INTEGER REFERENCES assigned_batches(id)
+);
+
 -- Create indexes for foreign keys to improve query performance
 CREATE INDEX idx_algorithms_player_id ON algorithms(player_id);
 CREATE INDEX idx_algorithms_challenge_id ON algorithms(challenge_id);
@@ -177,3 +201,6 @@ CREATE INDEX idx_frauds_player_id ON frauds(player_id);
 CREATE INDEX idx_wasms_algorithm_id ON wasms(algorithm_id);
 
 CREATE INDEX idx_jobs_challenge ON jobs(challenge);
+
+CREATE INDEX idx_batch_results_benchmark_id ON batch_results(benchmark_id);
+CREATE INDEX idx_assigned_batches_benchmark_id ON assigned_batches(benchmark_id);
