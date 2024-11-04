@@ -73,6 +73,8 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
             if resp.status != 200:
                 raise Exception(f"status {resp.status} when posting results to master: {await resp.text()}")
             logger.debug(f"posting results took {now() - start} ms")
+            # Step 5: Calculate Merkle proofs for sampled nonces
+            # TODO: calculate merkle proofs
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
