@@ -9,6 +9,8 @@ mod submit_topup;
 mod verify_proof;
 
 mod contract_benchmark;
+mod contract_algorithms;
+mod contract_challenges;
 
 use context::*;
 pub use error::*;
