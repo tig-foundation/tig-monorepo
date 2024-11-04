@@ -13,6 +13,7 @@ import { SettingsComponent } from '../settings/settings.component';
 import { EditSettingsDialogComponent } from '../../components/edit-settings-dialog/edit-settings-dialog.component';
 import { TigApisService } from '../../services/tig-apis.service';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { ChartModule } from 'primeng/chart';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -30,6 +31,7 @@ import { CurrencyPipe, DecimalPipe } from '@angular/common';
     EditSettingsDialogComponent,
     CurrencyPipe,
     DecimalPipe,
+    ChartModule,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
@@ -43,6 +45,7 @@ export class HomeComponent {
   constructor() {
     this.getBenchmarks();
     this.getSolutions();
+    this.initiateChart();
   }
 
   getSolutions() {
@@ -285,5 +288,63 @@ export class HomeComponent {
       },
     ];
     this.benchmarks.set(benchmark_test_data);
+  }
+
+  line_data: any;
+
+  line_options: any;
+
+  initiateChart() {
+    const documentStyle = getComputedStyle(document.documentElement);
+    const textColor = documentStyle.getPropertyValue('--text-color');
+    const textColorSecondary = documentStyle.getPropertyValue(
+      '--text-color-secondary'
+    );
+    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
+
+    this.line_data = {
+      labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+      datasets: [
+        {
+          label: 'Block Rewards',
+          data: [28, 48, 40, 19, 86, 27, 90],
+          fill: false,
+          borderColor: documentStyle.getPropertyValue('--pink-500'),
+          tension: 0.4,
+        },
+      ],
+    };
+
+    this.line_options = {
+      maintainAspectRatio: false,
+      aspectRatio: 0.6,
+      plugins: {
+        legend: {
+          labels: {
+            color: textColor,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: textColorSecondary,
+          },
+          grid: {
+            color: surfaceBorder,
+            drawBorder: false,
+          },
+        },
+        y: {
+          ticks: {
+            color: textColorSecondary,
+          },
+          grid: {
+            color: surfaceBorder,
+            drawBorder: false,
+          },
+        },
+      },
+    };
   }
 }
