@@ -1,9 +1,10 @@
 from sqlalchemy import (
-    Column, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, Float, UniqueConstraint
+    Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, Float, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from database import Base
 from structs import * 
+import datetime
 
 # Helper functions for PreciseNumber conversions
 def precise_to_float(value):
@@ -529,6 +530,10 @@ class JobModel(Base):
     last_proof_submit_time = Column(Integer, nullable=False)
     last_batch_retry_time = Column(JSON, nullable=False)
     
+    # Relationships
+    batch_results = relationship('BatchResultModel', back_populates='job')
+    assigned_batches = relationship('AssignedBatchModel', back_populates='job')
+    
     def to_dataclass(self) -> Job:
         return Job(
             benchmark_id=self.benchmark_id,
@@ -571,3 +576,41 @@ class JobModel(Base):
             last_proof_submit_time=job.last_proof_submit_time,
             last_batch_retry_time=job.last_batch_retry_time
         )
+
+# AssignedBatch
+class AssignedBatchModel(Base):
+    __tablename__ = 'assigned_batches'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    benchmark_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    batch_idx = Column(Integer, nullable=False)
+    assigned_slave = Column(String, nullable=False)
+    submitted_timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    completed_timestamp = Column(DateTime, nullable=True)
+    batch_result_id = Column(Integer, ForeignKey('batch_results.id'), nullable=True)
+    
+    # Unique constraint to prevent duplicate assignments
+    __table_args__ = (
+        UniqueConstraint('benchmark_id', 'batch_idx', name='uq_assigned_batch'),
+    )
+    
+    # Relationships
+    batch_result = relationship('BatchResultModel', back_populates='assigned_batch')
+    job = relationship('JobModel', back_populates='assigned_batches')
+
+# BatchResult
+class BatchResultModel(Base):
+    __tablename__ = 'batch_results'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    benchmark_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    start_nonce = Column(Integer, nullable=False)
+    merkle_root = Column(String, nullable=False)
+    solution_nonces = Column(JSON, nullable=False)
+    merkle_proofs = Column(JSON, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    assigned_batch_id = Column(Integer, ForeignKey('assigned_batches.id'), nullable=True)
+    
+    # Relationships
+    assigned_batch = relationship('AssignedBatchModel', back_populates='batch_result')
+    job = relationship('JobModel', back_populates='batch_results')
