@@ -83,10 +83,10 @@ impl<T: Context> BenchmarksContract<T>
         return Ok(());
     }
 
-    pub async fn verify_sufficient_lifespan<'a>(
-        &'a self,  
-        ctx:                            &'a T,
-        block:                          &'a Block
+    pub async fn verify_sufficient_lifespan(
+        &self,  
+        ctx:                            &T,
+        block:                          &Block
     )                                           -> ProtocolResult<()>
     {
         let latest_block                        = ctx
@@ -166,10 +166,10 @@ impl<T: Context> BenchmarksContract<T>
         return Ok(());
     }
 
-    pub async fn verify_benchmark_settings_are_unique<'a>(
-        &'a self, 
-        ctx:                            &'a T,
-        settings:                       &'a BenchmarkSettings
+    pub async fn verify_benchmark_settings_are_unique(
+        &self, 
+        ctx:                            &T,
+        settings:                       &BenchmarkSettings
     )                                           -> ProtocolResult<()>
     {
         if ctx

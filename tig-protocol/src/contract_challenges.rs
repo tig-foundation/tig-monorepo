@@ -35,11 +35,11 @@ impl<T: Context> ChallengesContract<T>
         return Self { _phantom: std::marker::PhantomData };
     }
 
-    pub async fn get_challenge_by_id<'a>(
-        &'a self,
-        ctx:                            &'a T,
-        challenge_id:                   &'a String,
-        block:                          &'a Block,
+    pub async fn get_challenge_by_id(
+        &self,
+        ctx:                            &T,
+        challenge_id:                   &String,
+        block:                          &Block,
     )                                           -> ProtocolResult<Challenge>
     {
         if !block.data().active_challenge_ids.contains(challenge_id) 

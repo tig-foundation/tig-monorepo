@@ -34,11 +34,11 @@ impl<T: Context> AlgorithmsContract<T>
         return Self { _phantom: std::marker::PhantomData };
     }
 
-    pub async fn verify_algorithm<'a>(
-        &'a self, 
-        ctx:                            &'a T,
-        algorithm_id:                   &'a String,
-        block:                          &'a Block
+    pub async fn verify_algorithm(
+        &self, 
+        ctx:                            &T,
+        algorithm_id:                   &String,
+        block:                          &Block
     )                                           -> ProtocolResult<()>
     {
         if !ctx
