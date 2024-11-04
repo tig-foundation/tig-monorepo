@@ -67,46 +67,6 @@ impl<T: Context> BenchmarksContract<T>
         return Ok(());
     }
 
-    pub fn verify_num_nonces(
-        &self, 
-        num_nonces:                     u32
-    )                                           -> ProtocolResult<()>
-    {
-        if num_nonces == 0 
-        {
-            return Err(ProtocolError::InvalidNumNonces
-            { 
-                num_nonces
-            });
-        }
-
-        return Ok(());
-    }
-
-    pub async fn verify_sufficient_lifespan(
-        &self,  
-        ctx:                            &T,
-        block:                          &Block
-    )                                           -> ProtocolResult<()>
-    {
-        let latest_block                        = ctx
-        .get_block(BlockFilter::Latest, false)
-        .await
-        .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
-        .expect("Expecting latest block to exist");
-
-        let config                              = block.config();
-        let submission_delay                    = latest_block.details.height - block.details.height + 1;
-        if (submission_delay as f64 * (config.benchmark_submissions.submission_delay_multiplier + 1.0))
-            as u32
-            >= config.benchmark_submissions.lifespan_period
-        {
-            return Err(ProtocolError::InsufficientLifespan);
-        }
-
-        return Ok(());
-    }
-
     pub fn verify_benchmark_difficulty(
         &self, 
         difficulty:                     &Vec<i32>,

@@ -91,10 +91,10 @@ impl<'a, T: Context> Protocol<T> {
         //self.benchmarks.execute(player, &settings, num_nonces).await
 
         self.benchmarks.verify_player_owns_benchmark(player, &settings)?;
-        self.benchmarks.verify_num_nonces(num_nonces)?;
+        submit_precommit::verify_num_nonces(num_nonces)?;
         
         let block                               = submit_precommit::get_block_by_id(&self.ctx, &settings.block_id).await?;
-        self.benchmarks.verify_sufficient_lifespan(&self.ctx, &block).await?;
+        submit_precommit::verify_sufficient_lifespan(&self.ctx, &block).await?;
         
         let challenge                           = self.challenges.get_challenge_by_id(&self.ctx, &settings.challenge_id, &block).await?;
         self.algorithms.verify_algorithm(&self.ctx, &settings.algorithm_id, &block).await?;
