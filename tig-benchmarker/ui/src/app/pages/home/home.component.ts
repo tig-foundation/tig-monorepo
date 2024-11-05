@@ -8,12 +8,18 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { SettingsComponent } from '../settings/settings.component';
 import { EditSettingsDialogComponent } from '../../components/edit-settings-dialog/edit-settings-dialog.component';
 import { TigApisService } from '../../services/tig-apis.service';
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { TabViewModule } from 'primeng/tabview';
+import { AsyncPipe, CurrencyPipe, DecimalPipe } from '@angular/common';
 import { ChartModule } from 'primeng/chart';
+import { IBenchmark } from '../../interfaces/IBenchmark';
+import { AlgorithmPipe } from '../../pipes/algorithm.pipe';
+import { ChallengePipe } from '../../pipes/challenge.pipe';
+import { TimeConverterPipe } from '../../pipes/time-converter.pipe';
+import { ICutoff } from '../../interfaces/ICutoff';
+import { PanelModule } from 'primeng/panel';
+import { IImbalance } from '../../interfaces/IImbalance';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -24,277 +30,134 @@ import { ChartModule } from 'primeng/chart';
     InputTextModule,
     ButtonModule,
     InputIconModule,
+    PanelModule,
     ProgressSpinnerModule,
     IconFieldModule,
     FormsModule,
     ReactiveFormsModule,
     EditSettingsDialogComponent,
+    TabViewModule,
     CurrencyPipe,
     DecimalPipe,
     ChartModule,
+    AsyncPipe,
+    TimeConverterPipe,
+    AlgorithmPipe,
+    ChallengePipe,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
 export class HomeComponent {
   tigService = inject(TigApisService);
+  price_usd: any = signal(null);
+  volume_24h: any = signal(null);
+  round_earnings: any = signal(null);
+  latest_earnings: any = signal(null);
+  available_fees: any = signal(null);
+
+  // Rewards Graph
+  rewards_data: any;
+  rewards_labels: any;
+  rewards_graph_options: any;
+  // Benchmarks Table
   benchmarks: any = signal(null);
-  solutions: any = signal(null);
-  delegation: any = signal(null);
+
+  // Cutoff and Imbalance
+  cutoff: any = signal(null);
+  imbalance: any = signal(null);
+
+  // Challenges Table
+  challenge_table: any = signal(null);
+  challenge_summary: any = signal(null);
+
+  //Delegation Cards
+  locked_deposit: any = signal(null);
+  total_delegated: any = signal(null);
+  delegators: any = signal([]);
 
   constructor() {
+    this.tigService.price_info$.subscribe((data: any) => {
+      if (data) {
+        this.price_usd.set(data.priceUsd);
+        this.volume_24h.set(data.volume?.h24);
+      }
+    });
+    // get Earnings and fees data
+    this.tigService.latest_block$.subscribe((data: any) => {
+      if (data) {
+        this.available_fees.set(3.5);
+        this.round_earnings.set(97.83);
+        this.latest_earnings.set(1.5);
+      }
+    });
     this.getBenchmarks();
-    this.getSolutions();
     this.initiateChart();
+    this.getCutoffAndImbalance();
   }
 
-  getSolutions() {
-    const solutions_test_data = [
-      {
-        age: 32,
-        solutions: 75,
-        difficulty: '[245,755]',
-        qualifiers: 12,
-        imbalance: 1.68,
-      },
-      {
-        age: 50,
-        solutions: 15,
-        difficulty: '[154,620]',
-        qualifiers: 88,
-        imbalance: 0.91,
-      },
-      {
-        age: 94,
-        solutions: 4,
-        difficulty: '[49,897]',
-        qualifiers: 21,
-        imbalance: 1.14,
-      },
-      {
-        age: 16,
-        solutions: 42,
-        difficulty: '[181,933]',
-        qualifiers: 99,
-        imbalance: 0.53,
-      },
-      {
-        age: 67,
-        solutions: 33,
-        difficulty: '[215,705]',
-        qualifiers: 70,
-        imbalance: 1.85,
-      },
-      {
-        age: 89,
-        solutions: 95,
-        difficulty: '[106,576]',
-        qualifiers: 10,
-        imbalance: 1.75,
-      },
-      {
-        age: 47,
-        solutions: 14,
-        difficulty: '[367,782]',
-        qualifiers: 3,
-        imbalance: 1.57,
-      },
-      {
-        age: 2,
-        solutions: 78,
-        difficulty: '[89,944]',
-        qualifiers: 29,
-        imbalance: 1.09,
-      },
-      {
-        age: 34,
-        solutions: 6,
-        difficulty: '[173,511]',
-        qualifiers: 25,
-        imbalance: 0.8,
-      },
-      {
-        age: 70,
-        solutions: 56,
-        difficulty: '[287,896]',
-        qualifiers: 47,
-        imbalance: 0.66,
-      },
-      {
-        age: 91,
-        solutions: 2,
-        difficulty: '[176,569]',
-        qualifiers: 40,
-        imbalance: 0.33,
-      },
-      {
-        age: 59,
-        solutions: 87,
-        difficulty: '[403,751]',
-        qualifiers: 76,
-        imbalance: 1.07,
-      },
-      {
-        age: 38,
-        solutions: 92,
-        difficulty: '[131,684]',
-        qualifiers: 58,
-        imbalance: 1.9,
-      },
-      {
-        age: 22,
-        solutions: 13,
-        difficulty: '[59,877]',
-        qualifiers: 15,
-        imbalance: 1.36,
-      },
-      {
-        age: 11,
-        solutions: 49,
-        difficulty: '[255,753]',
-        qualifiers: 91,
-        imbalance: 0.95,
-      },
-      {
-        age: 66,
-        solutions: 66,
-        difficulty: '[118,944]',
-        qualifiers: 32,
-        imbalance: 0.47,
-      },
-      {
-        age: 45,
-        solutions: 31,
-        difficulty: '[71,994]',
-        qualifiers: 90,
-        imbalance: 1.8,
-      },
-      {
-        age: 75,
-        solutions: 52,
-        difficulty: '[334,681]',
-        qualifiers: 79,
-        imbalance: 1.04,
-      },
-      {
-        age: 29,
-        solutions: 99,
-        difficulty: '[214,547]',
-        qualifiers: 86,
-        imbalance: 1.93,
-      },
-      {
-        age: 87,
-        solutions: 34,
-        difficulty: '[382,588]',
-        qualifiers: 20,
-        imbalance: 0.24,
-      },
-    ];
-
-    this.solutions.set(solutions_test_data);
-  }
   getBenchmarks() {
-    const benchmark_test_data = [
+    const benchmark_test_data: IBenchmark[] = [
       {
+        id: '1',
         age: 5,
-        challenge: 'Challenge 4',
-        algorithm: 'Algorithm 77',
+        challenge_id: 'c001',
+        algorithm_id: 'c001_a015',
         solutions: 2,
         difficulty: '[37,880]',
         submission_delay: 1,
         status: 'Pending',
-      },
-      {
-        age: 4,
-        challenge: 'Challenge 73',
-        algorithm: 'Algorithm 93',
-        solutions: 47,
-        difficulty: '[369,811]',
-        submission_delay: 1,
-        status: 'Pending',
-      },
-      {
-        age: 4,
-        challenge: 'Challenge 19',
-        algorithm: 'Algorithm 79',
-        solutions: 20,
-        difficulty: '[446,565]',
-        submission_delay: 1,
-        status: 'In Progress',
-      },
-      {
-        age: 4,
-        challenge: 'Challenge 34',
-        algorithm: 'Algorithm 31',
-        solutions: 85,
-        difficulty: '[358,844]',
-        submission_delay: 1,
-        status: 'Completed',
-      },
-      {
-        age: 8,
-        challenge: 'Challenge 19',
-        algorithm: 'Algorithm 65',
-        solutions: 82,
-        difficulty: '[170,565]',
-        submission_delay: 1,
-        status: 'In Progress',
-      },
-      {
-        age: 10,
-        challenge: 'Challenge 19',
-        algorithm: 'Algorithm 52',
-        solutions: 45,
-        difficulty: '[375,502]',
-        submission_delay: 1,
-        status: 'In Progress',
-      },
-      {
-        age: 1,
-        challenge: 'Challenge 3',
-        algorithm: 'Algorithm 89',
-        solutions: 56,
-        difficulty: '[25,770]',
-        submission_delay: 1,
-        status: 'Completed',
-      },
-      {
-        age: 4,
-        challenge: 'Challenge 91',
-        algorithm: 'Algorithm 2',
-        solutions: 98,
-        difficulty: '[376,672]',
-        submission_delay: 1,
-        status: 'In Progress',
-      },
-      {
-        age: 1,
-        challenge: 'Challenge 99',
-        algorithm: 'Algorithm 98',
-        solutions: 46,
-        difficulty: '[467,547]',
-        submission_delay: 1,
-        status: 'Pending',
-      },
-      {
-        age: 8,
-        challenge: 'Challenge 83',
-        algorithm: 'Algorithm 4',
-        solutions: 25,
-        difficulty: '[81,585]',
-        submission_delay: 1,
-        status: 'Pending',
+        qualifiers: 1,
+        number_of_nonces: 1,
+        start_time: new Date().toISOString(),
+        end_time: new Date(
+          new Date().setMinutes(new Date().getMinutes() + 10)
+        ).toISOString(),
       },
     ];
+
+    benchmark_test_data.map((b) => {
+      b.time_elapsed =
+        new Date(b.end_time).getTime() - new Date(b.start_time).getTime();
+    });
     this.benchmarks.set(benchmark_test_data);
   }
 
-  line_data: any;
-
-  line_options: any;
-
   initiateChart() {
+    //get rewards data
+    this.rewards_labels = [
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+      '11',
+      '12',
+      '13',
+      '14',
+      '15',
+      '16',
+      '17',
+      '18',
+      '19',
+      '20',
+      '21',
+      '22',
+      '23',
+      '24',
+      '25',
+    ];
+    const rewards_data = Array.from(
+      { length: 25 },
+      () => Math.floor(Math.random() * 550) / 100
+    );
+
+    // set chart data
     const documentStyle = getComputedStyle(document.documentElement);
     const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue(
@@ -302,20 +165,19 @@ export class HomeComponent {
     );
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
 
-    this.line_data = {
-      labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+    this.rewards_data = {
+      labels: this.rewards_labels,
       datasets: [
         {
           label: 'Block Rewards',
-          data: [28, 48, 40, 19, 86, 27, 90],
+          data: rewards_data,
           fill: false,
-          borderColor: documentStyle.getPropertyValue('--pink-500'),
           tension: 0.4,
         },
       ],
     };
 
-    this.line_options = {
+    this.rewards_graph_options = {
       maintainAspectRatio: false,
       aspectRatio: 0.6,
       plugins: {
@@ -346,5 +208,48 @@ export class HomeComponent {
         },
       },
     };
+  }
+
+  getCutoffAndImbalance() {
+    const cutoff: ICutoff = {
+      cutoff: 0.5,
+      c001_qualifiers: 1,
+      c002_qualifiers: 2,
+      c003_qualifiers: 3,
+      c004_qualifiers: 4,
+      deposit: 100,
+    };
+
+    this.cutoff.set(cutoff);
+
+    const imbalance: IImbalance = {
+      imbalance: 25,
+      c001_qualifiers: 1,
+      c002_qualifiers: 2,
+      c003_qualifiers: 3,
+      c004_qualifiers: 4,
+      c001_solutions: 10,
+      c002_solutions: 20,
+      c003_solutions: 30,
+      c004_solutions: 40,
+      deposit: 100,
+      deposit_qualifiers: 50,
+    };
+
+    this.imbalance.set(imbalance);
+  }
+
+  changeChallengeView(challenge: any) {
+    const selected = this.tigService.challenges()[challenge];
+    this.challenge_table.set(
+      this.benchmarks().filter((b: any) => b.challenge_id === selected.id)
+    );
+    // Set Challenge Summary Information
+    const summary = {
+      base_fee: 3,
+      solutions: 16,
+      qualifiers: 2,
+    };
+    this.challenge_summary.set(summary);
   }
 }
