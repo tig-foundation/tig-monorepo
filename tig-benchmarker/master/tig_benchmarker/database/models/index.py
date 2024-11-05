@@ -614,3 +614,43 @@ class BatchResultModel(Base):
     # Relationships
     assigned_batch = relationship('AssignedBatchModel', back_populates='batch_result')
     job = relationship('JobModel', back_populates='batch_results')
+
+# Precommit Request
+class PrecommitRequestModel(Base):
+    __tablename__ = 'precommit_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    settings = Column(JSON, nullable=False)
+    num_nonces = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    job = relationship('JobModel')
+
+# Benchmark Request
+class BenchmarkRequestModel(Base):
+    __tablename__ = 'benchmark_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    benchmark_id = Column(String, nullable=False)
+    merkle_root = Column(String, nullable=False)
+    solution_nonces = Column(JSON, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    job = relationship('JobModel')
+
+# Proof Request
+class ProofRequestModel(Base):
+    __tablename__ = 'proof_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    benchmark_id = Column(String, nullable=False)
+    merkle_proofs = Column(JSON, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    job = relationship('JobModel')

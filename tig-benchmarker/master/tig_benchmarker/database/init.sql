@@ -184,6 +184,37 @@ CREATE TABLE batch_results (
     assigned_batch_id INTEGER REFERENCES assigned_batches(id)
 );
 
+-- Create precommit_requests table
+
+CREATE TABLE precommit_requests (
+    id SERIAL PRIMARY KEY,
+    job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
+    settings JSONB NOT NULL,
+    num_nonces INTEGER NOT NULL,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Create benchmark_requests table
+
+CREATE TABLE benchmark_requests (
+    id SERIAL PRIMARY KEY,
+    job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
+    benchmark_id VARCHAR NOT NULL,
+    merkle_root VARCHAR NOT NULL,
+    solution_nonces JSONB NOT NULL,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Create proof_requests table
+
+CREATE TABLE proof_requests (
+    id SERIAL PRIMARY KEY,
+    job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
+    benchmark_id VARCHAR NOT NULL,
+    merkle_proofs JSONB NOT NULL,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Create indexes for foreign keys to improve query performance
 CREATE INDEX idx_algorithms_player_id ON algorithms(player_id);
 CREATE INDEX idx_algorithms_challenge_id ON algorithms(challenge_id);
@@ -204,3 +235,14 @@ CREATE INDEX idx_jobs_challenge ON jobs(challenge);
 
 CREATE INDEX idx_batch_results_benchmark_id ON batch_results(benchmark_id);
 CREATE INDEX idx_assigned_batches_benchmark_id ON assigned_batches(benchmark_id);
+
+-- Create index for faster queries on job_id
+CREATE INDEX idx_precommit_requests_job_id ON precommit_requests(job_id);
+
+-- Create index for faster queries on job_id and benchmark_id
+CREATE INDEX idx_benchmark_requests_job_id ON benchmark_requests(job_id);
+CREATE INDEX idx_benchmark_requests_benchmark_id ON benchmark_requests(benchmark_id);
+
+-- Create index for faster queries on job_id and benchmark_id
+CREATE INDEX idx_proof_requests_job_id ON proof_requests(job_id);
+CREATE INDEX idx_proof_requests_benchmark_id ON proof_requests(benchmark_id);

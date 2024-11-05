@@ -10,10 +10,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
-from database import SessionLocal
+from database.init import SessionLocal
 from typing import Dict, List, Optional, Set
 import datetime
-from database.models import JobModel, BatchResultModel, AssignedBatchModel
+from database.models.index import JobModel, BatchResultModel, AssignedBatchModel
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
