@@ -77,14 +77,6 @@ class SlaveManager:
         self.app = FastAPI()
         self.setup_routes()
     
-    def authCheck(self, request):
-        if (slave_name := request.headers.get('User-Agent', None)) is None:
-            return "User-Agent header is required", 403
-        if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-            logger.warning(f"slave {slave_name} does not match any regex. rejecting request")
-            return "Unregistered slave", 403
-        return slave_name
-
     def start(self):
         @self.app.get("/get-batches")
         def get_batches(request: Request):
