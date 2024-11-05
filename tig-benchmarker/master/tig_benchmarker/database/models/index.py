@@ -608,7 +608,7 @@ class AssignedBatchModel(Base):
     assigned_slave = Column(Integer, ForeignKey('slave_registry.id'), nullable=False)
     submitted_timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     completed_timestamp = Column(DateTime, nullable=True)
-    batch_result_id = Column(Integer, ForeignKey('batch_results.id'), nullable=True)
+    # batch_result_id = Column(Integer, ForeignKey('batch_results.id'), nullable=True)
     
     # Unique constraint to prevent duplicate assignments
     __table_args__ = (

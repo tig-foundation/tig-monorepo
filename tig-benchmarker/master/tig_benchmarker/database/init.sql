@@ -193,7 +193,7 @@ CREATE TABLE assigned_batches (
     assigned_slave INTEGER NOT NULL REFERENCES slave_registry(id),
     submitted_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     completed_timestamp TIMESTAMP,
-    batch_result_id INTEGER REFERENCES batch_results(id),
+    -- batch_result_id INTEGER REFERENCES batch_results(id),
     UNIQUE (benchmark_id, batch_idx)
 );
 
@@ -303,3 +303,89 @@ CREATE TRIGGER trigger_update_config_updated_at
 BEFORE UPDATE ON config
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Initialize the Config Table
+INSERT INTO config (id, config_data) VALUES (1, $$
+{
+    "player_id": "0x0000000000000000000000000000000000000000",
+    "api_key": "00000000000000000000000000000000",
+    "api_url": "https://mainnet-api.tig.foundation",
+    "difficulty_sampler_config": {
+        "difficulty_ranges": {
+            "satisfiability": [
+                0.0,
+                0.5
+            ],
+            "vehicle_routing": [
+                0.0,
+                0.5
+            ],
+            "knapsack": [
+                0.0,
+                0.5
+            ],
+            "vector_search": [
+                0.0,
+                0.5
+            ]
+        }
+    },
+    "job_manager_config": {
+        "backup_folder": "jobs",
+        "batch_sizes": {
+            "satisfiability": 1024,
+            "vehicle_routing": 1024,
+            "knapsack": 1024,
+            "vector_search": 1024
+        }
+    },
+    "submissions_manager_config": {
+        "time_between_retries": 60000
+    },
+    "precommit_manager_config": {
+        "max_pending_benchmarks": 4,
+        "algo_selection": {
+            "satisfiability": {
+                "algorithm": "schnoing",
+                "num_nonces": 1000,
+                "weight": 1.0,
+                "base_fee_limit": "10000000000000000"
+            },
+            "vehicle_routing": {
+                "algorithm": "clarke_wright",
+                "num_nonces": 1000,
+                "weight": 1.0,
+                "base_fee_limit": "10000000000000000"
+            },
+            "knapsack": {
+                "algorithm": "dynamic",
+                "num_nonces": 1000,
+                "weight": 1.0,
+                "base_fee_limit": "10000000000000000"
+            },
+            "vector_search": {
+                "algorithm": "optimal_ann",
+                "num_nonces": 1000,
+                "weight": 1.0,
+                "base_fee_limit": "10000000000000000"
+            }
+        }
+    },
+    "slave_manager_config": {
+        "port": 5115,
+        "time_before_batch_retry": 60000,
+        "num_nonces_to_sample": 0.5,
+        "slaves": [
+            {
+                "name_regex": ".*",
+                "max_concurrent_batches": {
+                    "satisfiability": 1,
+                    "vehicle_routing": 1,
+                    "knapsack": 1,
+                    "vector_search": 1
+                }
+            }
+        ]
+    }
+}
+$$);

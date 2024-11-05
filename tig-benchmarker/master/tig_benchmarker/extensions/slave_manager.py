@@ -190,8 +190,8 @@ class SlaveManager:
                                 batch_idx=batch_idx,
                                 assigned_slave=slave_name,
                                 submitted_timestamp=assigned_timestamp,
-                                completed_timestamp=None,
-                                batch_result_id=None
+                                completed_timestamp=None
+                                # batch_result_id=None
                             )
                             self.db_session.add(assigned_batch)
                             
@@ -303,7 +303,7 @@ class SlaveManager:
                     
                     # Update AssignedBatchModel with completed_timestamp and batch_result_id
                     assigned_batch.completed_timestamp = datetime.datetime.utcnow()
-                    assigned_batch.batch_result_id = batch_result.id
+                    # assigned_batch.batch_result_id = batch_result.id
 
                     # TODO: Filter sampled nonces based on start nonce and batch size
                     if job.sample_nonces is None:
