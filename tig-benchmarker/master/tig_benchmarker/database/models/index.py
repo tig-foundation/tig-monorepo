@@ -2,8 +2,8 @@ from sqlalchemy import (
     Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, Float, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
-from database import Base
-from structs import * 
+from tig_benchmarker.database.init import Base
+from tig_benchmarker.structs import * 
 import datetime
 
 # Helper functions for PreciseNumber conversions
@@ -664,6 +664,7 @@ class SlaveRegistryModel(Base):
     slave_name = Column(String(255), unique=True, nullable=False)
     num_of_cpus = Column(Integer, nullable=False)
     num_of_threads = Column(Integer, nullable=False)
+    memory = Column(Integer, nullable=False)
     registered_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     
     # Relationships

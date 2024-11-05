@@ -8,8 +8,8 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
 
-from database.init import SessionLocal
-from database.models.index import JobModel
+from tig_benchmarker.database.init import SessionLocal
+from tig_benchmarker.database.models.index import JobModel
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])

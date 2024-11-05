@@ -31,8 +31,8 @@ def main(config: Config):
     difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
     job_manager = JobManager(config.job_manager_config, jobs)
     precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id, jobs)
-    submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key, jobs)
-    slave_manager = SlaveManager(config.slave_manager_config, jobs)
+    submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key)
+    slave_manager = SlaveManager(config.slave_manager_config)
     slave_manager.start()
 
     while True:
