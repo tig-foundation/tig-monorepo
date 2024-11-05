@@ -165,7 +165,7 @@ CREATE TABLE assigned_batches (
     id SERIAL PRIMARY KEY,
     benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id),
     batch_idx INTEGER NOT NULL,
-    assigned_slave VARCHAR NOT NULL,
+    assigned_slave VARCHAR NOT NULL REFERENCES slave_registry(id),
     submitted_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     completed_timestamp TIMESTAMP,
     batch_result_id INTEGER REFERENCES batch_results(id),
@@ -215,6 +215,16 @@ CREATE TABLE proof_requests (
     timestamp TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Create slave_registry table
+
+CREATE TABLE slave_registry (
+    id SERIAL PRIMARY KEY,
+    slave_name VARCHAR(255) UNIQUE NOT NULL,
+    num_of_cpus INTEGER NOT NULL,
+    num_of_threads INTEGER NOT NULL,
+    registered_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Create indexes for foreign keys to improve query performance
 CREATE INDEX idx_algorithms_player_id ON algorithms(player_id);
 CREATE INDEX idx_algorithms_challenge_id ON algorithms(challenge_id);
@@ -246,3 +256,7 @@ CREATE INDEX idx_benchmark_requests_benchmark_id ON benchmark_requests(benchmark
 -- Create index for faster queries on job_id and benchmark_id
 CREATE INDEX idx_proof_requests_job_id ON proof_requests(job_id);
 CREATE INDEX idx_proof_requests_benchmark_id ON proof_requests(benchmark_id);
+
+-- Create index on slave_name for faster lookups
+CREATE INDEX idx_slave_registry_slave_name ON slave_registry(slave_name);
+CREATE INDEX idx_slave_registry_slave_id ON slave_registry(id);
