@@ -10,6 +10,14 @@ DROP TABLE IF EXISTS algorithms;
 DROP TABLE IF EXISTS challenges;
 DROP TABLE IF EXISTS players;
 DROP TABLE IF EXISTS blocks;
+DROP TABLE IF EXISTS jobs;
+DROP TABLE IF EXISTS assigned_batches;
+DROP TABLE IF EXISTS batch_results;
+DROP TABLE IF EXISTS precommit_requests;
+DROP TABLE IF EXISTS benchmark_requests;
+DROP TABLE IF EXISTS proof_requests;
+DROP TABLE IF EXISTS slave_registry;
+DROP TABLE IF EXISTS config;
 
 -- Create blocks table
 CREATE TABLE blocks (
@@ -43,7 +51,7 @@ CREATE TABLE players (
     name VARCHAR NOT NULL,
     is_multisig BOOLEAN NOT NULL,
     total_fees_paid NUMERIC(38, 18),
-    available_fee_balance NUMERIC(38, 18)
+    available_fee_balance NUMERIC(38, 18),
     block_data JSONB NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -108,7 +116,7 @@ CREATE TABLE benchmarks (
     sampled_nonces JSONB,
     solution_nonces JSONB,
     player_id VARCHAR NOT NULL REFERENCES players(id),
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Create proofs table
@@ -164,7 +172,17 @@ CREATE TABLE jobs (
     last_benchmark_submit_time INTEGER NOT NULL,
     last_proof_submit_time INTEGER NOT NULL,
     last_batch_retry_time JSONB NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Create slave_registry table
+CREATE TABLE slave_registry (
+    id SERIAL PRIMARY KEY,
+    slave_name VARCHAR(255) UNIQUE NOT NULL,
+    num_of_cpus INTEGER NOT NULL,
+    num_of_threads INTEGER NOT NULL,
+    memory INTEGER NOT NULL,
+    registered_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Create assigned_batches table
@@ -172,7 +190,7 @@ CREATE TABLE assigned_batches (
     id SERIAL PRIMARY KEY,
     benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id),
     batch_idx INTEGER NOT NULL,
-    assigned_slave VARCHAR NOT NULL REFERENCES slave_registry(id),
+    assigned_slave INTEGER NOT NULL REFERENCES slave_registry(id),
     submitted_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     completed_timestamp TIMESTAMP,
     batch_result_id INTEGER REFERENCES batch_results(id),
@@ -192,7 +210,6 @@ CREATE TABLE batch_results (
 );
 
 -- Create precommit_requests table
-
 CREATE TABLE precommit_requests (
     id SERIAL PRIMARY KEY,
     job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
@@ -202,7 +219,6 @@ CREATE TABLE precommit_requests (
 );
 
 -- Create benchmark_requests table
-
 CREATE TABLE benchmark_requests (
     id SERIAL PRIMARY KEY,
     job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
@@ -213,24 +229,12 @@ CREATE TABLE benchmark_requests (
 );
 
 -- Create proof_requests table
-
 CREATE TABLE proof_requests (
     id SERIAL PRIMARY KEY,
     job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
     benchmark_id VARCHAR NOT NULL,
     merkle_proofs JSONB NOT NULL,
     timestamp TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
--- Create slave_registry table
-
-CREATE TABLE slave_registry (
-    id SERIAL PRIMARY KEY,
-    slave_name VARCHAR(255) UNIQUE NOT NULL,
-    num_of_cpus INTEGER NOT NULL,
-    num_of_threads INTEGER NOT NULL,
-    memory INTEGER NOT NULL,
-    registered_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Create config table
@@ -274,7 +278,6 @@ CREATE INDEX idx_proof_requests_benchmark_id ON proof_requests(benchmark_id);
 
 -- Create index on slave_name for faster lookups
 CREATE INDEX idx_slave_registry_slave_name ON slave_registry(slave_name);
-CREATE INDEX idx_slave_registry_slave_id ON slave_registry(id);
 
 -- Create a trigger function to update the updated_at field on row update
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -285,19 +288,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create a trigger
+-- Create triggers
 CREATE TRIGGER trigger_update_players_updated_at
 BEFORE UPDATE ON players
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
--- Create a trigger
 CREATE TRIGGER trigger_update_blocks_updated_at
 BEFORE UPDATE ON blocks
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
--- Create a trigger
 CREATE TRIGGER trigger_update_config_updated_at
 BEFORE UPDATE ON config
 FOR EACH ROW
