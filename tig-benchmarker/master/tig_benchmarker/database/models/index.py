@@ -584,7 +584,7 @@ class AssignedBatchModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     benchmark_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
     batch_idx = Column(Integer, nullable=False)
-    assigned_slave = Column(String, nullable=False)
+    assigned_slave = Column(Integer, ForeignKey('slave_registry.id'), nullable=False)
     submitted_timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     completed_timestamp = Column(DateTime, nullable=True)
     batch_result_id = Column(Integer, ForeignKey('batch_results.id'), nullable=True)
@@ -597,6 +597,7 @@ class AssignedBatchModel(Base):
     # Relationships
     batch_result = relationship('BatchResultModel', back_populates='assigned_batch')
     job = relationship('JobModel', back_populates='assigned_batches')
+    slave = relationship('SlaveRegistryModel', back_populates='assigned_batches')
 
 # BatchResult
 class BatchResultModel(Base):
@@ -614,3 +615,56 @@ class BatchResultModel(Base):
     # Relationships
     assigned_batch = relationship('AssignedBatchModel', back_populates='batch_result')
     job = relationship('JobModel', back_populates='batch_results')
+
+# Precommit Request
+class PrecommitRequestModel(Base):
+    __tablename__ = 'precommit_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    settings = Column(JSON, nullable=False)
+    num_nonces = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    job = relationship('JobModel')
+
+# Benchmark Request
+class BenchmarkRequestModel(Base):
+    __tablename__ = 'benchmark_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    benchmark_id = Column(String, nullable=False)
+    merkle_root = Column(String, nullable=False)
+    solution_nonces = Column(JSON, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    job = relationship('JobModel')
+
+# Proof Request
+class ProofRequestModel(Base):
+    __tablename__ = 'proof_requests'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    benchmark_id = Column(String, nullable=False)
+    merkle_proofs = Column(JSON, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    job = relationship('JobModel')
+    
+# Slave Registry model
+class SlaveRegistryModel(Base):
+    __tablename__ = 'slave_registry'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    slave_name = Column(String(255), unique=True, nullable=False)
+    num_of_cpus = Column(Integer, nullable=False)
+    num_of_threads = Column(Integer, nullable=False)
+    registered_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    
+    # Relationships
+    assigned_batches = relationship('AssignedBatchModel', back_populates='slave')

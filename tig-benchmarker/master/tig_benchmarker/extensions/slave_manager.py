@@ -1,5 +1,6 @@
 import os
 import logging
+import random
 import re
 import signal
 import threading
@@ -9,10 +10,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
-from database import SessionLocal
+from database.init import SessionLocal
 from typing import Dict, List, Optional, Set
 import datetime
-from database.models import JobModel, BatchResultModel, AssignedBatchModel
+from database.models.index import JobModel, BatchResultModel, AssignedBatchModel
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -32,6 +33,9 @@ class Batch(FromDict):
 class BatchResult(FromDict):
     merkle_root: MerkleHash
     solution_nonces: List[int]
+
+@dataclass
+class BatchMerkleProof(FromDict):
     merkle_proofs: List[MerkleProof]
 
 @dataclass
@@ -43,6 +47,7 @@ class SlaveConfig(FromDict):
 class SlaveManagerConfig(FromDict):
     port: int
     time_before_batch_retry: int
+    num_nonces_to_sample: float
     slaves: List[SlaveConfig]
 
 @dataclass
@@ -74,7 +79,7 @@ class SlaveManager:
     
     def start(self):
         @self.app.get("/get-batches")
-        async def get_batches(request: Request):
+        def get_batches(request: Request):
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
             if not slave_name:
@@ -190,7 +195,7 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.post("/submit-batch-result/{batch_id}")
-        async def submit_batch_result(batch_id: str, result: BatchResult, request: Request):
+        def submit_batch_result(batch_id: str, result: BatchResult, request: Request):
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
             if not slave_name:
@@ -262,12 +267,71 @@ class SlaveManager:
                     # Update AssignedBatchModel with completed_timestamp and batch_result_id
                     assigned_batch.completed_timestamp = datetime.datetime.utcnow()
                     assigned_batch.batch_result_id = batch_result.id
+
+                    
+                    if job.sample_nonces is None:
+                        non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
+                        random.shuffle(result.solution_nonces)
+                        random.shuffle(non_solution_nonces)
+                        num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
+                        sampled = (result.solution_nonces + non_solution_nonces)[:num_nonces_to_sample]
+                    else:
+                        sampled = job.sample_nonces
                     
                     # Commit the transaction
                     self.db_session.commit()
 
                     logger.debug(f"Slave '{slave_name}' submitted batch result for benchmark '{benchmark_id}', start_nonce '{start_nonce}'.")
+                    return JSONResponse(content={"detail": "OK", "sample_nonces": sampled}, status_code=200)
+            except SQLAlchemyError as e:
+                self.db_session.rollback()
+                logger.error(f"Database error during submit_batch_result: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error.")
+            except HTTPException as he:
+                raise he
+            except Exception as e:
+                self.db_session.rollback()
+                logger.error(f"Unexpected error during submit_batch_result: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error.")
+            
+        @self.app.post('/merkle-proofs/{batch_id}')
+        def get_merkle_proofs(batch_id, result: BatchMerkleProof, request: Request):
+            # Extract User-Agent header to identify the slave
+            slave_name = request.headers.get('User-Agent')
+            if not slave_name:
+                logger.warning("Missing User-Agent header in submit-batch-result request.")
+                raise HTTPException(status_code=403, detail="User-Agent header is required.")
+
+            # Find the matching slave configuration
+            matching_slaves = [slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)]
+            if not matching_slaves:
+                logger.warning(f"Slave '{slave_name}' does not match any registered regex patterns.")
+                raise HTTPException(status_code=403, detail="Unregistered slave.")
+
+            slave = matching_slaves[0]  # Assuming one match is sufficient
+            try:
+                benchmark_id, start_nonce_str = batch_id.split("_")
+                start_nonce = int(start_nonce_str)
+            except ValueError:
+                logger.warning(f"Invalid batch_id format: {batch_id}")
+                raise HTTPException(status_code=400, detail="Invalid batch_id format.")
+            
+            try:
+                with self.db_session.begin():
+                    # Fetch the job from the database
+                    job = self.db_session.query(JobModel).filter_by(benchmark_id=benchmark_id).first()
+                    if not job:
+                        logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent job '{benchmark_id}'.")
+                        raise HTTPException(status_code=400, detail="Invalid benchmark_id.")
+                    
+                    # Set the batch result's merkle proofs
+                    job.merkle_proofs = result.merkle_proofs
+
+                    # Commit the transaction
+                    self.db_session.commit()
+                    logger.debug(f"Slave '{slave_name}' submitted batch result for benchmark '{benchmark_id}', start_nonce '{start_nonce}'.")
                     return JSONResponse(content={"detail": "OK"}, status_code=200)
+
             except SQLAlchemyError as e:
                 self.db_session.rollback()
                 logger.error(f"Database error during submit_batch_result: {e}")

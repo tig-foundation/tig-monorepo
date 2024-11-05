@@ -5,10 +5,10 @@ from tig_benchmarker.merkle_tree import MerkleBranch, MerkleTree
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 
-from database import SessionLocal
+from database.init import SessionLocal
 from sqlalchemy.exc import SQLAlchemyError
 
-from database.models import JobModel
+from database.models.index import JobModel
 from typing import Dict, List
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])

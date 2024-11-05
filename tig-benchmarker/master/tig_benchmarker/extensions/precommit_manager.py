@@ -1,4 +1,3 @@
-import asyncio
 import os
 import logging
 import random
@@ -9,8 +8,8 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
 
-from database import SessionLocal
-from database.models import JobModel
+from database.init import SessionLocal
+from database.models.index import JobModel
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])

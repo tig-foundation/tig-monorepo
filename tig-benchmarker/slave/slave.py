@@ -5,7 +5,6 @@ import logging
 import randomname
 import aiohttp
 import asyncio
-import subprocess
 import time
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -25,7 +24,7 @@ async def download_wasm(session, download_url, wasm_path):
         logger.debug(f"downloading WASM: took {now() - start}ms")
     logger.debug(f"WASM Path: {wasm_path}")
 
-async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
+async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
     start = now()
     cmd = [
         tig_worker_path, "compute_batch",
@@ -38,9 +37,10 @@ async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
         "--mem", str(batch["wasm_vm_config"]["max_memory"]),
         "--fuel", str(batch["wasm_vm_config"]["max_fuel"]),
         "--workers", str(num_workers),
+        "--output", f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}",
     ]
-    if batch["sampled_nonces"]:
-        cmd += ["--sampled", *map(str, batch["sampled_nonces"])]
+    # if batch["sampled_nonces"]:
+    #     cmd += ["--sampled", *map(str, batch["sampled_nonces"])]
     logger.info(f"computing batch: {' '.join(cmd)}")
     process = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -53,7 +53,7 @@ async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
     logger.debug(f"batch result: {result}")
     return result
 
-async def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers):
+async def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
     try:
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
         logger.info(f"Processing batch {batch_id}: {batch}")
@@ -63,7 +63,7 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
         await download_wasm(session, batch['download_url'], wasm_path)
 
         # Step 3: Run tig-worker
-        result = await run_tig_worker(tig_worker_path, batch, wasm_path, num_workers)
+        result = await run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path)
 
         # Step 4: Submit results
         start = now()
@@ -72,7 +72,9 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
         async with session.post(submit_url, json=result, headers=headers) as resp:
             if resp.status != 200:
                 raise Exception(f"status {resp.status} when posting results to master: {await resp.text()}")
-        logger.debug(f"posting results took {now() - start} ms")
+            logger.debug(f"posting results took {now() - start} ms")
+            # Step 5: Calculate Merkle proofs for sampled nonces
+            # TODO: calculate merkle proofs
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
@@ -83,7 +85,8 @@ async def main(
     download_wasms_folder: str,
     num_workers: int,
     slave_name: str,
-    master_port: int
+    master_port: int,
+    output_path: str
 ):
     if not os.path.exists(tig_worker_path):
         raise FileNotFoundError(f"tig-worker not found at path: {tig_worker_path}")
@@ -108,7 +111,7 @@ async def main(
 
                 # Process batches concurrently
                 tasks = [
-                    process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers)
+                    process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path)
                     for batch in batches
                 ]
                 await asyncio.gather(*tasks)
@@ -126,6 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default=randomname.get_name(), help="Name for the slave (default: randomly generated)")
     parser.add_argument("--port", type=int, default=5115, help="Port for master (default: 5115)")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
+    parser.add_argument('--output', type=str, default="output", help="Folder to output results to (default: output)")
     
     args = parser.parse_args()
     
@@ -134,4 +138,4 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO
     )
 
-    asyncio.run(main(args.master_ip, args.tig_worker_path, args.download, args.workers, args.name, args.port))
+    asyncio.run(main(args.master_ip, args.tig_worker_path, args.download, args.workers, args.name, args.port, args.output))
