@@ -22,7 +22,7 @@ DROP TABLE IF EXISTS config;
 -- Create blocks table
 CREATE TABLE blocks (
     id VARCHAR PRIMARY KEY,
-    prev_block_id VARCHAR REFERENCES blocks(id),
+    prev_block_id VARCHAR,
     height INTEGER NOT NULL,
     round INTEGER NOT NULL,
     eth_block_num VARCHAR,

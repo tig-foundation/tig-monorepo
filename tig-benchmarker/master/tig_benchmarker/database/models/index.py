@@ -18,7 +18,7 @@ def float_to_precise(value):
 class BlockModel(Base):
     __tablename__ = 'blocks'
     id = Column(String, primary_key=True)
-    prev_block_id = Column(String, ForeignKey('blocks.id'), nullable=True)
+    prev_block_id = Column(String, nullable=True)
     height = Column(Integer, nullable=False)
     round = Column(Integer, nullable=False)
     eth_block_num = Column(String, nullable=True)
@@ -41,7 +41,7 @@ class BlockModel(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
-    prev_block = relationship('BlockModel', remote_side=[id], backref='next_blocks')
+    # prev_block = relationship('BlockModel', remote_side=[id], backref='next_blocks')
     algorithms = relationship('AlgorithmModel', back_populates='block', cascade="all, delete-orphan")
     challenges = relationship('ChallengeModel', back_populates='block', cascade="all, delete-orphan")
 
@@ -230,7 +230,7 @@ class AlgorithmModel(Base):
             round_merged=algorithm.state.round_merged,
             banned=algorithm.state.banned,
             code=algorithm.code,
-            block_id=algorithm.block_data.block_id if algorithm.block_data else None
+            block_id=algorithm.block_data.block_id if algorithm.block_data.block_id else None
         )
 
     def to_dataclass(self) -> Algorithm:

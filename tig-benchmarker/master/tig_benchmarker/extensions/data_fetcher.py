@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import requests
+from sqlalchemy import false, null
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, Any
@@ -38,7 +39,8 @@ class DataFetcher:
     def run(self) -> dict:
         logger.debug("fetching latest block")
         block_data = _get(f"{self.api_url}/get-block?include_data")
-        block = Block.from_dict(block_data["block"])
+        block = Block.from_dict({k: v for k, v in block_data["block"].items() if k != 'data'})
+        block.data = block_data["block"]["data"]
         
         # Check if block exists in DB
         existing_block = self.db_session.query(BlockModel).filter_by(id=block.id).first()
@@ -63,7 +65,30 @@ class DataFetcher:
         wasms = {w["algorithm_id"]: Wasm.from_dict(w) for w in algorithms_data.get("wasms", [])}
         
         # Parse player
-        player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), None)
+        dummy_player = {
+            "id": self.player_id,
+            "details": {
+                "name": self.player_id,
+                "is_multisig": false
+            },
+            "state": {
+                "total_fees_paid": "0",
+                "available_fee_balance": "0"
+            },
+            "block_data": {
+                "num_qualifiers_by_challenge": null,
+                "cutoff": null,
+                "deposit": null,
+                "rolling_deposit": null,
+                "qualifying_percent_rolling_deposit": null,
+                "imbalance": null,
+                "imbalance_penalty": null,
+                "influence": null,
+                "reward": null,
+                "round_earnings": "0"
+            }
+        }
+        player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), dummy_player)
         
         # Parse precommits, benchmarks, proofs, frauds
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data.get("precommits", [])}
@@ -134,9 +159,28 @@ class DataFetcher:
             # Store block
             block_model = BlockModel.from_dataclass(block)
             session.merge(block_model)
+            
+            # Store challenges
+            for challenge in challenges.values():
+                challenge_model = ChallengeModel.from_dataclass(challenge)
+                session.merge(challenge_model)
+                
+            # Store player
+            if player:
+                existing_player = session.query(PlayerModel).filter_by(id=player.id).first()
+                if existing_player:
+                    existing_player.block_data = player.block_data
+                    existing_player.is_multisig = player.details.is_multisig
+                    existing_player.total_fees_paid = player.state.total_fees_paid
+                    existing_player.available_fee_balance = player.state.available_fee_balance
+                    session.merge(existing_player)
+                else:
+                    player_model = PlayerModel.from_dataclass(player)
+                    session.merge(player_model)
 
             # Store algorithms
             for alg in algorithms.values():
+                alg.block_data.block_id = block.id
                 alg_model = AlgorithmModel.from_dataclass(alg)
                 session.merge(alg_model)
 
@@ -144,11 +188,6 @@ class DataFetcher:
             for wasm in wasms.values():
                 wasm_model = WasmModel.from_dataclass(wasm)
                 session.merge(wasm_model)
-
-            # Store player
-            if player:
-                player_model = PlayerModel.from_dataclass(player)
-                session.merge(player_model)
 
             # Store precommits
             for precommit in precommits.values():
@@ -169,11 +208,6 @@ class DataFetcher:
             for fraud in frauds.values():
                 fraud_model = FraudModel.from_dataclass(fraud)
                 session.merge(fraud_model)
-
-            # Store challenges
-            for challenge in challenges.values():
-                challenge_model = ChallengeModel.from_dataclass(challenge)
-                session.merge(challenge_model)
 
             # Store difficulty data
             for c_id, difficulties in difficulty_data.items():
