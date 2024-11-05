@@ -97,29 +97,32 @@
   </p-card>
   <br>
   <p-card header="Mining Pool">
-    <p class="m-0">
-      @if(mining_panel_data()){
+    <div class="flex align-items-center justify-content-between">
+      <p> <p-checkbox 
+        [disabled]="true"
+        inputId="api_toggle" />
+    <label for="api_toggle" class="ml-2">Require API Key</label></p>
+
+      <p class="mr-4">Active Slaves : <b>{{active_slaves()}}</b></p>
+    </div>
+      @if(mining_panel_slaves()){
           <p-table
           #benchmarksTable
-          [value]="mining_panel_data()"
+          [value]="mining_panel_slaves()"
           [tableStyle]="{ 'min-width': '50rem' }"
           styleClass="p-datatable-striped"
           [paginator]="true"
           [rows]="5"
           [rowsPerPageOptions]="[5, 10, 20]"
           [globalFilterFields]="[
-            'challenge',
-            'algorithm',
-            'status',
-            'age',
-            'solutions',
-            'difficulty',
-            'submission_delay'
+            'name',
+            'api_key',
+            'reputation',
+            'reward',
           ]"
         >
           <ng-template pTemplate="caption">
             <div class="flex">
-              <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
               <p-iconField iconPosition="left" class="ml-auto">
                 <p-inputIcon>
                   <i class="pi pi-search"></i>
@@ -140,69 +143,54 @@
           </ng-template>
           <ng-template pTemplate="header">
             <tr>
-              <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
               <th pSortableColumn="challenge">
-                Challenge <p-sortIcon field="challenge" />
+                Name <p-sortIcon field="challenge" />
               </th>
               <th pSortableColumn="algorithm">
-                Algorithm <p-sortIcon field="algorithm" />
+                API Key <p-sortIcon field="algorithm" />
               </th>
-              <th pSortableColumn="solutions">
-                # Solutions <p-sortIcon field="solutions" />
+              <th pSortableColumn="reputation">
+               Reputation <p-sortIcon field="reputation" />
               </th>
-              <th pSortableColumn="difficulty">
-                Difficulty <p-sortIcon field="difficulty" />
+              <th pSortableColumn="reward">
+                Reward <p-sortIcon field="reward" />
               </th>
-              <th pSortableColumn="submission_delay">
-                Submission Delay <p-sortIcon field="submission_delay" />
+              <th pSortableColumn="last_updated">
+                Last Updated <p-sortIcon field="last_updated" />
               </th>
-              <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
+              <th></th>
             </tr>
           </ng-template>
           <ng-template pTemplate="body" let-benchmark>
             <tr>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.age }}
+                  {{ benchmark.name }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.challenge }}
+                  {{ benchmark.api_key }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.algorithm }}
+                  {{ benchmark.reputation }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.solutions }}
+                  {{ benchmark.reward }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.difficulty }}
+                  {{ benchmark.last_updated }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.submission_delay }}
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  <p-tag
-                    [severity]="
-                      benchmark.status == 'Completed'
-                        ? 'success'
-                        : benchmark.status == 'In Progress'
-                        ? 'warning'
-                        : 'info'
-                    "
-                    [value]="benchmark.status"
-                  />
+                  <app-edit-settings-dialog [title]="'Slave Settings'" [view]="'slaves'"></app-edit-settings-dialog>
                 </div>
               </td>
             </tr>
@@ -218,263 +206,223 @@
       animationDuration="1.5s" />
           </div>
       }
-  
-    </p>
   </p-card>
   <br>
-  <div class="grid">
-    <div class="col-6">
+  <p-card header="Challenges">
+    <p-tabView (onChange)="changeChallengeView($event.index)">
+      @for (challenge of tigService.challenges(); track $index) {
+      <p-tabPanel [header]="challenge.name">
         <p-card header="Slaves">
-            <p class="m-0">
-              @if(slaves_data()){
-                  <p-table
-                  #benchmarksTable
-                  [value]="slaves_data()"
-                  [tableStyle]="{ 'min-width': '50rem' }"
-                  styleClass="p-datatable-striped"
-                  [paginator]="true"
-                  [rows]="5"
-                  [rowsPerPageOptions]="[5, 10, 20]"
-                  [globalFilterFields]="[
-                    'challenge',
-                    'algorithm',
-                    'status',
-                    'age',
-                    'solutions',
-                    'difficulty',
-                    'submission_delay'
-                  ]"
-                >
-                  <ng-template pTemplate="caption">
-                    <div class="flex">
-                      <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
-                      <p-iconField iconPosition="left" class="ml-auto">
-                        <p-inputIcon>
-                          <i class="pi pi-search"></i>
-                        </p-inputIcon>
-                        <input
-                          pInputText
-                          type="text"
-                          (input)="
-                            benchmarksTable.filterGlobal(
-                              $any($event.target).value || '',
-                              'contains'
-                            )
-                          "
-                          placeholder="Search keyword"
-                        />
-                      </p-iconField>
-                    </div>
-                  </ng-template>
-                  <ng-template pTemplate="header">
-                    <tr>
-                      <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
-                      <th pSortableColumn="challenge">
-                        Challenge <p-sortIcon field="challenge" />
-                      </th>
-                      <th pSortableColumn="algorithm">
-                        Algorithm <p-sortIcon field="algorithm" />
-                      </th>
-                      <th pSortableColumn="solutions">
-                        # Solutions <p-sortIcon field="solutions" />
-                      </th>
-                      <th pSortableColumn="difficulty">
-                        Difficulty <p-sortIcon field="difficulty" />
-                      </th>
-                      <th pSortableColumn="submission_delay">
-                        Submission Delay <p-sortIcon field="submission_delay" />
-                      </th>
-                      <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
-                    </tr>
-                  </ng-template>
-                  <ng-template pTemplate="body" let-benchmark>
-                    <tr>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.age }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.challenge }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.algorithm }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.solutions }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.difficulty }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.submission_delay }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          <p-tag
-                            [severity]="
-                              benchmark.status == 'Completed'
-                                ? 'success'
-                                : benchmark.status == 'In Progress'
-                                ? 'warning'
-                                : 'info'
-                            "
-                            [value]="benchmark.status"
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  </ng-template>
-                </p-table>
-              }
-              @else {
-                  <div class="flex w-full justify-content-center align-items-center">
-                      <p-progressSpinner 
-              styleClass="w-4rem h-4rem" 
-              strokeWidth="8" 
-              fill="var(--surface-ground)" 
-              animationDuration="1.5s" />
+          @if(challenge_tabs_slave_table()){
+          <p-table
+            #benchmarksTable
+            [value]="challenge_tabs_slave_table()"
+            [tableStyle]="{ 'min-width': '50rem' }"
+            styleClass="p-datatable-striped"
+            [paginator]="true"
+            [rows]="5"
+            [rowsPerPageOptions]="[5, 10, 20]"
+            [globalFilterFields]="[
+              'name',
+              'max_concurrent_batches',
+              'recent_batches',
+              'in_progress',
+              'average_time_per_batch',
+            ]"
+          >
+            <ng-template pTemplate="caption">
+              <div class="flex">
+                <app-edit-settings-dialog
+                  [title]="'Algorithm Settings'"
+                  [view]="'algos'"
+                ></app-edit-settings-dialog>
+                <p-iconField iconPosition="left" class="ml-auto">
+                  <p-inputIcon>
+                    <i class="pi pi-search"></i>
+                  </p-inputIcon>
+                  <input
+                    pInputText
+                    type="text"
+                    (input)="
+                      benchmarksTable.filterGlobal(
+                        $any($event.target).value || '',
+                        'contains'
+                      )
+                    "
+                    placeholder="Search keyword"
+                  />
+                </p-iconField>
+              </div>
+            </ng-template>
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="name">Name <p-sortIcon field="name" /></th>
+                <th pSortableColumn="max_concurrent_batches">
+                  Max Concurrent Batches <p-sortIcon field="max_concurrent_batches" />
+                </th>
+                <th pSortableColumn="recent_batches">
+                  # Recent Batches <p-sortIcon field="recent_batches" />
+                </th>
+                <th pSortableColumn="in_progress">
+                  # In Progress Batches <p-sortIcon field="in_progress" />
+                </th>
+                <th pSortableColumn="average_time_per_batch">
+                  Average Time Per Batch <p-sortIcon field="average_time_per_batch" />
+                </th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-slave>
+              <tr>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ slave.name }}
                   </div>
-              }
-          
-            </p>
-          </p-card>
-    </div>
-    <div class="col-6">
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ slave.max_concurrent_batches }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ slave.recent_batches }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ slave.in_progress }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ slave.average_time_per_batch }} ms
+                  </div>
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+          } @else {
+          <div class="flex w-full justify-content-center align-items-center">
+            <p-progressSpinner
+              styleClass="w-4rem h-4rem"
+              strokeWidth="8"
+              fill="var(--surface-ground)"
+              animationDuration="1.5s"
+            />
+          </div>
+          }
+        </p-card>
+        <br>
         <p-card header="Batches">
-            <p class="m-0">
-              @if(batches_data()){
-                  <p-table
-                  #benchmarksTable
-                  [value]="batches_data()"
-                  [tableStyle]="{ 'min-width': '50rem' }"
-                  styleClass="p-datatable-striped"
-                  [paginator]="true"
-                  [rows]="5"
-                  [rowsPerPageOptions]="[5, 10, 20]"
-                  [globalFilterFields]="[
-                    'challenge',
-                    'algorithm',
-                    'status',
-                    'age',
-                    'solutions',
-                    'difficulty',
-                    'submission_delay'
-                  ]"
-                >
-                  <ng-template pTemplate="caption">
-                    <div class="flex">
-                      <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
-                      <p-iconField iconPosition="left" class="ml-auto">
-                        <p-inputIcon>
-                          <i class="pi pi-search"></i>
-                        </p-inputIcon>
-                        <input
-                          pInputText
-                          type="text"
-                          (input)="
-                            benchmarksTable.filterGlobal(
-                              $any($event.target).value || '',
-                              'contains'
-                            )
-                          "
-                          placeholder="Search keyword"
-                        />
-                      </p-iconField>
-                    </div>
-                  </ng-template>
-                  <ng-template pTemplate="header">
-                    <tr>
-                      <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
-                      <th pSortableColumn="challenge">
-                        Challenge <p-sortIcon field="challenge" />
-                      </th>
-                      <th pSortableColumn="algorithm">
-                        Algorithm <p-sortIcon field="algorithm" />
-                      </th>
-                      <th pSortableColumn="solutions">
-                        # Solutions <p-sortIcon field="solutions" />
-                      </th>
-                      <th pSortableColumn="difficulty">
-                        Difficulty <p-sortIcon field="difficulty" />
-                      </th>
-                      <th pSortableColumn="submission_delay">
-                        Submission Delay <p-sortIcon field="submission_delay" />
-                      </th>
-                      <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
-                    </tr>
-                  </ng-template>
-                  <ng-template pTemplate="body" let-benchmark>
-                    <tr>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.age }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.challenge }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.algorithm }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.solutions }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.difficulty }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          {{ benchmark.submission_delay }}
-                        </div>
-                      </td>
-                      <td>
-                        <div class="flex justify-content-center align-items-center">
-                          <p-tag
-                            [severity]="
-                              benchmark.status == 'Completed'
-                                ? 'success'
-                                : benchmark.status == 'In Progress'
-                                ? 'warning'
-                                : 'info'
-                            "
-                            [value]="benchmark.status"
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  </ng-template>
-                </p-table>
-              }
-              @else {
-                  <div class="flex w-full justify-content-center align-items-center">
-                      <p-progressSpinner 
-              styleClass="w-4rem h-4rem" 
-              strokeWidth="8" 
-              fill="var(--surface-ground)" 
-              animationDuration="1.5s" />
+          @if(challenge_tabs_batches_table()){
+          <p-table
+            #benchmarksTable
+            [value]="challenge_tabs_batches_table()"
+            [tableStyle]="{ 'min-width': '50rem' }"
+            styleClass="p-datatable-striped"
+            [paginator]="true"
+            [rows]="5"
+            [rowsPerPageOptions]="[5, 10, 20]"
+            [globalFilterFields]="[
+              'benchmark_id',
+              'algorithm',
+              'batch_size',
+              'status',
+              'slave',
+              'elapsed_time',
+            ]"
+          >
+            <ng-template pTemplate="caption">
+              <div class="flex">
+                <app-edit-settings-dialog
+                  [title]="'Algorithm Settings'"
+                  [view]="'algos'"
+                ></app-edit-settings-dialog>
+                <p-iconField iconPosition="left" class="ml-auto">
+                  <p-inputIcon>
+                    <i class="pi pi-search"></i>
+                  </p-inputIcon>
+                  <input
+                    pInputText
+                    type="text"
+                    (input)="
+                      benchmarksTable.filterGlobal(
+                        $any($event.target).value || '',
+                        'contains'
+                      )
+                    "
+                    placeholder="Search keyword"
+                  />
+                </p-iconField>
+              </div>
+            </ng-template>
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="benchmark_id">Benchmark Id <p-sortIcon field="benchmark_id" /></th>
+                <th pSortableColumn="algorithm">
+                  Algorithm <p-sortIcon field="algorithm" />
+                </th>
+                <th pSortableColumn="batch_size">
+                  Batch Size <p-sortIcon field="batch_size" />
+                </th>
+                <th pSortableColumn="status">
+                  status <p-sortIcon field="status" />
+                </th>
+                <th pSortableColumn="slave">
+                  Slave <p-sortIcon field="slave" />
+                </th>
+                <th pSortableColumn="elapsed_time">
+                  Elapsed Time <p-sortIcon field="elapsed_time" />
+                </th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-batch>
+              <tr>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ batch.benchmark_id }}
                   </div>
-              }
-          
-            </p>
-          </p-card>
-    </div>
-  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ batch.algorithm }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ batch.batch_size }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ batch.status }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ batch.slave }}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex justify-content-center align-items-center">
+                    {{ batch.elapsed_time }} ms
+                  </div>
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+          } @else {
+          <div class="flex w-full justify-content-center align-items-center">
+            <p-progressSpinner
+              styleClass="w-4rem h-4rem"
+              strokeWidth="8"
+              fill="var(--surface-ground)"
+              animationDuration="1.5s"
+            />
+          </div>
+          }
+        </p-card>
+      </p-tabPanel>
+      }
+    </p-tabView>
+  </p-card>
