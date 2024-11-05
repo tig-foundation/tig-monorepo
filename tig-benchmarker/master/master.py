@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 from tig_benchmarker.extensions.data_fetcher import *
 from tig_benchmarker.extensions.difficulty_sampler import *
 from tig_benchmarker.extensions.job_manager import *
@@ -25,14 +26,13 @@ class Config(FromDict):
 
 def main(config: Config):
     last_block_id = None
-    jobs = []
 
     data_fetcher = DataFetcher(config.api_url, config.player_id)
     difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
-    job_manager = JobManager(config.job_manager_config, jobs)
-    precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id, jobs)
-    submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key, jobs)
-    slave_manager = SlaveManager(config.slave_manager_config, jobs)
+    job_manager = JobManager(config.job_manager_config)
+    precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id)
+    submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key)
+    slave_manager = SlaveManager(config.slave_manager_config)
     slave_manager.start()
 
     while True:

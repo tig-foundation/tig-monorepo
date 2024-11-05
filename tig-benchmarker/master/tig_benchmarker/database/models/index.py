@@ -1,9 +1,10 @@
 from sqlalchemy import (
-    Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, Float, UniqueConstraint
+    Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, TIMESTAMP, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
-from database import Base
-from structs import * 
+from sqlalchemy.sql import func
+from tig_benchmarker.database.init import Base
+from tig_benchmarker.structs import * 
 import datetime
 
 # Helper functions for PreciseNumber conversions
@@ -36,6 +37,8 @@ class BlockModel(Base):
     num_active_players = Column(Integer, nullable=True)
     config = Column(JSON, nullable=False)
     data = Column(JSON, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
     prev_block = relationship('BlockModel', remote_side=[id], backref='next_blocks')
@@ -102,6 +105,9 @@ class PlayerModel(Base):
     is_multisig = Column(Boolean, nullable=False)
     total_fees_paid = Column(Numeric(38, 18), nullable=True)
     available_fee_balance = Column(Numeric(38, 18), nullable=True)
+    block_data = Column(JSON, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
     algorithms = relationship('AlgorithmModel', back_populates='player', cascade="all, delete-orphan")
@@ -117,7 +123,8 @@ class PlayerModel(Base):
             name=player.details.name,
             is_multisig=player.details.is_multisig,
             total_fees_paid=precise_to_float(player.state.total_fees_paid) if player.state else None,
-            available_fee_balance=precise_to_float(player.state.available_fee_balance) if player.state else None
+            available_fee_balance=precise_to_float(player.state.available_fee_balance) if player.state else None,
+            block_data=player.block_data.__dict__ if player.block_data else {}
         )
 
     def to_dataclass(self) -> Player:
@@ -129,11 +136,23 @@ class PlayerModel(Base):
             total_fees_paid=float_to_precise(self.total_fees_paid),
             available_fee_balance=float_to_precise(self.available_fee_balance)
         ) if self.total_fees_paid is not None else None
+        block_data = PlayerBlockData(
+            num_qualifiers_by_challenge=self.block_data.get("num_qualifiers_by_challenge"),
+            cutoff=self.block_data.get("cutoff"),
+            deposit=self.block_data.get("deposit"),
+            rolling_deposit=self.block_data.get("rolling_deposit"),
+            qualifying_percent_rolling_deposit=self.block_data.get("qualifying_percent_rolling_deposit"),
+            imbalance=self.block_data.get("imbalance"),
+            imbalance_penalty=self.block_data.get("imbalance_penalty"),
+            influence=self.block_data.get("influence"),
+            reward=self.block_data.get("reward"),
+            round_earnings=self.block_data.get("round_earnings")
+        ) if self.block_data else None
         return Player(
             id=self.id,
             details=details,
             state=state,
-            block_data=None  # Implement if needed
+            block_data=block_data
         )
 
 # ChallengeModel
@@ -346,6 +365,7 @@ class BenchmarkModel(Base):
     solution_nonces = Column(JSON, nullable=True)
 
     player_id = Column(String, ForeignKey('players.id'), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     # Relationships
     player = relationship('PlayerModel', back_populates='benchmarks')
@@ -529,6 +549,7 @@ class JobModel(Base):
     last_benchmark_submit_time = Column(Integer, nullable=False)
     last_proof_submit_time = Column(Integer, nullable=False)
     last_batch_retry_time = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     
     # Relationships
     batch_results = relationship('BatchResultModel', back_populates='job')
@@ -664,7 +685,15 @@ class SlaveRegistryModel(Base):
     slave_name = Column(String(255), unique=True, nullable=False)
     num_of_cpus = Column(Integer, nullable=False)
     num_of_threads = Column(Integer, nullable=False)
+    memory = Column(Integer, nullable=False)
     registered_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     
     # Relationships
     assigned_batches = relationship('AssignedBatchModel', back_populates='slave')
+
+# Master Config Model
+class ConfigModel(Base):
+    __tablename__ = 'config'
+    id = Column(Integer, primary_key=True, default=1)
+    config_data = Column(JSON, nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

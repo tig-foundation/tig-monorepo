@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Update the DATABASE_URL with your actual database credentials
-DATABASE_URL = "postgresql+psycopg2://"+os.environ.get("POSTGRES_USER")+":"+os.environ.get("POSTGRES_PASSWORD")+"@localhost:5432/"+os.environ.get("POSTGRES_DB")
+DATABASE_URL = "postgresql+psycopg2://"+os.environ.get("POSTGRES_USER")+":"+os.environ.get("POSTGRES_PASSWORD")+"@pgpool:5432/"+os.environ.get("POSTGRES_DB")
 
 engine = create_engine(
     DATABASE_URL,

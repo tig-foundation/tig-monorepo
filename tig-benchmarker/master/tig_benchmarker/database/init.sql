@@ -32,7 +32,9 @@ CREATE TABLE blocks (
     num_active_benchmarks INTEGER,
     num_active_players INTEGER,
     config JSONB NOT NULL,
-    data JSONB NOT NULL  
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- Create players table
@@ -42,6 +44,9 @@ CREATE TABLE players (
     is_multisig BOOLEAN NOT NULL,
     total_fees_paid NUMERIC(38, 18),
     available_fee_balance NUMERIC(38, 18)
+    block_data JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- Create challenges table
@@ -102,7 +107,8 @@ CREATE TABLE benchmarks (
     block_confirmed INTEGER NOT NULL,
     sampled_nonces JSONB,
     solution_nonces JSONB,
-    player_id VARCHAR NOT NULL REFERENCES players(id)
+    player_id VARCHAR NOT NULL REFERENCES players(id),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 );
 
 -- Create proofs table
@@ -157,7 +163,8 @@ CREATE TABLE jobs (
     batch_merkle_roots JSONB,
     last_benchmark_submit_time INTEGER NOT NULL,
     last_proof_submit_time INTEGER NOT NULL,
-    last_batch_retry_time JSONB NOT NULL
+    last_batch_retry_time JSONB NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 );
 
 -- Create assigned_batches table
@@ -222,7 +229,15 @@ CREATE TABLE slave_registry (
     slave_name VARCHAR(255) UNIQUE NOT NULL,
     num_of_cpus INTEGER NOT NULL,
     num_of_threads INTEGER NOT NULL,
+    memory INTEGER NOT NULL,
     registered_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Create config table
+CREATE TABLE config (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    config_data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- Create indexes for foreign keys to improve query performance
@@ -260,3 +275,30 @@ CREATE INDEX idx_proof_requests_benchmark_id ON proof_requests(benchmark_id);
 -- Create index on slave_name for faster lookups
 CREATE INDEX idx_slave_registry_slave_name ON slave_registry(slave_name);
 CREATE INDEX idx_slave_registry_slave_id ON slave_registry(id);
+
+-- Create a trigger function to update the updated_at field on row update
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a trigger
+CREATE TRIGGER trigger_update_players_updated_at
+BEFORE UPDATE ON players
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- Create a trigger
+CREATE TRIGGER trigger_update_blocks_updated_at
+BEFORE UPDATE ON blocks
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- Create a trigger
+CREATE TRIGGER trigger_update_config_updated_at
+BEFORE UPDATE ON config
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();

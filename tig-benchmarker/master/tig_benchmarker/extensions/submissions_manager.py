@@ -11,8 +11,8 @@ from typing import Union
 import threading
 
 from sqlalchemy.exc import SQLAlchemyError
-from database.init import SessionLocal
-from database.models.index import (
+from tig_benchmarker.database.init import SessionLocal
+from tig_benchmarker.database.models.index import (
     JobModel,
     PrecommitRequestModel,
     BenchmarkRequestModel,

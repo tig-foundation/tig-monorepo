@@ -10,10 +10,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
-from database.init import SessionLocal
+from tig_benchmarker.database.init import SessionLocal
 from typing import Dict, List, Optional, Set
 import datetime
-from database.models.index import JobModel, BatchResultModel, AssignedBatchModel
+from tig_benchmarker.database.models.index import JobModel, BatchResultModel, AssignedBatchModel, SlaveRegistryModel
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -37,6 +37,13 @@ class BatchResult(FromDict):
 @dataclass
 class BatchMerkleProof(FromDict):
     merkle_proofs: List[MerkleProof]
+
+@dataclass
+class Slave(FromDict):
+    name: str
+    num_of_cpus: int
+    num_of_threads: int
+    memory: int
 
 @dataclass
 class SlaveConfig(FromDict):
@@ -77,7 +84,34 @@ class SlaveManager:
         self.app = FastAPI()
         self.setup_routes()
     
-    def start(self):
+    def setup_routes(self):
+        @self.app.post("/register-slave")
+        def register_slave( request: Request):
+            try:
+                # Extract User-Agent header to identify the slave
+                slave_name = request.headers.get('User-Agent')
+                if not slave_name:
+                    logger.warning("Missing User-Agent header in register-slave request.")
+                    raise HTTPException(status_code=403, detail="User-Agent header is required.")
+                
+                slave = Slave.from_dict(request.json())
+
+                # Save slave details in the database
+                slave = SlaveRegistryModel(
+                    name=slave.name,
+                    num_of_cpus=slave.num_of_cpus,
+                    num_of_threads=slave.num_of_threads,
+                    memory = slave.memory
+                )
+                self.db_session.add(slave)
+                self.db_session.commit()
+                
+                return JSONResponse(content={"detail": "OK", "id": slave.id}, status_code=200)
+            except SQLAlchemyError as e:
+                self.db_session.rollback()
+                logger.error(f"Database error during register_slave: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error.")
+        
         @self.app.get("/get-batches")
         def get_batches(request: Request):
             # Extract User-Agent header to identify the slave
@@ -144,7 +178,7 @@ class SlaveManager:
                                 now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
                                 (
                                     job.batch_merkle_roots[batch_idx] is None or
-                                    not set(job.sampled_nonces_by_batch_idx.get(batch_idx, [])).issubset(job.merkle_proofs)
+                                    not set(job.sampled_nonces.get(batch_idx, [])).issubset(job.merkle_proofs)
                                 )
                             ):
                                 continue  # Batch not ready
@@ -170,7 +204,7 @@ class SlaveManager:
                                 start_nonce=start_nonce,
                                 num_nonces=num_nonces,
                                 settings=BenchmarkSettings.from_dict(job.settings),
-                                sampled_nonces=job.sampled_nonces_by_batch_idx.get(batch_idx, []),
+                                sampled_nonces=job.sampled_nonces.get(batch_idx, []),
                                 wasm_vm_config=job.wasm_vm_config,
                                 download_url=job.download_url,
                                 rand_hash=job.rand_hash,
@@ -195,7 +229,7 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.post("/submit-batch-result/{batch_id}")
-        def submit_batch_result(batch_id: str, result: BatchResult, request: Request):
+        def submit_batch_result(batch_id: str, request: Request):
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
             if not slave_name:
@@ -242,6 +276,9 @@ class SlaveManager:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for an unassigned or already completed batch '{batch_id}'.")
                         raise HTTPException(status_code=400, detail="Batch not assigned or already completed.")
                     
+                    # Get body from request
+                    result = BatchResult.from_dict(request.json())
+                    
                     # Update JobModel's batch_merkle_roots
                     job.batch_merkle_roots[batch_idx] = str(result.merkle_root)  # Assuming MerkleHash can be converted to string
 
@@ -268,7 +305,7 @@ class SlaveManager:
                     assigned_batch.completed_timestamp = datetime.datetime.utcnow()
                     assigned_batch.batch_result_id = batch_result.id
 
-                    
+                    # TODO: Filter sampled nonces based on start nonce and batch size
                     if job.sample_nonces is None:
                         non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
                         random.shuffle(result.solution_nonces)
@@ -295,7 +332,7 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
             
         @self.app.post('/merkle-proofs/{batch_id}')
-        def get_merkle_proofs(batch_id, result: BatchMerkleProof, request: Request):
+        def get_merkle_proofs(batch_id, request: Request):
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
             if not slave_name:
@@ -324,6 +361,9 @@ class SlaveManager:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent job '{benchmark_id}'.")
                         raise HTTPException(status_code=400, detail="Invalid benchmark_id.")
                     
+                    # Get Request body
+                    result = BatchMerkleProof.from_dict(request.json())
+                    
                     # Set the batch result's merkle proofs
                     job.merkle_proofs = result.merkle_proofs
 
@@ -343,13 +383,14 @@ class SlaveManager:
                 logger.error(f"Unexpected error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
     
-        def start_server(app: FastAPI):
-            uvicorn.run(app, host="0.0.0.0", port=self.config.port)
+    def start(self, host="0.0.0.0"):
+        def run():
+            uvicorn.run(self.app, host=host, port=self.config.port)
             
         # Start the FastAPI server in a separate thread
-        server_thread = threading.Thread(target=start_server, daemon=True)
+        server_thread = threading.Thread(target=run, daemon=True)
         server_thread.start()
-        logger.info(f"Webserver started on 0.0.0.0:{self.config.port}")
+        logger.info(f"SlaveManager started on 0.0.0.0:{self.config.port}")
 
         # Keep the main thread alive
         try:

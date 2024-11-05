@@ -7,8 +7,8 @@ from tig_benchmarker.utils import *
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
-from database.init import SessionLocal
-from database.models.index import (
+from tig_benchmarker.database.init import SessionLocal
+from tig_benchmarker.database.models.index import (
     BlockModel, AlgorithmModel, WasmModel, PlayerModel, PrecommitModel,
     BenchmarkModel, ProofModel, FraudModel, ChallengeModel,
     DifficultyDataModel
