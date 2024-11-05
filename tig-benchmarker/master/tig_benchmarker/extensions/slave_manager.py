@@ -13,7 +13,7 @@ from tig_benchmarker.utils import FromDict
 from database.init import SessionLocal
 from typing import Dict, List, Optional, Set
 import datetime
-from database.models.index import JobModel, BatchResultModel, AssignedBatchModel
+from database.models.index import JobModel, BatchResultModel, AssignedBatchModel, SlaveRegistryModel
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -37,6 +37,12 @@ class BatchResult(FromDict):
 @dataclass
 class BatchMerkleProof(FromDict):
     merkle_proofs: List[MerkleProof]
+
+@dataclass
+class Slave(FromDict):
+    name: str
+    num_of_cpus: int
+    num_of_threads: int
 
 @dataclass
 class SlaveConfig(FromDict):
@@ -78,6 +84,26 @@ class SlaveManager:
         self.setup_routes()
     
     def start(self):
+        @self.app.post("/register-slave")
+        def register_slave(slave: Slave, request: Request):
+            # Extract User-Agent header to identify the slave
+            slave_name = request.headers.get('User-Agent')
+            if not slave_name:
+                logger.warning("Missing User-Agent header in register-slave request.")
+                raise HTTPException(status_code=403, detail="User-Agent header is required.")
+            
+            # Save slave details in the database
+            slave = SlaveRegistryModel(
+                name=slave.name,
+                num_of_cpus=slave.num_of_cpus,
+                num_of_threads=slave.num_of_threads,
+            )
+            self.db_session.add(slave)
+            self.db_session.commit()
+            
+            return JSONResponse(content={"detail": "OK", "id": slave.id}, status_code=200)
+
+
         @self.app.get("/get-batches")
         def get_batches(request: Request):
             # Extract User-Agent header to identify the slave
