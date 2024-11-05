@@ -1,13 +1,14 @@
 from datetime import datetime
-import aiohttp
-import asyncio
 import logging
 import json
 import os
+import requests
 from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Union
+
+import threading
 
 from sqlalchemy.exc import SQLAlchemyError
 from database.init import SessionLocal
@@ -48,7 +49,7 @@ class SubmissionsManager:
         self.db_session = SessionLocal()
         logger.info("SubmissionsManager initialized and connected to the database.")
         
-    async def _post(self, submission_type: str, req: Union[SubmitPrecommitRequest, SubmitBenchmarkRequest, SubmitProofRequest]):
+    def _post(self, submission_type: str, req: Union[SubmitPrecommitRequest, SubmitBenchmarkRequest, SubmitProofRequest]):
         headers = {
             "X-Api-Key": self.api_key,
             "Content-Type": "application/json",
@@ -59,17 +60,20 @@ class SubmissionsManager:
         else:
             logger.info(f"submitting {submission_type} '{req.benchmark_id}'")
         logger.debug(f"{req}")
-        async with aiohttp.ClientSession() as session:
-            async with session.post(f"{self.api_url}/submit-{submission_type}", json=req.to_dict(), headers=headers) as resp:
-                text = await resp.text()
-                if resp.status == 200:
-                    logger.info(f"submitted {submission_type} successfully")
-                elif resp.headers.get("Content-Type") == "text/plain":
-                    logger.error(f"status {resp.status} when submitting {submission_type}: {text}")
-                else:
-                    logger.error(f"status {resp.status} when submitting {submission_type}")
+
+        try:
+            response = requests.post(f"{self.api_url}/submit-{submission_type}", json=req.to_dict(), headers=headers)
+            text = response.text
+            if response.status_code == 200:
+                logger.info(f"submitted {submission_type} successfully")
+            elif response.headers.get("Content-Type") == "text/plain":
+                logger.error(f"status {response.status_code} when submitting {submission_type}: {text}")
+            else:
+                logger.error(f"status {response.status_code} when submitting {submission_type}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error submitting {submission_type}: {e}")
    
-    async def handle_precommit(self, submit_precommit_req: SubmitPrecommitRequest):
+    def handle_precommit(self, submit_precommit_req: SubmitPrecommitRequest):
         try:
             # Create a PrecommitRequestModel entry
             precommit_entry = PrecommitRequestModel(
@@ -81,7 +85,7 @@ class SubmissionsManager:
             self.db_session.add(precommit_entry)
 
             # Submit the precommit request
-            success = await self._post("precommit", submit_precommit_req)
+            success = self._post("precommit", submit_precommit_req)
 
             if success:
                 self.db_session.commit()
@@ -96,7 +100,7 @@ class SubmissionsManager:
             self.db_session.rollback()
             logger.error(f"Unexpected error during precommit submission: {e}")
 
-    async def handle_benchmark_submissions(self, now: int):
+    def handle_benchmark_submissions(self, now: int):
         try:
             # Fetch jobs eligible for benchmark submission
             eligible_jobs = self.db_session.query(JobModel).filter(
@@ -133,7 +137,7 @@ class SubmissionsManager:
                 )
 
                 # Submit the benchmark request
-                success = await self._post("benchmark", submit_benchmark_req)
+                success = self._post("benchmark", submit_benchmark_req)
 
                 if success:
                     self.db_session.commit()
@@ -147,7 +151,7 @@ class SubmissionsManager:
             self.db_session.rollback()
             logger.error(f"Unexpected error during benchmark submissions: {e}")
 
-    async def handle_proof_submissions(self, now: int):
+    def handle_proof_submissions(self, now: int):
         try:
             # Fetch jobs eligible for proof submission
             eligible_jobs = self.db_session.query(JobModel).filter(
@@ -182,7 +186,7 @@ class SubmissionsManager:
                 )
 
                 # Submit the proof request
-                success = await self._post("proof", submit_proof_req)
+                success = self._post("proof", submit_proof_req)
 
                 if success:
                     self.db_session.commit()
@@ -201,12 +205,15 @@ class SubmissionsManager:
         # Submit Precommit Request if provided
         if submit_precommit_req:
             logger.debug("Processing Precommit Request")
-            asyncio.create_task(self.handle_precommit(submit_precommit_req))
+            precommit_thread = threading.Thread(target=self.handle_precommit, args=(submit_precommit_req))
+            precommit_thread.start()
         else:
             logger.debug("No Precommit Request to process")
 
         # Submit Benchmark Requests
-        asyncio.create_task(self.handle_benchmark_submissions(now))
+        benchmark_thread = threading.Thread(target=self.handle_benchmark_submissions, args=(now))
+        benchmark_thread.start()
         
         # Submit Proof Requests
-        asyncio.create_task(self.handle_proof_submissions(now))
+        proof_thread = threading.Thread(target=self.handle_proof_submissions, args=(now))
+        proof_thread.start()

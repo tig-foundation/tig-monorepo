@@ -1,5 +1,3 @@
-aiohttp
-asyncio
 blake3
 dataclasses
 hypercorn
