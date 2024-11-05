@@ -17,6 +17,20 @@ services:
     expose:
       - "5432"
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4_container
+    restart: always
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user-name@domain-name.com
+      PGADMIN_DEFAULT_PASSWORD: strong-password
+    networks:
+      - tig-benchmarker
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
   db_replica:
     image: bitnami/postgresql:latest
     container_name: db_replica
@@ -126,3 +140,6 @@ services:
 
 networks:
   tig-benchmarker:
+
+volumes:
+  pgadmin-data:

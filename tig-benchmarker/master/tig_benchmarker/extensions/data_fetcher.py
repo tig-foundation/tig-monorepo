@@ -167,6 +167,9 @@ class DataFetcher:
                 
             # Store player
             if player:
+
+                logger.info(f"player: {player}")
+
                 existing_player = session.query(PlayerModel).filter_by(id=player.id).first()
                 if existing_player:
                     existing_player.block_data = player.block_data

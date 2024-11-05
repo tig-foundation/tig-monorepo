@@ -10,6 +10,9 @@ from tig_benchmarker.extensions.precommit_manager import *
 from tig_benchmarker.extensions.slave_manager import *
 from tig_benchmarker.extensions.submissions_manager import *
 from tig_benchmarker.utils import FromDict
+from tig_benchmarker.database.init import SessionLocal
+from tig_benchmarker.database.models.index import ConfigModel
+
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -24,8 +27,13 @@ class Config(FromDict):
     slave_manager_config: SlaveManagerConfig
     submissions_manager_config: SubmissionsManagerConfig
 
-def main(config: Config):
+def main():
     last_block_id = None
+    db_session = SessionLocal()
+
+    # Get Config from db
+    configModel = db_session.query(ConfigModel).first()
+    config = Config.from_dict(configModel.config_data)
 
     data_fetcher = DataFetcher(config.api_url, config.player_id)
     difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
@@ -33,12 +41,27 @@ def main(config: Config):
     precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id)
     submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key)
     slave_manager = SlaveManager(config.slave_manager_config)
-    slave_manager.start()
+    # slave_manager.start()
 
     while True:
         try:
+            logger.info("Fetching Latest Block")
             data = data_fetcher.run()
             if data["block"].id != last_block_id:
+                # Fetch Latest Config from DB
+                configModel = db_session.query(ConfigModel).first()
+                config = Config.from_dict(configModel.config_data)
+
+                # Update config
+                data_fetcher.api_url = config.api_url
+                data_fetcher.player_id = config.player_id
+                difficulty_sampler.config = config.difficulty_sampler_config
+                job_manager.config = config.job_manager_config
+                precommit_manager.config = config.precommit_manager_config
+                submissions_manager.config = config.submissions_manager_config
+                slave_manager.config = config.slave_manager_config
+
+                # Process Latest Block
                 last_block_id = data["block"].id
                 difficulty_sampler.on_new_block(**data)
                 job_manager.on_new_block(**data)
@@ -66,10 +89,11 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO
     )
 
-    if not os.path.exists(args.config_path):
-        logger.error(f"config file not found at path: {args.config_path}")
-        sys.exit(1)
-    with open(args.config_path, "r") as f:
-        config = json.load(f)
-        config = Config.from_dict(config)
-    main(config)
+    # if not os.path.exists(args.config_path):
+    #     logger.error(f"config file not found at path: {args.config_path}")
+    #     sys.exit(1)
+    # with open(args.config_path, "r") as f:
+    #     config = json.load(f)
+    #     config = Config.from_dict(config)
+    
+    main()

@@ -199,7 +199,7 @@ class AlgorithmModel(Base):
     __tablename__ = 'algorithms'
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
-    player_id = Column(String, ForeignKey('players.id'), nullable=False)
+    player_id = Column(String, nullable=False)
     challenge_id = Column(String, ForeignKey('challenges.id'), nullable=False)
     tx_hash = Column(String, nullable=True)
     block_confirmed = Column(Integer, nullable=True)
@@ -211,7 +211,7 @@ class AlgorithmModel(Base):
     block_id = Column(String, ForeignKey('blocks.id'), nullable=True)
 
     # Relationships
-    player = relationship('PlayerModel', back_populates='algorithms')
+    # player = relationship('PlayerModel', back_populates='algorithms')
     challenge = relationship('ChallengeModel', back_populates='algorithms')
     wasms = relationship('WasmModel', back_populates='algorithm', cascade="all, delete-orphan")
     block = relationship('BlockModel', back_populates='algorithms')
@@ -297,7 +297,7 @@ class WasmModel(Base):
 class PrecommitModel(Base):
     __tablename__ = 'precommits'
     benchmark_id = Column(String, primary_key=True)
-    player_id = Column(String, ForeignKey('players.id'), nullable=False)
+    player_id = Column(String, nullable=False)
     block_id = Column(String, ForeignKey('blocks.id'), nullable=False)
     challenge_id = Column(String, ForeignKey('challenges.id'), nullable=False)
     algorithm_id = Column(String, ForeignKey('algorithms.id'), nullable=False)
@@ -309,7 +309,7 @@ class PrecommitModel(Base):
     block_confirmed = Column(Integer, nullable=True)
 
     # Relationships
-    player = relationship('PlayerModel', back_populates='precommits')
+    # player = relationship('PlayerModel', back_populates='precommits')
     challenge = relationship('ChallengeModel', back_populates='precommits')
     algorithm = relationship('AlgorithmModel')
     block = relationship('BlockModel')
