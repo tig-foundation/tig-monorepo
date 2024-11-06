@@ -644,6 +644,16 @@ class AssignedBatchModel(Base):
     __table_args__ = (
         UniqueConstraint('benchmark_id', 'batch_idx', name='uq_assigned_batch'),
     )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "benchmark_id": self.benchmark_id,
+            "batch_idx": self.batch_idx,
+            "assigned_slave": self.assigned_slave,
+            "submitted_timestamp": str(self.submitted_timestamp),
+            "completed_timestamp": str(self.completed_timestamp)
+        }
+
     
     # Relationships
     batch_result = relationship('BatchResultModel', back_populates='assigned_batch')

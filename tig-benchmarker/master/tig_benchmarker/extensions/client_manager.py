@@ -151,7 +151,7 @@ class ClientManager:
                     raise HTTPException(status_code=400, detail="Page not found")
                 
                 jobs = self.db_session.query(JobModel).order_by(desc(JobModel.created_at)).offset((page - 1)*limit).limit(limit).all()
-                jobs_data = [JobModel.from_dataclass(job) for job in jobs]
+                jobs_data = [job.to_dataclass().to_dict() for job in jobs]
                 response = {
                     "total_jobs": total_jobs,
                     "total_pages": total_pages,
@@ -175,7 +175,7 @@ class ClientManager:
                     raise HTTPException(status_code=400, detail="Page not found")
                 
                 batches = self.db_session.query(AssignedBatchModel).order_by(desc(AssignedBatchModel.submitted_timestamp)).offset((page - 1)*limit).limit(limit).all()
-                batch_data = [batch for batch in batches]
+                batch_data = [batch.to_dict() for batch in batches]
                 response = {
                     "total_batches": total_batches,
                     "total_pages": total_pages,
@@ -201,7 +201,7 @@ class ClientManager:
                 slaves = self.db_session.query(SlaveRegistryModel).order_by(desc(SlaveRegistryModel.registered_at)).offset((page - 1)*limit).limit(limit).all()
                 slaves_data = [slave.to_dict() for slave in slaves]
                 response = {
-                    "total_batches": total_slaves,
+                    "total_slaves": total_slaves,
                     "total_pages": total_pages,
                     "current_page": page,
                     "slaves": slaves_data
