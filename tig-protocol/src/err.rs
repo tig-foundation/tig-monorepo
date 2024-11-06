@@ -1,5 +1,6 @@
 use tig_structs::{config::DifficultyParameter, core::BenchmarkSettings};
 use tig_utils::PreciseNumber;
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq)]
 pub enum ProtocolError<'a> 
@@ -86,8 +87,8 @@ pub enum ProtocolError<'a>
     },
     InvalidProofNonces 
     {
-        expected_nonces:                &'a Vec<u64>,
-        submitted_nonces:               &'a Vec<u64>,
+        expected_nonces:                &'a HashSet<u64>,
+        submitted_nonces:               Vec<u64>,
     },
     InvalidSignatureFromSolutionData 
     {
@@ -117,21 +118,21 @@ pub enum ProtocolError<'a>
     },
     InvalidTransactionAmount 
     {
-        expected_amount:                &'a String,
-        actual_amount:                  &'a String,
+        expected_amount:                PreciseNumber,
+        actual_amount:                  PreciseNumber,
         tx_hash:                        &'a String,
     },
     InvalidTransactionReceiver 
     {
         tx_hash:                        &'a String,
-        expected_receiver:              &'a String,
-        actual_receiver:                &'a String,
+        expected_receiver:              String,
+        actual_receiver:                String,
     },
     InvalidTransactionSender 
     {
         tx_hash:                        &'a String,
-        expected_sender:                &'a String,
-        actual_sender:                  &'a String,
+        expected_sender:                String,
+        actual_sender:                  String,
     },
     InvalidTransaction 
     {

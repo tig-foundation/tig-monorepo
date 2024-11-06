@@ -10,11 +10,7 @@ use
         err::
         {
             ProtocolError,
-            ProtocolResult,
-        },
-        cache::
-        {
-            Cache
+            ContractResult,
         },
     },
     std::
@@ -35,46 +31,47 @@ use
         {
             *
         }
-    }
+    },
+    logging_timer::time,
 };
 
 pub struct AlgorithmsContract<T: Context>
 {
-    cache:                              Arc<Cache<T>>,
     phantom:                            PhantomData<T>,
 }   
 
 impl<T: Context> AlgorithmsContract<T>
 {
-    pub fn new(
-        cache:                          Arc<Cache<T>>
-    )                                           -> Self
+    pub fn new()                                -> Self
     {
         return Self 
         { 
-            cache                                   : cache, 
             phantom                                 : PhantomData
         };
     }
 
+    #[time]
+    pub async fn fetch_algorithm<'a>(
+        &self,
+        ctx:                    &T,
+        id:                     &'a String,
+        include_data:           bool
+    )                                   -> ContractResult<'a, Algorithm>
+    {
+        return Ok(ctx.get_algorithm_by_id(id, include_data).await.unwrap().expect("Algorithm not found"));
+    }
+
+    #[time]
     pub async fn verify_algorithm<'b>(
         &self,
         ctx:                            &T,
         algorithm_id:                   &'b String,
         block:                          &Block,
-    )                                           -> ProtocolResult<'b, ()> 
+    )                                           -> ContractResult<'b, ()> 
     {
-        if !self.cache.algorithms.read().unwrap().has_algorithm(algorithm_id)
-        {
-            let _ = self.cache
-                .algorithms
-                .write()
-                .unwrap()
-                .fetch_algorithm(ctx, algorithm_id, false)
-                .await;
-        }
+        let algorithm                   = self.fetch_algorithm(ctx, algorithm_id, false).await;
 
-        if !self.cache.algorithms.read().unwrap().get_algorithm(ctx, algorithm_id).unwrap().state.as_ref().is_some_and(|s| !s.banned)
+        if !algorithm.unwrap().state.as_ref().is_some_and(|s| !s.banned)
         {
             return Err(ProtocolError::InvalidAlgorithm 
             {

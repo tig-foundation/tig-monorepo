@@ -12,10 +12,6 @@ use
             ContractResult,
             ProtocolError,
         },
-        cache::
-        {
-            Cache,
-        },
     },
     std::
     {
@@ -39,28 +35,26 @@ use
     tig_utils::
     {
         *
-    }
+    },
+    logging_timer::time
 };
 
 pub struct BenchmarkContract<T: Context>
 {
     phantom:                            PhantomData<T>,
-    cache:                              Arc<Cache<T>>,
 }   
 
 impl<T: Context> BenchmarkContract<T>
 {
-    pub fn new(
-        cache:                  Arc<Cache<T>>
-    )                                   -> Self
+    pub fn new()                        -> Self
     {
         return Self 
         {
             phantom                         : PhantomData,
-            cache                           : cache,
         };
     }
 
+    #[time]
     pub async fn verify_benchmark_settings_are_unique<'a>(
         &self,
         ctx:                    &T,
@@ -83,6 +77,7 @@ impl<T: Context> BenchmarkContract<T>
         return Ok(());
     }
 
+    #[time]
     pub async fn verify_benchmark_difficulty<'b>(
         difficulty:             &'b Vec<i32>,
         challenge:              &Challenge,
@@ -135,6 +130,81 @@ impl<T: Context> BenchmarkContract<T>
                 });
             }
             PointCompareFrontiers::Within => {}
+        }
+
+        return Ok(());
+    }
+
+    #[time]
+    async fn get_benchmark_by_id<'a>(
+        ctx:                    &T,
+        benchmark_id:           &'a String,
+    )                                   -> ContractResult<'a, Benchmark> 
+    {
+        return ctx.get_benchmarks_by_id(benchmark_id, true)
+            .await
+            .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e))
+            .pop()
+            .filter(|b| b.state.is_some())
+            .ok_or_else(|| ProtocolError::InvalidBenchmark 
+            {
+                benchmark_id                : benchmark_id,
+            })
+    }
+
+    #[time]
+    async fn verify_benchmark_ownership<'a>(
+        player:                 &'a Player,
+        settings:               &'a BenchmarkSettings,
+    )                                   -> ContractResult<'a, ()>
+    {
+        if player.id != settings.player_id
+        {
+            return Err(ProtocolError::InvalidSubmittingPlayer 
+            {
+                actual_player_id            : &player.id,
+                expected_player_id          : &settings.player_id,
+            });
+        }
+
+        return Ok(());
+    }
+
+    #[time]
+    async fn verify_benchmark_not_already_submitted<'a>(
+        ctx:                    &T,
+        benchmark_id:           &'a String,
+    )                                   -> ContractResult<'a, ()>
+    {
+        if ctx
+            .get_benchmarks_by_id(benchmark_id, false)
+            .await
+            .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+            .first()
+            .is_some()
+        {
+            return Err(ProtocolError::DuplicateBenchmark 
+            {
+                benchmark_id                : benchmark_id,
+            });
+        }
+
+        return Ok(());
+    }
+
+    #[time]
+    async fn verify_player_owns_benchmark<'a>(
+        player:                 &'a Player,
+        settings:               &'a BenchmarkSettings,
+    )                                   -> ContractResult<'a, ()>
+    {
+        if player.id != settings.player_id 
+        {
+            return Err(ProtocolError::InvalidSubmittingPlayer 
+            {
+                actual_player_id            : &player.id,
+                expected_player_id          : &settings.player_id,
+            });
         }
 
         return Ok(());

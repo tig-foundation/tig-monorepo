@@ -1,6 +1,9 @@
 mod benchmark;
 mod algorithms;
 mod challenge;
+mod topup;
+mod precommits;
+mod proof;
 
 use
 {
@@ -12,10 +15,6 @@ use
             benchmark::BenchmarkContract,
             algorithms::AlgorithmsContract,
             challenge::ChallengeContract,
-        },
-        cache::
-        {
-            Cache,
         },
     },
     std::
@@ -36,15 +35,13 @@ pub struct Contracts<T: Context>
 
 impl<T: Context> Contracts<T>
 {
-    pub fn new(
-        cache:              Arc<Cache<T>>
-    )                               -> Self
+    pub fn new()                    -> Self
     {
         return Self 
         { 
-            benchmark                   : BenchmarkContract::new(cache.clone()), 
-            algorithms                  : AlgorithmsContract::new(cache.clone()),
-            challenge                   : ChallengeContract::new(cache.clone()),
+            benchmark                   : BenchmarkContract::new(), 
+            algorithms                  : AlgorithmsContract::new(),
+            challenge                   : ChallengeContract::new(),
         };
     }
 }
