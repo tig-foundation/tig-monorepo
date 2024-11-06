@@ -11,7 +11,7 @@ from tig_benchmarker.extensions.slave_manager import *
 from tig_benchmarker.extensions.submissions_manager import *
 from tig_benchmarker.extensions.client_manager import *
 from tig_benchmarker.utils import FromDict
-from tig_benchmarker.database.init import SessionLocal
+from tig_benchmarker.database.init import SessionLocal, execute_init_sql
 from tig_benchmarker.database.models.index import ConfigModel
 
 
@@ -31,6 +31,9 @@ class Config(FromDict):
 def main():
     last_block_id = None
     db_session = SessionLocal()
+    db_initialised = execute_init_sql()
+    if not db_initialised:
+        return
 
     # # Get Config from db
     configModel = db_session.query(ConfigModel).first()
