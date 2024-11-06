@@ -157,8 +157,6 @@ class ClientManager:
                 
                 jobs = self.db_session.query(JobModel).order_by(desc(JobModel.created_at)).offset((page - 1)*limit).limit(limit).all()
 
-                logger.info(f"Jobs: {jobs[0]}")
-
                 jobs_data = [{**job.to_dataclass().to_dict(), "block_height": job.block.to_dataclass().to_dict()['details']['height'], "assigned_batches": [batch.to_dict() for batch in job.assigned_batches]} for job in jobs]
                 response = {
                     "total_jobs": total_jobs,
