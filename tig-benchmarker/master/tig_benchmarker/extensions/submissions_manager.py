@@ -82,7 +82,7 @@ class SubmissionsManager:
                 job_id=submit_precommit_req.settings.challenge_id,  # Assuming challenge_id corresponds to job_id
                 settings=submit_precommit_req.settings.to_dict(),
                 num_nonces=submit_precommit_req.num_nonces,
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.utcnow()
             )
             logger.info(f"Precommit Entry: {precommit_entry}")
             # self.db_session.add(precommit_entry)
@@ -127,7 +127,7 @@ class SubmissionsManager:
                     benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
                     merkle_root=str(job.merkle_root),
                     solution_nonces=list(job.solution_nonces),
-                    timestamp=datetime.datetime.utcnow()
+                    timestamp=datetime.utcnow()
                 )
                 logger.info(f"Benchmark Entry: {benchmark_entry}")
                 # self.db_session.add(benchmark_entry)
@@ -182,7 +182,7 @@ class SubmissionsManager:
                     job_id=job.benchmark_id,
                     benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
                     merkle_proofs=list(job.merkle_proofs.values()),
-                    timestamp=datetime.datetime.utcnow()
+                    timestamp=datetime.utcnow()
                 )
                 logger.info(f"Proof Entry: {proof_entry}")
                 # self.db_session.add(proof_entry)

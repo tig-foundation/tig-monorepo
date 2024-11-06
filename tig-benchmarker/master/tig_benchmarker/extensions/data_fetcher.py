@@ -75,18 +75,6 @@ class DataFetcher:
                 "total_fees_paid": "0",
                 "available_fee_balance": "0"
             },
-            "block_data": {
-                "num_qualifiers_by_challenge": {},
-                "cutoff": 0,
-                "deposit": str("0"),
-                "rolling_deposit": str("0"),
-                "qualifying_percent_rolling_deposit": str("0"),
-                "imbalance": str("0"),
-                "imbalance_penalty": str("0"),
-                "influence": str("0"),
-                "reward": str("0"),
-                "round_earnings": "0"
-            }
         }
         player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), Player.from_dict(dummy_player))
         
@@ -191,8 +179,10 @@ class DataFetcher:
                 wasm_model = WasmModel.from_dataclass(wasm)
                 session.merge(wasm_model)
 
+
             # Store precommits
             for precommit in precommits.values():
+                logger.info(f"Storing precommits for block {precommit}")
                 precommit_model = PrecommitModel.from_dataclass(precommit)
                 session.merge(precommit_model)
 

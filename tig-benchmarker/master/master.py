@@ -34,7 +34,6 @@ def main():
 
     # # Get Config from db
     configModel = db_session.query(ConfigModel).first()
-    logger.info(f"Config: {configModel.config_data}")
     config = Config.from_dict(configModel.config_data)
 
     data_fetcher = DataFetcher(config.api_url, config.player_id)

@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, TIMESTAMP, UniqueConstraint
+    Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, TIMESTAMP, UniqueConstraint, BigInteger
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -49,8 +49,8 @@ class BlockModel(Base):
 
     # Relationships
     # prev_block = relationship('BlockModel', remote_side=[id], backref='next_blocks')
-    # algorithms = relationship('AlgorithmModel', back_populates='block', cascade="all, delete-orphan")
-    # challenges = relationship('ChallengeModel', back_populates='block', cascade="all, delete-orphan")
+    algorithms = relationship('AlgorithmModel', back_populates='block', cascade="all, delete-orphan")
+    challenges = relationship('ChallengeModel', back_populates='block', cascade="all, delete-orphan")
 
     @classmethod
     def from_dataclass(cls, block: Block):
@@ -372,7 +372,7 @@ class BenchmarkModel(Base):
     solution_nonces = Column(JSON, nullable=True)
 
     player_id = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
 
     # Relationships
     # player = relationship('PlayerModel', back_populates='benchmarks')
@@ -556,7 +556,7 @@ class JobModel(Base):
     last_benchmark_submit_time = Column(Integer, nullable=False)
     last_proof_submit_time = Column(Integer, nullable=False)
     last_batch_retry_time = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
     batch_results = relationship('BatchResultModel', back_populates='job')
@@ -625,7 +625,7 @@ class AssignedBatchModel(Base):
     benchmark_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
     batch_idx = Column(Integer, nullable=False)
     assigned_slave = Column(Integer, ForeignKey('slave_registry.id'), nullable=False)
-    submitted_timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    submitted_timestamp = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     completed_timestamp = Column(DateTime, nullable=True)
     # batch_result_id = Column(Integer, ForeignKey('batch_results.id'), nullable=True)
     
@@ -649,7 +649,7 @@ class BatchResultModel(Base):
     merkle_root = Column(String, nullable=False)
     solution_nonces = Column(JSON, nullable=False)
     merkle_proofs = Column(JSON, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     assigned_batch_id = Column(Integer, ForeignKey('assigned_batches.id'), nullable=True)
     
     # Relationships
@@ -664,7 +664,7 @@ class PrecommitRequestModel(Base):
     job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
     settings = Column(JSON, nullable=False)
     num_nonces = Column(Integer, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
     job = relationship('JobModel')
@@ -678,7 +678,7 @@ class BenchmarkRequestModel(Base):
     benchmark_id = Column(String, nullable=False)
     merkle_root = Column(String, nullable=False)
     solution_nonces = Column(JSON, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
     job = relationship('JobModel')
@@ -691,7 +691,7 @@ class ProofRequestModel(Base):
     job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
     benchmark_id = Column(String, nullable=False)
     merkle_proofs = Column(JSON, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
     job = relationship('JobModel')
@@ -704,8 +704,8 @@ class SlaveRegistryModel(Base):
     slave_name = Column(String(255), unique=True, nullable=False)
     num_of_cpus = Column(Integer, nullable=False)
     num_of_threads = Column(Integer, nullable=False)
-    memory = Column(Integer, nullable=False)
-    registered_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    memory = Column(BigInteger, nullable=False)
+    registered_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
     assigned_batches = relationship('AssignedBatchModel', back_populates='slave')

@@ -10,10 +10,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
-from tig_benchmarker.database.init import SessionLocal
+from tig_benchmarker.database.init import SessionLocal, engine
 from typing import Dict, List, Optional, Set
 import datetime
 from tig_benchmarker.database.models.index import JobModel, BatchResultModel, AssignedBatchModel, SlaveRegistryModel
+from sqlalchemy.orm import sessionmaker
+from pydantic import BaseModel, ValidationError, RootModel
+import time
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -74,6 +77,9 @@ class AssignedBatch(FromDict):
     completed_timestamp: Optional[str] = None
     batch_result_id: Optional[int] = None
     
+
+class Slave(RootModel[dict]):
+    pass
 class SlaveManager:
     def __init__(self, config: SlaveManagerConfig):
         self.config = config
@@ -86,27 +92,28 @@ class SlaveManager:
     
     def setup_routes(self):
         @self.app.post("/register-slave")
-        def register_slave( request: Request):
+        def register_slave( slave_data: Slave):
             try:
-                # Extract User-Agent header to identify the slave
-                slave_name = request.headers.get('User-Agent')
-                if not slave_name:
-                    logger.warning("Missing User-Agent header in register-slave request.")
-                    raise HTTPException(status_code=403, detail="User-Agent header is required.")
-                
-                slave = Slave.from_dict(request.json())
+                slave = slave_data.root
 
-                # Save slave details in the database
-                slave = SlaveRegistryModel(
-                    name=slave.name,
-                    num_of_cpus=slave.num_of_cpus,
-                    num_of_threads=slave.num_of_threads,
-                    memory = slave.memory
+                logger.info(f"Registering: { slave.get("name")}: {slave_data}")
+
+                name = slave.get("name")
+                num_of_cpus = int(slave.get("num_of_cpus"))
+                num_of_threads = int(slave.get("num_of_threads"))
+                memory = int(slave.get("memory"))
+
+                slaveModel = SlaveRegistryModel(
+                    slave_name=name,
+                    num_of_cpus=num_of_cpus,
+                    num_of_threads=num_of_threads, 
+                    memory = memory
                 )
-                self.db_session.add(slave)
+
+                self.db_session.add(slaveModel)
                 self.db_session.commit()
                 
-                return JSONResponse(content={"detail": "OK", "id": slave.id}, status_code=200)
+                return JSONResponse(content={"detail": "OK", "id": slaveModel.id}, status_code=200)
             except SQLAlchemyError as e:
                 self.db_session.rollback()
                 logger.error(f"Database error during register_slave: {e}")
@@ -128,7 +135,7 @@ class SlaveManager:
 
             slave = matching_slaves[0]
             
-            now = int(datetime.time.time() * 1000)
+            now = int(time.time() * 1000)
             batches = []
             selected_challenge = None
             max_concurrent_batches = None
@@ -139,6 +146,8 @@ class SlaveManager:
                     pending_jobs = self.db_session.query(JobModel).filter_by(merkle_root=None).all()
                     
                     for job in pending_jobs:
+                        
+
                         # Check if the job's challenge is handled by this slave
                         if job.challenge not in slave.max_concurrent_batches:
                             continue
@@ -178,7 +187,8 @@ class SlaveManager:
                                 now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
                                 (
                                     job.batch_merkle_roots[batch_idx] is None or
-                                    not set(job.sampled_nonces.get(batch_idx, [])).issubset(job.merkle_proofs)
+                                    not job.sampled_nonces or
+                                    not set(job.sampled_nonces[batch_idx]).issubset(job.merkle_proofs)
                                 )
                             ):
                                 continue  # Batch not ready
@@ -204,7 +214,7 @@ class SlaveManager:
                                 start_nonce=start_nonce,
                                 num_nonces=num_nonces,
                                 settings=BenchmarkSettings.from_dict(job.settings),
-                                sampled_nonces=job.sampled_nonces.get(batch_idx, []),
+                                sampled_nonces=job.sampled_nonces[batch_idx] if batch_idx in job.sampled_nonces else [],
                                 wasm_vm_config=job.wasm_vm_config,
                                 download_url=job.download_url,
                                 rand_hash=job.rand_hash,

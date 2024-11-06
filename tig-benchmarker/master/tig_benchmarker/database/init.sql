@@ -181,7 +181,7 @@ CREATE TABLE slave_registry (
     slave_name VARCHAR(255) UNIQUE NOT NULL,
     num_of_cpus INTEGER NOT NULL,
     num_of_threads INTEGER NOT NULL,
-    memory INTEGER NOT NULL,
+    memory BIGINT NOT NULL,
     registered_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
