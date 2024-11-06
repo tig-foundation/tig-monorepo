@@ -134,35 +134,35 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
 
-async def register_slave( master_ip, master_port, slave_name):
-    slave_id = None
-    # Step 1: Load slave id from file
-    if os.path.exists("slave_id.txt"):
-        with open("slave_id.txt", "r") as f:
-            slave_id = int(f.read())
+# async def register_slave( master_ip, master_port, slave_name):
+#     slave_id = None
+#     # Step 1: Load slave id from file
+#     if os.path.exists("slave_id.txt"):
+#         with open("slave_id.txt", "r") as f:
+#             slave_id = int(f.read())
     
-    if slave_id is None:
-        # Step 2: Register slave if not already registered
-        cpu_cores = psutil.cpu_count(logical=False)
-        cpu_threads = psutil.cpu_count(logical=True)
-        memory = psutil.virtual_memory()
+#     if slave_id is None:
+#         # Step 2: Register slave if not already registered
+#         cpu_cores = psutil.cpu_count(logical=False)
+#         cpu_threads = psutil.cpu_count(logical=True)
+#         memory = psutil.virtual_memory()
 
-        slaveRegistration = {
-            "slave_name": slave_name,
-            "cpu_cores": cpu_cores,
-            "cpu_threads": cpu_threads,
-            "memory": memory.percent,
-        }
+#         slaveRegistration = {
+#             "slave_name": slave_name,
+#             "cpu_cores": cpu_cores,
+#             "cpu_threads": cpu_threads,
+#             "memory": memory.percent,
+#         }
 
-        # Step 3: Send register slave request
-        async with aiohttp.ClientSession() as session:
-            async with session.post(f"http://{master_ip}:{master_port}/register_slave", json=slaveRegistration) as response:
-                response_json = await response.json()
-                slave_id = response_json["id"]
-                with open("slave_id.txt", "w") as f:
-                    f.write(str(slave_id))
+#         # Step 3: Send register slave request
+#         async with aiohttp.ClientSession() as session:
+#             async with session.post(f"http://{master_ip}:{master_port}/register_slave", json=slaveRegistration) as response:
+#                 response_json = await response.json()
+#                 slave_id = response_json["id"]
+#                 with open("slave_id.txt", "w") as f:
+#                     f.write(str(slave_id))
 
-    return slave_id
+#     return slave_id
 
 async def main(
     master_ip: str,

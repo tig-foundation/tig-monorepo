@@ -88,7 +88,7 @@ class SlaveManager:
         logger.info("SlaveManager initialized and connected to the database.")
         # Initialize FastAPI app
         self.app = FastAPI()
-        # self.setup_routes()
+        self.setup_routes()
     
     def setup_routes(self):
         @self.app.post("/register-slave")
@@ -122,15 +122,15 @@ class SlaveManager:
         @self.app.get("/get-batches")
         def get_batches(request: Request):
             # Extract User-Agent header to identify the slave
-            slave_name = request.headers.get('User-Agent')
-            if not slave_name:
+            slave_id = request.headers.get('User-Agent')
+            if not slave_id:
                 logger.warning("Missing User-Agent header in get-batches request.")
                 raise HTTPException(status_code=403, detail="User-Agent header is required.")
 
             # Find the matching slave configuration
-            matching_slaves = [slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)]
+            matching_slaves = [slave for slave in self.config.slaves if re.match(slave.name_regex, slave_id)]
             if not matching_slaves:
-                logger.warning(f"Slave '{slave_name}' does not match any registered regex patterns.")
+                logger.warning(f"Slave '{slave_id}' does not match any registered regex patterns.")
                 raise HTTPException(status_code=403, detail="Unregistered slave.")
 
             slave = matching_slaves[0]
@@ -147,7 +147,6 @@ class SlaveManager:
                     
                     for job in pending_jobs:
                         
-
                         # Check if the job's challenge is handled by this slave
                         if job.challenge not in slave.max_concurrent_batches:
                             continue
@@ -161,9 +160,11 @@ class SlaveManager:
                         # Count currently assigned batches for this challenge and slave
                         current_assigned = self.db_session.query(AssignedBatchModel).filter_by(
                             benchmark_id=job.benchmark_id,
-                            assigned_slave=slave_name,
+                            assigned_slave=slave_id,
                             completed_timestamp=None
                         ).count()
+
+                        logger.info(f"Current assigned batches: {current_assigned}")
 
                         available_slots = max_concurrent_batches - current_assigned
                         if available_slots <= 0:
@@ -179,7 +180,27 @@ class SlaveManager:
                                 benchmark_id=job.benchmark_id,
                                 batch_idx=batch_idx
                             ).first()
+
+                            logger.info(f"Current assigned batches: {current_assigned}")
+
                             if existing_assignment:
+                                start_nonce = batch_idx * job.batch_size
+                                num_nonces = min(job.batch_size, job.num_nonces - start_nonce)
+                                
+                                batch = Batch(
+                                    benchmark_id=job.benchmark_id,
+                                    start_nonce=start_nonce,
+                                    num_nonces=num_nonces,
+                                    settings=BenchmarkSettings.from_dict(job.settings),
+                                    sampled_nonces=job.sampled_nonces[batch_idx] if batch_idx in job.sampled_nonces else [],
+                                    wasm_vm_config=job.wasm_vm_config,
+                                    download_url=job.download_url,
+                                    rand_hash=job.rand_hash,
+                                    batch_size=job.batch_size
+                                )
+                                
+                                batches.append(batch.to_dict())
+                                selected_challenge = job.challenge
                                 continue  # Batch already assigned
                             
                             # Check if batch is ready
@@ -198,7 +219,7 @@ class SlaveManager:
                             assigned_batch = AssignedBatchModel(
                                 benchmark_id=job.benchmark_id,
                                 batch_idx=batch_idx,
-                                assigned_slave=slave_name,
+                                assigned_slave=slave_id,
                                 submitted_timestamp=assigned_timestamp,
                                 completed_timestamp=None
                                 # batch_result_id=None
@@ -226,12 +247,12 @@ class SlaveManager:
                             available_slots -= 1
                     
                     if not batches:
-                        logger.debug(f"Slave '{slave_name}' requested batches but none are available.")
+                        logger.debug(f"Slave '{slave_id}' requested batches but none are available.")
                         return JSONResponse(content={"detail": "No batches available"}, status_code=503)
                     else:
                         # Commit the assignments
                         self.db_session.commit()
-                        logger.debug(f"Slave '{slave_name}' received {len(batches)} batch(es) for challenge '{selected_challenge}'.")
+                        logger.debug(f"Slave '{slave_id}' received {len(batches)} batch(es) for challenge '{selected_challenge}'.")
                         return JSONResponse(content=batches, status_code=200)
             except SQLAlchemyError as e:
                 self.db_session.rollback()
