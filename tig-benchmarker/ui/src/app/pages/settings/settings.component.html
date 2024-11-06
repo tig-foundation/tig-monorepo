@@ -5,42 +5,32 @@
   <div class="grid">
     @if(view() == 'all' || view() == 'general'){
     <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
-      <p-card header="General" class="w-full h-full">
-        <div class="p-5">
+      <div header="Batch Sizes" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>General</h2>
+          @if(view() == 'all' || view() == 'batch_sizes'){
           <div class="field">
-            <label for="firstname1">IP Address</label>
-            <input
-              type="text"
-              pInputText
-              formControlName="ip_address"
+            <label for="firstname1">Max Pending Batches</label>
+            <p-inputNumber
+              inputId="max_pending_benchmarks"
+              [style]="{ width: '100%' }"
+              formControlName="max_pending_benchmarks"
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
-          <div class="field">
-            <label for="lastname1">Port</label>
-            <input
-              type="text"
-              pInputText
-              formControlName="port"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
-            />
-          </div>
-          <div class="field">
-            <label for="lastname1">Pre Commits</label>
-            <input
-              type="text"
-              pInputText
-              formControlName="precommits"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
-            />
-          </div>
+          }
         </div>
-      </p-card>
+      </div>
     </div>
-    } @if(view() == 'all' || view() == 'batch_sizes'){
+    } @if(view() == 'all' || view() == 'batch_sizes' || view() ==
+    'satisfiability' || view() == 'vehicle_routing' || view() == 'knapsack' ||
+    view() == 'vector_search'){
     <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
-      <p-card header="Batch Sizes" class="w-full">
-        <div class="p-5">
+      <div header="Batch Sizes" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>Batch Size</h2>
+          @if(view() == 'all' || view() == 'batch_sizes' || view() ==
+          'satisfiability'){
           <div class="field">
             <label for="firstname1">Satisfiability</label>
             <p-inputNumber
@@ -50,6 +40,8 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'batch_sizes' || view() ==
+          'vehicle_routing'){
           <div class="field">
             <label for="lastname1">Vehicle Routing</label>
             <p-inputNumber
@@ -59,6 +51,8 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'batch_sizes' || view() ==
+          'knapsack'){
           <div class="field">
             <label for="lastname1">Knapsack</label>
             <p-inputNumber
@@ -68,6 +62,8 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'batch_sizes' || view() ==
+          'vector_search'){
           <div class="field">
             <label for="lastname1">Vector Search</label>
             <p-inputNumber
@@ -77,64 +73,78 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          }
         </div>
-      </p-card>
+      </div>
     </div>
-    } @if(view() == 'all' || view() == 'algos'){
+    } @if(view() == 'all' || view() == 'algos' || view() == 'satisfiability' ||
+    view() == 'vehicle_routing' || view() == 'knapsack' || view() ==
+    'vector_search'){
     <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
-      <p-card header="Algos" class="w-full">
-        <div class="p-5">
+      <div header="Algorithm Selection" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>Algorithm Selection</h2>
+          @if(view() == 'all' || view() == 'algos' || view() ==
+          'satisfiability'){
           <div class="field">
             <label for="firstname1">Satisfiability</label>
-            <input
-              type="text"
-              pInputText
-              inputId="satisfiability_algorithm"
-              [style]="{ width: '100%' }"
+            <p-dropdown
               formControlName="satisfiability_algorithm"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [options]="satisfiability_algos"
+              optionLabel="name"
+              styleClass="w-full"
+              placeholder="Select a Satisfiability Algorithm"
             />
           </div>
+          } @if(view() == 'all' || view() == 'algos' || view() ==
+          'vehicle_routing'){
           <div class="field">
             <label for="lastname1">Vehicle Routing</label>
-            <input
-              type="text"
-              pInputText
-              inputId="vehicle_routing_algorithm"
-              [style]="{ width: '100%' }"
+
+            <p-dropdown
               formControlName="vehicle_routing_algorithm"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [options]="vehicle_routing_algos"
+              optionLabel="name"
+              styleClass="w-full"
+              placeholder="Select a Vehicle Routing Algorithm"
             />
           </div>
+          }@if(view() == 'all' || view() == 'algos' || view() == 'knapsack'){
           <div class="field">
             <label for="lastname1">Knapsack</label>
-            <input
-              type="text"
-              pInputText
-              inputId="knapsack_algorithm"
-              [style]="{ width: '100%' }"
+            <p-dropdown
               formControlName="knapsack_algorithm"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [options]="knapsack_algos"
+              optionLabel="name"
+              styleClass="w-full"
+              placeholder="Select a Vehicle Routing Algorithm"
             />
           </div>
+          }@if(view() == 'all' || view() == 'algos' || view() ==
+          'vector_search'){
           <div class="field">
             <label for="lastname1">Vector Search</label>
-            <input
-              type="text"
-              pInputText
-              inputId="vector_search_algorithm"
+            <p-dropdown
               formControlName="vector_search_algorithm"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [options]="vector_search_algos"
+              optionLabel="name"
+              styleClass="w-full"
+              placeholder="Select a Vehicle Routing Algorithm"
             />
           </div>
+          }
         </div>
-      </p-card>
+      </div>
     </div>
-    } @if(view() == 'all' || view() == 'number_nonces'){
+    } @if(view() == 'all' || view() == 'number_nonces' || view() ==
+    'satisfiability' || view() == 'vehicle_routing' || view() == 'knapsack' ||
+    view() == 'vector_search'){
     <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
-      <p-card header="Number of Nonces" class="w-full">
-        <div class="p-5">
+      <div header="Number of Nonces" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>Number of Nonces</h2>
+          @if(view() == 'all' || view() == 'number_nonces' || view() ==
+          'satisfiability' ){
           <div class="field">
             <label for="firstname1">Satisfiability</label>
             <p-inputNumber
@@ -144,6 +154,8 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'number_nonces' || view() ==
+          'vehicle_routing' ){
           <div class="field">
             <label for="lastname1">Vehicle Routing</label>
             <p-inputNumber
@@ -153,6 +165,8 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'number_nonces' || view() ==
+          'knapsack' ){
           <div class="field">
             <label for="lastname1">Knapsack</label>
             <p-inputNumber
@@ -162,6 +176,8 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'number_nonces' || view() ==
+          'vector_search' ){
           <div class="field">
             <label for="lastname1">Vector Search</label>
             <p-inputNumber
@@ -171,107 +187,127 @@
               class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
             />
           </div>
+          }
         </div>
-      </p-card>
+      </div>
     </div>
-    } @if(view() == 'all' || view() == 'weight'){
+    } @if(view() == 'all' || view() == 'weight' || view() == 'satisfiability' ||
+    view() == 'vehicle_routing' || view() == 'knapsack' || view() ==
+    'vector_search'){
     <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
-      <p-card header="Weight" class="w-full">
-        <div class="p-5">
+      <div header="Weight" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>Weight</h2>
+          @if(view() == 'all' || view() == 'weight' || view() ==
+          'satisfiability'){
           <div class="field">
             <label for="firstname1">Satisfiability</label>
-            <p-inputNumber
-              inputId="satisfiability_weight"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="satisfiability_weight"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [step]="0.1"
+              [max]="1"
+              styleClass="w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'weight' || view() ==
+          'vehicle_routing'){
           <div class="field">
             <label for="lastname1">Vehicle Routing</label>
-            <p-inputNumber
-              inputId="vehicle_routing_weight"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="vehicle_routing_weight"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [step]="0.1"
+              [max]="1"
+              styleClass="w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'weight' || view() == 'knapsack'){
           <div class="field">
             <label for="lastname1">Knapsack</label>
-            <p-inputNumber
-              inputId="knapsack_weight"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="knapsack_weight"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [step]="0.1"
+              [max]="1"
+              styleClass="w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'weight' || view() ==
+          'vector_search'){
           <div class="field">
             <label for="lastname1">Vector Search</label>
-            <p-inputNumber
-              inputId="vector_search_weight"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="vector_search_weight"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [step]="0.1"
+              [max]="1"
+              styleClass="w-full"
             />
           </div>
+          }
         </div>
-      </p-card>
+      </div>
     </div>
-    } @if(view() == 'all' || view() == 'difficulty'){
+    } @if(view() == 'all' || view() == 'difficulty' || view() ==
+    'satisfiability' || view() == 'vehicle_routing' || view() == 'knapsack' ||
+    view() == 'vector_search'){
     <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
-      <p-card header="Difficulty" class="w-full">
-        <div class="p-5">
+      <div header="Difficulty" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>Difficulty</h2>
+          @if(view() == 'all' || view() == 'difficulty' || view() ==
+          'satisfiability' ){
           <div class="field">
             <label for="firstname1">Satisfiability</label>
-            <p-inputNumber
-              inputId="satisfiability_difficulty"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="satisfiability_difficulty"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [range]="true"
+              [max]="1"
+              [step]="0.1"
+              styleClass="w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'difficulty' || view() ==
+          'vehicle_routing' ){
           <div class="field">
             <label for="lastname1">Vehicle Routing</label>
-            <p-inputNumber
-              inputId="vehicle_routing_difficulty"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="vehicle_routing_difficulty"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [range]="true"
+              [max]="1"
+              [step]="0.1"
+              styleClass="w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'difficulty' || view() ==
+          'knapsack' ){
           <div class="field">
             <label for="lastname1">Knapsack</label>
-            <p-inputNumber
-              inputId="knapsack_difficulty"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="knapsack_difficulty"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [range]="true"
+              [max]="1"
+              [step]="0.1"
+              styleClass="w-full"
             />
           </div>
+          } @if(view() == 'all' || view() == 'difficulty' || view() ==
+          'vector_search' ){
           <div class="field">
             <label for="lastname1">Vector Search</label>
-            <p-inputNumber
-              inputId="vector_search_difficulty"
-              [maxFractionDigits]="1"
+            <p-slider
               formControlName="vector_search_difficulty"
-              [style]="{ width: '100%' }"
-              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+              [range]="true"
+              [max]="1"
+              [step]="0.1"
+              styleClass="w-full"
             />
           </div>
+          }
         </div>
-      </p-card>
+      </div>
     </div>
     } @if(view() == 'all' || view() == 'slaves'){
-    <!-- <p-card header="Micro Slave Settings" class="w-full">
+    <!-- <div header="Micro Slave Settings" class="w-full">
       <div class="col-3">
-        <div class="p-5">
+        <div class="p-3 pb-0">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
             <p-inputNumber
@@ -312,7 +348,7 @@
       </div>
       <div class="col-3">
         <h1>Small Slave Settings</h1>
-        <div class="p-5">
+        <div class="p-3 pb-0">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
             <p-inputNumber
@@ -353,7 +389,7 @@
       </div>
       <div class="col-3">
         <h1>Medium Slave Settings</h1>
-        <div class="p-5">
+        <div class="p-3 pb-0">
           <div class="field">
             <label for="firstname1">Satisfiability</label>
             <p-inputNumber
@@ -394,7 +430,7 @@
       </div>
       <div class="col-3">
         <h1>Big Slave Settings</h1>
-        <div class="p-5">
+        <div class="p-3 pb-0">
           <div class="field">
             <label for="big_slave_satisfiability">Satisfiability</label>
             <p-inputNumber
@@ -433,7 +469,7 @@
           </div>
         </div>
       </div>
-    </p-card> -->
+    </div> -->
     }
   </div>
 </form>

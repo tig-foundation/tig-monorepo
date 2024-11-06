@@ -2,11 +2,16 @@ import axios from 'axios';
 import BigNumber from 'bignumber.js';
 import { inject, Injectable, signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
+import { MessageService } from 'primeng/api';
 
 @Injectable({
   providedIn: 'root',
 })
 export class TigApisService {
+  router = inject(Router);
+  messageService = inject(MessageService);
+  base_url = 'http://localhost:3336';
   player_stats: any = signal(null);
   ready: any = signal(false);
   algorithms: any = signal(null);
@@ -16,18 +21,43 @@ export class TigApisService {
   price_info$ = toObservable(this.price_info);
   round = 44;
   player_id = signal('0x81a8ed48a188853442e3ff2b5eab0c9fa9a3c626');
+  api_key = signal('256979aea0c51f485e9559a45f29ec74');
   latest_block: any = signal(null);
   latest_block$ = toObservable(this.latest_block);
+  config: any = signal(null);
+  config$ = toObservable(this.config);
   constructor() {
     this.init();
   }
 
   async init() {
-    await this.getLatestBlock();
-    this.getAlgorithms();
-    this.getChallenges();
-    this.getCurrentPlayerStats();
+    const player_id = localStorage.getItem('player_id');
+    const api_key = localStorage.getItem('api_key');
+    if (player_id && api_key) {
+      this.player_id.set(player_id);
+      this.api_key.set(api_key);
+      await this.initData();
+      this.router.navigate(['/home']);
+    } else {
+      this.router.navigate(['/auth']);
+    }
+  }
+
+  setPlayerAndAuthKey(player_id: string, api_key: string) {
+    this.player_id.set(player_id);
+    this.api_key.set(api_key);
+    localStorage.setItem('player_id', player_id);
+    localStorage.setItem('api_key', api_key);
+    this.init();
+  }
+
+  async initData() {
     this.getPriceInfo();
+    await this.getLatestBlock();
+    await this.getChallenges();
+    await this.getAlgorithms();
+    await this.getConfig();
+    this.getCurrentPlayerStats();
   }
 
   async getLatestBlock() {
@@ -55,6 +85,7 @@ export class TigApisService {
             };
           })
         );
+        console.log('algorithms', this.algorithms());
         this.checkReady();
       }
     }
@@ -148,8 +179,60 @@ export class TigApisService {
   }
 
   checkReady() {
-    if (this.algorithms() && this.challenges() && this.player_stats()) {
+    if (
+      this.algorithms() &&
+      this.challenges() &&
+      this.player_stats() &&
+      this.config()
+    ) {
       this.ready.set(true);
+    }
+  }
+
+  async getConfig() {
+    const url = `${this.base_url}/get-config`;
+    const result = (
+      await axios.get(url, {
+        headers: {
+          'x-api-key': this.api_key(),
+        },
+      })
+    ).data;
+    console.log('getConfig', result);
+    this.config.set(result);
+    this.checkReady();
+  }
+
+  async saveConfig(data: any) {
+    console.log('saveConfig', data);
+    try {
+      const url = `${this.base_url}/update-config`;
+      const result = (
+        await axios.post(url, data, {
+          headers: {
+            'x-api-key': this.api_key(),
+          },
+        })
+      ).data;
+      console.log('saveConfig', result);
+      this.config.set(result);
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Config saved successfully',
+        key: 'global-toast',
+        life: 5000,
+      });
+      this.getConfig();
+    } catch (e) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Error saving config',
+        key: 'global-toast',
+        life: 5000,
+      });
+      console.error('saveConfig', e);
     }
   }
 }

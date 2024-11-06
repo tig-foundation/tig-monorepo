@@ -5,6 +5,8 @@ import { SidebarModule } from 'primeng/sidebar';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { TigApisService } from './services/tig-apis.service';
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
 
 @Component({
   selector: 'app-root',
@@ -15,10 +17,13 @@ import { TigApisService } from './services/tig-apis.service';
     SidebarModule,
     FormsModule,
     ReactiveFormsModule,
+    ToastModule,
     ButtonModule,
+  
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
+  providers: [TigApisService,MessageService],
 })
 export class AppComponent {
   tigService = inject(TigApisService);
