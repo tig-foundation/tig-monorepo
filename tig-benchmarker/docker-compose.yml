@@ -94,7 +94,6 @@ services:
       context: ./master
       dockerfile: Dockerfile
     container_name: master
-    restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -103,6 +102,7 @@ services:
       - tig-benchmarker
     ports:
       - 5115:5115
+      - 3336:3336
     depends_on:
       - pgpool
 

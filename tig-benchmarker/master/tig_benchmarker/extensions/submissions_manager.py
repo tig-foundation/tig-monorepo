@@ -10,14 +10,20 @@ from typing import Union
 
 import threading
 
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
-from tig_benchmarker.database.init import SessionLocal
+from sqlalchemy.orm import sessionmaker
+from tig_benchmarker.database.init import SessionLocal, engine
+# from tig_benchmarker.database.models.index import (
+#     JobModel,
+#     PrecommitRequestModel,
+#     BenchmarkRequestModel,
+#     ProofRequestModel
+# )
 from tig_benchmarker.database.models.index import (
     JobModel,
-    PrecommitRequestModel,
-    BenchmarkRequestModel,
-    ProofRequestModel
 )
+
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -76,20 +82,20 @@ class SubmissionsManager:
     def handle_precommit(self, submit_precommit_req: SubmitPrecommitRequest):
         try:
             # Create a PrecommitRequestModel entry
-            precommit_entry = PrecommitRequestModel(
-                job_id=submit_precommit_req.settings.challenge_id,  # Assuming challenge_id corresponds to job_id
-                settings=submit_precommit_req.settings.to_dict(),
-                num_nonces=submit_precommit_req.num_nonces,
-                timestamp=datetime.datetime.utcnow()
-            )
-            self.db_session.add(precommit_entry)
+            # precommit_entry = PrecommitRequestModel(
+            #     job_id=submit_precommit_req.settings.challenge_id,  # Assuming challenge_id corresponds to job_id
+            #     settings=submit_precommit_req.settings.to_dict(),
+            #     num_nonces=submit_precommit_req.num_nonces,
+            #     timestamp=datetime.datetime.utcnow()
+            # )
+            # self.db_session.add(precommit_entry)
 
             # Submit the precommit request
             success = self._post("precommit", submit_precommit_req)
 
             if success:
                 self.db_session.commit()
-                logger.debug(f"PrecommitRequestModel entry created with id {precommit_entry.id}")
+                # logger.debug(f"PrecommitRequestModel entry created with id {precommit_entry.id}")
                 logger.info(f"Precommit request for job_id '{submit_precommit_req.settings.challenge_id}' submitted successfully.")
             else:
                 logger.error(f"Failed to submit precommit request for job_id '{submit_precommit_req.settings.challenge_id}'.")
@@ -101,11 +107,13 @@ class SubmissionsManager:
             logger.error(f"Unexpected error during precommit submission: {e}")
 
     def handle_benchmark_submissions(self, now: int):
+        Session = sessionmaker(bind=engine)
+        session = Session()
         try:
             # Fetch jobs eligible for benchmark submission
-            eligible_jobs = self.db_session.query(JobModel).filter(
+            eligible_jobs = session.query(JobModel).filter(
                 JobModel.merkle_root.isnot(None),
-                len(JobModel.sampled_nonces) == 0,
+                func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0) == 0,
                 JobModel.last_benchmark_submit_time < now - self.config.time_between_retries
             ).all()
 
@@ -117,14 +125,14 @@ class SubmissionsManager:
                 logger.debug(f"Processing Benchmark submission for job_id '{job.benchmark_id}'")
 
                 # Create a BenchmarkRequestModel entry
-                benchmark_entry = BenchmarkRequestModel(
-                    job_id=job.benchmark_id,
-                    benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
-                    merkle_root=str(job.merkle_root),
-                    solution_nonces=list(job.solution_nonces),
-                    timestamp=datetime.datetime.utcnow()
-                )
-                self.db_session.add(benchmark_entry)
+                # benchmark_entry = BenchmarkRequestModel(
+                #     job_id=job.benchmark_id,
+                #     benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
+                #     merkle_root=str(job.merkle_root),
+                #     solution_nonces=list(job.solution_nonces),
+                #     timestamp=datetime.datetime.utcnow()
+                # )
+                # self.db_session.add(benchmark_entry)
                 
                 # Update job's last_benchmark_submit_time
                 job.last_benchmark_submit_time = now
@@ -152,13 +160,17 @@ class SubmissionsManager:
             logger.error(f"Unexpected error during benchmark submissions: {e}")
 
     def handle_proof_submissions(self, now: int):
+        Session = sessionmaker(bind=engine)
+        session = Session()
         try:
             # Fetch jobs eligible for proof submission
-            eligible_jobs = self.db_session.query(JobModel).filter(
-                len(JobModel.sampled_nonces) != 0, 
-                len(JobModel.merkle_proofs) == len(JobModel.sampled_nonces), 
+            eligible_jobs = session.query(JobModel).filter(
+                func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0) != 0,
+                func.coalesce(func.jsonb_array_length(JobModel.merkle_proofs), 0) == func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0),
                 JobModel.last_proof_submit_time < now - self.config.time_between_retries
             ).all()
+
+             
 
             if not eligible_jobs:
                 logger.debug("No Proof submissions to process")
@@ -167,14 +179,14 @@ class SubmissionsManager:
             for job in eligible_jobs:
                 logger.debug(f"Processing Proof submission for job_id '{job.benchmark_id}'")
 
-                # Create a ProofRequestModel entry
-                proof_entry = ProofRequestModel(
-                    job_id=job.benchmark_id,
-                    benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
-                    merkle_proofs=list(job.merkle_proofs.values()),
-                    timestamp=datetime.datetime.utcnow()
-                )
-                self.db_session.add(proof_entry)
+                # # Create a ProofRequestModel entry
+                # proof_entry = ProofRequestModel(
+                #     job_id=job.benchmark_id,
+                #     benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
+                #     merkle_proofs=list(job.merkle_proofs.values()),
+                #     timestamp=datetime.datetime.utcnow()
+                # )
+                # self.db_session.add(proof_entry)
 
                 # Update job's last_proof_submit_time
                 job.last_proof_submit_time = now
@@ -205,15 +217,15 @@ class SubmissionsManager:
         # Submit Precommit Request if provided
         if submit_precommit_req:
             logger.debug("Processing Precommit Request")
-            precommit_thread = threading.Thread(target=self.handle_precommit, args=(submit_precommit_req))
+            precommit_thread = threading.Thread(target=self.handle_precommit, args=(submit_precommit_req,))
             precommit_thread.start()
         else:
             logger.debug("No Precommit Request to process")
 
         # Submit Benchmark Requests
-        benchmark_thread = threading.Thread(target=self.handle_benchmark_submissions, args=(now))
+        benchmark_thread = threading.Thread(target=self.handle_benchmark_submissions, args=(now,))
         benchmark_thread.start()
         
         # Submit Proof Requests
-        proof_thread = threading.Thread(target=self.handle_proof_submissions, args=(now))
+        proof_thread = threading.Thread(target=self.handle_proof_submissions, args=(now,))
         proof_thread.start()

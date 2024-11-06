@@ -393,10 +393,10 @@ class SlaveManager:
         logger.info(f"SlaveManager started on 0.0.0.0:{self.config.port}")
 
         # Keep the main thread alive
-        try:
-            while True:
-                signal.pause()
-        except KeyboardInterrupt:
-            logger.info("Shutting down SlaveManager.")
-            self.db_session.close()
-            logger.info("SlaveManager shut down successfully.")
+        # try:
+        #     while True:
+        #         signal.pause()
+        # except KeyboardInterrupt:
+        #     logger.info("Shutting down SlaveManager.")
+        #     self.db_session.close()
+        #     logger.info("SlaveManager shut down successfully.")

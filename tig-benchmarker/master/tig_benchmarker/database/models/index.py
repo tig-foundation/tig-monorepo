@@ -14,7 +14,14 @@ def precise_to_float(value):
 def float_to_precise(value):
     return PreciseNumber(value) if value is not None else None
 
-# BlockModel
+# Master Config Model
+class ConfigModel(Base):
+    __tablename__ = 'config'
+    id = Column(Integer, primary_key=True, default=1)
+    config_data = Column(JSON, nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+#BlockModel
 class BlockModel(Base):
     __tablename__ = 'blocks'
     id = Column(String, primary_key=True)
@@ -42,8 +49,8 @@ class BlockModel(Base):
 
     # Relationships
     # prev_block = relationship('BlockModel', remote_side=[id], backref='next_blocks')
-    algorithms = relationship('AlgorithmModel', back_populates='block', cascade="all, delete-orphan")
-    challenges = relationship('ChallengeModel', back_populates='block', cascade="all, delete-orphan")
+    # algorithms = relationship('AlgorithmModel', back_populates='block', cascade="all, delete-orphan")
+    # challenges = relationship('ChallengeModel', back_populates='block', cascade="all, delete-orphan")
 
     @classmethod
     def from_dataclass(cls, block: Block):
@@ -97,7 +104,7 @@ class BlockModel(Base):
             data=self.data
         )
 
-# PlayerModel
+# # PlayerModel
 class PlayerModel(Base):
     __tablename__ = 'players'
     id = Column(String, primary_key=True)
@@ -297,7 +304,7 @@ class WasmModel(Base):
 class PrecommitModel(Base):
     __tablename__ = 'precommits'
     benchmark_id = Column(String, primary_key=True)
-    player_id = Column(String, nullable=False)
+    player_id = Column(String, ForeignKey('players.id'), nullable=False)
     block_id = Column(String, ForeignKey('blocks.id'), nullable=False)
     challenge_id = Column(String, ForeignKey('challenges.id'), nullable=False)
     algorithm_id = Column(String, ForeignKey('algorithms.id'), nullable=False)
@@ -309,7 +316,7 @@ class PrecommitModel(Base):
     block_confirmed = Column(Integer, nullable=True)
 
     # Relationships
-    # player = relationship('PlayerModel', back_populates='precommits')
+    player = relationship('PlayerModel', back_populates='precommits')
     challenge = relationship('ChallengeModel', back_populates='precommits')
     algorithm = relationship('AlgorithmModel')
     block = relationship('BlockModel')
@@ -597,6 +604,18 @@ class JobModel(Base):
             last_proof_submit_time=job.last_proof_submit_time,
             last_batch_retry_time=job.last_batch_retry_time
         )
+    
+    @property
+    def num_batches(self) -> int:
+        return (self.num_nonces + self.batch_size - 1) // self.batch_size
+    
+    @property
+    def sampled_nonces_by_batch_idx(self) -> Dict[int, List[int]]:
+        ret = {}
+        for nonce in self.sampled_nonces:
+            batch_idx = nonce // self.batch_size
+            ret.setdefault(batch_idx, []).append(nonce)
+        return ret
 
 # AssignedBatch
 class AssignedBatchModel(Base):
@@ -677,7 +696,7 @@ class ProofRequestModel(Base):
     # Relationships
     job = relationship('JobModel')
     
-# Slave Registry model
+# # Slave Registry model
 class SlaveRegistryModel(Base):
     __tablename__ = 'slave_registry'
     
@@ -691,9 +710,3 @@ class SlaveRegistryModel(Base):
     # Relationships
     assigned_batches = relationship('AssignedBatchModel', back_populates='slave')
 
-# Master Config Model
-class ConfigModel(Base):
-    __tablename__ = 'config'
-    id = Column(Integer, primary_key=True, default=1)
-    config_data = Column(JSON, nullable=False)
-    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

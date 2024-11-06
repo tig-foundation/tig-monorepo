@@ -9,6 +9,7 @@ from tig_benchmarker.extensions.job_manager import *
 from tig_benchmarker.extensions.precommit_manager import *
 from tig_benchmarker.extensions.slave_manager import *
 from tig_benchmarker.extensions.submissions_manager import *
+from tig_benchmarker.extensions.client_manager import *
 from tig_benchmarker.utils import FromDict
 from tig_benchmarker.database.init import SessionLocal
 from tig_benchmarker.database.models.index import ConfigModel
@@ -31,8 +32,9 @@ def main():
     last_block_id = None
     db_session = SessionLocal()
 
-    # Get Config from db
+    # # Get Config from db
     configModel = db_session.query(ConfigModel).first()
+    logger.info(f"Config: {configModel.config_data}")
     config = Config.from_dict(configModel.config_data)
 
     data_fetcher = DataFetcher(config.api_url, config.player_id)
@@ -41,7 +43,9 @@ def main():
     precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id)
     submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key)
     slave_manager = SlaveManager(config.slave_manager_config)
-    # slave_manager.start()
+    slave_manager.start()
+
+    client_manager = ClientManager(config.api_key)
 
     while True:
         try:
@@ -49,9 +53,12 @@ def main():
             data = data_fetcher.run()
             if data["block"].id != last_block_id:
                 # Fetch Latest Config from DB
-                configModel = db_session.query(ConfigModel).first()
-                config = Config.from_dict(configModel.config_data)
+                db_session.expire_all()
 
+                # Get Config from db
+                configModelNew = db_session.query(ConfigModel).first()
+                config = Config.from_dict(configModelNew.config_data)
+              
                 # Update config
                 data_fetcher.api_url = config.api_url
                 data_fetcher.player_id = config.player_id
@@ -60,6 +67,7 @@ def main():
                 precommit_manager.config = config.precommit_manager_config
                 submissions_manager.config = config.submissions_manager_config
                 slave_manager.config = config.slave_manager_config
+                client_manager.api_key = config.api_key
 
                 # Process Latest Block
                 last_block_id = data["block"].id
