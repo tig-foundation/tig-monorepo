@@ -7,6 +7,7 @@ import uvicorn
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import FastAPI, Query, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError, RootModel
 from tig_benchmarker.database.init import SessionLocal
 from tig_benchmarker.database.models.index import AssignedBatchModel, BlockModel, ConfigModel, JobModel, PlayerModel, SlaveRegistryModel
@@ -27,6 +28,14 @@ class ClientManager:
         logger.info("ClientManager initialized and connected to the database.")
         # FastAPI Application
         self.app = FastAPI()
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
         self.setup_routes()
         self.start_server()
         
