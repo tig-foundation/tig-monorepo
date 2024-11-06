@@ -9,23 +9,30 @@ import { MessageService } from 'primeng/api';
   providedIn: 'root',
 })
 export class TigApisService {
+  base_url = 'http://localhost:3336';
+  tig_url = 'https://testnet-api.tig.foundation'; // 'https://api.tig.foundation';
+
+  // Services
   router = inject(Router);
   messageService = inject(MessageService);
-  base_url = 'http://localhost:3336';
   player_stats: any = signal(null);
+
+  // Signals
   ready: any = signal(false);
   algorithms: any = signal(null);
   challenges: any = signal(null);
-  batches: any = signal(null);
   price_info: any = signal(null);
   price_info$ = toObservable(this.price_info);
-  round = 44;
-  player_id = signal('0x81a8ed48a188853442e3ff2b5eab0c9fa9a3c626');
-  api_key = signal('256979aea0c51f485e9559a45f29ec74');
+  player_id: any = signal(null);
+  api_key: any = signal(null);
   latest_block: any = signal(null);
   latest_block$ = toObservable(this.latest_block);
   config: any = signal(null);
   config$ = toObservable(this.config);
+
+  batches: any = signal(null);
+  benchmarks: any = signal(null);
+  slaves: any = signal(null);
   constructor() {
     this.init();
   }
@@ -57,20 +64,11 @@ export class TigApisService {
     await this.getChallenges();
     await this.getAlgorithms();
     await this.getConfig();
-    this.getCurrentPlayerStats();
   }
 
-  async getLatestBlock() {
-    const url =
-      'https://mainnet-api.tig.foundation/get-block?round=42&include_data=true';
-    const result = (await axios.get(url)).data;
-    if (result?.block) {
-      this.latest_block.set(result.block);
-    }
-  }
   async getAlgorithms() {
     if (this.latest_block()) {
-      const url = `https://mainnet-api.tig.foundation/get-algorithms?block_id=${
+      const url = `${this.tig_url}/get-algorithms?block_id=${
         this.latest_block()?.id
       }`;
       const result = (await axios.get(url)).data;
@@ -93,11 +91,6 @@ export class TigApisService {
   async getChallenges() {
     console.log('getChallenges');
     if (this.latest_block()) {
-      // const url = `https://mainnet-api.tig.foundation/get-challenges?block_id=${
-      //   this.latest_block()?.id
-      // }`;
-      // const result = (await axios.get(url)).data;
-      // console.log('getChallenges', result);
       const temp_challenges = [
         {
           id: 'c001',
@@ -121,46 +114,52 @@ export class TigApisService {
       this.checkReady();
     }
   }
-
-  async getCurrentPlayerStats() {
-    const url = `https://mainnet-api.tig.foundation/get-players?block_id=${
-      this.latest_block()?.id
-    }&player_type=benchmarker`;
-    const result = (await axios.get(url)).data;
-    if (result?.players) {
-      if (result.players.filter((p: any) => p.id === this.player_id())[0]) {
-        const player = result.players.filter(
-          (p: any) => p.id === this.player_id()
-        )[0];
-        const data: any = {
-          id: player.id,
-          ...player.details,
-          ...player.state,
-          ...player.block_data,
-        };
-
-        data.deposit = new BigNumber(data.deposit)
-          .dividedBy(new BigNumber(Math.pow(10, 18)))
-          .toString();
-        data.total_fees_paid = new BigNumber(data.total_fees_paid)
-          .dividedBy(new BigNumber(Math.pow(10, 18)))
-          .toString();
-        data.round_earnings = new BigNumber(data.round_earnings)
-          .dividedBy(new BigNumber(Math.pow(10, 18)))
-          .toString();
-        data.rolling_deposit = new BigNumber(data.rolling_deposit)
-          .dividedBy(new BigNumber(Math.pow(10, 18)))
-          .toString();
-        data.available_fee_balance = new BigNumber(data.available_fee_balance)
-          .dividedBy(new BigNumber(Math.pow(10, 18)))
-          .toString();
-        data.reward = new BigNumber(data.reward)
-          .dividedBy(new BigNumber(Math.pow(10, 18)))
-          .toString();
-        this.player_stats.set(data);
-        this.checkReady();
-      }
+  async getLatestBlock() {
+    const url = `${this.base_url}/get-current-block`;
+    const result = (
+      await axios.get(url, {
+        headers: {
+          'x-api-key': this.api_key(),
+        },
+      })
+    ).data;
+    console.log('getLatestBlock', result);
+    if (result?.block) {
+      this.latest_block.set(result.block);
     }
+    if (result?.player) {
+      this.setCurrentPlayerStats(result.player);
+    }
+  }
+
+  async setCurrentPlayerStats(player: any) {
+    const data: any = {
+      id: player.id,
+      ...player.details,
+      ...player.state,
+      ...player.block_data,
+    };
+
+    data.deposit = new BigNumber(data.deposit || 0)
+      .dividedBy(new BigNumber(Math.pow(10, 18)))
+      .toString();
+    data.total_fees_paid = new BigNumber(data.total_fees_paid || 0)
+      .dividedBy(new BigNumber(Math.pow(10, 18)))
+      .toString();
+    data.round_earnings = new BigNumber(data.round_earnings || 0)
+      .dividedBy(new BigNumber(Math.pow(10, 18)))
+      .toString();
+    data.rolling_deposit = new BigNumber(data.rolling_deposit || 0)
+      .dividedBy(new BigNumber(Math.pow(10, 18)))
+      .toString();
+    data.available_fee_balance = new BigNumber(data.available_fee_balance || 0)
+      .dividedBy(new BigNumber(Math.pow(10, 18)))
+      .toString();
+    data.reward = new BigNumber(data.reward || 0)
+      .dividedBy(new BigNumber(Math.pow(10, 18)))
+      .toString();
+    this.player_stats.set(data);
+    this.checkReady();
   }
 
   async getPriceInfo() {
@@ -233,6 +232,29 @@ export class TigApisService {
         life: 5000,
       });
       console.error('saveConfig', e);
+    }
+  }
+
+  async getSlaves() {
+    if (this.latest_block()) {
+      const url = `${this.tig_url}/get-algorithms?block_id=${
+        this.latest_block()?.id
+      }`;
+      const result = (await axios.get(url)).data;
+      if (result?.algorithms) {
+        this.algorithms.set(
+          result.algorithms.map((a: any) => {
+            return {
+              id: a.id,
+              ...a.details,
+              state: a.state,
+              block_data: a.block_data,
+            };
+          })
+        );
+        console.log('algorithms', this.algorithms());
+        this.checkReady();
+      }
     }
   }
 }
