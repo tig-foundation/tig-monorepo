@@ -1,26 +1,5 @@
--- Drop tables if they exist (for clean setup)
-DROP TABLE IF EXISTS topups;
-DROP TABLE IF EXISTS difficulty_data;
-DROP TABLE IF EXISTS frauds;
-DROP TABLE IF EXISTS proofs;
-DROP TABLE IF EXISTS benchmarks;
-DROP TABLE IF EXISTS precommits;
-DROP TABLE IF EXISTS wasms;
-DROP TABLE IF EXISTS algorithms;
-DROP TABLE IF EXISTS challenges;
-DROP TABLE IF EXISTS players;
-DROP TABLE IF EXISTS blocks;
-DROP TABLE IF EXISTS jobs;
-DROP TABLE IF EXISTS assigned_batches;
-DROP TABLE IF EXISTS batch_results;
-DROP TABLE IF EXISTS precommit_requests;
-DROP TABLE IF EXISTS benchmark_requests;
-DROP TABLE IF EXISTS proof_requests;
-DROP TABLE IF EXISTS slave_registry;
-DROP TABLE IF EXISTS config;
-
 -- Create blocks table
-CREATE TABLE blocks (
+CREATE TABLE IF NOT EXISTS blocks (
     id VARCHAR PRIMARY KEY,
     prev_block_id VARCHAR,
     height INTEGER NOT NULL,
@@ -46,7 +25,7 @@ CREATE TABLE blocks (
 );
 
 -- Create players table
-CREATE TABLE players (
+CREATE TABLE IF NOT EXISTS players (
     id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
     is_multisig BOOLEAN NOT NULL,
@@ -58,7 +37,7 @@ CREATE TABLE players (
 );
 
 -- Create challenges table
-CREATE TABLE challenges (
+CREATE TABLE IF NOT EXISTS challenges (
     id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
     block_confirmed INTEGER NOT NULL,
@@ -67,7 +46,7 @@ CREATE TABLE challenges (
 );
 
 -- Create algorithms table
-CREATE TABLE algorithms (
+CREATE TABLE IF NOT EXISTS algorithms (
     id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
     player_id VARCHAR NOT NULL,
@@ -83,7 +62,7 @@ CREATE TABLE algorithms (
 );
 
 -- Create wasms table
-CREATE TABLE wasms (
+CREATE TABLE IF NOT EXISTS wasms (
     id SERIAL PRIMARY KEY,
     algorithm_id VARCHAR NOT NULL REFERENCES algorithms(id),
     compile_success BOOLEAN NOT NULL,
@@ -93,7 +72,7 @@ CREATE TABLE wasms (
 );
 
 -- Create precommits table
-CREATE TABLE precommits (
+CREATE TABLE IF NOT EXISTS precommits (
     benchmark_id VARCHAR PRIMARY KEY,
     player_id VARCHAR NOT NULL,
     block_id VARCHAR NOT NULL REFERENCES blocks(id),
@@ -108,7 +87,7 @@ CREATE TABLE precommits (
 );
 
 -- Create benchmarks table
-CREATE TABLE benchmarks (
+CREATE TABLE IF NOT EXISTS benchmarks (
     id VARCHAR PRIMARY KEY,
     num_solutions INTEGER NOT NULL,
     merkle_root VARCHAR,
@@ -120,7 +99,7 @@ CREATE TABLE benchmarks (
 );
 
 -- Create proofs table
-CREATE TABLE proofs (
+CREATE TABLE IF NOT EXISTS proofs (
     benchmark_id VARCHAR PRIMARY KEY REFERENCES benchmarks(id),
     block_confirmed INTEGER,
     submission_delay INTEGER,
@@ -129,7 +108,7 @@ CREATE TABLE proofs (
 );
 
 -- Create frauds table
-CREATE TABLE frauds (
+CREATE TABLE IF NOT EXISTS frauds (
     benchmark_id VARCHAR PRIMARY KEY REFERENCES benchmarks(id),
     block_confirmed INTEGER NOT NULL,
     allegation TEXT,
@@ -137,7 +116,7 @@ CREATE TABLE frauds (
 );
 
 -- Create difficulty_data table
-CREATE TABLE difficulty_data (
+CREATE TABLE IF NOT EXISTS difficulty_data (
     id SERIAL PRIMARY KEY,
     challenge_id VARCHAR NOT NULL REFERENCES challenges(id),
     num_solutions INTEGER NOT NULL,
@@ -146,7 +125,7 @@ CREATE TABLE difficulty_data (
 );
 
 -- Create topups table
-CREATE TABLE topups (
+CREATE TABLE IF NOT EXISTS topups (
     id VARCHAR PRIMARY KEY,
     player_id VARCHAR NOT NULL REFERENCES players(id),
     amount NUMERIC(38, 18) NOT NULL,
@@ -154,7 +133,7 @@ CREATE TABLE topups (
 );
 
 -- Create jobs table
-CREATE TABLE jobs (
+CREATE TABLE IF NOT EXISTS jobs (
     benchmark_id VARCHAR PRIMARY KEY,
     settings JSONB NOT NULL,
     num_nonces INTEGER NOT NULL,
@@ -176,7 +155,7 @@ CREATE TABLE jobs (
 );
 
 -- Create slave_registry table
-CREATE TABLE slave_registry (
+CREATE TABLE IF NOT EXISTS slave_registry (
     id SERIAL PRIMARY KEY,
     slave_name VARCHAR(255) UNIQUE NOT NULL,
     num_of_cpus INTEGER NOT NULL,
@@ -186,7 +165,7 @@ CREATE TABLE slave_registry (
 );
 
 -- Create assigned_batches table
-CREATE TABLE assigned_batches (
+CREATE TABLE IF NOT EXISTS assigned_batches (
     id SERIAL PRIMARY KEY,
     benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id),
     batch_idx INTEGER NOT NULL,
@@ -198,7 +177,7 @@ CREATE TABLE assigned_batches (
 );
 
 -- Create batch_results table
-CREATE TABLE batch_results (
+CREATE TABLE IF NOT EXISTS batch_results (
     id SERIAL PRIMARY KEY,
     benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id),
     start_nonce INTEGER NOT NULL,
@@ -210,7 +189,7 @@ CREATE TABLE batch_results (
 );
 
 -- Create precommit_requests table
-CREATE TABLE precommit_requests (
+CREATE TABLE IF NOT EXISTS precommit_requests (
     id SERIAL PRIMARY KEY,
     challenge_id VARCHAR NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
     settings JSONB NOT NULL,
@@ -219,7 +198,7 @@ CREATE TABLE precommit_requests (
 );
 
 -- Create benchmark_requests table
-CREATE TABLE benchmark_requests (
+CREATE TABLE IF NOT EXISTS benchmark_requests (
     id SERIAL PRIMARY KEY,
     job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
     benchmark_id VARCHAR NOT NULL,
@@ -229,7 +208,7 @@ CREATE TABLE benchmark_requests (
 );
 
 -- Create proof_requests table
-CREATE TABLE proof_requests (
+CREATE TABLE IF NOT EXISTS proof_requests (
     id SERIAL PRIMARY KEY,
     job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
     benchmark_id VARCHAR NOT NULL,
@@ -238,46 +217,46 @@ CREATE TABLE proof_requests (
 );
 
 -- Create config table
-CREATE TABLE config (
+CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY DEFAULT 1,
     config_data JSONB NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 -- Create indexes for foreign keys to improve query performance
-CREATE INDEX idx_algorithms_player_id ON algorithms(player_id);
-CREATE INDEX idx_algorithms_challenge_id ON algorithms(challenge_id);
-CREATE INDEX idx_algorithms_block_id ON algorithms(block_id);
+CREATE INDEX IF NOT EXISTS idx_algorithms_player_id ON algorithms(player_id);
+CREATE INDEX IF NOT EXISTS idx_algorithms_challenge_id ON algorithms(challenge_id);
+CREATE INDEX IF NOT EXISTS idx_algorithms_block_id ON algorithms(block_id);
 
-CREATE INDEX idx_precommits_player_id ON precommits(player_id);
-CREATE INDEX idx_precommits_challenge_id ON precommits(challenge_id);
-CREATE INDEX idx_precommits_algorithm_id ON precommits(algorithm_id);
+CREATE INDEX IF NOT EXISTS idx_precommits_player_id ON precommits(player_id);
+CREATE INDEX IF NOT EXISTS idx_precommits_challenge_id ON precommits(challenge_id);
+CREATE INDEX IF NOT EXISTS idx_precommits_algorithm_id ON precommits(algorithm_id);
 
-CREATE INDEX idx_difficulty_data_challenge_id ON difficulty_data(challenge_id);
+CREATE INDEX IF NOT EXISTS idx_difficulty_data_challenge_id ON difficulty_data(challenge_id);
 
-CREATE INDEX idx_proofs_player_id ON proofs(player_id);
-CREATE INDEX idx_frauds_player_id ON frauds(player_id);
+CREATE INDEX IF NOT EXISTS idx_proofs_player_id ON proofs(player_id);
+CREATE INDEX IF NOT EXISTS idx_frauds_player_id ON frauds(player_id);
 
-CREATE INDEX idx_wasms_algorithm_id ON wasms(algorithm_id);
+CREATE INDEX IF NOT EXISTS idx_wasms_algorithm_id ON wasms(algorithm_id);
 
-CREATE INDEX idx_jobs_challenge ON jobs(challenge);
+CREATE INDEX IF NOT EXISTS idx_jobs_challenge ON jobs(challenge);
 
-CREATE INDEX idx_batch_results_benchmark_id ON batch_results(benchmark_id);
-CREATE INDEX idx_assigned_batches_benchmark_id ON assigned_batches(benchmark_id);
+CREATE INDEX IF NOT EXISTS idx_batch_results_benchmark_id ON batch_results(benchmark_id);
+CREATE INDEX IF NOT EXISTS idx_assigned_batches_benchmark_id ON assigned_batches(benchmark_id);
 
--- Create index for faster queries on job_id
--- CREATE INDEX idx_precommit_requests_job_id ON precommit_requests(job_id);
+-- CREATE INDEX IF NOT EXISTS for faster queries on job_id
+-- CREATE INDEX IF NOT EXISTS idx_precommit_requests_job_id ON precommit_requests(job_id);
 
--- Create index for faster queries on job_id and benchmark_id
-CREATE INDEX idx_benchmark_requests_job_id ON benchmark_requests(job_id);
-CREATE INDEX idx_benchmark_requests_benchmark_id ON benchmark_requests(benchmark_id);
+-- CREATE INDEX IF NOT EXISTS for faster queries on job_id and benchmark_id
+CREATE INDEX IF NOT EXISTS idx_benchmark_requests_job_id ON benchmark_requests(job_id);
+CREATE INDEX IF NOT EXISTS idx_benchmark_requests_benchmark_id ON benchmark_requests(benchmark_id);
 
--- Create index for faster queries on job_id and benchmark_id
-CREATE INDEX idx_proof_requests_job_id ON proof_requests(job_id);
-CREATE INDEX idx_proof_requests_benchmark_id ON proof_requests(benchmark_id);
+-- CREATE INDEX IF NOT EXISTS for faster queries on job_id and benchmark_id
+CREATE INDEX IF NOT EXISTS idx_proof_requests_job_id ON proof_requests(job_id);
+CREATE INDEX IF NOT EXISTS idx_proof_requests_benchmark_id ON proof_requests(benchmark_id);
 
--- Create index on slave_name for faster lookups
-CREATE INDEX idx_slave_registry_slave_name ON slave_registry(slave_name);
+-- CREATE INDEX IF NOT EXISTS on slave_name for faster lookups
+CREATE INDEX IF NOT EXISTS idx_slave_registry_slave_name ON slave_registry(slave_name);
 
 -- Create a trigger function to update the updated_at field on row update
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -288,24 +267,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create triggers
-CREATE TRIGGER trigger_update_players_updated_at
+-- CREATE OR REPLACE TRIGGERs
+CREATE OR REPLACE TRIGGER trigger_update_players_updated_at
 BEFORE UPDATE ON players
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER trigger_update_blocks_updated_at
+CREATE OR REPLACE TRIGGER trigger_update_blocks_updated_at
 BEFORE UPDATE ON blocks
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER trigger_update_config_updated_at
+CREATE OR REPLACE TRIGGER trigger_update_config_updated_at
 BEFORE UPDATE ON config
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
--- Initialize the Config Table
-INSERT INTO config (id, config_data) VALUES (1, $$
+-- Initialize the Config Table only if it's empty
+INSERT INTO config (id, config_data)
+SELECT 1, $$
 {
     "player_id": "0x00469d928a6f35834705972e937070fa154f2f7f",
     "api_key": "256979aea0c51f485e9559a45f29ec74",
@@ -388,4 +368,5 @@ INSERT INTO config (id, config_data) VALUES (1, $$
         ]
     }
 }
-$$);
+$$
+WHERE NOT EXISTS (SELECT 1 FROM config);

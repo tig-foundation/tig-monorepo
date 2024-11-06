@@ -12,7 +12,7 @@ from tig_benchmarker.database.init import SessionLocal
 from tig_benchmarker.database.models.index import (
     BlockModel, AlgorithmModel, WasmModel, PlayerModel, PrecommitModel,
     BenchmarkModel, ProofModel, FraudModel, ChallengeModel,
-    DifficultyDataModel
+    DifficultyDataModel, precise_to_float
 )
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -54,15 +54,18 @@ class DataFetcher:
             f"{self.api_url}/get-algorithms?block_id={block.id}",
             f"{self.api_url}/get-players?player_type=benchmarker&block_id={block.id}",
             f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}",
-            f"{self.api_url}/get-challenges?block_id={block.id}"
+            f"{self.api_url}/get-challenges?block_id={block.id}",
+            f"{self.api_url}/get-fee-balance?player_id={self.player_id}&block_id={block.id}"
         ]
         
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
-            algorithms_data, players_data, benchmarks_data, challenges_data = list(executor.map(_get, urls))
+            algorithms_data, players_data, benchmarks_data, challenges_data, fee_data = list(executor.map(_get, urls))
 
         # Parse algorithms and wasms
         algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data.get("algorithms", [])}
         wasms = {w["algorithm_id"]: Wasm.from_dict(w) for w in algorithms_data.get("wasms", [])}
+
+
         
         # Parse player
         dummy_player = {
@@ -72,10 +75,13 @@ class DataFetcher:
                 "is_multisig": False
             },
             "state": {
-                "total_fees_paid": "0",
-                "available_fee_balance": "0"
+                "total_fees_paid":  fee_data['state']['total_fees_paid'],
+                "available_fee_balance": fee_data['state']['available_fee_balance']
             }
         }
+
+        logger.info(f"Player: {dummy_player}")
+
         player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), Player.from_dict(dummy_player))
         
         # Parse precommits, benchmarks, proofs, frauds
@@ -155,14 +161,14 @@ class DataFetcher:
                 
             # Store player
             if player:
-                logger.info(f"player: {player}")
+                logger.info(f"player: {PlayerModel.from_dataclass(player)}")
 
                 existing_player = session.query(PlayerModel).filter_by(id=player.id).first()
                 if existing_player:
                     existing_player.block_data = player.block_data
                     existing_player.is_multisig = player.details.is_multisig
-                    existing_player.total_fees_paid = player.state.total_fees_paid
-                    existing_player.available_fee_balance = player.state.available_fee_balance
+                    existing_player.total_fees_paid = precise_to_float(player.state.total_fees_paid)
+                    existing_player.available_fee_balance = precise_to_float(player.state.available_fee_balance)
                     session.merge(existing_player)
                 else:
                     player_model = PlayerModel.from_dataclass(player)

@@ -11,9 +11,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from tig_benchmarker.database.init import SessionLocal, engine
+from sqlalchemy.orm.attributes import flag_modified
 from typing import Dict, List, Optional, Set
 import datetime
-from tig_benchmarker.database.models.index import JobModel, BatchResultModel, AssignedBatchModel, SlaveRegistryModel
+from tig_benchmarker.database.models.index import JobModel, BatchResultModel, AssignedBatchModel, SlaveRegistryModel, ConfigModel
 from sqlalchemy.orm import sessionmaker
 from pydantic import BaseModel, ValidationError, RootModel
 import time
@@ -80,6 +81,9 @@ class AssignedBatch(FromDict):
 
 class Slave(RootModel[dict]):
     pass
+
+class BatchResultData(RootModel[dict]):
+    pass
 class SlaveManager:
     def __init__(self, config: SlaveManagerConfig):
         self.config = config
@@ -111,6 +115,24 @@ class SlaveManager:
                 )
 
                 self.db_session.add(slaveModel)
+                self.db_session.flush()
+
+                default_config = {
+                    "name_regex": str(slaveModel.id),
+                    "max_concurrent_batches": {
+                        "satisfiability": 1,
+                        "vehicle_routing": 1,
+                        "knapsack": 1,
+                        "vector_search": 1
+                    }
+                }
+
+                config = self.db_session.query(ConfigModel).first()
+                if config:
+                    config.config_data["slave_manager_config"]["slaves"].append(default_config)
+
+                flag_modified(config, "config_data")
+
                 self.db_session.commit()
                 
                 return JSONResponse(content={"detail": "OK", "id": slaveModel.id}, status_code=200)
@@ -260,7 +282,9 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.post("/submit-batch-result/{batch_id}")
-        def submit_batch_result(batch_id: str, request: Request):
+        def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request):
+            Session = sessionmaker(bind=engine)
+            session = Session()
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
             if not slave_name:
@@ -282,9 +306,9 @@ class SlaveManager:
                 raise HTTPException(status_code=400, detail="Invalid batch_id format.")
             
             try:
-                with self.db_session.begin():
+                with session.begin():
                     # Fetch the job from the database
-                    job = self.db_session.query(JobModel).filter_by(benchmark_id=benchmark_id).first()
+                    job = session.query(JobModel).filter_by(benchmark_id=benchmark_id).first()
                     if not job:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent job '{benchmark_id}'.")
                         raise HTTPException(status_code=400, detail="Invalid benchmark_id.")
@@ -296,7 +320,7 @@ class SlaveManager:
                         raise HTTPException(status_code=400, detail="Invalid start_nonce.")
                     
                     # Fetch the AssignedBatchModel
-                    assigned_batch = self.db_session.query(AssignedBatchModel).filter_by(
+                    assigned_batch = session.query(AssignedBatchModel).filter_by(
                         benchmark_id=benchmark_id,
                         batch_idx=batch_idx,
                         assigned_slave=slave_name,
@@ -308,7 +332,7 @@ class SlaveManager:
                         raise HTTPException(status_code=400, detail="Batch not assigned or already completed.")
                     
                     # Get body from request
-                    result = BatchResult.from_dict(request.json())
+                    result = BatchResult.from_dict(batch_result_data.root)
                     
                     # Update JobModel's batch_merkle_roots
                     job.batch_merkle_roots[batch_idx] = str(result.merkle_root)  # Assuming MerkleHash can be converted to string
@@ -323,39 +347,39 @@ class SlaveManager:
                         start_nonce=start_nonce,
                         merkle_root=str(result.merkle_root),
                         solution_nonces=result.solution_nonces,
-                        merkle_proofs=[proof.to_dict() for proof in result.merkle_proofs],
+                        merkle_proofs=[],
                         assigned_batch=assigned_batch  # Link to AssignedBatchModel
                     )
-                    self.db_session.add(batch_result)
-                    self.db_session.flush() # To get batch_result.id
+                    session.add(batch_result)
+                    session.flush() # To get batch_result.id
                     
                     # Update AssignedBatchModel with completed_timestamp and batch_result_id
                     assigned_batch.completed_timestamp = datetime.datetime.utcnow()
                     # assigned_batch.batch_result_id = batch_result.id
 
                     # TODO: Filter sampled nonces based on start nonce and batch size
-                    if job.sample_nonces is None:
+                    if job.sampled_nonces is None:
                         non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
                         random.shuffle(result.solution_nonces)
                         random.shuffle(non_solution_nonces)
                         num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
                         sampled = (result.solution_nonces + non_solution_nonces)[:num_nonces_to_sample]
                     else:
-                        sampled = job.sample_nonces
+                        sampled = job.sampled_nonces
                     
                     # Commit the transaction
-                    self.db_session.commit()
+                    session.commit()
 
                     logger.debug(f"Slave '{slave_name}' submitted batch result for benchmark '{benchmark_id}', start_nonce '{start_nonce}'.")
                     return JSONResponse(content={"detail": "OK", "sample_nonces": sampled}, status_code=200)
             except SQLAlchemyError as e:
-                self.db_session.rollback()
+                session.rollback()
                 logger.error(f"Database error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             except HTTPException as he:
                 raise he
             except Exception as e:
-                self.db_session.rollback()
+                session.rollback()
                 logger.error(f"Unexpected error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             
