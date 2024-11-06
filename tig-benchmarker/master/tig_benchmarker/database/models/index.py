@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy import (
     Column, DateTime, String, Integer, Boolean, ForeignKey, JSON, Text, Numeric, TIMESTAMP, UniqueConstraint, BigInteger
 )
@@ -9,10 +10,19 @@ import datetime
 
 # Helper functions for PreciseNumber conversions
 def precise_to_float(value):
-    return float(value.to_float()) if value else None
+    if isinstance(value, PreciseNumber):
+        return float(value.to_float())
+    elif isinstance(value, (int, float)):
+        return float(value)
+    else:
+        return None
 
 def float_to_precise(value):
-    return PreciseNumber(value) if value is not None else None
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return PreciseNumber(str(value))
+    return PreciseNumber(value)
 
 # Master Config Model
 class ConfigModel(Base):
@@ -173,6 +183,7 @@ class ChallengeModel(Base):
     # Relationships
     algorithms = relationship('AlgorithmModel', back_populates='challenge', cascade="all, delete-orphan")
     precommits = relationship('PrecommitModel', back_populates='challenge', cascade="all, delete-orphan")
+    submit_precommits = relationship('PrecommitRequestModel', back_populates='challenge', cascade="all, delete-orphan")
     block_id = Column(String, ForeignKey('blocks.id'), nullable=True)
     block = relationship('BlockModel', back_populates='challenges')
     difficulty_data = relationship('DifficultyDataModel', back_populates='challenge', cascade="all, delete-orphan")
@@ -661,13 +672,13 @@ class PrecommitRequestModel(Base):
     __tablename__ = 'precommit_requests'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    job_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    challenge_id = Column(String, ForeignKey('challenges.id'), nullable=False)
     settings = Column(JSON, nullable=False)
     num_nonces = Column(Integer, nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
-    job = relationship('JobModel')
+    challenge = relationship('ChallengeModel', back_populates='submit_precommits')
 
 # Benchmark Request
 class BenchmarkRequestModel(Base):

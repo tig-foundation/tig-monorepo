@@ -68,24 +68,26 @@ class SubmissionsManager:
             text = response.text
             if response.status_code == 200:
                 logger.info(f"submitted {submission_type} successfully")
+                return True
             elif response.headers.get("Content-Type") == "text/plain":
                 logger.error(f"status {response.status_code} when submitting {submission_type}: {text}")
             else:
                 logger.error(f"status {response.status_code} when submitting {submission_type}")
         except requests.exceptions.RequestException as e:
             logger.error(f"Error submitting {submission_type}: {e}")
+        return False
    
     def handle_precommit(self, submit_precommit_req: SubmitPrecommitRequest):
         try:
             # Create a PrecommitRequestModel entry
             precommit_entry = PrecommitRequestModel(
-                job_id=submit_precommit_req.settings.challenge_id,  # Assuming challenge_id corresponds to job_id
+                challenge_id=submit_precommit_req.settings.challenge_id,  
                 settings=submit_precommit_req.settings.to_dict(),
                 num_nonces=submit_precommit_req.num_nonces,
                 timestamp=datetime.utcnow()
             )
             logger.info(f"Precommit Entry: {precommit_entry}")
-            # self.db_session.add(precommit_entry)
+            self.db_session.add(precommit_entry)
 
             # Submit the precommit request
             success = self._post("precommit", submit_precommit_req)
@@ -130,7 +132,7 @@ class SubmissionsManager:
                     timestamp=datetime.utcnow()
                 )
                 logger.info(f"Benchmark Entry: {benchmark_entry}")
-                # self.db_session.add(benchmark_entry)
+                self.db_session.add(benchmark_entry)
                 
                 # Update job's last_benchmark_submit_time
                 job.last_benchmark_submit_time = now
@@ -185,7 +187,7 @@ class SubmissionsManager:
                     timestamp=datetime.utcnow()
                 )
                 logger.info(f"Proof Entry: {proof_entry}")
-                # self.db_session.add(proof_entry)
+                self.db_session.add(proof_entry)
 
                 # Update job's last_proof_submit_time
                 job.last_proof_submit_time = now

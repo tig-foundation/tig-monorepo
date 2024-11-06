@@ -212,7 +212,7 @@ CREATE TABLE batch_results (
 -- Create precommit_requests table
 CREATE TABLE precommit_requests (
     id SERIAL PRIMARY KEY,
-    job_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
+    challenge_id VARCHAR NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
     settings JSONB NOT NULL,
     num_nonces INTEGER NOT NULL,
     timestamp TIMESTAMP NOT NULL DEFAULT NOW()
@@ -307,9 +307,9 @@ EXECUTE FUNCTION update_updated_at_column();
 -- Initialize the Config Table
 INSERT INTO config (id, config_data) VALUES (1, $$
 {
-    "player_id": "0x0000000000000000000000000000000000000000",
-    "api_key": "00000000000000000000000000000000",
-    "api_url": "https://mainnet-api.tig.foundation",
+    "player_id": "0x00469d928a6f35834705972e937070fa154f2f7f",
+    "api_key": "256979aea0c51f485e9559a45f29ec74",
+    "api_url": "https://testnet-api.tig.foundation",
     "difficulty_sampler_config": {
         "difficulty_ranges": {
             "satisfiability": [

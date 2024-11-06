@@ -74,7 +74,7 @@ class DataFetcher:
             "state": {
                 "total_fees_paid": "0",
                 "available_fee_balance": "0"
-            },
+            }
         }
         player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), Player.from_dict(dummy_player))
         

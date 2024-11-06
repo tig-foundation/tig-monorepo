@@ -35,6 +35,7 @@ def main():
     # # Get Config from db
     configModel = db_session.query(ConfigModel).first()
     config = Config.from_dict(configModel.config_data)
+    logger.info(f"Config: {config.api_url}")
 
     data_fetcher = DataFetcher(config.api_url, config.player_id)
     difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
