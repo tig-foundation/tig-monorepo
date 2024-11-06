@@ -5,6 +5,7 @@ import threading
 from sqlalchemy import desc
 import uvicorn
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm.attributes import flag_modified
 from fastapi import FastAPI, Query, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,9 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 # Pydantic Models
 class ConfigUpdate(RootModel[dict]):
+    pass
+
+class PlayerData(RootModel[dict]):
     pass
 
 
@@ -44,6 +48,33 @@ class ClientManager:
             raise HTTPException(status_code=403, detail="Could not validate credentials")
 
     def setup_routes(self):
+        @self.app.post("/register-player")
+        async def register_player(player_data: PlayerData):
+            try:
+                new_player_data = player_data.root
+                # Validate the incoming config if needed
+                config = self.db_session.query(ConfigModel).first()
+                if config:
+                    config.config_data["player_id"] = new_player_data.get("player_id")
+                    config.config_data["api_key"] = new_player_data.get("api_key")
+                
+                flag_modified(config, "config_data")
+
+                logger.info(f"Player updated: {config.config_data}")
+
+                self.db_session.commit()
+                return JSONResponse(content={"message": "Player updated successfully."}, status_code=200)
+            except ValidationError as ve:
+                logger.error(f"Validation error on /update-config: {ve}")
+                raise HTTPException(status_code=400, detail="Invalid configuration data")
+            except SQLAlchemyError as e:
+                self.db_session.rollback()
+                logger.error(f"Database error on /update-config: {e}")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
+            except Exception as e:
+                logger.error(f"Unexpected error on /update-config: {e}")
+                raise HTTPException(status_code=400, detail="Invalid configuration data")
+
         @self.app.get("/get-config", dependencies=[Depends(self.verify_api_key)])
         async def get_config():
             try:
@@ -89,8 +120,8 @@ class ClientManager:
                     if player:
                         return JSONResponse(
                             content={
-                                "block": BlockModel.from_dataclass(block),
-                                "player": PlayerModel.from_dataclass(player)
+                                "block": block.to_dataclass().to_dict(),
+                                "player": player.to_dataclass().to_dict()
                             },
                             status_code=200
                         )

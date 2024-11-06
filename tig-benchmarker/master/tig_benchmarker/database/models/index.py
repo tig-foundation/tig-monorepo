@@ -11,7 +11,7 @@ import datetime
 # Helper functions for PreciseNumber conversions
 def precise_to_float(value):
     if isinstance(value, PreciseNumber):
-        return float(value.to_float())
+        return float(value.to_float())/10**18
     elif isinstance(value, (int, float)):
         return float(value)
     else:
