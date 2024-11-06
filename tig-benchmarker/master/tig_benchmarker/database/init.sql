@@ -136,6 +136,11 @@ CREATE TABLE IF NOT EXISTS topups (
 CREATE TABLE IF NOT EXISTS jobs (
     benchmark_id VARCHAR PRIMARY KEY,
     settings JSONB NOT NULL,
+    settings_block_id VARCHAR NOT NULL REFERENCES blocks(id),
+    settings_player_id VARCHAR NOT NULL,
+    settings_difficulty JSONB NOT NULL,
+    settings_challenge_id VARCHAR NOT NULL,
+    settings_algorithm_id VARCHAR NOT NULL,
     num_nonces INTEGER NOT NULL,
     rand_hash VARCHAR NOT NULL,
     wasm_vm_config JSONB NOT NULL,

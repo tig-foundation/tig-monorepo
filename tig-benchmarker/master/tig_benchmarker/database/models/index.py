@@ -552,6 +552,11 @@ class JobModel(Base):
     
     benchmark_id = Column(String, primary_key=True)
     settings = Column(JSON, nullable=False)
+    settings_block_id = Column(String, ForeignKey('blocks.id'), nullable=False)
+    settings_challenge_id = Column(String, nullable=False)
+    settings_algorithm_id = Column(String, nullable=False)
+    settings_difficulty = Column(JSON, nullable=False)
+    settings_player_id = Column(String, nullable=False)
     num_nonces = Column(Integer, nullable=False)
     rand_hash = Column(String, nullable=False)
     wasm_vm_config = Column(JSON, nullable=False)
@@ -572,7 +577,8 @@ class JobModel(Base):
     # Relationships
     batch_results = relationship('BatchResultModel', back_populates='job')
     assigned_batches = relationship('AssignedBatchModel', back_populates='job')
-    
+    block = relationship('BlockModel')
+
     def to_dataclass(self) -> Job:
         return Job(
             benchmark_id=self.benchmark_id,
@@ -599,6 +605,11 @@ class JobModel(Base):
         return cls(
             benchmark_id=job.benchmark_id,
             settings=job.settings.to_dict(),
+            settings_block_id=job.settings.block_id,
+            settings_player_id=job.settings.player_id,
+            settings_challenge_id=job.settings.challenge_id,
+            settings_algorithm_id=job.settings.algorithm_id,
+            settings_difficulty=job.settings.difficulty,
             num_nonces=job.num_nonces,
             rand_hash=job.rand_hash,
             wasm_vm_config=job.wasm_vm_config,

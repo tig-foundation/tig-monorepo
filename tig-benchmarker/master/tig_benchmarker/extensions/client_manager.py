@@ -144,6 +144,11 @@ class ClientManager:
             
         @self.app.get("/get-benchmark-jobs", dependencies=[Depends(self.verify_api_key)])
         async def get_benchmark_jobs(limit: int = Query(10, gt=0), page: int = Query(1, gt=0)):
+
+            # TODO: Get Block Data
+            # TODO: Get Created Time, Start Time, End Time
+            # TODO: Batch Progress
+            
             try:
                 total_jobs = self.db_session.query(JobModel).count()
                 total_pages = (total_jobs + limit - 1) // limit
@@ -151,7 +156,10 @@ class ClientManager:
                     raise HTTPException(status_code=400, detail="Page not found")
                 
                 jobs = self.db_session.query(JobModel).order_by(desc(JobModel.created_at)).offset((page - 1)*limit).limit(limit).all()
-                jobs_data = [job.to_dataclass().to_dict() for job in jobs]
+
+                logger.info(f"Jobs: {jobs[0]}")
+
+                jobs_data = [{**job.to_dataclass().to_dict(), "block_height": job.block.to_dataclass().to_dict()['details']['height'], "assigned_batches": [batch.to_dict() for batch in job.assigned_batches]} for job in jobs]
                 response = {
                     "total_jobs": total_jobs,
                     "total_pages": total_pages,
