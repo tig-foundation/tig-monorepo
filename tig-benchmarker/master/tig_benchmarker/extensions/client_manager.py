@@ -198,8 +198,8 @@ class ClientManager:
                 if page > total_pages and total_slaves != 0:
                     raise HTTPException(status_code=400, detail="Page not found")
                 
-                slaves = self.db_session.query(SlaveRegistryModel).order_by(desc(SlaveRegistryModel.updated_at)).offset((page - 1)*limit).limit(limit).all()
-                slaves_data = [slave for slave in slaves]
+                slaves = self.db_session.query(SlaveRegistryModel).order_by(desc(SlaveRegistryModel.registered_at)).offset((page - 1)*limit).limit(limit).all()
+                slaves_data = [slave.to_dict() for slave in slaves]
                 response = {
                     "total_batches": total_slaves,
                     "total_pages": total_pages,

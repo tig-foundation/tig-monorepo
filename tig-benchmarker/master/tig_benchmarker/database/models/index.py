@@ -717,6 +717,16 @@ class SlaveRegistryModel(Base):
     num_of_threads = Column(Integer, nullable=False)
     memory = Column(BigInteger, nullable=False)
     registered_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "slave_name": self.slave_name,
+            "num_of_cpus": self.num_of_cpus,
+            "num_of_threads": self.num_of_threads,
+            "memory": self.memory,
+            "registered_at": str(self.registered_at)
+        }
     
     # Relationships
     assigned_batches = relationship('AssignedBatchModel', back_populates='slave')
