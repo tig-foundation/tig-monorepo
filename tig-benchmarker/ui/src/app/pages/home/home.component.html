@@ -1,362 +1,515 @@
-@if(tigService.latest_block()){
-  <div class="grid p-3">
-    <div class="col-4 p-4">
-      <p-card header="Price" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.price_info()){
-            <p>Price : <b>{{tigService.price_info().priceUsd | currency}}</b></p>
-            <p>24 Hour Volume : <b>{{tigService.price_info().volume.h24 | currency}}</b></p>
-          }
-         @else {
-          <p>Could not get Price Info</p>
-         }
-        </div>
-      </p-card>
-    </div>  
-    <div class="col-4 p-4">
-      <p-card header="Earnings" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.player_stats()){
-            <p>Round Earnings : <b>{{tigService.player_stats().round_earnings| number : '1.2-2'}}</b></p>
-            <p>Latest Earnings : <b>{{tigService.player_stats().reward | number : '1.2-2'}}</b></p>
-          }
-         @else {
-          <p>Could not get Earnings Info</p>
-         }
-        </div>
-      </p-card>
-     
-    </div>  
-    <div class="col-4 p-4">
-      <p-card header="Fees" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.player_stats()){
-            <p>Available Fees : <b>{{tigService.player_stats().available_fee_balance| number : '1.2-2'}}</b></p>
-            <p-button label="Top Up" [rounded]="true"></p-button>
-          }
-         @else {
-          <p>Could not get Fee Info</p>
-         }         
-        </div>
-      </p-card>
-     
-    </div>  
-    </div>
-}
-<div class="w-full">
-  <p-chart type="line" [data]="line_data" [options]="line_options" />
+@if(tigService.ready()){
+<div class="grid p-3">
+  <div class="col-4 p-4">
+    <p-card header="Price" class="w-full">
+      <div class="flex flex-column justify-content-center align-items-center">
+        @if(tigService.price_info()){
+        <p>
+          Price : <b>{{ tigService.price_info().priceUsd | currency }}</b>
+        </p>
+        <p>
+          24 Hour Volume :
+          <b>{{ tigService.price_info().volume.h24 | currency }}</b>
+        </p>
+        } @else {
+        <p>Could not get Price Info</p>
+        }
+      </div>
+    </p-card>
+  </div> 
+  <div class="col-4 p-4">
+    <p-card header="Earnings" class="w-full">
+      <div class="flex flex-column justify-content-center align-items-center">
+        @if(round_earnings()){
+        <p>
+          Round Earnings : <b>{{ round_earnings() | number : "1.2-2" }}</b>
+        </p>
+        <p>
+          Latest Earnings : <b>{{ latest_earnings() | number : "1.2-2" }}</b>
+        </p>
+        } @else {
+        <p>Could not get Earnings Info</p>
+        }
+      </div>
+    </p-card>
+  </div>
+  <div class="col-4 p-4">
+    <p-card header="Fees" class="w-full">
+      <div class="flex flex-column justify-content-center align-items-center">
+        @if(available_fees()){
+        <p>
+          Available Fees : <b>{{ available_fees() | number : "1.2-2" }}</b>
+        </p>
+        <p-button label="Top Up" [rounded]="true"></p-button>
+        } @else {
+        <p>Could not get Fee Info</p>
+        }
+      </div>
+    </p-card>
+  </div>
 </div>
-<br>
+<div class="w-full">
+  <p-chart
+    type="line"
+    [data]="rewards_data"
+    [options]="rewards_graph_options"
+  />
+</div>
+<br />
 <p-card header="Benchmarks">
-  <p class="m-0">
-    Table of player’s benchmarks (more detailed version of
-    play.tig.foundation..) Display difficulty, and submission delay
-    @if(benchmarks()){
-        <p-table
-        #benchmarksTable
-        [value]="benchmarks()"
-        [tableStyle]="{ 'min-width': '50rem' }"
-        styleClass="p-datatable-striped"
-        [paginator]="true"
-        [rows]="5"
-        [rowsPerPageOptions]="[5, 10, 20]"
-        [globalFilterFields]="[
-          'challenge',
-          'algorithm',
-          'status',
-          'age',
-          'solutions',
-          'difficulty',
-          'submission_delay'
-        ]"
-      >
-        <ng-template pTemplate="caption">
-          <div class="flex">
-            <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
-            <p-iconField iconPosition="left" class="ml-auto">
-              <p-inputIcon>
-                <i class="pi pi-search"></i>
-              </p-inputIcon>
-              <input
-                pInputText
-                type="text"
-                (input)="
-                  benchmarksTable.filterGlobal(
-                    $any($event.target).value || '',
-                    'contains'
-                  )
-                "
-                placeholder="Search keyword"
-              />
-            </p-iconField>
+  @if(benchmarks()){
+  <p-table
+    #benchmarksTable
+    [value]="benchmarks()"
+    [tableStyle]="{ 'min-width': '50rem' }"
+    styleClass="p-datatable-striped"
+    [paginator]="true"
+    [rows]="5"
+    [rowsPerPageOptions]="[5, 10, 20]"
+    [globalFilterFields]="[
+      'age',
+      'challenge',
+      'algorithm',
+      'status',
+      'qualifiers',
+      'solutions',
+      'difficulty',
+      'submission_delay'
+    ]"
+  >
+    <ng-template pTemplate="caption">
+      <div class="flex">
+        <app-edit-settings-dialog
+          [title]="'Algorithm Settings'"
+          [view]="'algos'"
+        ></app-edit-settings-dialog>
+        <p-iconField iconPosition="left" class="ml-auto">
+          <p-inputIcon>
+            <i class="pi pi-search"></i>
+          </p-inputIcon>
+          <input
+            pInputText
+            type="text"
+            (input)="
+              benchmarksTable.filterGlobal(
+                $any($event.target).value || '',
+                'contains'
+              )
+            "
+            placeholder="Search keyword"
+          />
+        </p-iconField>
+      </div>
+    </ng-template>
+    <ng-template pTemplate="header">
+      <tr>
+        <th></th>
+        <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
+        <th pSortableColumn="challenge">
+          Challenge <p-sortIcon field="challenge" />
+        </th>
+        <th pSortableColumn="algorithm">
+          Algorithm <p-sortIcon field="algorithm" />
+        </th>
+        <th pSortableColumn="solutions">
+          # Solutions <p-sortIcon field="solutions" />
+        </th>
+        <th pSortableColumn="difficulty">
+          Difficulty <p-sortIcon field="difficulty" />
+        </th>
+        <th pSortableColumn="submission_delay">
+          Submission Delay <p-sortIcon field="submission_delay" />
+        </th>
+        <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
+        <th pSortableColumn="time_elapsed">
+          Time Elapsed <p-sortIcon field="time_elapsed" />
+        </th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-benchmark>
+      <tr>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            @if(benchmark.end_time){
+            <i class="pi pi-check" style="font-size: 1.5rem; color: green"></i>
+            } @else {
+            <i
+              class="pi pi-spin pi-spinner"
+              style="font-size: 1.5rem; color: var(--primary-color)"
+            ></i>
+            }
           </div>
-        </ng-template>
-        <ng-template pTemplate="header">
-          <tr>
-            <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
-            <th pSortableColumn="challenge">
-              Challenge <p-sortIcon field="challenge" />
-            </th>
-            <th pSortableColumn="algorithm">
-              Algorithm <p-sortIcon field="algorithm" />
-            </th>
-            <th pSortableColumn="solutions">
-              # Solutions <p-sortIcon field="solutions" />
-            </th>
-            <th pSortableColumn="difficulty">
-              Difficulty <p-sortIcon field="difficulty" />
-            </th>
-            <th pSortableColumn="submission_delay">
-              Submission Delay <p-sortIcon field="submission_delay" />
-            </th>
-            <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-benchmark>
-          <tr>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                {{ benchmark.age }}
-              </div>
-            </td>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                {{ benchmark.challenge }}
-              </div>
-            </td>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                {{ benchmark.algorithm }}
-              </div>
-            </td>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                {{ benchmark.solutions }}
-              </div>
-            </td>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                {{ benchmark.difficulty }}
-              </div>
-            </td>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                {{ benchmark.submission_delay }}
-              </div>
-            </td>
-            <td>
-              <div class="flex justify-content-center align-items-center">
-                <p-tag
-                  [severity]="
-                    benchmark.status == 'Completed'
-                      ? 'success'
-                      : benchmark.status == 'In Progress'
-                      ? 'warning'
-                      : 'info'
-                  "
-                  [value]="benchmark.status"
-                />
-              </div>
-            </td>
-          </tr>
-        </ng-template>
-      </p-table>
-    }
-    @else {
-        <div class="flex w-full justify-content-center align-items-center">
-            <p-progressSpinner 
-    styleClass="w-4rem h-4rem" 
-    strokeWidth="8" 
-    fill="var(--surface-ground)" 
-    animationDuration="1.5s" />
-        </div>
-    }
-
-  </p>
-</p-card>
-<br>
-@if(tigService.latest_block()){
-  <div class="grid p-3">
-    <div class="col-6 p-4">
-      <p-card header="Cutoff" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.player_stats()){
-            <p>Cutoff : <b>{{tigService.player_stats().cutoff| number : '1.2-2'}}</b></p>
-            <p>Influence : <b>{{tigService.player_stats().influence | number : '1.2-2'}}</b></p>
-          }
-         @else {
-          <p>Could not get Cutoff Info</p>
-         }
-        </div>
-      </p-card>
-     
-    </div>  
-    <div class="col-6 p-4">
-      <p-card header="Imbalance" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.player_stats()){
-            <p>Imbalance : <b>{{tigService.player_stats().imbalance| number : '1.2-2'}}</b></p>
-            <p>Imbalance Penalty : <b>{{tigService.player_stats().imbalance_penalty | number : '1.2-2'}}</b></p>
-          }
-         @else {
-          <p>Could not get Imbalance Info</p>
-         }         
-        </div>
-      </p-card>
-     
-    </div>  
-    </div>
-}
-
-<p-card header="Solutions">
-    Summary table of solutions #Solutions & cutoff Qualifiers, imbalance
-    @if(solutions()){
-    <p-table
-      #solutionsTable
-      [value]="solutions()"
-      [tableStyle]="{ 'min-width': '50rem' }"
-      styleClass="p-datatable-striped"
-      [paginator]="true"
-      [rows]="5"
-      [rowsPerPageOptions]="[5, 10, 20]"
-      [globalFilterFields]="[
-        'age',
-        'solutions',
-        'difficulty',
-        'qualifiers',
-        'imbalance'
-      ]"
-    >
-      <ng-template pTemplate="caption">
-        <div class="flex justify-content-end">
-          <app-edit-settings-dialog [title]="'Algorithm Settings'" [view]="'algos'"></app-edit-settings-dialog>
-          <p-iconField iconPosition="left" class="ml-auto">
-            <p-inputIcon>
-              <i class="pi pi-search"></i>
-            </p-inputIcon>
-            <input
-              pInputText
-              type="text"
-              (input)="
-                solutionsTable.filterGlobal(
-                  $any($event.target).value || '',
-                  'contains'
-                )
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.age }}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.challenge_id | challengePipe }}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.algorithm_id | algorithmPipe }}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.solutions }} Solutions /
+            {{ benchmark.number_of_nonces }} Nonces
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.difficulty }}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.submission_delay }}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            <p-tag
+              [severity]="
+                benchmark.status == 'Completed'
+                  ? 'success'
+                  : benchmark.status == 'In Progress'
+                  ? 'warning'
+                  : 'info'
               "
-              placeholder="Search keyword"
+              [value]="benchmark.status"
             />
-          </p-iconField>
-        </div>
-      </ng-template>
-      <ng-template pTemplate="header">
-        <tr>
-          <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
-          <th pSortableColumn="solutions">
-            # Solutions <p-sortIcon field="solutions" />
-          </th>
-          <th pSortableColumn="difficulty">
-            Difficulty <p-sortIcon field="difficulty" />
-          </th>
-          <th pSortableColumn="qualifiers">
-            # Qualifiers <p-sortIcon field="qualifiers" />
-          </th>
-          <th pSortableColumn="imbalance">Imbalance <p-sortIcon field="imbalance" /></th>
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="body" let-benchmark>
-        <tr>
-          <td>
-            <div class="flex justify-content-center align-items-center">
-              {{ benchmark.age }}
-            </div>
-          </td>
-          <td>
-            <div class="flex justify-content-center align-items-center">
-              {{ benchmark.solutions }}
-            </div>
-          </td>
-          <td>
-            <div class="flex justify-content-center align-items-center">
-              {{ benchmark.difficulty }}
-            </div>
-          </td>
-          <td>
-            <div class="flex justify-content-center align-items-center">
-              {{ benchmark.qualifiers }}
-            </div>
-          </td>
-          <td>
-            <div class="flex justify-content-center align-items-center">
-              <p-tag
-                [severity]="
-                  benchmark.imbalance >= 1
-                    ? 'success'
-                    : benchmark.imbalance > 0.5
-                    ? 'warning'
-                    : 'info'
-                "
-                [value]="benchmark.imbalance"
-              />
-            </div>
-          </td>
-        </tr>
-      </ng-template>
-    </p-table>
-}
-@else {
-    <div class="flex w-full justify-content-center align-items-center">
-        <p-progressSpinner 
-styleClass="w-4rem h-4rem" 
-strokeWidth="8" 
-fill="var(--surface-ground)" 
-animationDuration="1.5s" />
-    </div>
-}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.time_elapsed | timeConverter }}
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+  } @else {
+  <div class="flex w-full justify-content-center align-items-center">
+    <p-progressSpinner
+      styleClass="w-4rem h-4rem"
+      strokeWidth="8"
+      fill="var(--surface-ground)"
+      animationDuration="1.5s"
+    />
+  </div>
+  }
 </p-card>
-<br>
-@if(tigService.latest_block()){
-  <div class="grid p-3">
-    <div class="col-4 p-4">
-      <p-card header="Deposit" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.price_info()){
-            <p>Locked  : <b>{{tigService.player_stats().available_fee_balance| number : '1.2-2'}}</b></p>
-            <p-button label="Deposit Now" [rounded]="true"></p-button>
-          }
-         @else {
-          <p>Could not get Price Info</p>
-         }
+<br />
+
+@if(cutoff()){
+<div class="grid p-3">
+  <div class="col-6 p-4">
+    <p-card>
+      <div class="grid">
+        <div class="cutoff-section col-6 flex justify-content-center">
+          <span class="cutoff-label">Cutoff</span>
+          <span class="cutoff-value">{{ cutoff().cutoff }}</span>
+          <span class="cutoff-equation">= 1.1 x min</span>
         </div>
-      </p-card>
-    </div>  
-    <div class="col-4 p-4">
-      <p-card header="Delegate" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.player_stats()){
-            <p>Total Delegated : <b>{{tigService.player_stats().round_earnings| number : '1.2-2'}}</b></p>
-            <p-button label="Change Fee" [rounded]="true"></p-button>
-          }
-         @else {
-          <p>Could not get Earnings Info</p>
-         }
+
+        <div class="col-6">
+          <div
+            class="active-solutions-title"
+            style="text-align: center; width: 100%; justify-content: center"
+          >
+            active solutions
+          </div>
+          <div class="solutions-section">
+            <div class="solution-item">
+              <span class="solution-label">{{ "c001" | challengePipe }} :</span>
+              <span class="solution-value">{{ cutoff().c001_qualifiers }}</span>
+            </div>
+            <div class="solution-item highlighted">
+              <span class="solution-label">{{ "c002" | challengePipe }} :</span>
+              <span class="solution-value">{{ cutoff().c002_qualifiers }}</span>
+            </div>
+            <div class="solution-item">
+              <span class="solution-label">{{ "c003" | challengePipe }} :</span>
+              <span class="solution-value">{{ cutoff().c003_qualifiers }}</span>
+            </div>
+            <div class="solution-item">
+              <span class="solution-label">{{ "c004" | challengePipe }} :</span>
+              <span class="solution-value">{{ cutoff().c004_qualifiers }}</span>
+            </div>
+            <!-- More solutions can be added here -->
+          </div>
+          <div
+            class="solution-item"
+            style="text-align: center; width: 100%; justify-content: center"
+          >
+            <span class="solution-label">deposit : {{ cutoff().deposit }}</span>
+          </div>
         </div>
-      </p-card>
-     
-    </div>  
-    <div class="col-4 p-4">
-      <p-card header="Delegators" class="w-full ">
-        <div class="flex flex-column  justify-content-center align-items-center">
-          @if(tigService.player_stats()){
-            <p>Delegator 1</p>
-            <p>Delegator 2</p>
-          }
-         @else {
-          <p>Could not get Fee Info</p>
-         }         
+      </div>
+    </p-card>
+  </div>
+  <div class="col-6 p-4">
+    <p-card>
+      <div class="grid">
+        <div class="cutoff-section col-6 flex justify-content-center">
+          <span class="cutoff-label">Imbalance </span>
+          <span class="cutoff-value">{{ imbalance().imbalance }} %</span>
         </div>
-      </p-card>
-     
-    </div>  
-    </div>
+
+        <div class="col-6">
+          <div
+            class="active-solutions-title"
+            style="text-align: center; width: 100%; justify-content: center"
+          >
+            qualifying solutions
+          </div>
+          <div class="solutions-section">
+            <div class="solution-item">
+              <span class="solution-label">{{ "c001" | challengePipe }} :</span>
+              <span class="solution-value"
+                >{{ imbalance().c001_qualifiers }} of
+                {{ imbalance().c001_solutions }}</span
+              >
+            </div>
+            <div class="solution-item highlighted">
+              <span class="solution-label">{{ "c002" | challengePipe }} :</span>
+              <span class="solution-value"
+                >{{ imbalance().c002_qualifiers }} of
+                {{ imbalance().c002_solutions }}</span
+              >
+            </div>
+            <div class="solution-item">
+              <span class="solution-label">{{ "c003" | challengePipe }} :</span>
+              <span class="solution-value"
+                >{{ imbalance().c003_qualifiers }} of
+                {{ imbalance().c003_solutions }}</span
+              >
+            </div>
+            <div class="solution-item">
+              <span class="solution-label">{{ "c004" | challengePipe }} :</span>
+              <span class="solution-value"
+                >{{ imbalance().c004_qualifiers }} of
+                {{ imbalance().c004_solutions }}</span
+              >
+            </div>
+            <!-- More solutions can be added here -->
+          </div>
+          <div
+            class="solution-item"
+            style="text-align: center; width: 100%; justify-content: center"
+          >
+            <span class="solution-label"
+              >deposit : {{ imbalance().deposit_qualifiers }} of
+              {{ imbalance().deposit }}</span
+            >
+          </div>
+        </div>
+      </div>
+    </p-card>
+  </div>
+</div>
 }
 
+<p-card header="Challenges">
+  <p-tabView (onChange)="changeChallengeView($event.index)">
+    @for (challenge of tigService.challenges(); track $index) {
+    <p-tabPanel [header]="challenge.name">
+      <div class="grid">
+        <div class="col-4 p-4">
+          <p-card header="Base Fee" class="w-full">
+            <div
+              class="flex flex-column justify-content-center align-items-center"
+            >
+              @if(challenge_summary()){
+              <p>
+                <b>{{ challenge_summary().base_fee }}</b>
+              </p>
+              } @else {
+              <p>Could not get Summary Info</p>
+              }
+            </div>
+          </p-card>
+        </div>
+        <div class="col-4 p-4">
+          <p-card header="Solutions" class="w-full">
+            <div
+              class="flex flex-column justify-content-center align-items-center"
+            >
+              @if(challenge_summary()){
+              <p>
+                <b>{{ challenge_summary().solutions }}</b>
+              </p>
+              } @else {
+              <p>Could not get Summary Info</p>
+              }
+            </div>
+          </p-card>
+        </div>
+        <div class="col-4 p-4">
+          <p-card header="Qualifiers" class="w-full">
+            <div
+              class="flex flex-column justify-content-center align-items-center"
+            >
+              @if(challenge_summary()){
+              <p>
+                <b>{{ challenge_summary().qualifiers }}</b>
+              </p>
+              } @else {
+              <p>Could not get Summary Info</p>
+              }
+            </div>
+          </p-card>
+        </div>
+      </div>
+      <p-card header="Benchmarks">
+        @if(challenge_table()){
+        <p-table
+          #benchmarksTable
+          [value]="challenge_table()"
+          [tableStyle]="{ 'min-width': '50rem' }"
+          styleClass="p-datatable-striped"
+          [paginator]="true"
+          [rows]="5"
+          [rowsPerPageOptions]="[5, 10, 20]"
+          [globalFilterFields]="[
+            'age',
+            'status',
+            'qualifiers',
+            'solutions',
+            'difficulty',
+            'submission_delay'
+          ]"
+        >
+          <ng-template pTemplate="caption">
+            <div class="flex">
+              <app-edit-settings-dialog
+                [title]="'Algorithm Settings'"
+                [view]="'algos'"
+              ></app-edit-settings-dialog>
+              <p-iconField iconPosition="left" class="ml-auto">
+                <p-inputIcon>
+                  <i class="pi pi-search"></i>
+                </p-inputIcon>
+                <input
+                  pInputText
+                  type="text"
+                  (input)="
+                    benchmarksTable.filterGlobal(
+                      $any($event.target).value || '',
+                      'contains'
+                    )
+                  "
+                  placeholder="Search keyword"
+                />
+              </p-iconField>
+            </div>
+          </ng-template>
+          <ng-template pTemplate="header">
+            <tr>
+              <th></th>
+              <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
+              <th pSortableColumn="difficulty">
+                Difficulty <p-sortIcon field="difficulty" />
+              </th>
+              <th pSortableColumn="solutions">
+                # Nonces <p-sortIcon field="solutions" />
+              </th>
+              <th pSortableColumn="solutions">
+                # Solutions <p-sortIcon field="solutions" />
+              </th>
+              <th pSortableColumn="submission_delay">
+                # Nonces per Solution <p-sortIcon field="submission_delay" />
+              </th>
+              <th pSortableColumn="status">
+                Status <p-sortIcon field="status" />
+              </th>
+              <th pSortableColumn="time_elapsed">
+                Time Elapsed <p-sortIcon field="time_elapsed" />
+              </th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-benchmark>
+            <tr>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  @if(benchmark.end_time){
+                  <i
+                    class="pi pi-check"
+                    style="font-size: 1.5rem; color: green"
+                  ></i>
+                  } @else {
+                  <i
+                    class="pi pi-spin pi-spinner"
+                    style="font-size: 1.5rem; color: var(--primary-color)"
+                  ></i>
+                  }
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  {{ benchmark.age }}
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  {{ benchmark.difficulty }}
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  {{ benchmark.number_of_nonces }}
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  {{ benchmark.solutions }}
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  {{ benchmark.solutions / benchmark.number_of_nonces }}
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  <p-tag
+                    [severity]="
+                      benchmark.status == 'Completed'
+                        ? 'success'
+                        : benchmark.status == 'In Progress'
+                        ? 'warning'
+                        : 'info'
+                    "
+                    [value]="benchmark.status"
+                  />
+                </div>
+              </td>
+              <td>
+                <div class="flex justify-content-center align-items-center">
+                  {{ benchmark.time_elapsed | timeConverter }}
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+        } @else {
+        <div class="flex w-full justify-content-center align-items-center">
+          <p-progressSpinner
+            styleClass="w-4rem h-4rem"
+            strokeWidth="8"
+            fill="var(--surface-ground)"
+            animationDuration="1.5s"
+          />
+        </div>
+        }
+      </p-card>
+    </p-tabPanel>
+    }
+  </p-tabView>
+</p-card>
+}

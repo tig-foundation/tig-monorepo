@@ -88,7 +88,7 @@ class SlaveManager:
         logger.info("SlaveManager initialized and connected to the database.")
         # Initialize FastAPI app
         self.app = FastAPI()
-        self.setup_routes()
+        # self.setup_routes()
     
     def setup_routes(self):
         @self.app.post("/register-slave")
@@ -295,9 +295,6 @@ class SlaveManager:
                     # Update solution_nonces
                     job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
 
-                    # Update batch_merkle_proofs
-                    for proof in result.merkle_proofs:
-                        job.batch_merkle_proofs[str(proof.leaf.nonce)] = proof.to_dict()
                         
                     # Create BatchResultModel
                     batch_result = BatchResultModel(
