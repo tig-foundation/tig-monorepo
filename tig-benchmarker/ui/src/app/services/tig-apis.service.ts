@@ -24,7 +24,7 @@ export class TigApisService {
   price_info: any = signal(null);
   price_info$ = toObservable(this.price_info);
   player_id: any = signal(null);
-  api_key: any = signal(null);
+  api_key: any = signal(null); //"256979aea0c51f485e9559a45f29ec74"
   latest_block: any = signal(null);
   latest_block$ = toObservable(this.latest_block);
   config: any = signal(null);
@@ -64,6 +64,7 @@ export class TigApisService {
     await this.getChallenges();
     await this.getAlgorithms();
     await this.getConfig();
+    await this.getSlaves();
   }
 
   async getAlgorithms() {
@@ -237,23 +238,16 @@ export class TigApisService {
 
   async getSlaves() {
     if (this.latest_block()) {
-      const url = `${this.tig_url}/get-algorithms?block_id=${
-        this.latest_block()?.id
-      }`;
-      const result = (await axios.get(url)).data;
-      if (result?.algorithms) {
-        this.algorithms.set(
-          result.algorithms.map((a: any) => {
-            return {
-              id: a.id,
-              ...a.details,
-              state: a.state,
-              block_data: a.block_data,
-            };
-          })
-        );
-        console.log('algorithms', this.algorithms());
-        this.checkReady();
+      const url = `${this.base_url}/get-slaves?limit=1000&page=1`;
+      const result = (
+        await axios.get(url, {
+          headers: {
+            'x-api-key': this.api_key(),
+          },
+        })
+      ).data;
+      if (result?.slaves) {
+        this.slaves.set(result.slaves);
       }
     }
   }
