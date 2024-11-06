@@ -117,11 +117,11 @@ class PlayerModel(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
-    algorithms = relationship('AlgorithmModel', back_populates='player', cascade="all, delete-orphan")
-    precommits = relationship('PrecommitModel', back_populates='player', cascade="all, delete-orphan")
-    benchmarks = relationship('BenchmarkModel', back_populates='player', cascade="all, delete-orphan")
-    proofs = relationship('ProofModel', back_populates='player', cascade="all, delete-orphan")
-    frauds = relationship('FraudModel', back_populates='player', cascade="all, delete-orphan")
+    # algorithms = relationship('AlgorithmModel', back_populates='player', cascade="all, delete-orphan")
+    # precommits = relationship('PrecommitModel', back_populates='player', cascade="all, delete-orphan")
+    # benchmarks = relationship('BenchmarkModel', back_populates='player', cascade="all, delete-orphan")
+    # proofs = relationship('ProofModel', back_populates='player', cascade="all, delete-orphan")
+    # frauds = relationship('FraudModel', back_populates='player', cascade="all, delete-orphan")
 
     @classmethod
     def from_dataclass(cls, player: Player):
@@ -304,7 +304,7 @@ class WasmModel(Base):
 class PrecommitModel(Base):
     __tablename__ = 'precommits'
     benchmark_id = Column(String, primary_key=True)
-    player_id = Column(String, ForeignKey('players.id'), nullable=False)
+    player_id = Column(String, nullable=False)
     block_id = Column(String, ForeignKey('blocks.id'), nullable=False)
     challenge_id = Column(String, ForeignKey('challenges.id'), nullable=False)
     algorithm_id = Column(String, ForeignKey('algorithms.id'), nullable=False)
@@ -316,7 +316,7 @@ class PrecommitModel(Base):
     block_confirmed = Column(Integer, nullable=True)
 
     # Relationships
-    player = relationship('PlayerModel', back_populates='precommits')
+    # player = relationship('PlayerModel', back_populates='precommits')
     challenge = relationship('ChallengeModel', back_populates='precommits')
     algorithm = relationship('AlgorithmModel')
     block = relationship('BlockModel')
@@ -371,11 +371,11 @@ class BenchmarkModel(Base):
     sampled_nonces = Column(JSON, nullable=True)
     solution_nonces = Column(JSON, nullable=True)
 
-    player_id = Column(String, ForeignKey('players.id'), nullable=False)
+    player_id = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     # Relationships
-    player = relationship('PlayerModel', back_populates='benchmarks')
+    # player = relationship('PlayerModel', back_populates='benchmarks')
     proofs = relationship('ProofModel', back_populates='benchmark', cascade="all, delete-orphan")
     frauds = relationship('FraudModel', back_populates='benchmark', cascade="all, delete-orphan")
 
@@ -414,11 +414,11 @@ class ProofModel(Base):
     block_confirmed = Column(Integer, nullable=True)
     submission_delay = Column(Integer, nullable=True)
     merkle_proofs = Column(JSON, nullable=True)
-    player_id = Column(String, ForeignKey('players.id'), nullable=True)
+    player_id = Column(String,  nullable=True)
 
     # Relationships
     benchmark = relationship('BenchmarkModel', back_populates='proofs')
-    player = relationship('PlayerModel', back_populates='proofs')
+    # player = relationship('PlayerModel', back_populates='proofs')
 
     @classmethod
     def from_dataclass(cls, proof: Proof):
@@ -448,11 +448,11 @@ class FraudModel(Base):
     benchmark_id = Column(String, ForeignKey('benchmarks.id'), primary_key=True)
     block_confirmed = Column(Integer, nullable=False)
     allegation = Column(Text, nullable=True)
-    player_id = Column(String, ForeignKey('players.id'), nullable=True)
+    player_id = Column(String, nullable=True)
 
     # Relationships
     benchmark = relationship('BenchmarkModel', back_populates='frauds')
-    player = relationship('PlayerModel', back_populates='frauds')
+    # player = relationship('PlayerModel', back_populates='frauds')
 
     @classmethod
     def from_dataclass(cls, fraud: Fraud):

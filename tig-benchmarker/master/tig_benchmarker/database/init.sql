@@ -70,7 +70,7 @@ CREATE TABLE challenges (
 CREATE TABLE algorithms (
     id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
-    player_id VARCHAR NOT NULL REFERENCES players(id),
+    player_id VARCHAR NOT NULL,
     challenge_id VARCHAR NOT NULL REFERENCES challenges(id),
     tx_hash VARCHAR,
     block_confirmed INTEGER,
@@ -95,7 +95,7 @@ CREATE TABLE wasms (
 -- Create precommits table
 CREATE TABLE precommits (
     benchmark_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL REFERENCES players(id),
+    player_id VARCHAR NOT NULL,
     block_id VARCHAR NOT NULL REFERENCES blocks(id),
     challenge_id VARCHAR NOT NULL REFERENCES challenges(id),
     algorithm_id VARCHAR NOT NULL REFERENCES algorithms(id),
@@ -115,7 +115,7 @@ CREATE TABLE benchmarks (
     block_confirmed INTEGER NOT NULL,
     sampled_nonces JSONB,
     solution_nonces JSONB,
-    player_id VARCHAR NOT NULL REFERENCES players(id),
+    player_id VARCHAR NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -125,7 +125,7 @@ CREATE TABLE proofs (
     block_confirmed INTEGER,
     submission_delay INTEGER,
     merkle_proofs JSONB,
-    player_id VARCHAR REFERENCES players(id)
+    player_id VARCHAR
 );
 
 -- Create frauds table
@@ -133,7 +133,7 @@ CREATE TABLE frauds (
     benchmark_id VARCHAR PRIMARY KEY REFERENCES benchmarks(id),
     block_confirmed INTEGER NOT NULL,
     allegation TEXT,
-    player_id VARCHAR REFERENCES players(id)
+    player_id VARCHAR
 );
 
 -- Create difficulty_data table

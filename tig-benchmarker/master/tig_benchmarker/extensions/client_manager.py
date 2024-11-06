@@ -9,7 +9,7 @@ from fastapi import FastAPI, Query, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, RootModel
 from tig_benchmarker.database.init import SessionLocal
-from tig_benchmarker.database.models.index import AssignedBatchModel, BlockModel, ConfigModel, JobModel, SlaveRegistryModel
+from tig_benchmarker.database.models.index import AssignedBatchModel, BlockModel, ConfigModel, JobModel, PlayerModel, SlaveRegistryModel
 
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -71,36 +71,36 @@ class ClientManager:
                 logger.error(f"Unexpected error on /update-config: {e}")
                 raise HTTPException(status_code=400, detail="Invalid configuration data")
             
-        # @self.app.get("/get-current-block", dependencies=[Depends(self.verify_api_key)])
-        # async def get_current_block():
-        #     try:
-        #         block = self.db_session.query(BlockModel).order_by(desc(BlockModel.created_at)).first()
-        #         if block :
-        #             player = self.db_session.query(PlayerModel).order_by(desc(PlayerModel.created_at)).first()
-        #             if player:
-        #                 return JSONResponse(
-        #                     content={
-        #                         "block": BlockModel.from_dataclass(block),
-        #                         "player": PlayerModel.from_dataclass(player)
-        #                     },
-        #                     status_code=200
-        #                 )
-        #             else:
-        #                 raise HTTPException(
-        #                     status_code=400,
-        #                     detail="Player details not found"
-        #                 )
-        #         else:
-        #             raise HTTPException(
-        #                 status_code=400,
-        #                 details="Block details not found"
-        #             )
-        #     except SQLAlchemyError as e:
-        #         logger.error(f"Database error on /get-current-block: {e}")
-        #         raise HTTPException(status_code=500, detail="Internal Server Error")
-        #     except Exception as e:
-        #         logger.error(f"Unexpected error on /get-current-block: {e}")
-        #         raise HTTPException(status_code=500, detail="Internal Server Error")
+        @self.app.get("/get-current-block", dependencies=[Depends(self.verify_api_key)])
+        async def get_current_block():
+            try:
+                block = self.db_session.query(BlockModel).order_by(desc(BlockModel.created_at)).first()
+                if block :
+                    player = self.db_session.query(PlayerModel).order_by(desc(PlayerModel.created_at)).first()
+                    if player:
+                        return JSONResponse(
+                            content={
+                                "block": BlockModel.from_dataclass(block),
+                                "player": PlayerModel.from_dataclass(player)
+                            },
+                            status_code=200
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Player details not found"
+                        )
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        details="Block details not found"
+                    )
+            except SQLAlchemyError as e:
+                logger.error(f"Database error on /get-current-block: {e}")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
+            except Exception as e:
+                logger.error(f"Unexpected error on /get-current-block: {e}")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
             
         @self.app.get("/get-benchmark-jobs", dependencies=[Depends(self.verify_api_key)])
         async def get_benchmark_jobs(limit: int = Query(10, gt=0), page: int = Query(1, gt=0)):

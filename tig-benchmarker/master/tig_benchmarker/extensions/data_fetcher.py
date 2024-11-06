@@ -10,13 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tig_benchmarker.database.init import SessionLocal
 from tig_benchmarker.database.models.index import (
-    BlockModel
+    BlockModel, AlgorithmModel, WasmModel, PlayerModel, PrecommitModel,
+    BenchmarkModel, ProofModel, FraudModel, ChallengeModel,
+    DifficultyDataModel
 )
-# from tig_benchmarker.database.models.index import (
-#     BlockModel, AlgorithmModel, WasmModel, PlayerModel, PrecommitModel,
-#     BenchmarkModel, ProofModel, FraudModel, ChallengeModel,
-#     DifficultyDataModel
-# )
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -117,18 +114,18 @@ class DataFetcher:
         }
 
         # Store all fetched data into the database.
-        # self._store_in_db(
-        #     block=block,
-        #     algorithms=algorithms,
-        #     wasms=wasms,
-        #     player=player,
-        #     precommits=precommits,
-        #     benchmarks=benchmarks,
-        #     proofs=proofs,
-        #     frauds=frauds,
-        #     challenges=challenges,
-        #     difficulty_data=difficulty_data
-        # )
+        self._store_in_db(
+            block=block,
+            algorithms=algorithms,
+            wasms=wasms,
+            player=player,
+            precommits=precommits,
+            benchmarks=benchmarks,
+            proofs=proofs,
+            frauds=frauds,
+            challenges=challenges,
+            difficulty_data=difficulty_data
+        )
 
         # Return data
         return {
@@ -170,7 +167,6 @@ class DataFetcher:
                 
             # Store player
             if player:
-
                 logger.info(f"player: {player}")
 
                 existing_player = session.query(PlayerModel).filter_by(id=player.id).first()
