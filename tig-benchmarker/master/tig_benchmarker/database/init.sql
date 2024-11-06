@@ -266,7 +266,7 @@ CREATE INDEX idx_batch_results_benchmark_id ON batch_results(benchmark_id);
 CREATE INDEX idx_assigned_batches_benchmark_id ON assigned_batches(benchmark_id);
 
 -- Create index for faster queries on job_id
-CREATE INDEX idx_precommit_requests_job_id ON precommit_requests(job_id);
+-- CREATE INDEX idx_precommit_requests_job_id ON precommit_requests(job_id);
 
 -- Create index for faster queries on job_id and benchmark_id
 CREATE INDEX idx_benchmark_requests_job_id ON benchmark_requests(job_id);
