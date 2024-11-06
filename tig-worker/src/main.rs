@@ -215,7 +215,7 @@ fn compute_batch(
         let mut solution_nonces = Vec::new();
 
         // Create a stream of nonces and process them concurrently
-        let results = stream::iter(start_nonce..(start_nonce + batch_size))
+        let results = stream::iter(start_nonce..(start_nonce + num_nonces))
             .map(|nonce| {
                 let settings = Arc::clone(&settings);
                 let wasm = Arc::clone(&wasm);

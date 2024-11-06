@@ -6,6 +6,7 @@ import randomname
 import aiohttp
 import asyncio
 import time
+import psutil
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -53,6 +54,41 @@ async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_
     logger.debug(f"batch result: {result}")
     return result
 
+async def register_slave(session, master_ip, master_port, slave_name):
+    # Get Slave ID from disk
+    slave_id = None
+
+    # Check if slave_id.txt exists
+    if os.path.exists("slave_id.txt"):
+        with open("slave_id.txt", "r") as f:
+            slave_id = f.read()
+
+    if slave_id is None:
+        # Register Slave with Master
+        start = now()
+        logger.info(f"Registering slave '{slave_name}' with master at {master_ip}:{master_port}")
+
+        slave_data = {
+            "name": slave_name,
+            "num_of_cpus": psutil.cpu_count(logical=False),
+            "num_of_threads": psutil.cpu_count(logical=True),
+            "memory": psutil.virtual_memory().total,
+        }
+
+        async with session.post(f"http://{master_ip}:{master_port}/register-slave", json=slave_data) as resp:
+            if resp.status != 200:
+                raise Exception(f"status {resp.status} when registering slave: {await resp.text()}")
+            data = await resp.json()
+            logger.debug(f"Registering slave took {now() - start}ms")
+            logger.info(f"Slave '{slave_name}' registered with ID {slave_id}")
+            with open("slave_id.txt", "w") as f:
+                f.write(str(data.get("id")))
+    else:
+        logger.info(f"Slave '{slave_name}' already registered with ID {slave_id}")
+
+    return slave_id
+
+
 async def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
     try:
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
@@ -75,6 +111,24 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
             logger.debug(f"posting results took {now() - start} ms")
             # Step 5: Calculate Merkle proofs for sampled nonces
             # TODO: calculate merkle proofs
+        #     leafs = {
+        # nonce: json.loads("{nonce}.json")
+        # for nonce in range(start_nonce, start_nonce + batch_size)
+        # }
+
+        # merkle_tree = MerkleTree(
+        # [x.to_merkle_hash() for x in leafs.values()],
+        # batch_size
+        # )
+
+        # merkle_proofs = [
+        # MerkleProof(+
+        #     leaf=leafs[n],
+        #     branch=merkle_tree.calc_merkle_branch(branch_idx=n - start_nonce)
+        # )
+        # for n in sampled
+        # ]
+
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
@@ -91,14 +145,18 @@ async def main(
     if not os.path.exists(tig_worker_path):
         raise FileNotFoundError(f"tig-worker not found at path: {tig_worker_path}")
     os.makedirs(download_wasms_folder, exist_ok=True)
-
-    headers = {
-        "User-Agent": slave_name
-    }
     
     async with aiohttp.ClientSession() as session:
         while True:
             try:
+                # Step 0: Register Slave
+                slave_id = await register_slave(session, master_ip, master_port, slave_name)
+
+                headers = {
+                    "User-Agent": slave_id
+                }
+
+
                 # Step 1: Query for job
                 start = now()
                 get_batch_url = f"http://{master_ip}:{master_port}/get-batches"
