@@ -147,8 +147,8 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
     {
         rayon::scope(|s|
         {
-            s.spawn(|_| futures::executor::block_on(update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| update_cutoffs(&block, &mut Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| update_cutoffs( &block, &mut Arc::into_inner(cache.clone()).unwrap()));
         });
     }.await;
 
@@ -207,12 +207,12 @@ fn confirm_mempool_algorithms(
     cache:                  &AddBlockCache,
 )
 {
-    for algorithm in cache.mempool_algorithms.write().unwrap().iter_mut() 
+    cache.mempool_algorithms.write().unwrap().par_iter_mut().for_each(|algorithm|
     {
         let state                       = algorithm.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
         state.round_submitted           = Some(block.details.round);
-    }
+    });
 }
 
 #[time]
@@ -221,7 +221,7 @@ fn confirm_mempool_precommits(
     cache:                  &AddBlockCache,
 )
 {
-    for precommit in cache.mempool_precommits.write().unwrap().iter_mut() 
+    cache.mempool_precommits.write().unwrap().par_iter_mut().for_each(|precommit|
     {
         let state                       = precommit.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
@@ -238,7 +238,7 @@ fn confirm_mempool_precommits(
             .active_fee_players.write().unwrap().get_mut(&precommit.settings.player_id).unwrap()
             .state.as_mut().unwrap()
             .total_fees_paid.as_mut().unwrap()   -= fee_paid;
-    }
+    });
 }
 
 #[time]
@@ -248,7 +248,7 @@ fn confirm_mempool_benchmarks(
 )
 {
     let config                          = block.config();
-    for benchmark in cache.mempool_benchmarks.write().unwrap().iter_mut() 
+    cache.mempool_benchmarks.write().unwrap().par_iter_mut().for_each(|benchmark|
     {
         let seed                        = u64s_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str())[0];
         let mut rng                     = StdRng::seed_from_u64(seed);
@@ -304,7 +304,7 @@ fn confirm_mempool_benchmarks(
         let state = benchmark.state.as_mut().unwrap();
         state.sampled_nonces = Some(sampled_nonces);
         state.block_confirmed = Some(block.details.height);
-    }
+    });
 }
 
 #[time]
@@ -313,14 +313,14 @@ fn confirm_mempool_proofs(
     cache:                  &AddBlockCache,
 )
 {
-    for proof in cache.mempool_proofs.write().unwrap().iter_mut() 
+    cache.mempool_proofs.write().unwrap().par_iter_mut().for_each(|proof|
     {
         let state                       = proof.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
         state.submission_delay          = Some(block.details.height 
                                             - cache.confirmed_precommits.read().unwrap().get(&proof.benchmark_id).unwrap().details.block_started
         );
-    }
+    });
 }
 
 #[time]
@@ -329,11 +329,11 @@ fn confirm_mempool_frauds(
     cache:                  &AddBlockCache,
 )
 {
-    for fraud in cache.mempool_frauds.write().unwrap().iter_mut() 
+    cache.mempool_frauds.write().unwrap().par_iter_mut().for_each(|fraud|
     {
         let state                       = fraud.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
-    }
+    });
 }
 
 #[time]
@@ -342,7 +342,7 @@ fn confirm_mempool_topups(
     cache:                  &AddBlockCache,
 )
 {
-    for topup in cache.mempool_topups.write().unwrap().iter_mut() 
+    cache.mempool_topups.write().unwrap().par_iter_mut().for_each(|topup|
     {
         let state                       = topup.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
@@ -351,7 +351,7 @@ fn confirm_mempool_topups(
             .active_fee_players.write().unwrap().get_mut(&topup.details.player_id).unwrap()
             .state.as_mut().unwrap()
             .available_fee_balance.as_mut().unwrap()    += topup.details.amount;
-    }
+    });
 }
 
 #[time]
@@ -360,15 +360,15 @@ fn confirm_mempool_wasms(
     cache:                  &AddBlockCache,
 )
 {
-    for wasm in cache.mempool_wasms.write().unwrap().iter_mut() 
+    cache.mempool_wasms.write().unwrap().par_iter_mut().for_each(|wasm|
     {
         let state                       = wasm.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
-    }
+    });
 }
 
 #[time]
-async fn update_deposits<T: Context>(
+fn update_deposits<T: Context + std::marker::Send + std::marker::Sync>(
     ctx:                    &RwLock<T>,
     block:                  &Block,
     cache:                  &mut AddBlockCache,
@@ -383,9 +383,9 @@ async fn update_deposits<T: Context>(
     let eth_block_num                   = block.details.eth_block_num();
     let zero                            = PreciseNumber::from(0);
     let one                             = PreciseNumber::from(1);
-    for player in cache.active_fee_players.write().unwrap().values_mut() 
+    cache.active_fee_players.write().unwrap().par_iter_mut().for_each(|(player_id, player)|
     {
-        let rolling_deposit             = match &cache.prev_players.read().unwrap().get(&player.id).unwrap().block_data 
+        let rolling_deposit             = match &cache.prev_players.read().unwrap().get(player_id).unwrap().block_data 
         {
             Some(data)                  => data.rolling_deposit,
             None                        => None,
@@ -393,13 +393,15 @@ async fn update_deposits<T: Context>(
         .unwrap_or_else(|| zero);
 
         let data                        = player.block_data.as_mut().unwrap();
-        let deposit                     = ctx.read().unwrap().get_player_deposit(eth_block_num, &player.id).await.unwrap_or_else(|| zero);
+        let deposit                     = futures::executor::block_on(ctx.read().unwrap().get_player_deposit(eth_block_num, player_id))
+                                            .unwrap_or_else(|| zero);
 
         data.rolling_deposit            = Some(decay * rolling_deposit + (one - decay) * deposit);
         data.deposit                    = Some(deposit);
         data.qualifying_percent_rolling_deposit = Some(zero);
-    }
+    });
 }
+
 #[time]
 fn update_cutoffs(
     block:                  &Block,
@@ -410,7 +412,7 @@ fn update_cutoffs(
     let mut phase_in_challenge_ids      = HashSet::<String>::new();
     phase_in_challenge_ids              = cache.active_challenges.read().unwrap().keys().cloned().collect();
 
-    for algorithm in cache.active_algorithms.read().unwrap().values() 
+    for algorithm in cache.active_algorithms.read().unwrap().values()
     {
         if algorithm.state().round_pushed.is_some_and(|r| r + 1 <= block.details.round)
         {
