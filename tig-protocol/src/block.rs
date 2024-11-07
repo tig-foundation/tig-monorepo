@@ -378,17 +378,17 @@ async fn update_deposits<T: Context>(
     {
         let rolling_deposit             = match &cache.prev_players.read().unwrap().get(&player.id).unwrap().block_data 
         {
-            Some(data)                  => data.rolling_deposit.clone(),
+            Some(data)                  => data.rolling_deposit,
             None                        => None,
         }
-        .unwrap_or_else(|| zero.clone());
+        .unwrap_or_else(|| zero);
 
         let data                        = player.block_data.as_mut().unwrap();
-        let deposit                     = ctx.read().unwrap().get_player_deposit(eth_block_num, &player.id).await.unwrap_or_else(|| zero.clone());
+        let deposit                     = ctx.read().unwrap().get_player_deposit(eth_block_num, &player.id).await.unwrap_or_else(|| zero);
 
         data.rolling_deposit            = Some(decay * rolling_deposit + (one - decay) * deposit);
         data.deposit                    = Some(deposit);
-        data.qualifying_percent_rolling_deposit = Some(zero.clone());
+        data.qualifying_percent_rolling_deposit = Some(zero);
     }
 }
 #[time]
@@ -434,11 +434,11 @@ fn update_cutoffs(
             let phase_in_min_num_solutions = cache
                 .active_challenges.read().unwrap()
                 .keys().filter(|&id| !phase_in_challenge_ids.contains(id))
-                .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
+                .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0))
                 .min().unwrap();
 
             let phase_in_cutoff         = min_cutoff.max(
-                (phase_in_min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32
+                (*phase_in_min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32
             );
 
             let phase_in_weight         = (phase_in_end - block.details.height) as f64 / phase_in_period as f64;
