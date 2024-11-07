@@ -128,14 +128,14 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
     {
         rayon::scope(|s|
         {
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_challenges(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_algorithms(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_precommits(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_benchmarks(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_proofs(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_frauds(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_topups(&block, &Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(confirm_mempool_wasms(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| confirm_mempool_challenges( &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_algorithms( &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_precommits( &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_benchmarks( &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_proofs(     &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_frauds(     &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_topups(     &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| confirm_mempool_wasms(      &block, &Arc::into_inner(cache.clone()).unwrap()));
         });
     }.await;
 
@@ -145,7 +145,7 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
         rayon::scope(|s|
         {
             s.spawn(|_| futures::executor::block_on(update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap())));
-            s.spawn(|_| futures::executor::block_on(update_cutoffs(&block, &mut Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| update_cutoffs(&block, &mut Arc::into_inner(cache.clone()).unwrap()));
         });
     }.await;
 
@@ -180,7 +180,7 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
 }
 
 #[time]
-async fn confirm_mempool_challenges(
+fn confirm_mempool_challenges(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -193,7 +193,7 @@ async fn confirm_mempool_challenges(
 }
 
 #[time]
-async fn confirm_mempool_algorithms(
+fn confirm_mempool_algorithms(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -207,7 +207,7 @@ async fn confirm_mempool_algorithms(
 }
 
 #[time]
-async fn confirm_mempool_precommits(
+fn confirm_mempool_precommits(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -233,7 +233,7 @@ async fn confirm_mempool_precommits(
 }
 
 #[time]
-async fn confirm_mempool_benchmarks(
+fn confirm_mempool_benchmarks(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -299,7 +299,7 @@ async fn confirm_mempool_benchmarks(
 }
 
 #[time]
-async fn confirm_mempool_proofs(
+fn confirm_mempool_proofs(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -315,7 +315,7 @@ async fn confirm_mempool_proofs(
 }
 
 #[time]
-async fn confirm_mempool_frauds(
+fn confirm_mempool_frauds(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -328,7 +328,7 @@ async fn confirm_mempool_frauds(
 }
 
 #[time]
-async fn confirm_mempool_topups(
+fn confirm_mempool_topups(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -346,7 +346,7 @@ async fn confirm_mempool_topups(
 }
 
 #[time]
-async fn confirm_mempool_wasms(
+fn confirm_mempool_wasms(
     block:                  &Block,
     cache:                  &AddBlockCache,
 )
@@ -384,12 +384,7 @@ async fn update_deposits<T: Context>(
         .unwrap_or_else(|| zero.clone());
 
         let data                        = player.block_data.as_mut().unwrap();
-        let deposit                     = ctx
-            .read()
-            .unwrap()
-            .get_player_deposit(eth_block_num, &player.id)
-            .await
-            .unwrap_or_else(|| zero.clone());
+        let deposit                     = ctx.read().unwrap().get_player_deposit(eth_block_num, &player.id).await.unwrap_or_else(|| zero.clone());
 
         data.rolling_deposit            = Some(decay * rolling_deposit + (one - decay) * deposit);
         data.deposit                    = Some(deposit);
@@ -397,7 +392,7 @@ async fn update_deposits<T: Context>(
     }
 }
 #[time]
-async fn update_cutoffs(
+fn update_cutoffs(
     block:                  &Block,
     cache:                  &mut AddBlockCache,
 )
