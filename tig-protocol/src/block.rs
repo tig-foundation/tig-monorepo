@@ -123,6 +123,9 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
 {
     let (mut block, mut cache)          = create_block(&Arc::into_inner(ctx.clone()).unwrap()).await;
 
+    // notify ctx
+    ctx.read().unwrap().notify_new_block();
+
     // confirm mempool items
     async 
     {
@@ -148,6 +151,9 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
             s.spawn(|_| update_cutoffs(&block, &mut Arc::into_inner(cache.clone()).unwrap()));
         });
     }.await;
+
+    // notify ctx
+    ctx.read().unwrap().block_assembled(&block);
 
     // commit changes
     async
@@ -175,6 +181,9 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
             });
         });
     }.await;
+
+    // notify ctx
+    ctx.read().unwrap().data_committed(&block);
 
     return block.id;
 }

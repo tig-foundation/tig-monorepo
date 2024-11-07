@@ -141,4 +141,18 @@ pub trait Context
         algorithm_id: &String,
         state:                          &AlgorithmState,
     )                                           -> ContextResult<()>;
+
+    fn notify_new_block(
+        &self
+    );
+
+    fn block_assembled(
+        &self,
+        block:                          &Block,
+    );
+
+    fn data_committed(
+        &self,
+        block:                          &Block,
+    );
 }
