@@ -8,6 +8,11 @@ use
             ContextResult,
             ContextError,
         },
+        err::
+        {
+            ProtocolError,
+            ProtocolResult,
+        },
         contracts::
         {
             Contracts,
@@ -15,17 +20,29 @@ use
     },
     std::
     {
+        collections::
+        {
+            HashSet,
+        },
         sync::
         {
             RwLock,
             Arc
         }
     },
+    tig_structs::
+    {
+        core::
+        {
+            *
+        },
+        *,
+    },
 };
 
 pub struct Protocol<T: Context>
 {
-    ctx:                        T,
+    ctx:                        Arc<RwLock<T>>,
     contracts:                  Contracts<T>,
 }
 
@@ -35,14 +52,21 @@ impl<T: Context> Protocol<T>
     {
         let mut new                 = Self 
         { 
-            ctx                     : ctx,
+            ctx                     : Arc::new(RwLock::new(ctx)),
             contracts               : Contracts::new(),
         };
 
         return new;
     }
 
-    async fn run_block()
+    async fn submit_benchmark(
+        &self,
+        player:                 &Player,
+        benchmark_id:           &String,
+        merkle_root:            MerkleHash,
+        solution_nonces:        HashSet<u64>,
+    )                                   -> ProtocolResult<()>
     {
+        self.contracts.benchmark.submit_benchmark(&Arc::into_inner(self.ctx.clone()).unwrap(), player, benchmark_id, merkle_root, solution_nonces).await
     }
 }

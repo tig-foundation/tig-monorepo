@@ -50,39 +50,14 @@ impl<T: Context> ChallengeContract<T>
     }
 
     #[time]
-    pub async fn fetch_challenge_by_id_and_block<'a>(
-        &mut self,
-        ctx:                    &T,
-        id:                     &'a String,
-        block:                  &Block,
-        include_data:           bool
-    )                                   -> ContractResult<'a, Challenge>
-    {
-        if !block.data().active_challenge_ids.contains(id) 
-        {
-            return Err(ProtocolError::InvalidChallenge 
-            {
-                challenge_id                : id,
-            });
-        }
-
-        return Ok(
-            ctx.get_challenge_by_id_and_height(id, block.details.height as u64, include_data)
-                .await
-                .unwrap()
-                .expect("Challenge not found")
-        );
-    }
-
-    #[time]
     async fn verify_challenge_exists<'a>(
         &self,
         ctx:                    &T,
         details:                &'a AlgorithmDetails,
-    )                                   -> ContractResult<'a, ()> 
+    )                                   -> ContractResult<()> 
     {
         let latest_block = ctx
-            .get_block_by_height(-1, false)
+            .get_block_by_height(-1)
             .await
             .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
             .expect("Expecting latest block to exist");
@@ -99,10 +74,7 @@ impl<T: Context> ChallengeContract<T>
                     .is_some_and(|r| *r <= latest_block.details.round)
             })
         {
-            return Err(ProtocolError::InvalidChallenge 
-            {
-                challenge_id                : &details.challenge_id,
-            });
+            return Err(format!("Invalid challenge: {}", details.challenge_id));
         }
         Ok(())
     }

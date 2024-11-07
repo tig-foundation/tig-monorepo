@@ -59,10 +59,10 @@ impl<T: Context> TopUpContract<T>
         ctx:                            &'a T,
         player:                         &'a Player,
         tx_hash:                        &'a String,
-    )                                           -> ContractResult<'a, PreciseNumber> 
+    )                                           -> ContractResult<PreciseNumber> 
     {
         let block = ctx
-            .get_block_by_height(-1, false)
+            .get_block_by_height(-1)
             .await
             .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
             .expect("No latest block found");
@@ -74,49 +74,28 @@ impl<T: Context> TopUpContract<T>
             .first()
             .is_some()
         {
-            return Err(ProtocolError::DuplicateTransaction 
-            {
-                tx_hash                         : tx_hash,
-            });
+            return Err(format!("Duplicate transaction: {}", tx_hash));
         }
 
         let transaction                         = ctx.get_transaction(&tx_hash)
             .await
-            .map_err(|_| ProtocolError::InvalidTransaction 
-            {
-                tx_hash                         : tx_hash,
-            })?;
+            .map_err(|_| format!("Invalid transaction: {}", tx_hash))?;
 
         if player.id != transaction.sender 
         {
-            return Err(ProtocolError::InvalidTransactionSender 
-            {
-                tx_hash                         : tx_hash,
-                expected_sender                 : player.id.clone(),
-                actual_sender                   : transaction.sender.clone(),
-            });
+            return Err(format!("Invalid transaction sender: expected {}, actual {}", player.id, transaction.sender));
         }
 
         let burn_address                        = &block.config().erc20.burn_address;
         if transaction.receiver != *burn_address 
         {
-            return Err(ProtocolError::InvalidTransactionReceiver 
-            {
-                tx_hash                         : tx_hash,
-                expected_receiver               : burn_address.to_string(),
-                actual_receiver                 : transaction.receiver,
-            });
+            return Err(format!("Invalid transaction receiver: expected {}, actual {}", burn_address, transaction.receiver));
         }
 
         let expected_amount                     = block.config().precommit_submissions().topup_amount;
         if transaction.amount != expected_amount 
         {
-            return Err(ProtocolError::InvalidTransactionAmount 
-            {
-                tx_hash                         : tx_hash,
-                expected_amount                 : expected_amount,
-                actual_amount                   : transaction.amount,
-            });
+            return Err(format!("Invalid transaction amount: expected {}, actual {}", expected_amount, transaction.amount));
         }
 
         return Ok(expected_amount);
