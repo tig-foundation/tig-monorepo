@@ -429,7 +429,7 @@ fn update_cutoffs(
                                         += *num_solutions;
     }
 
-    for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() 
+    num_solutions_by_player_by_challenge.par_iter().for_each(|(player_id, num_solutions_by_challenge)|
     {
         let phase_in_start              = (block.details.round - 1) * config.rounds.blocks_per_round;
         let phase_in_period             = config.qualifiers.cutoff_phase_in_period.unwrap();
@@ -460,5 +460,5 @@ fn update_cutoffs(
             .get_mut(player_id).unwrap()
             .block_data.as_mut().unwrap()
             .cutoff                     = Some(cutoff);
-    }
+    });
 }
