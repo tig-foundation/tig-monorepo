@@ -176,8 +176,8 @@ impl<T: Context> BenchmarkContract<T>
         ctx:                    &RwLock<T>,
         player:                 &Player,
         benchmark_id:           &String,
-        merkle_root:            MerkleHash,
-        solution_nonces:        HashSet<u64>,
+        merkle_root:            &MerkleHash,
+        solution_nonces:        &HashSet<u64>,
     )                                   -> ContractResult<()>
     {
         //verify that the benchmark is not already submitted
@@ -208,12 +208,8 @@ impl<T: Context> BenchmarkContract<T>
             }
         }
 
-        ctx.write().unwrap().add_benchmark_to_mempool(benchmark_id, &BenchmarkDetails 
-        {
-            num_solutions                   : solution_nonces.len() as u32,
-            merkle_root                     : Some(merkle_root),
-        }, &solution_nonces).await
-        .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e));
+        ctx.write().unwrap().add_benchmark_to_mempool(benchmark_id, merkle_root, solution_nonces).await
+            .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e));
 
         return Ok(());
     }
@@ -223,7 +219,7 @@ impl<T: Context> BenchmarkContract<T>
         ctx:                    &RwLock<T>,
         player:                 &Player,
         benchmark_id:           &String,
-        merkle_proofs:          Vec<MerkleProof>,
+        merkle_proofs:          &Vec<MerkleProof>,
     )                                   -> ContractResult<Result<(), String>>
     {
         //verify that the proof is not already submitted

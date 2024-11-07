@@ -54,11 +54,11 @@ impl<T: Context> TopUpContract<T>
     }
 
     #[time]
-    async fn verify_topup_tx<'a>(
+    async fn verify_topup_tx(
         &self,
-        ctx:                            &'a T,
-        player:                         &'a Player,
-        tx_hash:                        &'a String,
+        ctx:                            &T,
+        player:                         &Player,
+        tx_hash:                        &String,
     )                                           -> ContractResult<PreciseNumber> 
     {
         let block                             = ctx

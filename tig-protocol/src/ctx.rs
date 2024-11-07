@@ -108,7 +108,7 @@ pub trait Context
     async fn add_benchmark_to_mempool(
         &self,
         benchmark_id:                   &String,
-        details:                        &BenchmarkDetails,
+        merkle_root:                    &MerkleHash,
         solution_nonces:                &HashSet<u64>,
     )                                           -> ContextResult<()>;
 

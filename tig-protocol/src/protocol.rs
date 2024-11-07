@@ -59,14 +59,36 @@ impl<T: Context> Protocol<T>
         return new;
     }
 
+    pub async fn submit_precommit(
+        &self,
+        ctx:                    &RwLock<T>,
+        player:                 &Player,
+        settings:               &BenchmarkSettings,
+        num_nonces:             u32,
+    )                                   -> ProtocolResult<String>
+    {
+        return self.contracts.benchmark.submit_precommit(&Arc::into_inner(self.ctx.clone()).unwrap(), player, settings, num_nonces).await;
+    }
+
     async fn submit_benchmark(
         &self,
         player:                 &Player,
         benchmark_id:           &String,
-        merkle_root:            MerkleHash,
-        solution_nonces:        HashSet<u64>,
+        merkle_root:            &MerkleHash,
+        solution_nonces:        &HashSet<u64>,
     )                                   -> ProtocolResult<()>
     {
-        self.contracts.benchmark.submit_benchmark(&Arc::into_inner(self.ctx.clone()).unwrap(), player, benchmark_id, merkle_root, solution_nonces).await
+        return self.contracts.benchmark.submit_benchmark(&Arc::into_inner(self.ctx.clone()).unwrap(), player, benchmark_id, merkle_root, solution_nonces).await;
+    }
+
+    pub async fn submit_proof(
+        &self,
+        ctx:                    &RwLock<T>,
+        player:                 &Player,
+        benchmark_id:           &String,
+        merkle_proofs:          &Vec<MerkleProof>,
+    )                                   -> ProtocolResult<Result<(), String>>
+    {
+        return self.contracts.benchmark.submit_proof(&Arc::into_inner(self.ctx.clone()).unwrap(), player, benchmark_id, &merkle_proofs).await;
     }
 }
