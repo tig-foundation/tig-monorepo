@@ -67,8 +67,8 @@ impl<T: Context> BenchmarkContract<T>
         }
 
         //make sure that the submission delay is within the lifespan period
-        let benchmark_block                 = ctx.read().unwrap().get_block_by_id(&settings.block_id).await.unwrap().expect("Expecting benchmark block to exist");
-        let latest_block                    = ctx.read().unwrap().get_block_by_height(-1).await.unwrap().expect("Expecting latest block to exist");
+        let benchmark_block                 = ctx.read().unwrap().get_block_by_id(&settings.block_id).await.expect(&format!("Expecting benchmark block to exist: {}", settings.block_id));
+        let latest_block                    = ctx.read().unwrap().get_block_by_height(-1).await.expect("Expecting latest block to exist");
 
         let config                          = benchmark_block.config();
         let submission_delay                = latest_block.details.height - benchmark_block.details.height + 1;
@@ -82,12 +82,12 @@ impl<T: Context> BenchmarkContract<T>
             return Err(format!("Invalid challenge: {}", settings.challenge_id));
         }
 
-        let challenge                       = ctx.read().unwrap().get_challenge_by_id_and_block_id(&settings.challenge_id, &benchmark_block.id).await.unwrap()
-            .ok_or_else(|| format!("Invalid challenge: {}", settings.challenge_id))?;
+        let challenge                       = ctx.read().unwrap().get_challenge_by_id_and_block_id(&settings.challenge_id, &benchmark_block.id).await
+            .expect(&format!("Invalid challenge: {}", settings.challenge_id));
 
         //verify that the algorithm is not banned
         let algorithm                       = ctx.read().unwrap().get_algorithm_by_id(&settings.algorithm_id).await.unwrap();
-        if !algorithm.unwrap().state.as_ref().is_some_and(|s| !s.banned)
+        if !algorithm.state.as_ref().is_some_and(|s| !s.banned)
         {
             return Err(format!("Invalid algorithm: {}", settings.algorithm_id));
         }
@@ -98,7 +98,7 @@ impl<T: Context> BenchmarkContract<T>
         }
 
         // verify that benchmark settings are unique
-        if ctx.read().unwrap().get_precommits_by_settings(settings).await.unwrap().first().is_some()
+        if ctx.read().unwrap().get_precommits_by_settings(settings).await.first().is_some()
         {
             return Err(format!("Duplicate benchmark settings"));
         }
@@ -181,13 +181,13 @@ impl<T: Context> BenchmarkContract<T>
     )                                   -> ContractResult<()>
     {
         //verify that the benchmark is not already submitted
-        if ctx.read().unwrap().get_benchmarks_by_id(benchmark_id).await.unwrap().first().is_some()
+        if ctx.read().unwrap().get_benchmarks_by_id(benchmark_id).await.first().is_some()
         {
             return Err(format!("Duplicate benchmark: {}", benchmark_id));
         }
     
         //fetch the precommit
-        let precommit                       = ctx.read().unwrap().get_precommits_by_benchmark_id(benchmark_id).await.unwrap()
+        let precommit                       = ctx.read().unwrap().get_precommits_by_benchmark_id(benchmark_id).await
             .pop()
             .filter(|p| p.state.is_some())
             .ok_or_else(|| format!("Invalid precommit: {}", benchmark_id))?;
@@ -227,13 +227,13 @@ impl<T: Context> BenchmarkContract<T>
     )                                   -> ContractResult<Result<(), String>>
     {
         //verify that the proof is not already submitted
-        if ctx.read().unwrap().get_proofs_by_benchmark_id(benchmark_id).await.unwrap().first().is_some()
+        if ctx.read().unwrap().get_proofs_by_benchmark_id(benchmark_id).await.first().is_some()
         {
             return Err(format!("Duplicate proof: {}", benchmark_id));
         }
         
         //fetch the precommit
-        let precommit                       = ctx.read().unwrap().get_precommits_by_benchmark_id(benchmark_id).await.unwrap()
+        let precommit                       = ctx.read().unwrap().get_precommits_by_benchmark_id(benchmark_id).await
             .pop()
             .filter(|p| p.state.is_some())
             .ok_or_else(|| format!("Invalid precommit: {}", benchmark_id))?;
@@ -245,7 +245,7 @@ impl<T: Context> BenchmarkContract<T>
         }
 
         //fetch the benchmark
-        let benchmark                       = ctx.read().unwrap().get_benchmarks_by_id(benchmark_id).await.unwrap()
+        let benchmark                       = ctx.read().unwrap().get_benchmarks_by_id(benchmark_id).await
             .pop()
             .filter(|b| b.state.is_some())
             .ok_or_else(|| format!("Invalid benchmark: {}", benchmark_id))?;

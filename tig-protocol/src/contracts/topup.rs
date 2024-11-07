@@ -61,16 +61,14 @@ impl<T: Context> TopUpContract<T>
         tx_hash:                        &'a String,
     )                                           -> ContractResult<PreciseNumber> 
     {
-        let block = ctx
+        let block                             = ctx
             .get_block_by_height(-1)
             .await
-            .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
             .expect("No latest block found");
 
         if ctx
-            .get_topups_by_txid(tx_hash)
+            .get_topups_by_tx_hash(tx_hash)
             .await
-            .unwrap_or_else(|e| panic!("get_topups error: {:?}", e))
             .first()
             .is_some()
         {
@@ -79,7 +77,7 @@ impl<T: Context> TopUpContract<T>
 
         let transaction                         = ctx.get_transaction(&tx_hash)
             .await
-            .map_err(|_| format!("Invalid transaction: {}", tx_hash))?;
+            .expect(&format!("Invalid transaction: {}", tx_hash));
 
         if player.id != transaction.sender 
         {

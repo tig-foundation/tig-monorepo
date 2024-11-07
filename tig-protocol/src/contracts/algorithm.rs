@@ -34,12 +34,12 @@ use
     logging_timer::time
 };
 
-pub struct PlayerContract<T: Context>
+pub struct AlgorithmContract<T: Context>
 {
     phantom:                            PhantomData<T>,
 }   
 
-impl<T: Context> PlayerContract<T>
+impl<T: Context> AlgorithmContract<T>
 {
     pub fn new()                                -> Self
     {
