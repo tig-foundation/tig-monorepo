@@ -85,6 +85,12 @@ pub trait Context
         benchmark_id:                   &String,
     )                                           -> Vec<Proof>;
 
+    async fn get_player_deposit(
+        &self,
+        eth_block_num:                  &String,
+        player_id:                      &String,
+    )                                           -> Option<PreciseNumber>;
+
     async fn verify_solution(
         &self,
         settings:                       &BenchmarkSettings,
@@ -122,5 +128,17 @@ pub trait Context
         &self,
         benchmark_id:                   &String,
         allegations:                    &String,
+    )                                           -> ContextResult<()>;
+
+    async fn update_precommit_state(
+        &self,
+        benchmark_id:                   &String,
+        state:                          &PrecommitState,
+    )                                           -> ContextResult<()>;
+
+    async fn update_algorithm_state(
+        &self,
+        algorithm_id: &String,
+        state:                          &AlgorithmState,
     )                                           -> ContextResult<()>;
 }

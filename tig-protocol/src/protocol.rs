@@ -47,7 +47,7 @@ pub struct Protocol<T: Context>
     contracts:                  Arc<Contracts<T>>,
 }
 
-impl<T: Context> Protocol<T>
+impl<T: Context + std::marker::Send + std::marker::Sync> Protocol<T>
 {
     pub fn new(ctx: T)          -> Self
     {

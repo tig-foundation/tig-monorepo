@@ -46,7 +46,12 @@ struct AddBlockCache
     pub mempool_topups:         RwLock<Vec<TopUp>>,
     pub mempool_wasms:          RwLock<Vec<Wasm>>,
     pub confirmed_precommits:   RwLock<HashMap<String, Precommit>>,
+    pub active_challenges:      RwLock<HashMap<String, Challenge>>,
+    pub active_algorithms:      RwLock<HashMap<String, Algorithm>>,
+    pub active_solutions:       RwLock<HashMap<String, (BenchmarkSettings, u32)>>,
+    pub active_players:         RwLock<HashMap<String, Player>>,
     pub active_fee_players:     RwLock<HashMap<String, Player>>,
+    pub prev_players:           RwLock<HashMap<String, Player>>,
 }
 
 #[time]
@@ -102,17 +107,23 @@ async fn setup_cache<T: Context>(
         mempool_wasms                   : RwLock::new(vec![]),
         confirmed_precommits            : RwLock::new(HashMap::new()),
         active_fee_players              : RwLock::new(HashMap::new()),
+        active_challenges               : RwLock::new(HashMap::new()),
+        active_algorithms               : RwLock::new(HashMap::new()),
+        active_solutions                : RwLock::new(HashMap::new()),
+        prev_players                    : RwLock::new(HashMap::new()),
+        active_players                  : RwLock::new(HashMap::new()),
     });
 }
 
 #[time]
-pub async fn add_block<T: Context>(
+pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
     ctx:                    Arc<RwLock<T>>,
     contracts:              Arc<Contracts<T>>,
 )                                   -> String
 {
     let (mut block, mut cache)          = create_block(&Arc::into_inner(ctx.clone()).unwrap()).await;
 
+    // confirm mempool items
     async 
     {
         rayon::scope(|s|
@@ -128,7 +139,44 @@ pub async fn add_block<T: Context>(
         });
     }.await;
 
-    return "".to_string();
+    //update block details
+    async 
+    {
+        rayon::scope(|s|
+        {
+            s.spawn(|_| futures::executor::block_on(update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(update_cutoffs(&block, &mut Arc::into_inner(cache.clone()).unwrap())));
+        });
+    }.await;
+
+    // commit changes
+    async
+    {
+        rayon::scope(|s|
+        {
+            // commit precommits
+            s.spawn(|_|
+            {
+                for precommit in cache.mempool_precommits.write().unwrap().drain(..) 
+                {
+                    futures::executor::block_on(ctx.read().unwrap().update_precommit_state(&precommit.benchmark_id, &precommit.state.unwrap()))
+                        .unwrap_or_else(|e| panic!("update_precommit_state error: {:?}", e));
+                }
+            });
+
+            // commit algorithm states
+            s.spawn(|_|
+            {
+                for algorithm in cache.mempool_algorithms.write().unwrap().drain(..) 
+                {
+                    futures::executor::block_on(ctx.read().unwrap().update_algorithm_state(&algorithm.id, &algorithm.state.unwrap()))
+                        .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
+                }
+            });
+        });
+    }.await;
+
+    return block.id;
 }
 
 #[time]
@@ -307,5 +355,104 @@ async fn confirm_mempool_wasms(
     {
         let state                       = wasm.state.as_mut().unwrap();
         state.block_confirmed           = Some(block.details.height);
+    }
+}
+
+#[time]
+async fn update_deposits<T: Context>(
+    ctx:                    &RwLock<T>,
+    block:                  &Block,
+    cache:                  &mut AddBlockCache,
+)
+{
+    let decay                           = match &block.config().optimisable_proof_of_work.rolling_deposit_decay
+    {
+        Some(decay)                     => PreciseNumber::from_f64(*decay),
+        None                            => return, // Proof of deposit not implemented for these blocks
+    };
+
+    let eth_block_num                   = block.details.eth_block_num();
+    let zero                            = PreciseNumber::from(0);
+    let one                             = PreciseNumber::from(1);
+    for player in cache.active_fee_players.write().unwrap().values_mut() 
+    {
+        let rolling_deposit             = match &cache.prev_players.read().unwrap().get(&player.id).unwrap().block_data 
+        {
+            Some(data)                  => data.rolling_deposit.clone(),
+            None                        => None,
+        }
+        .unwrap_or_else(|| zero.clone());
+
+        let data                        = player.block_data.as_mut().unwrap();
+        let deposit                     = ctx
+            .read()
+            .unwrap()
+            .get_player_deposit(eth_block_num, &player.id)
+            .await
+            .unwrap_or_else(|| zero.clone());
+
+        data.rolling_deposit            = Some(decay * rolling_deposit + (one - decay) * deposit);
+        data.deposit                    = Some(deposit);
+        data.qualifying_percent_rolling_deposit = Some(zero.clone());
+    }
+}
+#[time]
+async fn update_cutoffs(
+    block:                  &Block,
+    cache:                  &mut AddBlockCache,
+)
+{
+    let config                          = block.config();
+    let mut phase_in_challenge_ids      = HashSet::<String>::new();
+    phase_in_challenge_ids              = cache.active_challenges.read().unwrap().keys().cloned().collect();
+
+    for algorithm in cache.active_algorithms.read().unwrap().values() 
+    {
+        if algorithm.state().round_pushed.is_some_and(|r| r + 1 <= block.details.round)
+        {
+            phase_in_challenge_ids.remove(&algorithm.details.challenge_id);
+        }
+    }
+
+    let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
+    for (settings, num_solutions) in cache.active_solutions.read().unwrap().values() 
+    {
+        *num_solutions_by_player_by_challenge
+            .entry(settings.player_id.clone()).or_default()
+            .entry(settings.challenge_id.clone()).or_default()         
+                                        += *num_solutions;
+    }
+
+    for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() 
+    {
+        let phase_in_start              = (block.details.round - 1) * config.rounds.blocks_per_round;
+        let phase_in_period             = config.qualifiers.cutoff_phase_in_period.unwrap();
+        let phase_in_end                = phase_in_start + phase_in_period;
+        let min_cutoff                  = config.qualifiers.min_cutoff.unwrap();
+        let min_num_solutions           = cache.active_challenges.read().unwrap().keys()
+            .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0))
+            .min().unwrap();
+
+        let mut cutoff                  = min_cutoff.max((*min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32);
+        if phase_in_challenge_ids.len() > 0 && phase_in_end > block.details.height 
+        {
+            let phase_in_min_num_solutions = cache
+                .active_challenges.read().unwrap()
+                .keys().filter(|&id| !phase_in_challenge_ids.contains(id))
+                .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
+                .min().unwrap();
+
+            let phase_in_cutoff         = min_cutoff.max(
+                (phase_in_min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32
+            );
+
+            let phase_in_weight         = (phase_in_end - block.details.height) as f64 / phase_in_period as f64;
+            cutoff                      = (phase_in_cutoff as f64 * phase_in_weight + cutoff as f64 * (1.0 - phase_in_weight)) as u32;
+        }
+
+        cache.active_players.write().unwrap()
+            .get_mut(player_id).unwrap()
+            .block_data.as_mut().unwrap()
+            .cutoff                     = Some(cutoff);
     }
 }
