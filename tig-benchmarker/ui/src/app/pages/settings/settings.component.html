@@ -1,6 +1,6 @@
 @if(view() == 'all'){
 <h1>Settings</h1>
-} @if(settings()){
+} @if(settings() && !slave()){
 <form [formGroup]="formGroup">
   <div class="grid">
     @if(view() == 'all' || view() == 'general'){
@@ -482,4 +482,64 @@
     class="p-button-success"
   ></button>
 </div>
-}@else {nope}
+}@else { @if(error()){
+<div class="p-3 flex justify-content-center align-items-center">
+  <h3>{{ error() }}</h3>
+</div>
+
+}@else{
+<div class="flex flex-column justify-content-end">
+  <form [formGroup]="slaveFormGroup">
+    <div [class]="view() == 'all' ? 'col-6' : 'col-12'">
+      <div header="Max Concurrent Batches" class="w-full">
+        <div class="p-3 pb-0">
+          <h2>Max Concurrent Batches</h2>
+          <div class="field">
+            <label for="firstname1">Satisfiability</label>
+            <p-inputNumber
+              inputId="satisfiability"
+              [style]="{ width: '100%' }"
+              formControlName="satisfiability"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vehicle Routing</label>
+            <p-inputNumber
+              inputId="vehicle_routing"
+              [style]="{ width: '100%' }"
+              formControlName="vehicle_routing"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Knapsack</label>
+            <p-inputNumber
+              inputId="knapsack"
+              [style]="{ width: '100%' }"
+              formControlName="knapsack"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+          <div class="field">
+            <label for="lastname1">Vector Search</label>
+            <p-inputNumber
+              inputId="vector_search"
+              [style]="{ width: '100%' }"
+              formControlName="vector_search"
+              class="text-base text-color surface-overlay border-1 border-solid surface-border border-round appearance-none outline-none focus:border-primary w-full"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+  <button
+    (click)="saveSalve()"
+    pButton
+    pRipple
+    label="Save"
+    class="p-button-success"
+  ></button>
+</div>
+} }

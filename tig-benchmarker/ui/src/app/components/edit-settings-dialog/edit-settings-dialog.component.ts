@@ -12,6 +12,7 @@ import { SettingsComponent } from '../../pages/settings/settings.component';
 })
 export class EditSettingsDialogComponent {
   view: any = input<string>('all');
+  slave: any = input<any>(null);
   title: any = input<string>('Settings');
   edit_solution_settings = false;
 }

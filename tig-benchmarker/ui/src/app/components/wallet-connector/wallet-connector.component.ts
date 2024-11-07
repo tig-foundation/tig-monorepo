@@ -27,7 +27,6 @@ export class WalletConnectorComponent {
   termsAccepted = false;
 
   connectWallet(type: string) {
-    console.log('termsAccepted', this.termsAccepted);
     if (!this.termsAccepted) {
       this.messageService.add({
         severity: 'warn',

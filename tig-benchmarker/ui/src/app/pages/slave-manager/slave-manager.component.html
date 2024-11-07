@@ -119,6 +119,7 @@
             'api_key',
             'reputation',
             'reward',
+            'last_batch',
           ]"
         >
           <ng-template pTemplate="caption">
@@ -155,42 +156,42 @@
               <th pSortableColumn="reward">
                 Reward <p-sortIcon field="reward" />
               </th>
-              <th pSortableColumn="last_updated">
-                Last Updated <p-sortIcon field="last_updated" />
+              <th pSortableColumn="last_batch">
+                Last Batch <p-sortIcon field="last_batch" />
               </th>
               <th></th>
             </tr>
           </ng-template>
-          <ng-template pTemplate="body" let-benchmark>
+          <ng-template pTemplate="body" let-slave>
             <tr>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.name }}
+                  {{ slave.slave_name }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.api_key }}
+                  {{ slave.api_key }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.reputation }}
+                  {{ slave.reputation || 0 }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.reward }}
+                  {{ slave.reward || 0 }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.last_updated }}
+                  {{ slave.last_batch | timeConverter }}
                 </div>
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  <app-edit-settings-dialog [title]="'Slave Settings'" [view]="'slaves'"></app-edit-settings-dialog>
+                  <app-edit-settings-dialog [title]="'Slave Settings'" [slave]="slave" [view]="'slave'+slave.id"></app-edit-settings-dialog>
                 </div>
               </td>
             </tr>

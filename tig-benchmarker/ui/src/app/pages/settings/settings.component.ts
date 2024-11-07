@@ -35,7 +35,10 @@ export class SettingsComponent {
   tigService: any = inject(TigApisService);
   settings: any = signal(null);
   formGroup!: FormGroup;
+  slaveFormGroup!: FormGroup;
   view: any = input<string>('all');
+  slave: any = input<any>(null);
+  error: any = signal(null);
   satisfiability_algos: any = this.tigService
     .algorithms()
     .filter((a: any) => a.challenge_id === 'c001');
@@ -52,9 +55,35 @@ export class SettingsComponent {
   async ngOnInit() {
     this.tigService.config$.subscribe((data: any) => {
       if (data) {
-        this.setCurrentConfig(data);
+        if (this.slave()) {
+          this.slaveForm(data);
+        } else {
+          this.setCurrentConfig(data);
+        }
       }
     });
+  }
+
+  slaveForm(data: any) {
+    const slaveConfig = data.slave_manager_config.slaves.find(
+      (s: any) => s.name_regex === this.slave().id.toString()
+    );
+    if (slaveConfig === undefined) {
+      this.error.set('Slave not found');
+    } else {
+      this.slaveFormGroup = new FormGroup({
+        satisfiability: new FormControl(
+          slaveConfig.max_concurrent_batches.satisfiability
+        ),
+        vector_search: new FormControl(
+          slaveConfig.max_concurrent_batches.vector_search
+        ),
+        knapsack: new FormControl(slaveConfig.max_concurrent_batches.knapsack),
+        vehicle_routing: new FormControl(
+          slaveConfig.max_concurrent_batches.vehicle_routing
+        ),
+      });
+    }
   }
 
   setCurrentConfig(data: any) {
@@ -206,6 +235,26 @@ export class SettingsComponent {
     save_data.precommit_manager_config.max_pending_benchmarks =
       this.formGroup.value.max_pending_benchmarks;
 
+    this.tigService.saveConfig(save_data);
+  }
+
+  async saveSalve() {
+    const save_data = this.tigService.config();
+    const slaveConfig = save_data.slave_manager_config.slaves.find(
+      (s: any) => s.name_regex === this.slave().id.toString()
+    );
+    if (slaveConfig === undefined) {
+      this.error.set('Slave not found');
+    } else {
+      slaveConfig.max_concurrent_batches.satisfiability =
+        this.slaveFormGroup.value.satisfiability;
+      slaveConfig.max_concurrent_batches.vector_search =
+        this.slaveFormGroup.value.vector_search;
+      slaveConfig.max_concurrent_batches.knapsack =
+        this.slaveFormGroup.value.knapsack;
+      slaveConfig.max_concurrent_batches.vehicle_routing =
+        this.slaveFormGroup.value.vehicle_routing;
+    }
     this.tigService.saveConfig(save_data);
   }
 }

@@ -86,41 +86,34 @@ export class HomeComponent {
     // get Earnings and fees data
     this.tigService.latest_block$.subscribe((data: any) => {
       if (data) {
-        this.available_fees.set(3.5);
-        this.round_earnings.set(97.83);
-        this.latest_earnings.set(1.5);
+        this.available_fees.set(
+          this.tigService.player_stats().available_fee_balance
+        );
+        this.round_earnings.set(this.tigService.player_stats().round_earnings);
+        this.latest_earnings.set(this.tigService.player_stats().reward);
       }
     });
+    this.init();
+  }
+
+  init() {
     this.getBenchmarks();
     this.initiateChart();
     this.getCutoffAndImbalance();
   }
 
   getBenchmarks() {
-    const benchmark_test_data: IBenchmark[] = [
-      {
-        id: '1',
-        age: 5,
-        challenge_id: 'c001',
-        algorithm_id: 'c001_a015',
-        solutions: 2,
-        difficulty: '[37,880]',
-        submission_delay: 1,
-        status: 'Pending',
-        qualifiers: 1,
-        number_of_nonces: 1,
-        start_time: new Date().toISOString(),
-        end_time: new Date(
-          new Date().setMinutes(new Date().getMinutes() + 10)
-        ).toISOString(),
-      },
-    ];
+    const benchmark_test_data: IBenchmark[] = this.tigService
+      .benchmarks()
+  
 
     benchmark_test_data.map((b) => {
       b.time_elapsed =
         new Date(b.end_time).getTime() - new Date(b.start_time).getTime();
     });
     this.benchmarks.set(benchmark_test_data);
+
+    this.changeChallengeView(0);
   }
 
   initiateChart() {
@@ -244,11 +237,15 @@ export class HomeComponent {
     this.challenge_table.set(
       this.benchmarks().filter((b: any) => b.challenge_id === selected.id)
     );
+    let solutions = 0;
+    this.challenge_table().forEach((element: any) => {
+      solutions = solutions + element.solutions;
+    });
     // Set Challenge Summary Information
     const summary = {
-      base_fee: 3,
-      solutions: 16,
-      qualifiers: 2,
+      base_fee: 0, // SET BASE FEE HERE
+      solutions: solutions,
+      qualifiers: 0,
     };
     this.challenge_summary.set(summary);
   }

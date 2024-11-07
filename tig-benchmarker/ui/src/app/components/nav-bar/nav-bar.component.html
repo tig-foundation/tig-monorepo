@@ -232,6 +232,16 @@
   </div>
 
   <div class="w-full text-center" style="position: relative; bottom: 0">
+    <p
+      style="font-size: x-small; cursor: pointer"
+      (click)="tigService.initData()"
+    >
+      Data Refresh
+    </p>
+    <p-progressBar [value]="value" [style]="{ height: '6px' }" />
     <p style="font-size: x-small">Version : 1.0</p>
+    <p style="font-size: x-small" (click)="tigService.disconnect()">
+      Disconnect
+    </p>
   </div>
 </div>

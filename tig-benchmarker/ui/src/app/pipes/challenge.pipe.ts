@@ -8,7 +8,6 @@ import { TigApisService } from '../services/tig-apis.service';
 export class ChallengePipe implements PipeTransform {
   tigService = inject(TigApisService);
   transform(value: unknown, ...args: unknown[]): unknown {
-    console.log('challenge pipe',value)
     return this.tigService.challenges().find((a: any) => a.id === value)?.name || 'Unknown';
   }
 
