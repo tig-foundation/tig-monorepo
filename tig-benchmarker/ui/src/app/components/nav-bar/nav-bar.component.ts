@@ -31,15 +31,14 @@ export class NavBarComponent {
   interval: any;
 
   constructor(private messageService: MessageService, private ngZone: NgZone) {
-    this.tigService.ready$.subscribe((ready: any) => {  
+    this.tigService.ready$.subscribe((ready: any) => {
       console.log('ready observer', ready);
       if (ready) {
         this.wallet_service.ready.set(true);
       } else {
         this.wallet_service.ready.set(false);
       }
-    }
-    );
+    });
     // this.tigService.ready$.subscribe((ready: boolean) => {
     //   console.log('ready observer', ready);
     //   if (ready) {
@@ -54,19 +53,21 @@ export class NavBarComponent {
     this.ngZone.runOutsideAngular(() => {
       this.interval = setInterval(() => {
         this.ngZone.run(() => {
-          this.value = this.value + 1;
-          if (this.value >= 60) {
-            this.tigService.initData();
-            this.value = 0;
-            this.messageService.add({
-              severity: 'info',
-              summary: 'Data Refreshed',
-              detail: 'Process Completed',
-            });
-          } else {
+          if (this.tigService.player_id() && this.tigService.api_key()) {
+            this.value = this.value + 1;
+            if (this.value >= 60) {
+              this.tigService.initData();
+              this.value = 0;
+              this.messageService.add({
+                severity: 'info',
+                summary: 'Data Refreshed',
+                detail: 'Process Completed',
+              });
+            } else {
+            }
           }
         });
-      }, 5000);
+      }, 2000);
     });
   }
 

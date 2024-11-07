@@ -65,8 +65,7 @@ export class TigApisService {
       })
     ).data;
     console.log('setPlayerAndAuthKey', result);
-
-    this.init();
+    await this.init();
   }
 
   disconnect() {

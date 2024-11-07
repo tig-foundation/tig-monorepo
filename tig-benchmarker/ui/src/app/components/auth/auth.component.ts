@@ -18,6 +18,7 @@ import {
   styleUrl: './auth.component.scss',
 })
 export class AuthComponent {
+  loading = false;
   tigService = inject(TigApisService);
   authFrom!: FormGroup;
 
@@ -34,12 +35,14 @@ export class AuthComponent {
     });
   }
 
-  saveDetails() {
+  async saveDetails() {
+    this.loading = true;
     if (this.authFrom.valid) {
-      this.tigService.setPlayerAndAuthKey(
+      await this.tigService.setPlayerAndAuthKey(
         this.authFrom.value.player_id,
         this.authFrom.value.api_key
       );
     }
+    this.loading = false;
   }
 }
