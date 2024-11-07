@@ -9,6 +9,9 @@ import time
 import psutil
 import psutil
 
+from tig_benchmarker.merkle_tree import MerkleTree
+from tig_benchmarker.structs import MerkleProof, OutputData
+
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 def now():
@@ -107,29 +110,45 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-result/{batch_id}"
         logger.info(f"posting results to {submit_url}")
         async with session.post(submit_url, json=result, headers=headers) as resp:
+            response_text = await resp.text() 
+
+            logger.info(f"response text: {resp.status}")
+
             if resp.status != 200:
-                raise Exception(f"status {resp.status} when posting results to master: {await resp.text()}")
+                raise Exception(f"status {resp.status} when posting results to master: {response_text}")
             logger.debug(f"posting results took {now() - start} ms")
             # Step 5: Calculate Merkle proofs for sampled nonces
-            # TODO: calculate merkle proofs
-        #     leafs = {
-        # nonce: json.loads("{nonce}.json")
-        # for nonce in range(start_nonce, start_nonce + batch_size)
-        # }
 
-        # merkle_tree = MerkleTree(
-        # [x.to_merkle_hash() for x in leafs.values()],
-        # batch_size
-        # )
+            data = json.loads(response_text)
 
-        # merkle_proofs = [
-        # MerkleProof(+
-        #     leaf=leafs[n],
-        #     branch=merkle_tree.calc_merkle_branch(branch_idx=n - start_nonce)
-        # )
-        # for n in sampled
-        # ]
+            sample_nonces = data["sample_nonces"]
 
+            start_nonce = int(batch["start_nonce"])
+            batch_size = int(batch["num_nonces"])
+
+            leafs = {}
+            for nonce in range(start_nonce, start_nonce + batch_size):
+                file_path = f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}/{nonce}.json"
+                try:
+                    with open(file_path) as f:
+                        leafs[nonce] = json.load(f)
+                except FileNotFoundError:
+                    logger.error(f"File not found: {file_path}")
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON in file: {file_path}")
+
+            merkle_tree = MerkleTree(
+                [OutputData.from_dict(x).to_merkle_hash() for x in leafs.values()],
+                batch_size
+            )
+
+            merkle_proofs = [
+                MerkleProof(
+                    leaf=leafs[n],
+                    branch=merkle_tree.calc_merkle_branch(branch_idx=n - start_nonce)
+                )
+                for n in sample_nonces
+            ]
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")

@@ -206,6 +206,9 @@ class SlaveManager:
                             logger.info(f"Current assigned batches: {current_assigned}")
 
                             if existing_assignment:
+                                if existing_assignment.completed_timestamp:
+                                    continue  # Skip if already completed
+
                                 start_nonce = batch_idx * job.batch_size
                                 num_nonces = min(job.batch_size, job.num_nonces - start_nonce)
                                 
@@ -268,6 +271,8 @@ class SlaveManager:
                             selected_challenge = job.challenge
                             available_slots -= 1
                     
+                    logger.info(f"Batches: {batches}")
+
                     if not batches:
                         logger.debug(f"Slave '{slave_id}' requested batches but none are available.")
                         return JSONResponse(content={"detail": "No batches available"}, status_code=503)
@@ -326,6 +331,8 @@ class SlaveManager:
                         assigned_slave=slave_name,
                         completed_timestamp=None
                     ).first()
+
+                    logger.info(f"Assigned batch: {assigned_batch}")
                     
                     if not assigned_batch:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for an unassigned or already completed batch '{batch_id}'.")
@@ -362,10 +369,12 @@ class SlaveManager:
                         non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
                         random.shuffle(result.solution_nonces)
                         random.shuffle(non_solution_nonces)
-                        num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
-                        sampled = (result.solution_nonces + non_solution_nonces)[:num_nonces_to_sample]
+                        # num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
+                        sampled = (result.solution_nonces + non_solution_nonces)[:10]
                     else:
                         sampled = job.sampled_nonces
+
+                    logger.info(f"Sampled nonces: {sampled}")
                     
                     # Commit the transaction
                     session.commit()
