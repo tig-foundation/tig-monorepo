@@ -113,17 +113,20 @@ pub async fn add_block<T: Context>(
 {
     let (mut block, mut cache)          = create_block(&Arc::into_inner(ctx.clone()).unwrap()).await;
 
-    rayon::scope(|s|
+    async 
     {
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_challenges(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_algorithms(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_precommits(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_benchmarks(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_proofs(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_frauds(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_topups(&block, &Arc::into_inner(cache.clone()).unwrap())));
-        s.spawn(|_| futures::executor::block_on(confirm_mempool_wasms(&block, &Arc::into_inner(cache.clone()).unwrap())));
-    });
+        rayon::scope(|s|
+        {
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_challenges(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_algorithms(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_precommits(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_benchmarks(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_proofs(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_frauds(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_topups(&block, &Arc::into_inner(cache.clone()).unwrap())));
+            s.spawn(|_| futures::executor::block_on(confirm_mempool_wasms(&block, &Arc::into_inner(cache.clone()).unwrap())));
+        });
+    }.await;
 
     return "".to_string();
 }
