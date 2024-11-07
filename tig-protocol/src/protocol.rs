@@ -61,7 +61,6 @@ impl<T: Context> Protocol<T>
 
     pub async fn submit_precommit(
         &self,
-        ctx:                    &RwLock<T>,
         player:                 &Player,
         settings:               &BenchmarkSettings,
         num_nonces:             u32,
@@ -83,12 +82,16 @@ impl<T: Context> Protocol<T>
 
     pub async fn submit_proof(
         &self,
-        ctx:                    &RwLock<T>,
         player:                 &Player,
         benchmark_id:           &String,
         merkle_proofs:          &Vec<MerkleProof>,
     )                                   -> ProtocolResult<Result<(), String>>
     {
         return self.contracts.benchmark.submit_proof(&Arc::into_inner(self.ctx.clone()).unwrap(), player, benchmark_id, &merkle_proofs).await;
+    }
+
+    pub async fn add_block(&self)       -> String
+    {
+        return "".to_string();
     }
 }
