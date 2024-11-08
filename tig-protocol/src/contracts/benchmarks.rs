@@ -31,19 +31,20 @@ use
     logging_timer::time
 };
 
-pub struct BenchmarkContract
+pub struct BenchmarkContract<T: Context>
 {
+    phantom: PhantomData<T>,
 }   
 
-impl BenchmarkContract {
+impl<T: Context> BenchmarkContract<T> {
     pub fn new()                        -> Self
     {
-        return Self {};
+        return Self { phantom: PhantomData };
     }
 
-    /*pub async fn submit_precommit(
+    pub async fn submit_precommit(
         &self,
-        ctx:                    &RwLock<T>,
+        ctx:                    &T,
         player:                 &Player,
         settings:               &BenchmarkSettings,
         num_nonces:             u32,
@@ -54,53 +55,54 @@ impl BenchmarkContract {
         {
             return Err(format!("Invalid submitting player: {}", player.id));
         }
-
+ 
         //verify that the num nonces is greater than 0
         if num_nonces == 0 
         {
             return Err("Invalid num nonces".to_string());
         }
 
+        let next_block_id               = ctx.get_next_block_id();
         //make sure that the submission delay is within the lifespan period
-        let benchmark_block                 = ctx.read().unwrap().get_block_by_id(&settings.block_id).await.expect(&format!("Expecting benchmark block to exist: {}", settings.block_id));
-        let latest_block                    = ctx.read().unwrap().get_block_by_height(-1).await.expect("Expecting latest block to exist");
+        let benchmark_block_details     = ctx.get_block_details(&settings.block_id).unwrap();
+        let benchmark_block             = ctx.get_block_data(&settings.block_id).expect(&format!("Expecting benchmark block to exist: {}", settings.block_id));
 
-        let config                          = benchmark_block.config();
-        let submission_delay                = latest_block.details.height - benchmark_block.details.height + 1;
+        let latest_block_details        = ctx.get_block_details(next_block_id).unwrap();
+        let latest_block                = ctx.get_block_data(next_block_id).expect("Expecting latest block to exist");
+
+        let config                      = ctx.get_block_config(&settings.block_id).unwrap();
+        let submission_delay            = latest_block_details.height - benchmark_block_details.height + 1;
         if (submission_delay as f64 * (config.benchmark_submissions.submission_delay_multiplier + 1.0)) as u32 >= config.benchmark_submissions.lifespan_period
         {
             return Err(format!("Insufficient lifespan"));
         }
 
-        if !benchmark_block.data().active_challenge_ids.contains(&settings.challenge_id) 
+        if !benchmark_block.confirmed_challenge_ids.contains(&settings.challenge_id) 
         {
             return Err(format!("Invalid challenge: {}", settings.challenge_id));
         }
 
-        let challenge                       = ctx.read().unwrap().get_challenge_by_id_and_block_id(&settings.challenge_id, &benchmark_block.id).await
-            .expect(&format!("Invalid challenge: {}", settings.challenge_id));
-
         //verify that the algorithm is not banned
-        let algorithm                       = ctx.read().unwrap().get_algorithm_by_id(&settings.algorithm_id).await.unwrap();
-        if !algorithm.state.as_ref().is_some_and(|s| !s.banned)
+        let algorithm = ctx.get_algorithm_state(&settings.algorithm_id, &settings.block_id).unwrap();
+        if !algorithm.banned
         {
             return Err(format!("Invalid algorithm: {}", settings.algorithm_id));
         }
     
-        if !benchmark_block.data().active_algorithm_ids.contains(&settings.algorithm_id)
+        if !benchmark_block.confirmed_algorithm_ids.contains(&settings.algorithm_id)
         {
             return Err(format!("Invalid algorithm: {}", settings.algorithm_id));
         }
 
         // verify that benchmark settings are unique
-        if ctx.read().unwrap().get_precommits_by_settings(settings).await.first().is_some()
+        if ctx.get_precommit_details(ctx.calc_benchmark_id(settings)).is_some()
         {
             return Err(format!("Duplicate benchmark settings"));
         }
 
         //verify benchmark difficulty
-        let difficulty                      = &settings.difficulty;
-        let difficulty_parameters           = &config.difficulty.parameters[&challenge.id];
+        let difficulty              = &settings.difficulty;
+        let difficulty_parameters   = &config.difficulty.parameters[&settings.challenge_id];
         if difficulty.len() != difficulty_parameters.len()
             || difficulty.iter()
                 .zip(difficulty_parameters.iter())
@@ -111,7 +113,7 @@ impl BenchmarkContract {
             );
         }
 
-        let challenge_data                  = challenge.block_data();
+        let challenge_data = ctx.get_challenge_data(&settings.challenge_id, &settings.block_id).unwrap();
         let (lower_frontier, upper_frontier) = if *challenge_data.scaling_factor() > 1f64 {
             (
                 challenge_data.base_frontier(),
@@ -142,8 +144,8 @@ impl BenchmarkContract {
         }
 
         //verify fee paid
-        let fee_paid                        = challenge.block_data().base_fee()
-                                                + challenge.block_data().per_nonce_fee() * PreciseNumber::from(num_nonces);
+        let fee_paid = challenge_data.base_fee()
+                        + challenge_data.per_nonce_fee() * PreciseNumber::from(num_nonces);
 
         if !player.state.as_ref().is_some_and(|s| *s.available_fee_balance.as_ref().unwrap() >= fee_paid)
         {
@@ -155,18 +157,18 @@ impl BenchmarkContract {
         }
 
         //submit precommit
-        let benchmark_id = ctx.write().unwrap().add_precommit_to_mempool(settings, &PrecommitDetails 
+        /*let benchmark_id = ctx.write().unwrap().add_precommit_to_mempool(settings, &PrecommitDetails 
         {
             block_started                   : benchmark_block.details.height,
             num_nonces                      : Some(num_nonces),
             fee_paid                        : Some(fee_paid),
         }).await
-        .unwrap_or_else(|e| panic!("add_precommit_to_mempool error: {:?}", e));
+        .unwrap_or_else(|e| panic!("add_precommit_to_mempool error: {:?}", e));*/
         
-        return Ok(benchmark_id);    
+        return Ok(String::new());    
     }
 
-    pub async fn submit_benchmark(
+    /*pub async fn submit_benchmark(
         &self,
         ctx:                    &RwLock<T>,
         player:                 &Player,

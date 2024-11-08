@@ -13,8 +13,8 @@ use {
 };
 pub struct Protocol<T: Context>
 {
-    ctx:        Arc<T>,
-    contracts:  Arc<Contracts>,
+    ctx:        RwLock<Arc<T>>,
+    contracts:  Arc<Contracts<T>>,
 }
 
 impl<T: Context> Protocol<T>
@@ -24,7 +24,7 @@ impl<T: Context> Protocol<T>
         return Self 
         {
             contracts:  Arc::new(Contracts::new()),
-            ctx:        Arc::new(ctx),
+            ctx:        RwLock::new(Arc::new(ctx)),
         };
     }
 
