@@ -168,35 +168,38 @@ impl<T: Context> BenchmarkContract<T> {
         return Ok(String::new());    
     }
 
-    /*pub async fn submit_benchmark(
-        &self,
-        ctx:                    &RwLock<T>,
-        player:                 &Player,
-        benchmark_id:           &String,
-        merkle_root:            &MerkleHash,
-        solution_nonces:        &HashSet<u64>,
-    )                                   -> ContractResult<()>
+    pub async fn submit_benchmark(&self,
+        ctx:                &T,
+        player:             &Player,
+        benchmark_id:       &String,
+        merkle_root:        &MerkleHash,
+        solution_nonces:    &HashSet<u64>,
+    ) -> ContractResult<()>
     {
         //verify that the benchmark is not already submitted
-        if ctx.read().unwrap().get_benchmarks_by_id(benchmark_id).await.first().is_some()
+        if ctx.get_benchmark_state(benchmark_id).is_some() 
         {
             return Err(format!("Duplicate benchmark: {}", benchmark_id));
         }
     
         //fetch the precommit
-        let precommit                       = ctx.read().unwrap().get_precommits_by_benchmark_id(benchmark_id).await
-            .pop()
-            .filter(|p| p.state.is_some())
+        let precommit_details = ctx.get_precommit_details(benchmark_id)
             .ok_or_else(|| format!("Invalid precommit: {}", benchmark_id))?;
+            
+        let precommit_state = ctx.get_precommit_state(benchmark_id)
+            .ok_or_else(|| format!("Invalid precommit state: {}", benchmark_id))?;
+
+        let settings = ctx.get_benchmark_settings(benchmark_id)
+            .ok_or_else(|| format!("Invalid benchmark settings: {}", benchmark_id))?;
 
         //verify that the player owns the precommit
-        if player.id != precommit.settings.player_id
+        if player.id != settings.player_id 
         {
             return Err(format!("Invalid submitting player: {}", player.id));
         }
 
         //verify that the solution nonces are valid
-        let num_nonces                      = *precommit.details.num_nonces.as_ref().unwrap() as u64;
+        let num_nonces = precommit_details.num_nonces.unwrap() as u64;
         for n in solution_nonces.iter() 
         {
             if *n >= num_nonces 
@@ -205,72 +208,75 @@ impl<T: Context> BenchmarkContract<T> {
             }
         }
 
-        ctx.write().unwrap().add_benchmark_to_mempool(benchmark_id, merkle_root, solution_nonces).await
-            .unwrap_or_else(|e| panic!("add_benchmark_to_mempool error: {:?}", e));
+        // TODO: Add benchmark to mempool using appropriate context method
+        // ctx.add_benchmark_to_mempool(benchmark_id, merkle_root, solution_nonces)?;
 
         return Ok(());
     }
 
     pub async fn submit_proof(
         &self,
-        ctx:                    &RwLock<T>,
+        ctx:                    &T,
         player:                 &Player,
         benchmark_id:           &String,
         merkle_proofs:          &Vec<MerkleProof>,
     )                                   -> ContractResult<Result<(), String>>
     {
         //verify that the proof is not already submitted
-        if ctx.read().unwrap().get_proofs_by_benchmark_id(benchmark_id).await.first().is_some()
+        if ctx.get_proof_state(benchmark_id).is_some()
         {
             return Err(format!("Duplicate proof: {}", benchmark_id));
         }
         
         //fetch the precommit
-        let precommit                       = ctx.read().unwrap().get_precommits_by_benchmark_id(benchmark_id).await
-            .pop()
-            .filter(|p| p.state.is_some())
+        let precommit_details = ctx.get_precommit_details(benchmark_id)
             .ok_or_else(|| format!("Invalid precommit: {}", benchmark_id))?;
+            
+        let precommit_state = ctx.get_precommit_state(benchmark_id)
+            .ok_or_else(|| format!("Invalid precommit state: {}", benchmark_id))?;
+
+        let settings = ctx.get_benchmark_settings(benchmark_id)
+            .ok_or_else(|| format!("Invalid benchmark settings: {}", benchmark_id))?;
 
         //verify that the player owns the benchmark
-        if player.id != precommit.settings.player_id 
+        if player.id != settings.player_id 
         {
             return Err(format!("Invalid submitting player: {}", player.id));
         }
 
         //fetch the benchmark
-        let benchmark                       = ctx.read().unwrap().get_benchmarks_by_id(benchmark_id).await
-            .pop()
-            .filter(|b| b.state.is_some())
+        let benchmark_details = ctx.get_benchmark_details(benchmark_id)
             .ok_or_else(|| format!("Invalid benchmark: {}", benchmark_id))?;
 
+        let benchmark_state = ctx.get_benchmark_state(benchmark_id)
+            .ok_or_else(|| format!("Invalid benchmark state: {}", benchmark_id))?;
 
         //verify the sampled nonces
-        let sampled_nonces                  = benchmark.state().sampled_nonces();
-        let proof_nonces                    : HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
+        let sampled_nonces  = &benchmark_state.sampled_nonces;
+        let proof_nonces    : HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
     
-        if *sampled_nonces != proof_nonces || sampled_nonces.len() != merkle_proofs.len() 
+        if sampled_nonces.as_ref().is_some_and(|s| s != &proof_nonces) || sampled_nonces.as_ref().is_some_and(|s| s.len() != merkle_proofs.len()) 
         {
             return Err(format!("Invalid proof nonces"));
         }
 
         //verify the merkle proofs
-        let max_branch_len                  = (64 - (*precommit.details.num_nonces.as_ref().unwrap() - 1).leading_zeros()) as usize;
-        let expected_merkle_root            = benchmark.details.merkle_root.as_ref().unwrap();
-
-        let mut is_fraudulent               = None;
+        let max_branch_len          = (64 - (precommit_details.num_nonces.unwrap() - 1).leading_zeros()) as usize;
+        let expected_merkle_root    = benchmark_details.merkle_root.as_ref().unwrap();
+        let mut is_fraudulent       = None;
+        
         for merkle_proof in merkle_proofs.iter()
         {
-            let branch                      = merkle_proof.branch.as_ref().unwrap();
+            let branch = merkle_proof.branch.as_ref().unwrap();
             if branch.0.len() > max_branch_len || branch.0.iter().any(|(d, _)| *d as usize > max_branch_len)
             {
-                is_fraudulent               = Some(format!("Invalid merkle proof: {}", merkle_proof.leaf.nonce));
-
+                is_fraudulent = Some(format!("Invalid merkle proof: {}", merkle_proof.leaf.nonce));
                 break;
             }
 
-            let output_meta_data            = OutputMetaData::from(merkle_proof.leaf.clone());
-            let hash                        = MerkleHash::from(output_meta_data);
-            let result                      = merkle_proof
+            let output_meta_data    = OutputMetaData::from(merkle_proof.leaf.clone());
+            let hash                = MerkleHash::from(output_meta_data);
+            let result              = merkle_proof
                 .branch
                 .as_ref()
                 .unwrap()
@@ -278,8 +284,7 @@ impl<T: Context> BenchmarkContract<T> {
 
             if !result.is_ok_and(|actual_merkle_root| actual_merkle_root == *expected_merkle_root)
             {
-                is_fraudulent               = Some(format!("Invalid merkle proof: {}", merkle_proof.leaf.nonce));
-                
+                is_fraudulent = Some(format!("Invalid merkle proof: {}", merkle_proof.leaf.nonce));
                 break;
             }
         }
@@ -289,26 +294,24 @@ impl<T: Context> BenchmarkContract<T> {
         {
             for p in merkle_proofs.iter() 
             {
-                if ctx.read().unwrap().verify_solution(&precommit.settings, p.leaf.nonce, &p.leaf.solution).await.unwrap().is_err()
+                if ctx.verify_solution(&settings, p.leaf.nonce, &p.leaf.solution).is_err()
                 {
-                    is_fraudulent           = Some(format!("Invalid solution: {}", p.leaf.nonce));
-
+                    is_fraudulent = Some(format!("Invalid solution: {}", p.leaf.nonce));
                     break;
                 }
             }
         }
 
         //add the proof to the mempool
-        ctx.write().unwrap().add_proof_to_mempool(benchmark_id, &merkle_proofs).await.unwrap_or_else(|e| panic!("add_proof_to_mempool error: {:?}", e));
+        //ctx.add_proof_to_mempool(benchmark_id, merkle_proofs)?;
 
         //add fraud to the mempool if the proof is fraudulent
         if is_fraudulent.is_some()
         {
-            ctx.write().unwrap().add_fraud_to_mempool(benchmark_id, &is_fraudulent.clone().unwrap().to_string()).await.unwrap_or_else(|e| panic!("add_fraud_to_mempool error: {:?}", e));
-
+            //ctx.add_fraud_to_mempool(benchmark_id, &is_fraudulent.clone().unwrap())?;
             return Ok(Err(is_fraudulent.unwrap()));
         }
-
+        
         return Ok(Ok(()));
-    }*/
+    }
 }
