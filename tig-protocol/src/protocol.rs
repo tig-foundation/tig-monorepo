@@ -11,32 +11,20 @@ use {
     tig_structs::{core::*, *},
     crate::store::*,
 };
-pub struct Protocol<B, A, P, BE, PR, F, C, T, W>
-where
-    B: BlocksStore,
-    A: AlgorithmsStore,
-    P: PrecommitsStore,
-    BE: BenchmarksStore,
-    PR: ProofsStore,
-    F: FraudsStore,
-    C: ChallengesStore,
-    T: TopUpsStore,
-    W: WasmsStore,
+pub struct Protocol<T: Context>
 {
-    ctx:        Context<B, A, P, BE, PR, F, C, T, W>,
+    ctx:        Arc<T>,
     contracts:  Arc<Contracts>,
 }
 
-impl<B: BlocksStore, A: AlgorithmsStore, P: PrecommitsStore, BE: BenchmarksStore, PR: ProofsStore, 
-    F: FraudsStore, C: ChallengesStore, T: TopUpsStore, W: WasmsStore
-> Protocol<B, A, P, BE, PR, F, C, T, W>
+impl<T: Context> Protocol<T>
 {
-    pub fn new(blocks: B, algorithms: A, precommits: P, benchmarks: BE, proofs: PR, frauds: F, challenges: C, topups: T, wasms: W) -> Self 
+    pub fn new(ctx: T) -> Self 
     {
         return Self 
         {
             contracts:  Arc::new(Contracts::new()),
-            ctx:        Context::new(blocks, algorithms, precommits, benchmarks, proofs, frauds, challenges, topups, wasms),
+            ctx:        Arc::new(ctx),
         };
     }
 

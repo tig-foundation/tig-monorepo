@@ -3,166 +3,76 @@ use {
     std::sync::Arc,
     tig_structs::{config::*, core::*, *},
     std::sync::RwLock,
+    std::collections::HashSet,
     crate::
     {
         store::*,
     },
 };
 
-// TODO Vote
-// TODO Deposit
-// TODO Breakthrough
-// TODO Binary
-
-pub struct Context<B, A, P, BE, PR, F, C, T, W>
-where
-    B: BlocksStore,
-    A: AlgorithmsStore,
-    P: PrecommitsStore,
-    BE: BenchmarksStore,
-    PR: ProofsStore,
-    F: FraudsStore,
-    C: ChallengesStore,
-    T: TopUpsStore,
-    W: WasmsStore,
+pub trait Context 
 {
-    pub blocks:        Arc<RwLock<B>>,
-    pub algorithms:    Arc<RwLock<A>>,
-    pub precommits:    Arc<RwLock<P>>,
-    pub benchmarks:    Arc<RwLock<BE>>,
-    pub proofs:        Arc<RwLock<PR>>,
-    pub frauds:        Arc<RwLock<F>>,
-    pub challenges:    Arc<RwLock<C>>,
-    pub topups:        Arc<RwLock<T>>,
-    pub wasms:         Arc<RwLock<W>>,
+    fn verify_solution(&self, settings: &BenchmarkSettings, nonce: u64, solution: &Solution)            -> ContextResult<anyhow::Result<()>>;
+    fn compute_solution(&self, settings: &BenchmarkSettings, nonce: u64, wasm_vm_config: &WasmVMConfig) -> ContextResult<anyhow::Result<OutputData>>;
+    fn update_precommit_state(&self, benchmark_id: &String, state: &PrecommitState) -> ContextResult<()>;
+    fn update_algorithm_state(&self, algorithm_id: &String, state: &AlgorithmState) -> ContextResult<()>;
+
+    fn notify_new_block(&self);
+    fn block_assembled(&self, block: &Block);
+    fn data_committed(&self, block: &Block);
+
+    // BlocksStore functions
+    fn get_block(&self, block_id: &String)          -> Option<&Block>;
+    fn get_block_details(&self, block_id: &String)  -> Option<&BlockDetails>;
+    fn get_block_data(&self, block_id: &String)     -> Option<&BlockData>;
+    fn get_block_config(&self, block_id: &String)   -> Option<&ProtocolConfig>;
+    fn get_next_block_id(&self)                     -> &String;
+
+    // AlgorithmsStore functions
+    fn get_algorithm(&self, algorithm_id: &String)          -> Option<&Algorithm>;
+    fn get_algorithm_details(&self, algorithm_id: &String)  -> Option<&AlgorithmDetails>;
+    fn get_algorithm_state(&self, algorithm_id: &String)    -> Option<&AlgorithmState>;
+    fn get_algorithm_data(&self, algorithm_id: &String)     -> Option<&AlgorithmBlockData>;
+
+    // PrecommitsStore functions
+    fn get_precommit(&self, benchmark_id: &String)              -> Option<&Precommit>;
+    fn get_precommit_details(&self, benchmark_id: &String)      -> Option<&PrecommitDetails>;
+    fn get_benchmark_settings(&self, benchmark_id: &String)     -> Option<&BenchmarkSettings>;
+    fn get_precommit_state(&self, benchmark_id: &String)        -> Option<&PrecommitState>;
+    fn calc_benchmark_id(&self, settings: &BenchmarkSettings)   -> &String;
+
+    // BenchmarksStore functions
+    fn get_benchmark(&self, benchmark_id: &String)          -> Option<&Benchmark>;
+    fn get_benchmark_details(&self, benchmark_id: &String)  -> Option<&BenchmarkDetails>;
+    fn get_benchmark_state(&self, benchmark_id: &String)    -> Option<&BenchmarkState>;
+    fn get_solution_nonces(&self, benchmark_id: &String)    -> Option<&HashSet<i32>>;
+
+    // ProofsStore functions
+    fn get_proof(&self, benchmark_id: &String)          -> Option<&Proof>;
+    fn get_proof_state(&self, benchmark_id: &String)    -> Option<&ProofState>;
+    fn get_merkle_proofs(&self, benchmark_id: &String)  -> Option<&Vec<&MerkleProof>>;
+
+    // FraudsStore functions
+    fn get_fraud(&self, benchmark_id: &String)              -> Option<&Fraud>;
+    fn get_fraud_state(&self, benchmark_id: &String)        -> Option<&FraudState>;
+    fn get_fraud_allegations(&self, benchmark_id: &String)  -> Option<&String>;
+
+    // ChallengesStore functions
+    fn get_challenge(&self, challenge_id: &String)          -> Option<&Challenge>;
+    fn get_challenge_details(&self, challenge_id: &String)  -> Option<&ChallengeDetails>;
+    
+    fn get_challenge_state(&self, challenge_id: &String)    -> Option<&ChallengeState>;
+    fn get_challenge_state_mut(&self, challenge_id: &String) -> Option<&mut ChallengeState>;
+
+    fn get_challenge_data(&self, challenge_id: &String)     -> Option<&ChallengeBlockData>;
+
+    // TopUpsStore functions
+    fn get_top_up(&self, tx_hash: &String)          -> Option<&TopUp>;
+    fn get_top_up_details(&self, tx_hash: &String)  -> Option<&TopUpDetails>;
+    fn get_top_up_state(&self, tx_hash: &String)    -> Option<&TopUpState>;
+
+    // WasmsStore functions
+    fn get_wasm(&self, wasm_id: &String)            -> Option<&Wasm>;
+    fn get_wasm_details(&self, wasm_id: &String)    -> Option<&WasmDetails>;
+    fn get_wasm_state(&self, wasm_id: &String)      -> Option<&WasmState>;
 }
-
-impl<B, A, P, BE, PR, F, C, T, W> Context<B, A, P, BE, PR, F, C, T, W>
-where
-    B: BlocksStore,
-    A: AlgorithmsStore,
-    P: PrecommitsStore,
-    BE: BenchmarksStore,
-    PR: ProofsStore,
-    F: FraudsStore,
-    C: ChallengesStore,
-    T: TopUpsStore,
-    W: WasmsStore,
-{
-    pub fn new(blocks: B, algorithms: A, precommits: P, benchmarks: BE, proofs: PR, frauds: F, challenges: C, topups: T, wasms: W) -> Self
-    {
-        return Self 
-        {
-            blocks:        Arc::new(RwLock::new(blocks)),
-            algorithms:    Arc::new(RwLock::new(algorithms)),
-            precommits:    Arc::new(RwLock::new(precommits)),
-            benchmarks:    Arc::new(RwLock::new(benchmarks)),
-            proofs:        Arc::new(RwLock::new(proofs)),
-            frauds:        Arc::new(RwLock::new(frauds)),
-            challenges:    Arc::new(RwLock::new(challenges)),
-            topups:        Arc::new(RwLock::new(topups)),
-            wasms:         Arc::new(RwLock::new(wasms)),
-        };
-    }
-}
-
-// pub trait Context {
-//     fn get_block_by_height(&self, block_height: i64) -> Option<Block>;
-
-//     fn get_block_by_id(&self, block_id: &String) -> Option<&Block>;
-
-//     fn get_next_block(&self) -> &Block;
-
-//     fn get_algorithm_by_id(&self, algorithm_id: &String) -> Option<Algorithm>;
-
-//     fn get_algorithm_by_tx_hash(&self, tx_hash: &String) -> Option<Algorithm>;
-
-//     fn get_challenges_by_id(&self, challenge_id: &String) -> Vec<Challenge>;
-
-//     fn get_challenge_by_id_and_height(
-//         &self,
-//         challenge_id: &String,
-//         block_height: u64,
-//     ) -> Option<Challenge>;
-
-//     fn get_challenge_by_id_and_block_id(
-//         &self,
-//         challenge_id: &String,
-//         block_id: &String,
-//     ) -> Option<Challenge>;
-
-//     fn get_precommits_by_settings(&self, settings: &BenchmarkSettings) -> Vec<Precommit>;
-
-//     fn get_precommits_by_benchmark_id(&self, benchmark_id: &String) -> Vec<Precommit>;
-
-//     fn get_transaction(&self, tx_hash: &String) -> Option<Transaction>;
-
-//     fn get_topups_by_tx_hash(&self, tx_hash: &String) -> Vec<TopUp>;
-
-//     fn get_benchmarks_by_id(&self, benchmark_id: &String) -> Vec<Benchmark>;
-
-//     fn get_proofs_by_benchmark_id(&self, benchmark_id: &String) -> Vec<Proof>;
-
-//     fn get_player_deposit(
-//         &self,
-//         eth_block_num: &String,
-//         player_id: &String,
-//     ) -> Option<PreciseNumber>;
-
-//     fn verify_solution(
-//         &self,
-//         settings: &BenchmarkSettings,
-//         nonce: u64,
-//         solution: &Solution,
-//     ) -> ContextResult<anyhow::Result<()>>;
-
-//     fn compute_solution(
-//         &self,
-//         settings: &BenchmarkSettings,
-//         nonce: u64,
-//         wasm_vm_config: &WasmVMConfig,
-//     ) -> ContextResult<anyhow::Result<OutputData>>;
-
-//     fn add_precommit_to_mempool(
-//         &self,
-//         settings: &BenchmarkSettings,
-//         details: &PrecommitDetails,
-//     ) -> ContextResult<String>;
-
-//     fn add_benchmark_to_mempool(
-//         &self,
-//         benchmark_id: &String,
-//         merkle_root: &MerkleHash,
-//         solution_nonces: &HashSet<u64>,
-//     ) -> ContextResult<()>;
-
-//     fn add_proof_to_mempool(
-//         &self,
-//         benchmark_id: &String,
-//         merkle_proofs: &Vec<MerkleProof>,
-//     ) -> ContextResult<()>;
-
-//     fn add_fraud_to_mempool(
-//         &self,
-//         benchmark_id: &String,
-//         allegations: &String,
-//     ) -> ContextResult<()>;
-
-//     fn update_precommit_state(
-//         &self,
-//         benchmark_id: &String,
-//         state: &PrecommitState,
-//     ) -> ContextResult<()>;
-
-//     fn update_algorithm_state(
-//         &self,
-//         algorithm_id: &String,
-//         state: &AlgorithmState,
-//     ) -> ContextResult<()>;
-
-//     fn notify_new_block(&self);
-
-//     fn block_assembled(&self, block: &Block);
-
-//     fn data_committed(&self, block: &Block);
-// }
