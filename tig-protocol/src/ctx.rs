@@ -2,108 +2,68 @@ pub use anyhow::{Error as ContextError, Result as ContextResult};
 use {
     std::sync::Arc,
     tig_structs::{config::*, core::*, *},
+    std::sync::RwLock,
+    crate::
+    {
+        store::*,
+    },
 };
-
-pub trait BlocksStore {
-    fn get(&self, block_id: &String) -> Option<&Block>;
-
-    fn get_details(&self, block_id: &String) -> Option<&BlockDetails>;
-
-    fn get_data(&self, block_id: &String) -> Option<&BlockData>;
-
-    fn get_config(&self, block_id: &String) -> Option<&ProtocolConfig>;
-
-    fn get_next_id(&self) -> String;
-}
-
-pub trait AlgorithmsStore {
-    fn get(&self, block_id: &String) -> Option<&Block>;
-
-    fn get_details(&self, algorithm_id: &String) -> Option<&AlgorithmDetails>;
-
-    fn get_state(&self, algorithm_id: &String) -> Option<&AlgorithmState>;
-
-    fn get_data(&self, algorithm_id: &String) -> Option<&AlgorithmBlockData>;
-}
-
-pub trait PrecommitsStore {
-    fn get(&self, benchmark_id: &String) -> Option<&Precommit>;
-
-    fn get_details(&self, benchmark_id: &String) -> Option<&PrecommitDetails>;
-
-    fn get_settings(&self, benchmark_id: &String) -> Option<&BenchmarkSettings>;
-
-    fn get_state(&self, benchmark_id: &String) -> Option<&PrecommitState>;
-
-    fn calc_benchmark_id(&self, settings: &BenchmarkSettings) -> String;
-}
-
-pub trait BenchmarksStore {
-    fn get(&self, benchmark_id: &String) -> Option<&Benchmark>;
-
-    fn get_details(&self, benchmark_id: &String) -> Option<&BenchmarkDetails>;
-
-    fn get_state(&self, benchmark_id: &String) -> Option<&BenchmarkState>;
-
-    fn get_solution_nonces(&self, benchmark_id: &String) -> Option<&HashSet<u64>>;
-}
-
-pub trait ProofsStore {
-    fn get(&self, benchmark_id: &String) -> Option<&Proof>;
-
-    fn get_state(&self, benchmark_id: &String) -> Option<&ProofState>;
-
-    fn get_merkle_proofs(&self, benchmark_id: &String) -> Option<&Vec<MerkleProof>>;
-}
-
-pub trait FraudsStore {
-    fn get(&self, benchmark_id: &String) -> Option<&Fraud>;
-
-    fn get_state(&self, benchmark_id: &String) -> Option<&FraudState>;
-
-    fn get_allegations(&self, benchmark_id: &String) -> Option<&String>;
-}
-
-pub trait ChallengesStore {
-    fn get(&self, challenge_id: &String) -> Option<&Challenge>;
-
-    fn get_details(&self, challenge_id: &String) -> Option<&ChallengeDetails>;
-
-    fn get_state(&self, challenge_id: &String) -> Option<&ChallengeState>;
-
-    fn get_data(&self, challenge_id: &String) -> Option<&ChallengeBlockData>;
-}
-
-pub trait TopUpsStore {
-    fn get(&self, tx_hash: &String) -> Option<&TopUp>;
-
-    fn get_details(&self, tx_hash: &String) -> Option<&TopUpDetails>;
-
-    fn get_state(&self, tx_hash: &String) -> Option<&TopUpState>;
-}
-
-pub trait WasmsStore {
-    fn get(&self, wasm_id: &String) -> Option<&Wasm>;
-
-    fn get_details(&self, wasm_id: &String) -> Option<&WasmDetails>;
-
-    fn get_state(&self, wasm_id: &String) -> Option<&WasmState>;
-}
 
 // TODO Vote
 // TODO Deposit
 // TODO Breakthrough
 // TODO Binary
 
-pub struct Context {
-    pub blocks: Arc<dyn BlocksStore>,
-    pub algorithms: Arc<dyn AlgorithmsStore>,
-    pub challenges: Arc<dyn ChallengesStore>,
-    pub precommits: Arc<dyn PrecommitsStore>,
-    pub benchmarks: Arc<dyn BenchmarksStore>,
-    pub proofs: Arc<dyn ProofsStore>,
-    pub frauds: Arc<dyn FraudsStore>,
-    pub wasms: Arc<dyn WasmsStore>,
+pub struct Context<B, A, P, BE, PR, F, C, T, W>
+where
+    B: BlocksStore,
+    A: AlgorithmsStore,
+    P: PrecommitsStore,
+    BE: BenchmarksStore,
+    PR: ProofsStore,
+    F: FraudsStore,
+    C: ChallengesStore,
+    T: TopUpsStore,
+    W: WasmsStore,
+{
+    pub blocks:        Arc<RwLock<B>>,
+    pub algorithms:    Arc<RwLock<A>>,
+    pub precommits:    Arc<RwLock<P>>,
+    pub benchmarks:    Arc<RwLock<BE>>,
+    pub proofs:        Arc<RwLock<PR>>,
+    pub frauds:        Arc<RwLock<F>>,
+    pub challenges:    Arc<RwLock<C>>,
+    pub topups:        Arc<RwLock<T>>,
+    pub wasms:         Arc<RwLock<W>>,
+}
+
+impl<B, A, P, BE, PR, F, C, T, W> Context<B, A, P, BE, PR, F, C, T, W>
+where
+    B: BlocksStore,
+    A: AlgorithmsStore,
+    P: PrecommitsStore,
+    BE: BenchmarksStore,
+    PR: ProofsStore,
+    F: FraudsStore,
+    C: ChallengesStore,
+    T: TopUpsStore,
+    W: WasmsStore,
+{
+    pub fn new(blocks: B, algorithms: A, precommits: P, benchmarks: BE, proofs: PR, frauds: F, challenges: C, topups: T, wasms: W) -> Self
+    {
+        return Self 
+        {
+            blocks:        Arc::new(RwLock::new(blocks)),
+            algorithms:    Arc::new(RwLock::new(algorithms)),
+            precommits:    Arc::new(RwLock::new(precommits)),
+            benchmarks:    Arc::new(RwLock::new(benchmarks)),
+            proofs:        Arc::new(RwLock::new(proofs)),
+            frauds:        Arc::new(RwLock::new(frauds)),
+            challenges:    Arc::new(RwLock::new(challenges)),
+            topups:        Arc::new(RwLock::new(topups)),
+            wasms:         Arc::new(RwLock::new(wasms)),
+        };
+    }
 }
 
 // pub trait Context {

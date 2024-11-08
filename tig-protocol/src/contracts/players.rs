@@ -11,18 +11,16 @@ use {
     tig_structs::core::*,
 };
 
-pub struct PlayerContract<T: Context> {
-    phantom: PhantomData<T>,
+pub struct PlayerContract
+{
 }
 
-impl<T: Context> PlayerContract<T> {
+impl PlayerContract {
     pub fn new() -> Self {
-        return Self {
-            phantom: PhantomData,
-        };
+        return Self {};
     }
 
-    async fn submit_topup() {
+    /*async fn submit_topup() {
         let block = ctx
             .get_block_by_height(-1)
             .await
@@ -61,7 +59,7 @@ impl<T: Context> PlayerContract<T> {
         }
 
         return Ok(expected_amount);
-    }
+    }*/
 
     // FUTURE submit_deposit
     // FUTURE submit_vote

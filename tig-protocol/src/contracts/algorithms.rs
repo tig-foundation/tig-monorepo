@@ -8,15 +8,13 @@ use {
     tig_structs::core::*,
 };
 
-pub struct AlgorithmContract<T: Context> {
-    phantom: PhantomData<T>,
+pub struct AlgorithmContract
+{
 }
 
-impl<T: Context> AlgorithmContract<T> {
+impl AlgorithmContract {
     pub fn new() -> Self {
-        return Self {
-            phantom: PhantomData,
-        };
+        return Self {};
     }
 
     async fn submit_algorithm() {

@@ -11,14 +11,12 @@ use {
     tig_structs::core::*,
 };
 
-pub struct ChallengeContract<T: Context> {
-    phantom: PhantomData<T>,
+pub struct ChallengeContract
+{
 }
 
-impl<T: Context> ChallengeContract<T> {
+impl ChallengeContract {
     pub fn new() -> Self {
-        return Self {
-            phantom: PhantomData,
-        };
+        return Self {};
     }
 }

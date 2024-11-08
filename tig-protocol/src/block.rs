@@ -147,7 +147,7 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
     {
         rayon::scope(|s|
         {
-            s.spawn(|_| update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap()));
+            //s.spawn(|_| update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap()));
             s.spawn(|_| update_cutoffs( &block, &mut Arc::into_inner(cache.clone()).unwrap()));
         });
     }.await;
@@ -367,6 +367,7 @@ fn confirm_mempool_wasms(
     });
 }
 
+/*
 #[time]
 fn update_deposits<T: Context + std::marker::Send + std::marker::Sync>(
     ctx:                    &RwLock<T>,
@@ -401,6 +402,7 @@ fn update_deposits<T: Context + std::marker::Send + std::marker::Sync>(
         data.qualifying_percent_rolling_deposit = Some(zero);
     });
 }
+*/
 
 #[time]
 fn update_cutoffs(

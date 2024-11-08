@@ -11,14 +11,14 @@ use {
     tig_structs::core::*,
 };
 
-pub struct PlayerContract<T: Context> {
-    phantom: PhantomData<T>,
+pub struct OPoWContract
+{
 }
 
-impl<T: Context> PlayerContract<T> {
+impl OPoWContract {
     pub fn new() -> Self {
-        return Self {
-            phantom: PhantomData,
+        return Self 
+        {
         };
     }
 

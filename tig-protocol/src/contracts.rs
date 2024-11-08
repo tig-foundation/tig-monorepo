@@ -1,36 +1,43 @@
-mod algorithm;
-mod benchmark;
-mod challenge;
-mod player;
-mod topup;
+mod algorithms;
+mod benchmarks;
+mod challenges;
+mod players;
+mod opow;
 
 use {
     crate::{
         contracts::{
-            algorithm::AlgorithmContract, benchmark::BenchmarkContract,
-            challenge::ChallengeContract, player::PlayerContract, topup::TopUpContract,
+            algorithms::AlgorithmContract,
+            benchmarks::BenchmarkContract,
+            challenges::ChallengeContract,
+            players::PlayerContract,
+            opow::OPoWContract,
         },
         ctx::Context,
     },
     std::sync::Arc,
 };
 
-pub struct Contracts<T: Context> {
-    pub benchmark: BenchmarkContract<T>,
-    pub challenge: ChallengeContract<T>,
-    pub algorithm: AlgorithmContract<T>,
-    pub player: PlayerContract<T>,
-    pub topup: TopUpContract<T>,
+pub struct Contracts
+{
+    pub benchmark:  BenchmarkContract,
+    pub challenge:  ChallengeContract,
+    pub algorithm:  AlgorithmContract,
+    pub player:     PlayerContract,
+    pub opow:       OPoWContract,
 }
 
-impl<T: Context> Contracts<T> {
-    pub fn new() -> Self {
-        return Self {
-            benchmark: BenchmarkContract::new(),
-            challenge: ChallengeContract::new(),
-            algorithm: AlgorithmContract::new(),
-            player: PlayerContract::new(),
-            topup: TopUpContract::new(),
-        };
+impl Contracts
+{
+    pub fn new() -> Self 
+    {
+        return Self 
+        {
+            benchmark:  BenchmarkContract::new(),
+            challenge:  ChallengeContract::new(),
+            algorithm:  AlgorithmContract::new(),
+            player:     PlayerContract::new(),
+            opow:       OPoWContract::new(),
+        };  
     }
 }
