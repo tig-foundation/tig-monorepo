@@ -13,7 +13,7 @@ use {
 
 pub struct Protocol<T: Context>
 {
-    ctx:        RwLock<Arc<T>>,
+    ctx:        Arc<RwLock<T>>,
     contracts:  Arc<Contracts<T>>,
 }
 
@@ -24,7 +24,7 @@ impl<T: Context> Protocol<T>
         return Self 
         {
             contracts:  Arc::new(Contracts::new()),
-            ctx:        RwLock::new(Arc::new(ctx)),
+            ctx:        Arc::new(RwLock::new(ctx)),
         };
     }
 
@@ -34,18 +34,16 @@ impl<T: Context> Protocol<T>
         settings: &BenchmarkSettings,
         num_nonces: u32,
     ) -> ProtocolResult<String> {
-        /*return self
+        return self
             .contracts
             .benchmark
             .submit_precommit(
-                &Arc::into_inner(self.ctx.clone()).unwrap(),
+                &Arc::into_inner(self.ctx.clone()).unwrap().read().unwrap(),
                 player,
                 settings,
                 num_nonces,
             )
-            .await;*/
-
-        return Ok(String::new());
+            .await;
     }
 
     async fn submit_benchmark(
@@ -55,19 +53,17 @@ impl<T: Context> Protocol<T>
         merkle_root: &MerkleHash,
         solution_nonces: &HashSet<u64>,
     ) -> ProtocolResult<()> {
-        /*return self
+        return self
             .contracts
             .benchmark
             .submit_benchmark(
-                &Arc::into_inner(self.ctx.clone()).unwrap(),
+                &Arc::into_inner(self.ctx.clone()).unwrap().read().unwrap(),
                 player,
                 benchmark_id,
                 merkle_root,
                 solution_nonces,
             )
-            .await;*/
-
-        return Ok(());
+            .await;
     }
 
     pub async fn submit_proof(
@@ -76,18 +72,16 @@ impl<T: Context> Protocol<T>
         benchmark_id: &String,
         merkle_proofs: &Vec<MerkleProof>,
     ) -> ProtocolResult<Result<(), String>> {
-        /*return self
+        return self
             .contracts
             .benchmark
             .submit_proof(
-                &Arc::into_inner(self.ctx.clone()).unwrap(),
+                &Arc::into_inner(self.ctx.clone()).unwrap().read().unwrap(),
                 player,
                 benchmark_id,
                 &merkle_proofs,
             )
-            .await;*/
-
-        return Ok(Ok(()));
+            .await;
     }
 
     pub async fn add_block(&self) -> String 
