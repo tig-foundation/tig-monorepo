@@ -68,7 +68,6 @@ impl<T: Context> BenchmarkContract<T> {
         let benchmark_block             = ctx.get_block_data(&settings.block_id).expect(&format!("Expecting benchmark block to exist: {}", settings.block_id));
 
         let latest_block_details        = ctx.get_block_details(next_block_id).unwrap();
-        let latest_block                = ctx.get_block_data(next_block_id).expect("Expecting latest block to exist");
 
         let config                      = ctx.get_block_config(&settings.block_id).unwrap();
         let submission_delay            = latest_block_details.height - benchmark_block_details.height + 1;
@@ -185,10 +184,7 @@ impl<T: Context> BenchmarkContract<T> {
         //fetch the precommit
         let precommit_details = ctx.get_precommit_details(benchmark_id)
             .ok_or_else(|| format!("Invalid precommit: {}", benchmark_id))?;
-            
-        let precommit_state = ctx.get_precommit_state(benchmark_id)
-            .ok_or_else(|| format!("Invalid precommit state: {}", benchmark_id))?;
-
+        
         let settings = ctx.get_benchmark_settings(benchmark_id)
             .ok_or_else(|| format!("Invalid benchmark settings: {}", benchmark_id))?;
 
@@ -231,9 +227,6 @@ impl<T: Context> BenchmarkContract<T> {
         //fetch the precommit
         let precommit_details = ctx.get_precommit_details(benchmark_id)
             .ok_or_else(|| format!("Invalid precommit: {}", benchmark_id))?;
-            
-        let precommit_state = ctx.get_precommit_state(benchmark_id)
-            .ok_or_else(|| format!("Invalid precommit state: {}", benchmark_id))?;
 
         let settings = ctx.get_benchmark_settings(benchmark_id)
             .ok_or_else(|| format!("Invalid benchmark settings: {}", benchmark_id))?;
