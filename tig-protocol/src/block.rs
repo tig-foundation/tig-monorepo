@@ -147,8 +147,8 @@ pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
     {
         rayon::scope(|s|
         {
-            s.spawn(|_| update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| update_cutoffs( &block, &mut Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &Arc::into_inner(cache.clone()).unwrap()));
+            s.spawn(|_| update_cutoffs(                                         &block, &Arc::into_inner(cache.clone()).unwrap()));
         });
     }.await;
 
@@ -371,7 +371,7 @@ fn confirm_mempool_wasms(
 fn update_deposits<T: Context + std::marker::Send + std::marker::Sync>(
     ctx:                    &RwLock<T>,
     block:                  &Block,
-    cache:                  &mut AddBlockCache,
+    cache:                  &AddBlockCache,
 )
 {
     let decay                           = match &block.config().optimisable_proof_of_work.rolling_deposit_decay
@@ -405,7 +405,7 @@ fn update_deposits<T: Context + std::marker::Send + std::marker::Sync>(
 #[time]
 fn update_cutoffs(
     block:                  &Block,
-    cache:                  &mut AddBlockCache,
+    cache:                  &AddBlockCache,
 )
 {
     let config                          = block.config();
@@ -429,7 +429,7 @@ fn update_cutoffs(
                                         += *num_solutions;
     }
 
-    for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() 
+    num_solutions_by_player_by_challenge.par_iter().for_each(|(player_id, num_solutions_by_challenge)|
     {
         let phase_in_start              = (block.details.round - 1) * config.rounds.blocks_per_round;
         let phase_in_period             = config.qualifiers.cutoff_phase_in_period.unwrap();
@@ -460,5 +460,5 @@ fn update_cutoffs(
             .get_mut(player_id).unwrap()
             .block_data.as_mut().unwrap()
             .cutoff                     = Some(cutoff);
-    }
+    });
 }

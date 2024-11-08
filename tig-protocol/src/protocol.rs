@@ -51,13 +51,11 @@ impl<T: Context + std::marker::Send + std::marker::Sync> Protocol<T>
 {
     pub fn new(ctx: T)          -> Self
     {
-        let mut new                 = Self 
+        return Self 
         { 
             ctx                     : Arc::new(RwLock::new(ctx)),
             contracts               : Arc::new(Contracts::new()),
         };
-
-        return new;
     }
 
     pub async fn submit_precommit(
