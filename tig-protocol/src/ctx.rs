@@ -4,10 +4,6 @@ use {
     tig_structs::{config::*, core::*, *},
     std::sync::RwLock,
     std::collections::HashSet,
-    crate::
-    {
-        store::*,
-    },
 };
 
 pub trait Context 

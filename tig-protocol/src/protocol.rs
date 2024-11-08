@@ -9,8 +9,8 @@ use {
         sync::{Arc, RwLock},
     },
     tig_structs::{core::*, *},
-    crate::store::*,
 };
+
 pub struct Protocol<T: Context>
 {
     ctx:        RwLock<Arc<T>>,
