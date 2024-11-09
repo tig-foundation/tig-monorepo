@@ -17,7 +17,7 @@ pub struct Protocol<T: Context>
     contracts:  Arc<Contracts<T>>,
 }
 
-impl<T: Context> Protocol<T>
+impl<T: Context + std::marker::Sync + std::marker::Send> Protocol<T>
 {
     pub fn new(ctx: T) -> Self 
     {
@@ -89,11 +89,21 @@ impl<T: Context> Protocol<T>
         self.ctx.notify_add_new_block();
 
         let (mut block, mut cache) = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap()).await;
+
         self.contracts.opow.update(&cache, &block);
-        self.contracts.algorithm.update(&cache, &block);
+        rayon::scope(|s| 
+        {
+            s.spawn(|_| self.contracts.algorithm.update(&cache, &block));
+            s.spawn(|_| self.contracts.challenge.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block));
+            s.spawn(|_| self.contracts.rewards.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block));
+
+            s.spawn(|_| futures::executor::block_on(
+                self.contracts.player.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block)
+            ));
+        });
         
         // apply data
 
-        return String::new();
+        return block.id;
     }
 }

@@ -19,15 +19,9 @@ use
     },
     tig_structs::
     {
-        core::
-        {
-            *
-        }
+        core::*
     },
-    tig_utils::
-    {
-        *
-    },
+    tig_utils::*,
     logging_timer::time,
     rayon::prelude::*,
 };
