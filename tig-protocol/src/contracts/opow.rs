@@ -2,6 +2,7 @@ use {
     crate::{
         ctx::Context,
         err::{ContractResult, ProtocolError},
+        block::AddBlockCache,
     },
     logging_timer::time,
     std::{
@@ -32,7 +33,7 @@ impl OPoWContract {
         // FIXME
     }
 
-    fn update(cache: &mut crate::block::AddBlockCache, block: &Block)
+    fn update(cache: &AddBlockCache, block: &Block)
     {
         // update cutoffs
         {
@@ -175,14 +176,14 @@ impl OPoWContract {
                     }                   = settings;
         
                     if curr_frontier_index != frontier_indexes[difficulty]
-                        && *challenge_data.num_qualifiers() > config.qualifiers.total_qualifiers_threshold
+                        && *challenge_data.num_qualifiers() > block.config().qualifiers.total_qualifiers_threshold
                     {
                         break;
                     }
 
-                    let difficulty_parameters = &config.difficulty.parameters[challenge_id];
-                    let min_difficulty   = difficulty_parameters.min_difficulty();
-                    let max_difficulty   = difficulty_parameters.max_difficulty();
+                    let difficulty_parameters   = &block.config().difficulty.parameters[challenge_id];
+                    let min_difficulty          = difficulty_parameters.min_difficulty();
+                    let max_difficulty          = difficulty_parameters.max_difficulty();
 
                     if (0..difficulty.len())
                         .into_par_iter()
@@ -238,7 +239,7 @@ impl OPoWContract {
         }
 
         // update frontiers
-        /*{
+        {
             let config = block.config();
             cache.active_challenges.write().unwrap().par_iter_mut().for_each(|(_, challenge)| 
             {
@@ -251,7 +252,7 @@ impl OPoWContract {
                     .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
                     .collect::<Frontier>();
 
-                let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
+                /*let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
                 {
                     let base_frontier     : Frontier = vec![min_difficulty.clone()].into_iter().collect();
                     let scaling_factor    = 0.0;
@@ -282,9 +283,9 @@ impl OPoWContract {
 
                 block_data.base_frontier      = Some(base_frontier);
                 block_data.scaled_frontier    = Some(scaled_frontier); 
-                block_data.scaling_factor     = Some(scaling_factor);
+                block_data.scaling_factor     = Some(scaling_factor);*/
             });
-        }*/
+        }
 
         // update influence
         {
@@ -326,8 +327,7 @@ impl OPoWContract {
                         .get(player_id).unwrap()
                         .block_data.as_ref().unwrap()
                         .num_qualifiers_by_challenge()
-                        .get(challenge_id)
-                        .unwrap_or(&0) == 0 
+                        .get(challenge_id).unwrap_or(&0) == 0 
                     {
                         PreciseNumber::from(0)
                     } 
@@ -426,10 +426,4 @@ impl OPoWContract {
             }
         }
     }
-
-    // update (order of ops)
-    // 1. update_cutoffs
-    // 2. update_qualifiers
-    // 3. update_frontiers
-    // 4. update_influence
 }
