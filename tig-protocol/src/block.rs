@@ -35,7 +35,7 @@ use
     rayon::prelude::*,
 };
 
-struct AddBlockCache 
+pub struct AddBlockCache 
 {
     pub mempool_challenges:     RwLock<Vec<Challenge>>,
     pub mempool_algorithms:     RwLock<Vec<Algorithm>>,
@@ -54,6 +54,7 @@ struct AddBlockCache
     pub prev_players:           RwLock<HashMap<String, Player>>,
 }
 
+/*
 #[time]
 pub async fn create_block<T: Context>(
     ctx:                    &RwLock<T>
@@ -464,3 +465,4 @@ fn update_cutoffs(
             .cutoff                     = Some(cutoff);
     });
 }
+*/

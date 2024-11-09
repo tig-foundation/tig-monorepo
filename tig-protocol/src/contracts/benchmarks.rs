@@ -28,7 +28,8 @@ use
     {
         *
     },
-    logging_timer::time
+    logging_timer::time,
+    rayon::prelude::*,
 };
 
 pub struct BenchmarkContract<T: Context>
