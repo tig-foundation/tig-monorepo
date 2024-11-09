@@ -51,6 +51,8 @@ pub struct AddBlockCache
     pub active_solutions:       RwLock<HashMap<String, (BenchmarkSettings, u32)>>,
     pub active_players:         RwLock<HashMap<String, Player>>,
     pub active_fee_players:     RwLock<HashMap<String, Player>>,
+    pub prev_challenges:        RwLock<HashMap<String, Challenge>>,
+    pub prev_algorithms:        RwLock<HashMap<String, Algorithm>>,
     pub prev_players:           RwLock<HashMap<String, Player>>,
 }
 

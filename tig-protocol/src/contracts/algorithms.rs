@@ -69,7 +69,7 @@ impl AlgorithmContract {
                             .get(player_id).unwrap()
                             .block_data.as_ref().unwrap()
                             .influence.unwrap();
-                        
+
                         let player_num_qualifiers = PreciseNumber::from(
                             *cache
                                 .active_players.read().unwrap()
@@ -90,6 +90,79 @@ impl AlgorithmContract {
                 for (algorithm, adoption) in algorithms.iter_mut().zip(adoption) {
                     algorithm.block_data.as_mut().unwrap().adoption = Some(adoption);
                 }
+            }
+        }
+
+        // update merge points
+        {
+            let config = block.config();
+            let adoption_threshold =PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
+            for algorithm in cache.active_algorithms.write().unwrap().values_mut() 
+            {
+                let is_merged   = algorithm.state().round_merged.is_some();
+                let data        = algorithm.block_data.as_mut().unwrap();
+
+                // first block of the round
+                let prev_merge_points = if block.details.height % config.rounds.blocks_per_round == 0 
+                {
+                    0
+                } else 
+                {
+                    match cache.prev_algorithms.read().unwrap().get(&algorithm.id)
+                    {
+                        Some(data)  => *data.block_data.as_ref().unwrap().merge_points(),
+                        None        => 0,
+                    }
+                };
+
+                data.merge_points = Some(if is_merged || *data.adoption() < adoption_threshold 
+                {
+                    prev_merge_points
+                } 
+                else 
+                {
+                    prev_merge_points + 1
+                });
+            }
+        }
+
+        //update merges
+        {
+            let config = block.config();
+
+            // last block of the round
+            if (block.details.height + 1) % config.rounds.blocks_per_round != 0 
+            {
+                return;
+            }
+        
+            let mut algorithm_to_merge_by_challenge = HashMap::<String, &mut Algorithm>::new();
+            let mut algorithms                      = cache.active_algorithms.write().unwrap();
+            for algorithm in algorithms.values_mut() 
+            {
+                let challenge_id    = algorithm.details.challenge_id.clone();
+                let data            = algorithm.block_data();
+        
+                if algorithm.state().round_merged.is_some()
+                    || *data.merge_points() < config.algorithm_submissions.merge_points_threshold
+                {
+                    continue;
+                }
+                if !algorithm_to_merge_by_challenge.contains_key(&challenge_id)
+                    || algorithm_to_merge_by_challenge[&challenge_id]
+                        .block_data()
+                        .merge_points
+                        < data.merge_points
+                {
+                    algorithm_to_merge_by_challenge.insert(challenge_id, algorithm);
+                }
+            }
+        
+            let round_merged = block.details.round + 1;
+            for algorithm in algorithm_to_merge_by_challenge.values_mut() 
+            {
+                let state           = algorithm.state.as_mut().unwrap();
+                state.round_merged  = Some(round_merged);
             }
         }
     }
