@@ -13,6 +13,10 @@ pub trait Context
   
     fn notify_add_new_block(&self);
 
+    // PlayersContract functions
+    fn get_player_deposit(&self, eth_block_num: &String, player_id: &String) -> ContextResult<Option<PreciseNumber>>;
+
+
     // BlocksStore functions
     fn get_block_details(&self, block_id: &String)  -> Option<&BlockDetails>;
     fn get_block_data(&self, block_id: &String)     -> Option<&BlockData>;

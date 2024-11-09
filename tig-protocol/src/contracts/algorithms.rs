@@ -167,11 +167,6 @@ impl AlgorithmContract {
         }
     }
 
-    // update (call after opow.update)
-    // update_adoption
-    // update_merge_points
-    // update_merges
-
     // FUTURE submit_brekthrough
     // FUTURE rename wasm -> binary
     // FUTURE update breakthrough adoption

@@ -89,9 +89,10 @@ impl<T: Context> Protocol<T>
         self.ctx.notify_add_new_block();
 
         let (mut block, mut cache) = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap()).await;
-
         self.contracts.opow.update(&cache, &block);
         self.contracts.algorithm.update(&cache, &block);
+        
+        // apply data
 
         return String::new();
     }

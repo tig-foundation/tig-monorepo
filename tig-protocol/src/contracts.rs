@@ -3,6 +3,7 @@ mod benchmarks;
 mod challenges;
 mod players;
 mod opow;
+mod rewards;
 
 use {
     crate::{
@@ -12,6 +13,7 @@ use {
             challenges::ChallengeContract,
             players::PlayerContract,
             opow::OPoWContract,
+            rewards::RewardsContract,
         },
         ctx::Context,
     },
@@ -23,8 +25,9 @@ pub struct Contracts<T: Context>
     pub benchmark:  BenchmarkContract<T>,
     pub challenge:  ChallengeContract,
     pub algorithm:  AlgorithmContract,
-    pub player:     PlayerContract,
+    pub player:     PlayerContract<T>,
     pub opow:       OPoWContract<T>,
+    pub rewards:    RewardsContract<T>,
 }
 
 impl<T: Context> Contracts<T>
@@ -38,6 +41,7 @@ impl<T: Context> Contracts<T>
             algorithm:  AlgorithmContract::new(),
             player:     PlayerContract::new(),
             opow:       OPoWContract::new(),
+            rewards:    RewardsContract::new(),
         };  
     }
 }

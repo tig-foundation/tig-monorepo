@@ -2,6 +2,7 @@ use {
     crate::{
         ctx::Context,
         err::{ContractResult, ProtocolError},
+        block::AddBlockCache,
     },
     logging_timer::time,
     std::{
@@ -11,13 +12,14 @@ use {
     tig_structs::core::*,
 };
 
-pub struct PlayerContract
+pub struct PlayerContract<T: Context>
 {
+    phantom: PhantomData<T>,
 }
 
-impl PlayerContract {
+impl<T: Context> PlayerContract<T> {
     pub fn new() -> Self {
-        return Self {};
+        return Self { phantom: PhantomData };
     }
 
     /*async fn submit_topup() {
@@ -60,6 +62,52 @@ impl PlayerContract {
 
         return Ok(expected_amount);
     }*/
+
+    pub async fn update(&self, ctx: &T, cache: &AddBlockCache, block: &Block)
+    {
+        // update deposits
+        {
+            let decay = match &block
+                .config()
+                .optimisable_proof_of_work
+                .rolling_deposit_decay 
+            {
+                Some(decay) => PreciseNumber::from_f64(*decay),
+                None => return, // Proof of deposit not implemented for these blocks
+            };
+
+            let eth_block_num = block.details.eth_block_num();
+            let zero          = PreciseNumber::from(0);
+            let one           = PreciseNumber::from(1);
+
+            let mut players = cache.active_players.write().unwrap();
+            for player in players.values_mut() 
+            {
+                let rolling_deposit = match &cache.prev_players.read().unwrap().get(&player.id).unwrap().block_data 
+                {
+                    Some(data)      => data.rolling_deposit.clone(),
+                    None            => None,
+                }
+                .unwrap_or_else(|| zero.clone());
+
+                let data    = player.block_data.as_mut().unwrap();
+                let deposit = ctx
+                    .get_player_deposit(eth_block_num, &player.id)
+                    .unwrap()
+                    .unwrap_or_else(|| zero.clone());
+
+                data.rolling_deposit                            = Some(decay * rolling_deposit + (one - decay) * deposit);
+                data.deposit                                    = Some(deposit);
+                data.qualifying_percent_rolling_deposit         = Some(zero.clone());
+            }
+        }
+
+        // update votes
+        {
+        }
+
+        return ();
+    }
 
     // FUTURE submit_deposit
     // FUTURE submit_vote

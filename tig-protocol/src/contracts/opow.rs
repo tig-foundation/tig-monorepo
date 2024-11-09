@@ -37,7 +37,7 @@ impl<T: Context> OPoWContract<T>
         // FIXME
     }
 
-    pub async fn update(&self, cache: &AddBlockCache, block: &Block)
+    pub fn update(&self, cache: &AddBlockCache, block: &Block)
     {
         // update cutoffs
         {
