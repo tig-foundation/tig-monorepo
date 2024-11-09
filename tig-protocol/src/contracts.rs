@@ -23,7 +23,7 @@ use {
 pub struct Contracts<T: Context>
 {
     pub benchmark:  BenchmarkContract<T>,
-    pub challenge:  ChallengeContract,
+    pub challenge:  ChallengeContract<T>,
     pub algorithm:  AlgorithmContract,
     pub player:     PlayerContract<T>,
     pub opow:       OPoWContract<T>,
