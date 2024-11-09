@@ -99,9 +99,9 @@ impl OPoWContract {
 
         // update qualifiers
         {
-            let config                      = block.config();
             let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
-            for (settings, num_solutions) in cache.active_solutions.read().unwrap().values() 
+            let active_solutions            = cache.active_solutions.read().unwrap();
+            for (settings, num_solutions) in active_solutions.values() 
             {
                 solutions_by_challenge
                     .entry(settings.challenge_id.clone()).or_default()
@@ -109,22 +109,23 @@ impl OPoWContract {
             }
         
             let mut max_qualifiers_by_player = HashMap::<String, u32>::new();
-            for challenge in cache.active_challenges.read().unwrap().values() 
+            for challenge in cache.active_challenges.write().unwrap().values_mut() 
             {
                 let block_data                      = challenge.block_data.as_mut().unwrap();
                 block_data.num_qualifiers           = Some(0);
                 block_data.qualifier_difficulties   = Some(HashSet::new());
             }
 
-            for algorithm in cache.active_algorithms.read().unwrap().values() 
+            for algorithm in cache.active_algorithms.write().unwrap().values_mut() 
             {
                 let block_data                      = algorithm.block_data.as_mut().unwrap();
                 block_data.num_qualifiers_by_player = Some(HashMap::new());
             }
-            for player in cache.active_players.read().unwrap().values() 
+
+            for player in cache.active_players.write().unwrap().values_mut() 
             {
-                let block_data                          = player.block_data.as_mut().unwrap();
-                block_data.num_qualifiers_by_challenge  = Some(HashMap::new());
+                let block_data = player.block_data.as_mut().unwrap();
+                block_data.num_qualifiers_by_challenge = Some(HashMap::new());
 
                 max_qualifiers_by_player.insert(player.id.clone(), *block_data.cutoff());
             }
@@ -142,7 +143,7 @@ impl OPoWContract {
                     .map(|(settings, _)| settings.difficulty.clone())
                     .collect::<Frontier>();
 
-                let mut frontier_indexes = HashMap::<Point, usize>::new();
+                /*let mut frontier_indexes = HashMap::<Point, usize>::new();
                 for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() 
                 {
                     for point in frontier 
@@ -232,12 +233,12 @@ impl OPoWContract {
                         .as_mut()
                         .unwrap()
                         .insert(difficulty.clone());
-                }
+                }*/
             });
         }
 
         // update frontiers
-        {
+        /*{
             let config = block.config();
             cache.active_challenges.write().unwrap().par_iter_mut().for_each(|(_, challenge)| 
             {
@@ -283,7 +284,7 @@ impl OPoWContract {
                 block_data.scaled_frontier    = Some(scaled_frontier); 
                 block_data.scaling_factor     = Some(scaling_factor);
             });
-        }
+        }*/
 
         // update influence
         {
@@ -304,7 +305,7 @@ impl OPoWContract {
             }
 
             let total_deposit = cache
-                .active_players.read().unwrap().par_iter()
+                .active_players.read().unwrap().iter()
                 .map(|(_, p)| p.block_data().deposit.as_ref().unwrap())
                 .sum::<PreciseNumber>();
 
@@ -314,29 +315,31 @@ impl OPoWContract {
             let num_challenges          = PreciseNumber::from(cache.active_challenges.read().unwrap().len());
             let mut weights             = Vec::<PreciseNumber>::new();
 
-            active_player_ids.par_iter().for_each(|player_id| 
+            for player_id in active_player_ids.iter()
             {
-                let data = cache
-                    .active_players.read().unwrap()
-                    .get(player_id).unwrap()
-                    .block_data.as_ref().unwrap();
-
                 let mut percent_qualifiers = Vec::<PreciseNumber>::new();
                 for (challenge_id, _) in cache.active_challenges.read().unwrap().iter() 
                 {
                     let num_qualifiers              = num_qualifiers_by_challenge[challenge_id];
-                    let num_qualifiers_by_player    = data
+                    percent_qualifiers.push(if *cache
+                        .active_players.read().unwrap()
+                        .get(player_id).unwrap()
+                        .block_data.as_ref().unwrap()
                         .num_qualifiers_by_challenge()
                         .get(challenge_id)
-                        .unwrap_or(&0);
-
-                    percent_qualifiers.push(if *num_qualifiers_by_player == 0 
+                        .unwrap_or(&0) == 0 
                     {
                         PreciseNumber::from(0)
                     } 
                     else 
                     {
-                        PreciseNumber::from(*num_qualifiers_by_player) / PreciseNumber::from(num_qualifiers)
+                        PreciseNumber::from(*cache
+                            .active_players.read().unwrap()
+                            .get(player_id).unwrap()
+                            .block_data.as_ref().unwrap()
+                            .num_qualifiers_by_challenge()
+                            .get(challenge_id)
+                            .unwrap_or(&0)) / PreciseNumber::from(num_qualifiers)
                     });
                 }
 
@@ -348,7 +351,7 @@ impl OPoWContract {
 
                 if enable_proof_of_deposit.is_some_and(|x| x) {
                     let max_percent_rolling_deposit = PreciseNumber::from_f64(avg_percent_qualifiers_multiplier.unwrap())
-                            * percent_qualifiers.par_iter().sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
+                            * percent_qualifiers.iter().sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
 
                     let percent_rolling_deposit = if total_deposit == zero 
                     {
@@ -356,7 +359,11 @@ impl OPoWContract {
                     } 
                     else 
                     {
-                        data.deposit.as_ref().unwrap() / total_deposit
+                        cache
+                            .active_players.read().unwrap()
+                            .get(player_id).unwrap()
+                            .block_data.as_ref().unwrap()
+                            .deposit.as_ref().unwrap() / total_deposit
                     };
 
                     let qualifying_percent_rolling_deposit = if percent_rolling_deposit > max_percent_rolling_deposit 
@@ -369,11 +376,16 @@ impl OPoWContract {
                     };
 
                     percent_qualifiers.push(qualifying_percent_rolling_deposit.to_owned());
-                    data.qualifying_percent_rolling_deposit = Some(qualifying_percent_rolling_deposit.to_owned());
+
+                    cache
+                        .active_players.write().unwrap()
+                        .get_mut(player_id).unwrap()
+                        .block_data.as_mut().unwrap()
+                        .qualifying_percent_rolling_deposit = Some(qualifying_percent_rolling_deposit.to_owned());
                 }
 
-                let mean        = percent_qualifiers.par_iter().sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
-                let variance    = percent_qualifiers.par_iter()
+                let mean        = percent_qualifiers.iter().sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
+                let variance    = percent_qualifiers.iter()
                     .map(|x| (x - &mean) * (x - &mean))
                     .sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
 
@@ -387,14 +399,23 @@ impl OPoWContract {
                 let imbalance           = cv_sqr / (&num_challenges - &one);
                 let imbalance_penalty   = one - PreciseNumber::approx_inv_exp(&imbalance_multiplier * imbalance);
 
-                weights.push(&mean * (&one - &imbalance_penalty));
+                weights.push(mean * (&one - &imbalance_penalty));
 
-                data.imbalance = Some(imbalance.to_owned());
-                data.imbalance_penalty = Some(imbalance_penalty.to_owned());
-            });
+                cache
+                    .active_players.write().unwrap()
+                    .get_mut(player_id).unwrap()
+                    .block_data.as_mut().unwrap()
+                    .imbalance = Some(imbalance.to_owned());
 
-            let total_weight = weights.par_iter().sum::<PreciseNumber>();
-            let influences = weights.par_iter().map(|w| w / &total_weight).collect::<Vec<_>>();
+                cache
+                    .active_players.write().unwrap()
+                    .get_mut(player_id).unwrap()
+                    .block_data.as_mut().unwrap()
+                    .imbalance_penalty = Some(imbalance_penalty.to_owned());
+            }
+
+            let total_weight = weights.iter().sum::<PreciseNumber>();
+            let influences = weights.iter().map(|w| w / &total_weight).collect::<Vec<_>>();
             
             for (player_id, &influence) in active_player_ids.iter().zip(influences.iter()) 
             {
