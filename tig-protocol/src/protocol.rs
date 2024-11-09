@@ -13,7 +13,7 @@ use {
 
 pub struct Protocol<T: Context>
 {
-    ctx:        Arc<RwLock<T>>,
+    ctx:        Arc<T>,
     contracts:  Arc<Contracts<T>>,
 }
 
@@ -24,7 +24,7 @@ impl<T: Context> Protocol<T>
         return Self 
         {
             contracts:  Arc::new(Contracts::new()),
-            ctx:        Arc::new(RwLock::new(ctx)),
+            ctx:        Arc::new(ctx),
         };
     }
 
@@ -38,7 +38,7 @@ impl<T: Context> Protocol<T>
             .contracts
             .benchmark
             .submit_precommit(
-                &Arc::into_inner(self.ctx.clone()).unwrap().read().unwrap(),
+                &Arc::into_inner(self.ctx.clone()).unwrap(),
                 player,
                 settings,
                 num_nonces,
@@ -57,7 +57,7 @@ impl<T: Context> Protocol<T>
             .contracts
             .benchmark
             .submit_benchmark(
-                &Arc::into_inner(self.ctx.clone()).unwrap().read().unwrap(),
+                &Arc::into_inner(self.ctx.clone()).unwrap(),
                 player,
                 benchmark_id,
                 merkle_root,
@@ -76,7 +76,7 @@ impl<T: Context> Protocol<T>
             .contracts
             .benchmark
             .submit_proof(
-                &Arc::into_inner(self.ctx.clone()).unwrap().read().unwrap(),
+                &Arc::into_inner(self.ctx.clone()).unwrap(),
                 player,
                 benchmark_id,
                 &merkle_proofs,
@@ -86,7 +86,12 @@ impl<T: Context> Protocol<T>
 
     pub async fn add_block(&self) -> String 
     {
-        //return block::add_block(self.ctx.clone(), self.contracts.clone()).await;
+        self.ctx.notify_add_new_block();
+
+        let (mut block, mut cache) = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap()).await;
+
+        self.contracts.opow.update(&cache, &block);
+        self.contracts.algorithm.update(&cache, &block);
 
         return String::new();
     }

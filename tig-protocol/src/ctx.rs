@@ -10,13 +10,8 @@ pub trait Context
 {
     fn verify_solution(&self, settings: &BenchmarkSettings, nonce: u64, solution: &Solution)            -> ContextResult<anyhow::Result<()>>;
     fn compute_solution(&self, settings: &BenchmarkSettings, nonce: u64, wasm_vm_config: &WasmVMConfig) -> ContextResult<anyhow::Result<OutputData>>;
-    
-    fn update_precommit_state(&self, benchmark_id: &String, state: &PrecommitState) -> ContextResult<()>;
-    fn update_algorithm_state(&self, algorithm_id: &String, state: &AlgorithmState) -> ContextResult<()>;
-
-    fn notify_new_block(&self);
-    fn block_assembled(&self, block: &Block);
-    fn data_committed(&self, block: &Block);
+  
+    fn notify_add_new_block(&self);
 
     // BlocksStore functions
     fn get_block_details(&self, block_id: &String)  -> Option<&BlockDetails>;

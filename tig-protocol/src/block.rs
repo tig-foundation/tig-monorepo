@@ -56,10 +56,10 @@ pub struct AddBlockCache
     pub prev_players:           RwLock<HashMap<String, Player>>,
 }
 
-/*
+
 #[time]
 pub async fn create_block<T: Context>(
-    ctx:                    &RwLock<T>
+    ctx:                    &T
 )                                   -> (Block, Arc<AddBlockCache>)
 {
     let cache                           = setup_cache(ctx).await;
@@ -95,7 +95,7 @@ pub async fn create_block<T: Context>(
 
 #[time]
 async fn setup_cache<T: Context>(
-    ctx:                    &RwLock<T>,
+    ctx:                    &T,
 )                                   -> Arc<AddBlockCache>
 {
     return Arc::new(AddBlockCache 
@@ -114,10 +114,13 @@ async fn setup_cache<T: Context>(
         active_algorithms               : RwLock::new(HashMap::new()),
         active_solutions                : RwLock::new(HashMap::new()),
         prev_players                    : RwLock::new(HashMap::new()),
+        prev_challenges                 : RwLock::new(HashMap::new()),
+        prev_algorithms                 : RwLock::new(HashMap::new()),
         active_players                  : RwLock::new(HashMap::new()),
     });
 }
 
+/*
 #[time]
 pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
     ctx:                    Arc<RwLock<T>>,

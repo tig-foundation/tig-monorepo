@@ -24,7 +24,7 @@ pub struct Contracts<T: Context>
     pub challenge:  ChallengeContract,
     pub algorithm:  AlgorithmContract,
     pub player:     PlayerContract,
-    pub opow:       OPoWContract,
+    pub opow:       OPoWContract<T>,
 }
 
 impl<T: Context> Contracts<T>

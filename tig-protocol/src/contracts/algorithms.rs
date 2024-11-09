@@ -31,7 +31,7 @@ impl AlgorithmContract {
         // FIXME
     }
 
-    fn update(cache: &AddBlockCache, block: &Block)
+    pub fn update(&self, cache: &AddBlockCache, block: &Block)
     {
         // update adoption
         {

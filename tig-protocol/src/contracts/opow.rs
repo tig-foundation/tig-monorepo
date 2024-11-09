@@ -18,14 +18,18 @@ use {
     rayon::prelude::*,
 };
 
-pub struct OPoWContract
+pub struct OPoWContract<T>
 {
+    phantom: PhantomData<T>,
 }
 
-impl OPoWContract {
-    pub fn new() -> Self {
+impl<T: Context> OPoWContract<T>
+{
+    pub fn new() -> Self 
+    {
         return Self 
         {
+            phantom: PhantomData,
         };
     }
 
@@ -33,7 +37,7 @@ impl OPoWContract {
         // FIXME
     }
 
-    fn update(cache: &AddBlockCache, block: &Block)
+    pub async fn update(&self, cache: &AddBlockCache, block: &Block)
     {
         // update cutoffs
         {
