@@ -94,17 +94,21 @@ impl<T: Context> OPoWContract<T>
                     cutoff              = (phase_in_cutoff as f64 * phase_in_weight + cutoff as f64 * (1.0 - phase_in_weight)) as u32;
                 }
                 
-                cache
+                /*cache
                     .active_players.write().unwrap()
                     .get_mut(player_id).unwrap()
                     .block_data.as_mut().unwrap()
-                    .cutoff = Some(cutoff);
+                    .cutoff = Some(cutoff);*/
+
+                cache
+                    .commit_opow_cutoffs.write().unwrap()
+                    .insert(player_id.clone(), cutoff);
             });
         }
 
         // update qualifiers
         {
-            let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
+            /*let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
             let active_solutions            = cache.active_solutions.read().unwrap();
             for (settings, num_solutions) in active_solutions.values() 
             {
@@ -148,7 +152,7 @@ impl<T: Context> OPoWContract<T>
                     .map(|(settings, _)| settings.difficulty.clone())
                     .collect::<Frontier>();
 
-                /*let mut frontier_indexes = HashMap::<Point, usize>::new();
+                let mut frontier_indexes = HashMap::<Point, usize>::new();
                 for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() 
                 {
                     for point in frontier 
@@ -215,8 +219,12 @@ impl<T: Context> OPoWContract<T>
                     let max_qualifiers  = max_qualifiers_by_player.get(player_id).unwrap().clone();
                     let num_qualifiers  = num_solutions.min(max_qualifiers);
                     max_qualifiers_by_player.insert(player_id.clone(), max_qualifiers - num_qualifiers);
+
+                    cache
+                        .commit_opow_add_qualifiers.write().unwrap()
+                        .insert(challenge_id.clone(), (algorithm_id.clone(), player_id.clone(), num_qualifiers, difficulty.clone()));
         
-                    if num_qualifiers > 0 
+                    /*if num_qualifiers > 0 
                     {
                         *player_data
                             .num_qualifiers_by_challenge
@@ -237,17 +245,17 @@ impl<T: Context> OPoWContract<T>
                         .qualifier_difficulties
                         .as_mut()
                         .unwrap()
-                        .insert(difficulty.clone());
-                }*/
-            });
+                        .insert(difficulty.clone());*/
+                }
+            });*/
         }
 
         // update frontiers
         {
             let config = block.config();
-            cache.active_challenges.write().unwrap().par_iter_mut().for_each(|(_, challenge)| 
+            cache.active_challenges.read().unwrap().par_iter().for_each(|(challenge_id, challenge)| 
             {
-                let block_data              = challenge.block_data.as_mut().unwrap();
+                let block_data              = challenge.block_data.as_ref().unwrap();
                 let difficulty_parameters   = &config.difficulty.parameters[&challenge.id];
                 let min_difficulty          = difficulty_parameters.min_difficulty();
                 let max_difficulty          = difficulty_parameters.max_difficulty();
@@ -288,6 +296,12 @@ impl<T: Context> OPoWContract<T>
                 block_data.base_frontier      = Some(base_frontier);
                 block_data.scaled_frontier    = Some(scaled_frontier); 
                 block_data.scaling_factor     = Some(scaling_factor);*/
+
+                /*
+                cache
+                    .commit_opow_frontiers.write().unwrap()
+                    .insert(challenge_id.to_string(), (base_frontier, scaling_factor, scaled_frontier));
+                */
             });
         }
 
@@ -423,11 +437,22 @@ impl<T: Context> OPoWContract<T>
             
             for (player_id, &influence) in active_player_ids.iter().zip(influences.iter()) 
             {
+                // remove this later maybe
                 cache
                     .active_players.write().unwrap()
                     .get_mut(player_id).unwrap()
                     .block_data.as_mut().unwrap().influence = Some(influence);
+
+                // keep this
+                cache
+                    .commit_opow_influence.write().unwrap()
+                    .insert(player_id.to_string(), influence);
             }
         }
+    }
+
+    pub fn commit_data(&self, ctx: &T, cache: &AddBlockCache, block: &Block)
+    {
+        
     }
 }

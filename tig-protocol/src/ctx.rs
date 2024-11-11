@@ -11,11 +11,16 @@ pub trait Context
     fn verify_solution(&self, settings: &BenchmarkSettings, nonce: u64, solution: &Solution)            -> ContextResult<anyhow::Result<()>>;
     fn compute_solution(&self, settings: &BenchmarkSettings, nonce: u64, wasm_vm_config: &WasmVMConfig) -> ContextResult<anyhow::Result<OutputData>>;
   
-    fn notify_add_new_block(&self);
+    fn notify_add_new_block(&self) -> ContextResult<String>;
+
+    //add_
+    fn add_precommit(&self, settings: &BenchmarkSettings, details: &PrecommitDetails) -> ContextResult<String>;
 
     // PlayersContract functions
     fn get_player_deposit(&self, eth_block_num: &String, player_id: &String) -> ContextResult<Option<PreciseNumber>>;
-
+    
+    fn get_player_state(&self, player_id: &String)      -> ContextResult<Option<&PlayerState>>;
+    fn get_player_state_mut(&self, player_id: &String)  -> ContextResult<Option<&mut PlayerState>>;
 
     // BlocksStore functions
     fn get_block_details(&self, block_id: &String)  -> Option<&BlockDetails>;

@@ -92,7 +92,7 @@ impl<T: Context> ChallengeContract<T>
                 .into_inner()
                 .unwrap();
 
-            for challenge in cache.active_challenges.write().unwrap().values_mut() 
+            cache.active_challenges.write().unwrap().par_iter().for_each(|(challenge_id, challenge)|
             {
                 let max_threshold       = u32::MAX as f64;
                 let current_threshold   = match cache.prev_challenges.read().unwrap().get(&challenge.id)
@@ -116,13 +116,21 @@ impl<T: Context> ChallengeContract<T>
                 };
 
                 let threshold_decay = config.solution_signature.threshold_decay.unwrap_or(0.99);
-                let block_data      = challenge.block_data.as_mut().unwrap();
-                
+                //let block_data      = challenge.block_data.as_mut().unwrap();
+                /*
                 block_data.solution_signature_threshold = Some(
                     (current_threshold * threshold_decay + target_threshold * (1.0 - threshold_decay))
                         .clamp(0.0, max_threshold) as u32,
                 );
-            }
+                */
+
+                cache
+                    .commit_challenges_solution_sig_thresholds.write().unwrap()
+                    .insert(
+                        challenge_id.clone(), 
+                        (current_threshold * threshold_decay + target_threshold * (1.0 - threshold_decay)).clamp(0.0, max_threshold) as u32
+                    );
+            });
         }
 
         // update fees
@@ -149,7 +157,7 @@ impl<T: Context> ChallengeContract<T>
             let one                     = PreciseNumber::from(1);
             let zero                    = PreciseNumber::from(0);
 
-            for challenge in cache.active_challenges.write().unwrap().values_mut() 
+            cache.active_challenges.read().unwrap().par_iter().for_each(|(challenge_id, challenge)|
             {
                 let num_precommits = PreciseNumber::from(
                     num_precommits_by_challenge
@@ -194,10 +202,15 @@ impl<T: Context> ChallengeContract<T>
                     base_fee = *min_base_fee;
                 }
 
+                /*
                 let block_data = challenge.block_data.as_mut().unwrap();
                 block_data.base_fee = Some(base_fee);
-                block_data.per_nonce_fee = Some(min_per_nonce_fee.clone());
-            }
+                block_data.per_nonce_fee = Some(min_per_nonce_fee.clone());*/
+
+                cache
+                    .commit_challenges_fees.write().unwrap()
+                    .insert(challenge.id.clone(), (base_fee, min_per_nonce_fee.clone()));
+            });
         }
     }
 }

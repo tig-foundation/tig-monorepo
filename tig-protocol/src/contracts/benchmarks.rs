@@ -31,7 +31,8 @@ pub struct BenchmarkContract<T: Context>
     phantom: PhantomData<T>,
 }   
 
-impl<T: Context> BenchmarkContract<T> {
+impl<T: Context> BenchmarkContract<T> 
+{
     pub fn new()                        -> Self
     {
         return Self { phantom: PhantomData };
@@ -158,6 +159,30 @@ impl<T: Context> BenchmarkContract<T> {
             fee_paid                        : Some(fee_paid),
         }).await
         .unwrap_or_else(|e| panic!("add_precommit_to_mempool error: {:?}", e));*/
+
+        let result = ctx.add_precommit(settings, &PrecommitDetails 
+        {
+            block_started                   : benchmark_block_details.height,
+            num_nonces                      : Some(num_nonces),
+            fee_paid                        : Some(fee_paid),
+        });
+
+        if result.is_err()
+        {
+            panic!("add_precommit error: {:?}", result.err().unwrap());
+        }
+
+        /*ctx.get_player_state_mut(&player.id).unwrap().add_precommit(settings, &PrecommitDetails 
+        {
+            block_started                   : benchmark_block_details.height,
+            num_nonces                      : Some(num_nonces),
+            fee_paid                        : Some(fee_paid),
+        });*/
+
+        // add_precommit 
+        // get_player_state_mut
+        // add precommit to player state
+        // 
         
         return Ok(String::new());    
     }

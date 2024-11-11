@@ -37,23 +37,38 @@ use
 
 pub struct AddBlockCache 
 {
-    pub mempool_challenges:     RwLock<Vec<Challenge>>,
-    pub mempool_algorithms:     RwLock<Vec<Algorithm>>,
-    pub mempool_benchmarks:     RwLock<Vec<Benchmark>>,
-    pub mempool_precommits:     RwLock<Vec<Precommit>>,
-    pub mempool_proofs:         RwLock<Vec<Proof>>,
-    pub mempool_frauds:         RwLock<Vec<Fraud>>,
-    pub mempool_topups:         RwLock<Vec<TopUp>>,
-    pub mempool_wasms:          RwLock<Vec<Wasm>>,
-    pub confirmed_precommits:   RwLock<HashMap<String, Precommit>>,
-    pub active_challenges:      RwLock<HashMap<String, Challenge>>,
-    pub active_algorithms:      RwLock<HashMap<String, Algorithm>>,
-    pub active_solutions:       RwLock<HashMap<String, (BenchmarkSettings, u32)>>,
-    pub active_players:         RwLock<HashMap<String, Player>>,
-    pub active_fee_players:     RwLock<HashMap<String, Player>>,
-    pub prev_challenges:        RwLock<HashMap<String, Challenge>>,
-    pub prev_algorithms:        RwLock<HashMap<String, Algorithm>>,
-    pub prev_players:           RwLock<HashMap<String, Player>>,
+    pub mempool_challenges:             RwLock<Vec<Challenge>>,
+    pub mempool_algorithms:             RwLock<Vec<Algorithm>>,
+    pub mempool_benchmarks:             RwLock<Vec<Benchmark>>,
+    pub mempool_precommits:             RwLock<Vec<Precommit>>,
+    pub mempool_proofs:                 RwLock<Vec<Proof>>,
+    pub mempool_frauds:                 RwLock<Vec<Fraud>>,
+    pub mempool_topups:                 RwLock<Vec<TopUp>>,
+    pub mempool_wasms:                  RwLock<Vec<Wasm>>,
+    pub confirmed_precommits:           RwLock<HashMap<String, Precommit>>,
+    pub active_challenges:              RwLock<HashMap<String, Challenge>>,
+    pub active_algorithms:              RwLock<HashMap<String, Algorithm>>,
+    pub active_solutions:               RwLock<HashMap<String, (BenchmarkSettings, u32)>>,
+    pub active_players:                 RwLock<HashMap<String, Player>>,
+    pub active_fee_players:             RwLock<HashMap<String, Player>>,
+    pub prev_challenges:                RwLock<HashMap<String, Challenge>>,
+    pub prev_algorithms:                RwLock<HashMap<String, Algorithm>>,
+    pub prev_players:                   RwLock<HashMap<String, Player>>,
+    // new fields we use to keep track of data to commit    
+    pub commit_algorithms_adoption:                 RwLock<HashMap<String, (String, PreciseNumber)>>, // (challenge_id, (algorithm_id, adoption))
+    pub commit_algorithms_merge_points:             RwLock<HashMap<String, u32>>,                    // (challenge_id, (algorithm_id, merge_points))
+    pub commit_algorithms_merges:                   RwLock<HashMap<String, u32>>,                   // (challenge_id, algorithm_id)
+
+    pub commit_challenges_solution_sig_thresholds:  RwLock<HashMap<String, u32>>,                            // (challenge_id, threshold)
+    pub commit_challenges_fees:                     RwLock<HashMap<String, (PreciseNumber, PreciseNumber)>>, // (challenge_id, (base_fee, per_nonce_fee))
+
+    pub commit_innovator_rewards:                   RwLock<HashMap<String, (String, PreciseNumber)>>,     // (challenge_id, reward)
+    pub commit_benchmarker_rewards:                 RwLock<HashMap<String, PreciseNumber>>,               // (player_id, reward)
+
+    pub commit_opow_cutoffs:                        RwLock<HashMap<String, u32>>,                           // acitve players[player_id].cutoff 
+    pub commit_opow_add_qualifiers:                 RwLock<HashMap<String, (String, String, u32, Point)>>, // (challenge_id, algorithm_id, num_qualifiers, difficulty)
+    pub commit_opow_frontiers:                      RwLock<HashMap<String, (Frontier, f64, Frontier)>>,     // (base_frontier, scaling_factor, scaled_frontier)
+    pub commit_opow_influence:                      RwLock<HashMap<String, PreciseNumber>>,                 // (player_id, influence)
 }
 
 
@@ -117,6 +132,21 @@ async fn setup_cache<T: Context>(
         prev_challenges                 : RwLock::new(HashMap::new()),
         prev_algorithms                 : RwLock::new(HashMap::new()),
         active_players                  : RwLock::new(HashMap::new()),
+        // new fields
+        commit_algorithms_adoption                  : RwLock::new(HashMap::new()),
+        commit_algorithms_merge_points              : RwLock::new(HashMap::new()),
+        commit_algorithms_merges                    : RwLock::new(HashMap::new()),
+
+        commit_challenges_solution_sig_thresholds   : RwLock::new(HashMap::new()),
+        commit_challenges_fees                      : RwLock::new(HashMap::new()),
+
+        commit_innovator_rewards                    : RwLock::new(HashMap::new()),
+        commit_benchmarker_rewards                  : RwLock::new(HashMap::new()),
+
+        commit_opow_cutoffs                         : RwLock::new(HashMap::new()),
+        commit_opow_add_qualifiers                  : RwLock::new(HashMap::new()),
+        commit_opow_frontiers                       : RwLock::new(HashMap::new()),
+        commit_opow_influence                       : RwLock::new(HashMap::new()),
     });
 }
 
