@@ -213,4 +213,24 @@ impl<T: Context> ChallengeContract<T>
             });
         }
     }
+
+    pub fn commit_updates(&self, ctx: &T, cache: &AddBlockCache, block: &Block) -> ContractResult<()>
+    {
+        for (challenge_id, threshold) in cache.commit_challenges_solution_sig_thresholds.read().unwrap().iter()
+        {
+            let challenge_data = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
+
+            challenge_data.solution_signature_threshold = Some(*threshold);
+        }
+
+        for (challenge_id, (base_fee, per_nonce_fee)) in cache.commit_challenges_fees.read().unwrap().iter()
+        {
+            let challenge_data = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
+
+            challenge_data.base_fee         = Some(*base_fee);
+            challenge_data.per_nonce_fee    = Some(*per_nonce_fee);
+        }
+
+        Ok(())
+    }
 }

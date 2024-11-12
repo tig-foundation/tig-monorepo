@@ -162,9 +162,9 @@ impl<T: Context> BenchmarkContract<T>
 
         let result = ctx.add_precommit(settings, &PrecommitDetails 
         {
-            block_started                   : benchmark_block_details.height,
-            num_nonces                      : Some(num_nonces),
-            fee_paid                        : Some(fee_paid),
+            block_started   : benchmark_block_details.height,
+            num_nonces      : Some(num_nonces),
+            fee_paid        : Some(fee_paid),
         });
 
         if result.is_err()
@@ -172,18 +172,14 @@ impl<T: Context> BenchmarkContract<T>
             panic!("add_precommit error: {:?}", result.err().unwrap());
         }
 
-        /*ctx.get_player_state_mut(&player.id).unwrap().add_precommit(settings, &PrecommitDetails 
+        // subtract fee from player state
         {
-            block_started                   : benchmark_block_details.height,
-            num_nonces                      : Some(num_nonces),
-            fee_paid                        : Some(fee_paid),
-        });*/
+            let player_state = ctx.get_player_state_mut(&player.id).unwrap();
 
-        // add_precommit 
-        // get_player_state_mut
-        // add precommit to player state
-        // 
-        
+            *player_state.available_fee_balance.as_mut().unwrap()   -= fee_paid;
+            *player_state.total_fees_paid.as_mut().unwrap()         += fee_paid;
+        }
+
         return Ok(String::new());    
     }
 
@@ -226,6 +222,14 @@ impl<T: Context> BenchmarkContract<T>
 
         // TODO: Add benchmark to mempool using appropriate context method
         // ctx.add_benchmark_to_mempool(benchmark_id, merkle_root, solution_nonces)?;
+
+        let result = ctx.add_benchmark(benchmark_id, merkle_root, solution_nonces);
+        if result.is_err()
+        {
+            panic!("add_benchmark error: {:?}", result.err().unwrap());
+        }
+
+        
 
         return Ok(());
     }

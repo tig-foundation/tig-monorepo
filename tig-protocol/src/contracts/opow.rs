@@ -451,8 +451,46 @@ impl<T: Context> OPoWContract<T>
         }
     }
 
-    pub fn commit_data(&self, ctx: &T, cache: &AddBlockCache, block: &Block)
+    pub fn commit_updates(&self, ctx: &T, cache: &AddBlockCache, block: &Block) -> ContractResult<()>
     {
-        
+        // commit cutoffs
+        for (player_id, cutoff) in cache.commit_opow_cutoffs.read().unwrap().iter()
+        {
+            let player_data     = ctx.get_player_block_data_mut(player_id).unwrap();
+
+            player_data.cutoff  = Some(*cutoff);
+        }
+
+        // commit qualifiers
+        for (challenge_id, (algorithm_id, player_id, num_qualifiers, difficulty)) in cache.commit_opow_add_qualifiers.read().unwrap().iter()
+        {
+            let algorithm_data  = ctx.get_algorithm_data_mut(algorithm_id, &block.id).unwrap();
+            let player_data     = ctx.get_player_block_data_mut(player_id).unwrap();
+            let challenge_data  = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
+
+            algorithm_data.num_qualifiers_by_player.as_mut().unwrap().insert(player_id.to_owned(), *num_qualifiers);
+            player_data.num_qualifiers_by_challenge.as_mut().unwrap().insert(challenge_id.to_owned(), *num_qualifiers);
+            challenge_data.qualifier_difficulties.as_mut().unwrap().insert(difficulty.to_owned());
+        }
+
+        // commit frontiers
+        for (challenge_id, (base_frontier, scaling_factor, scaled_frontier)) in cache.commit_opow_frontiers.read().unwrap().iter()
+        {
+            let challenge_data = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
+
+            challenge_data.base_frontier      = Some(base_frontier.to_owned());
+            challenge_data.scaled_frontier    = Some(scaled_frontier.to_owned());
+            challenge_data.scaling_factor     = Some(scaling_factor.to_owned());
+        }
+
+        // commit influence
+        for (player_id, influence) in cache.commit_opow_influence.read().unwrap().iter()
+        {
+            let player_data         = ctx.get_player_block_data_mut(player_id).unwrap();
+            
+            player_data.influence   = Some(influence.to_owned());
+        }
+
+        return Ok(());
     }
 }

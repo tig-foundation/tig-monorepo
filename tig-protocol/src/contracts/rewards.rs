@@ -96,7 +96,7 @@ impl<T: Context> RewardsContract<T> {
             let config      = block.config();
             let reward_pool = PreciseNumber::from_f64(block_reward) * PreciseNumber::from_f64(config.rewards.distribution.benchmarkers);
 
-            for player in cache.active_players.read().unwrap().values() 
+            /*for player in ctx.get_active_players().iter()
             {
                 let data        = player.block_data.as_ref().unwrap();
                 let influence   = *data.influence();
@@ -106,7 +106,7 @@ impl<T: Context> RewardsContract<T> {
                     .insert(player.id.clone(), influence * reward_pool);
 
                 //data.reward     = Some(influence * reward_pool);
-            }
+            }*/
         }
     }
 }

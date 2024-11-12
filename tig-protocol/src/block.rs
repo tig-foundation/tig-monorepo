@@ -2,37 +2,22 @@ use
 {
     crate::
     {
-        ctx::Context,
-        contracts::Contracts,
-    },
-    std::
+        contracts::Contracts, ctx::Context
+    }, config::ProtocolConfig, logging_timer::time, rand::
     {
-        collections::HashMap,
-        collections::HashSet,
+        rngs::StdRng, seq::SliceRandom, Rng, SeedableRng
+    }, rayon::prelude::*, std::
+    {
+        collections::{HashMap, HashSet},
         sync::
         {
             Arc,
             RwLock,
         },
-    },
-    tig_structs::
+    }, tig_structs::
     {
-        *,
-        core::*,
-    },
-    tig_utils::
-    {
-        u64s_from_str,
-    },
-    rand::
-    {
-        Rng,
-        SeedableRng,
-        rngs::StdRng,
-        seq::SliceRandom,
-    },
-    logging_timer::time,
-    rayon::prelude::*,
+        core::*, *
+    }, tig_utils::u64s_from_str
 };
 
 pub struct AddBlockCache 
@@ -54,6 +39,9 @@ pub struct AddBlockCache
     pub prev_challenges:                RwLock<HashMap<String, Challenge>>,
     pub prev_algorithms:                RwLock<HashMap<String, Algorithm>>,
     pub prev_players:                   RwLock<HashMap<String, Player>>,
+    
+    // more optimizedf prev fields
+    //pub active_solutions:                           RwLock<Vec<(Arc<BenchmarkSettings>, u32)>>,
     // new fields we use to keep track of data to commit    
     pub commit_algorithms_adoption:                 RwLock<HashMap<String, (String, PreciseNumber)>>, // (challenge_id, (algorithm_id, adoption))
     pub commit_algorithms_merge_points:             RwLock<HashMap<String, u32>>,                    // (challenge_id, (algorithm_id, merge_points))
@@ -74,10 +62,11 @@ pub struct AddBlockCache
 
 #[time]
 pub async fn create_block<T: Context>(
-    ctx:                    &T
+    ctx:                    &T,
+    config:                 &ProtocolConfig
 )                                   -> (Block, Arc<AddBlockCache>)
 {
-    let cache                           = setup_cache(ctx).await;
+    let cache                           = setup_cache(ctx, &config).await;
     let block                           = Block 
     {
         id                              : "".to_string(),
@@ -111,9 +100,11 @@ pub async fn create_block<T: Context>(
 #[time]
 async fn setup_cache<T: Context>(
     ctx:                    &T,
+    config:                 &ProtocolConfig
 )                                   -> Arc<AddBlockCache>
 {
-    return Arc::new(AddBlockCache 
+    let latest_block = ctx.get_block_details(&ctx.get_next_block_id()).unwrap();
+    let cache = Arc::new(AddBlockCache 
     {
         mempool_challenges              : RwLock::new(vec![]),
         mempool_algorithms              : RwLock::new(vec![]),
@@ -148,356 +139,449 @@ async fn setup_cache<T: Context>(
         commit_opow_frontiers                       : RwLock::new(HashMap::new()),
         commit_opow_influence                       : RwLock::new(HashMap::new()),
     });
-}
 
-/*
-#[time]
-pub async fn add_block<T: Context + std::marker::Send + std::marker::Sync>(
-    ctx:                    Arc<RwLock<T>>,
-    contracts:              Arc<Contracts<T>>,
-)                                   -> String
-{
-    let (mut block, mut cache)          = create_block(&Arc::into_inner(ctx.clone()).unwrap()).await;
-
-    // notify ctx
-    ctx.read().unwrap().notify_new_block();
-
-    // confirm mempool items
-    async 
+    // grab challenges
+    // mempool
+    let mut challenges = Vec::new();
     {
-        rayon::scope(|s|
+        for challenge in ctx.get_confirmed_challenges()
         {
-            s.spawn(|_| confirm_mempool_challenges( &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_algorithms( &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_precommits( &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_benchmarks( &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_proofs(     &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_frauds(     &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_topups(     &block, &Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| confirm_mempool_wasms(      &block, &Arc::into_inner(cache.clone()).unwrap()));
-        });
-    }.await;
-
-    //update block details
-    async 
-    {
-        rayon::scope(|s|
+            if challenge
+            .state.as_ref().unwrap()
+            .round_active
+            .is_some_and(|r| r <= latest_block.round)
         {
-            //s.spawn(|_| update_deposits(&Arc::into_inner(ctx.clone()).unwrap(), &block, &mut Arc::into_inner(cache.clone()).unwrap()));
-            s.spawn(|_| update_cutoffs( &block, &mut Arc::into_inner(cache.clone()).unwrap()));
-        });
-    }.await;
-
-    // notify ctx
-    ctx.read().unwrap().block_assembled(&block);
-
-    // commit changes
-    async
-    {
-        rayon::scope(|s|
-        {
-            // commit precommits
-            s.spawn(|_|
-            {
-                for precommit in cache.mempool_precommits.write().unwrap().drain(..) 
+                let mut challenge       = challenge.clone();
+                challenge.block_data    = Some(ChallengeBlockData 
                 {
-                    futures::executor::block_on(ctx.read().unwrap().update_precommit_state(&precommit.benchmark_id, &precommit.state.unwrap()))
-                        .unwrap_or_else(|e| panic!("update_precommit_state error: {:?}", e));
-                }
-            });
+                    num_qualifiers: None,
+                    solution_signature_threshold: None,
+                    scaled_frontier: None,
+                    base_frontier: None,
+                    scaling_factor: None,
+                    qualifier_difficulties: None,
+                    base_fee: None,
+                    per_nonce_fee: None,
+                });
 
-            // commit algorithm states
-            s.spawn(|_|
-            {
-                for algorithm in cache.mempool_algorithms.write().unwrap().drain(..) 
-                {
-                    futures::executor::block_on(ctx.read().unwrap().update_algorithm_state(&algorithm.id, &algorithm.state.unwrap()))
-                        .unwrap_or_else(|e| panic!("update_algorithm_state error: {:?}", e));
-                }
-            });
-        });
-    }.await;
-
-    // notify ctx
-    ctx.read().unwrap().data_committed(&block);
-
-    return block.id;
-}
-
-#[time]
-fn confirm_mempool_challenges(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    for challenge in cache.mempool_challenges.write().unwrap().iter_mut() 
-    {
-        let state                       = challenge.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-    }
-}
-
-#[time]
-fn confirm_mempool_algorithms(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    cache.mempool_algorithms.write().unwrap().par_iter_mut().for_each(|algorithm|
-    {
-        let state                       = algorithm.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-        state.round_submitted           = Some(block.details.round);
-    });
-}
-
-#[time]
-fn confirm_mempool_precommits(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    cache.mempool_precommits.write().unwrap().par_iter_mut().for_each(|precommit|
-    {
-        let state                       = precommit.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-        state.rand_hash                 = Some(block.id.clone());
-
-        let fee_paid                    = *precommit.details.fee_paid.as_ref().unwrap();
-        
-        *cache
-            .active_fee_players.write().unwrap().get_mut(&precommit.settings.player_id).unwrap()
-            .state.as_mut().unwrap()
-            .available_fee_balance.as_mut().unwrap()   -= fee_paid;
-
-        *cache
-            .active_fee_players.write().unwrap().get_mut(&precommit.settings.player_id).unwrap()
-            .state.as_mut().unwrap()
-            .total_fees_paid.as_mut().unwrap()   -= fee_paid;
-    });
-}
-
-#[time]
-fn confirm_mempool_benchmarks(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    let config                          = block.config();
-    cache.mempool_benchmarks.write().unwrap().par_iter_mut().for_each(|benchmark|
-    {
-        let seed                        = u64s_from_str(format!("{:?}|{:?}", block.id, benchmark.id).as_str())[0];
-        let mut rng                     = StdRng::seed_from_u64(seed);
-        let mut sampled_nonces          = HashSet::new();
-        let mut solution_nonces         = benchmark.solution_nonces.as_ref().unwrap().iter().cloned().collect::<Vec<u64>>();
-
-        if solution_nonces.len() > 0 
-        {
-            solution_nonces.shuffle(&mut rng);
-            for nonce in solution_nonces
-                .iter()
-                .take(config.benchmark_submissions.max_samples)
-            {
-                sampled_nonces.insert(*nonce);
+                challenges.push(challenge);
             }
         }
+    }
 
-        let solution_nonces             = benchmark.solution_nonces.as_ref().unwrap();
-        let num_nonces                  = *cache.confirmed_precommits.read().unwrap().get(&benchmark.id).unwrap().details.num_nonces.as_ref().unwrap() as usize;
-        if num_nonces > solution_nonces.len() 
+    // grab algorithms
+    let mut algorithms: Vec<_> = Vec::new();
+    {
+        let confirmed_algorithms        = ctx.get_confirmed_algorithms();
+        let challenges_with_algorithms  = algorithms
+            .iter()
+            .filter(|a: &&Algorithm| a.state().round_pushed.is_some())
+            .map(|a| a.details.challenge_id.clone())
+            .collect::<HashSet<String>>();
+
+        for algorithm in confirmed_algorithms
         {
-            if num_nonces > solution_nonces.len() * 2 
-            {
-                // use rejection sampling
-                let stop_length         = config.benchmark_submissions.max_samples.min(num_nonces - solution_nonces.len())
-                                            + sampled_nonces.len();
-
-                while sampled_nonces.len() < stop_length 
+            let state           = algorithm.state.as_ref().unwrap();
+            let round_pushed    = *state.round_submitted()
+                + if challenges_with_algorithms.contains(&algorithm.details.challenge_id) 
                 {
-                    let nonce           = rng.gen_range(0..num_nonces as u64);
-                    if sampled_nonces.contains(&nonce) || solution_nonces.contains(&nonce) 
-                    {
-                        continue;
-                    }
+                    config.algorithm_submissions.push_delay
+                } else {
+                    1
+                };
 
-                    sampled_nonces.insert(nonce);
-                }
-            } 
-            else 
+            let wasm = ctx
+                .get_wasm_by_algorithm_id(&algorithm.id);
+
+            if latest_block.round >= *state.round_pushed.as_ref().unwrap_or(&round_pushed)
+                && wasm.is_some_and(|w| w.details.compile_success)
             {
-                let mut non_solution_nonces: Vec<u64> = (0..num_nonces as u64)
-                    .filter(|n| !solution_nonces.contains(n))
-                    .collect();
-
-                non_solution_nonces.shuffle(&mut rng);
-                for nonce in non_solution_nonces.iter().take(config.benchmark_submissions.max_samples)
+                let mut algorithm   = algorithm.clone();
+                *algorithm.block_data.as_mut().unwrap() = AlgorithmBlockData 
                 {
-                    sampled_nonces.insert(*nonce);
+                    reward: None,
+                    adoption: None,
+                    merge_points: None,
+                    num_qualifiers_by_player: None,
+                    round_earnings: None,
+                };
+
+                if algorithm.state().round_pushed.is_none() 
+                {
+                    algorithm.state.as_mut().unwrap().round_pushed = Some(round_pushed);
                 }
+
+                algorithms.push(algorithm);
             }
         }
-
-        let state = benchmark.state.as_mut().unwrap();
-        state.sampled_nonces = Some(sampled_nonces);
-        state.block_confirmed = Some(block.details.height);
-    });
-}
-
-#[time]
-fn confirm_mempool_proofs(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    cache.mempool_proofs.write().unwrap().par_iter_mut().for_each(|proof|
-    {
-        let state                       = proof.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-        state.submission_delay          = Some(block.details.height 
-                                            - cache.confirmed_precommits.read().unwrap().get(&proof.benchmark_id).unwrap().details.block_started
-        );
-    });
-}
-
-#[time]
-fn confirm_mempool_frauds(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    cache.mempool_frauds.write().unwrap().par_iter_mut().for_each(|fraud|
-    {
-        let state                       = fraud.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-    });
-}
-
-#[time]
-fn confirm_mempool_topups(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    cache.mempool_topups.write().unwrap().par_iter_mut().for_each(|topup|
-    {
-        let state                       = topup.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-
-        *cache
-            .active_fee_players.write().unwrap().get_mut(&topup.details.player_id).unwrap()
-            .state.as_mut().unwrap()
-            .available_fee_balance.as_mut().unwrap()    += topup.details.amount;
-    });
-}
-
-#[time]
-fn confirm_mempool_wasms(
-    block:                  &Block,
-    cache:                  &AddBlockCache,
-)
-{
-    cache.mempool_wasms.write().unwrap().par_iter_mut().for_each(|wasm|
-    {
-        let state                       = wasm.state.as_mut().unwrap();
-        state.block_confirmed           = Some(block.details.height);
-    });
-}
-
-/*
-#[time]
-fn update_deposits<T: Context + std::marker::Send + std::marker::Sync>(
-    ctx:                    &RwLock<T>,
-    block:                  &Block,
-    cache:                  &mut AddBlockCache,
-)
-{
-    let decay                           = match &block.config().optimisable_proof_of_work.rolling_deposit_decay
-    {
-        Some(decay)                     => PreciseNumber::from_f64(*decay),
-        None                            => return, // Proof of deposit not implemented for these blocks
-    };
-
-    let eth_block_num                   = block.details.eth_block_num();
-    let zero                            = PreciseNumber::from(0);
-    let one                             = PreciseNumber::from(1);
-    cache.active_fee_players.write().unwrap().par_iter_mut().for_each(|(player_id, player)|
-    {
-        let rolling_deposit             = match &cache.prev_players.read().unwrap().get(player_id).unwrap().block_data 
-        {
-            Some(data)                  => data.rolling_deposit,
-            None                        => None,
-        }
-        .unwrap_or_else(|| zero);
-
-        let data                        = player.block_data.as_mut().unwrap();
-        let deposit                     = futures::executor::block_on(ctx.read().unwrap().get_player_deposit(eth_block_num, player_id))
-                                            .unwrap_or_else(|| zero);
-
-        data.rolling_deposit            = Some(decay * rolling_deposit + (one - decay) * deposit);
-        data.deposit                    = Some(deposit);
-        data.qualifying_percent_rolling_deposit = Some(zero);
-    });
-}
-*/
-
-#[time]
-fn update_cutoffs(
-    block:                  &Block,
-    cache:                  &mut AddBlockCache,
-)
-{
-    let config                          = block.config();
-    let mut phase_in_challenge_ids      = HashSet::<String>::new();
-    phase_in_challenge_ids              = cache.active_challenges.read().unwrap().keys().cloned().collect();
-
-    for algorithm in cache.active_algorithms.read().unwrap().values()
-    {
-        if algorithm.state().round_pushed.is_some_and(|r| r + 1 <= block.details.round)
-        {
-            phase_in_challenge_ids.remove(&algorithm.details.challenge_id);
-        }
     }
 
-    let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for (settings, num_solutions) in cache.active_solutions.read().unwrap().values() 
+    // grab precommits
+    let mut confirmed_precommits: HashMap<String, Precommit> = HashMap::new();
+    //for precommit in ctx.get_confirmed_precommits()
     {
-        *num_solutions_by_player_by_challenge
-            .entry(settings.player_id.clone()).or_default()
-            .entry(settings.challenge_id.clone()).or_default()         
-                                        += *num_solutions;
+    //    confirmed_precommits.insert(precommit.benchmark_id.clone(), precommit);
     }
 
-    num_solutions_by_player_by_challenge.par_iter().for_each(|(player_id, num_solutions_by_challenge)|
+    // grab solutions
+    let mut solutions = HashMap::new();
     {
-        let phase_in_start              = (block.details.round - 1) * config.rounds.blocks_per_round;
-        let phase_in_period             = config.qualifiers.cutoff_phase_in_period.unwrap();
-        let phase_in_end                = phase_in_start + phase_in_period;
-        let min_cutoff                  = config.qualifiers.min_cutoff.unwrap();
-        let min_num_solutions           = cache.active_challenges.read().unwrap().keys()
-            .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0))
-            .min().unwrap();
-
-        let mut cutoff                  = min_cutoff.max((*min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32);
-        if phase_in_challenge_ids.len() > 0 && phase_in_end > block.details.height 
+        for proof in ctx.get_confirmed_proofs_by_height_started(0)
         {
-            let phase_in_min_num_solutions = cache
-                .active_challenges.read().unwrap()
-                .keys().filter(|&id| !phase_in_challenge_ids.contains(id))
-                .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0))
-                .min().unwrap();
+            let benchmark_id = &proof.benchmark_id;
+            let fraud = ctx
+                .get_frauds_by_benchmark_id(benchmark_id)
+                .pop();
 
-            let phase_in_cutoff         = min_cutoff.max(
-                (*phase_in_min_num_solutions as f64 * config.qualifiers.cutoff_multiplier).ceil() as u32
+            if fraud.is_some_and(|f| f.state.is_some()) 
+            {
+                continue;
+            }
+            
+            let state               = proof.state();
+            let submission_delay    = *state.submission_delay();
+            let block_confirmed     = *state.block_confirmed();
+            let block_active        = block_confirmed
+                                        + (submission_delay as f64 * config.benchmark_submissions.submission_delay_multiplier) as u32;
+
+            if block_active > latest_block.height 
+            {
+                continue;
+            }
+
+            let benchmark_details = ctx
+                .get_benchmark_details(benchmark_id)
+                .unwrap();
+
+            if benchmark_details.num_solutions == 0 
+            {
+                continue;
+            }
+
+            let settings = &confirmed_precommits[benchmark_id].settings;
+            solutions.insert(
+                benchmark_id.clone(),
+                (settings.clone(), benchmark_details.num_solutions),
             );
-
-            let phase_in_weight         = (phase_in_end - block.details.height) as f64 / phase_in_period as f64;
-            cutoff                      = (phase_in_cutoff as f64 * phase_in_weight + cutoff as f64 * (1.0 - phase_in_weight)) as u32;
         }
+    }
+    
+    /*
+    let from_block_started = details
+        .height
+        .saturating_sub(config.benchmark_submissions.lifespan_period);
+    let mut confirmed_precommits = HashMap::new();
+    for precommit in ctx
+        .get_precommits(PrecommitsFilter::Confirmed { from_block_started })
+        .await
+        .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
+    {
+        confirmed_precommits.insert(precommit.benchmark_id.clone(), precommit);
+    }
+    let mut mempool_challenges = Vec::new();
+    for mut challenge in ctx
+        .get_challenges(ChallengesFilter::Mempool, None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+    {
+        challenge.state = Some(ChallengeState {
+            block_confirmed: None,
+            round_active: None,
+        });
+        mempool_challenges.push(challenge);
+    }
+    let mut mempool_algorithms = Vec::new();
+    for mut algorithm in ctx
+        .get_algorithms(AlgorithmsFilter::Mempool, None, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e))
+    {
+        algorithm.state = Some(AlgorithmState {
+            block_confirmed: None,
+            round_submitted: None,
+            round_pushed: None,
+            round_merged: None,
+            banned: false,
+        });
+        mempool_algorithms.push(algorithm);
+    }
+    let mut mempool_benchmarks = Vec::new();
+    for mut benchmark in ctx
+        .get_benchmarks(BenchmarksFilter::Mempool { from_block_started }, true)
+        .await
+        .unwrap_or_else(|e| panic!("get_benchmarks error: {:?}", e))
+    {
+        if !confirmed_precommits.contains_key(&benchmark.id) {
+            continue;
+        }
+        benchmark.state = Some(BenchmarkState {
+            block_confirmed: None,
+            sampled_nonces: None,
+        });
+        mempool_benchmarks.push(benchmark);
+    }
+    let mut mempool_precommits = Vec::new();
+    for mut precommit in ctx
+        .get_precommits(PrecommitsFilter::Mempool { from_block_started })
+        .await
+        .unwrap_or_else(|e| panic!("get_precommits error: {:?}", e))
+    {
+        precommit.state = Some(PrecommitState {
+            block_confirmed: None,
+            rand_hash: None,
+        });
+        mempool_precommits.push(precommit);
+    }
+    let mut mempool_proofs = Vec::new();
+    for mut proof in ctx
+        .get_proofs(ProofsFilter::Mempool { from_block_started }, false)
+        .await
+        .unwrap_or_else(|e| panic!("mempool_proofs error: {:?}", e))
+    {
+        if !confirmed_precommits.contains_key(&proof.benchmark_id) {
+            continue;
+        }
+        proof.state = Some(ProofState {
+            block_confirmed: None,
+            submission_delay: None,
+        });
+        mempool_proofs.push(proof);
+    }
+    let mut mempool_frauds = Vec::new();
+    for mut fraud in ctx
+        .get_frauds(FraudsFilter::Mempool { from_block_started }, false)
+        .await
+        .unwrap_or_else(|e| panic!("mempool_frauds error: {:?}", e))
+    {
+        if !confirmed_precommits.contains_key(&fraud.benchmark_id) {
+            continue;
+        }
+        fraud.state = Some(FraudState {
+            block_confirmed: None,
+        });
+        mempool_frauds.push(fraud);
+    }
+    let mut mempool_topups = Vec::new();
+    for mut topup in ctx
+        .get_topups(TopUpsFilter::Mempool)
+        .await
+        .unwrap_or_else(|e| panic!("get_topups error: {:?}", e))
+    {
+        topup.state = Some(TopUpState {
+            block_confirmed: None,
+        });
+        mempool_topups.push(topup);
+    }
+    let mut mempool_wasms = Vec::new();
+    for mut wasm in ctx
+        .get_wasms(WasmsFilter::Mempool)
+        .await
+        .unwrap_or_else(|e| panic!("mempool_wasms error: {:?}", e))
+    {
+        wasm.state = Some(WasmState {
+            block_confirmed: None,
+        });
+        mempool_wasms.push(wasm);
+    }
+    let mut active_challenges = HashMap::new();
+    for mut challenge in ctx
+        .get_challenges(ChallengesFilter::Confirmed, None)
+        .await
+        .unwrap_or_else(|e| panic!("get_challenges error: {:?}", e))
+    {
+        if challenge
+            .state
+            .as_ref()
+            .unwrap()
+            .round_active
+            .is_some_and(|r| r <= details.round)
+        {
+            challenge.block_data = Some(ChallengeBlockData {
+                num_qualifiers: None,
+                solution_signature_threshold: None,
+                scaled_frontier: None,
+                base_frontier: None,
+                scaling_factor: None,
+                qualifier_difficulties: None,
+                base_fee: None,
+                per_nonce_fee: None,
+            });
+            active_challenges.insert(challenge.id.clone(), challenge);
+        }
+    }
+    let algorithms = ctx
+        .get_algorithms(AlgorithmsFilter::Confirmed, None, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_algorithms error: {:?}", e));
+    let challenges_with_algorithms = algorithms
+        .iter()
+        .filter(|a| a.state().round_pushed.is_some())
+        .map(|a| a.details.challenge_id.clone())
+        .collect::<HashSet<String>>();
+    let mut active_algorithms = HashMap::new(); // FIXME round_pushed 1 for new challenges
+    for mut algorithm in algorithms {
+        let state = algorithm.state.as_mut().unwrap();
+        let round_pushed = *state.round_submitted()
+            + if challenges_with_algorithms.contains(&algorithm.details.challenge_id) {
+                config.algorithm_submissions.push_delay
+            } else {
+                1
+            };
+        let wasm = ctx
+            .get_wasms(WasmsFilter::AlgorithmId(algorithm.id.clone()))
+            .await
+            .unwrap_or_else(|e| panic!("get_wasms error: {:?}", e));
+        if details.round >= *state.round_pushed.as_ref().unwrap_or(&round_pushed)
+            && wasm.first().is_some_and(|w| w.details.compile_success)
+        {
+            algorithm.block_data = Some(AlgorithmBlockData {
+                reward: None,
+                adoption: None,
+                merge_points: None,
+                num_qualifiers_by_player: None,
+                round_earnings: None,
+            });
+            if state.round_pushed.is_none() {
+                state.round_pushed = Some(round_pushed);
+            }
+            active_algorithms.insert(algorithm.id.clone(), algorithm);
+        }
+    }
+    let mut active_solutions = HashMap::new();
+    for proof in ctx
+        .get_proofs(ProofsFilter::Confirmed { from_block_started }, false)
+        .await
+        .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
+    {
+        let benchmark_id = &proof.benchmark_id;
+        let fraud = ctx
+            .get_frauds(FraudsFilter::BenchmarkId(benchmark_id.clone()), false)
+            .await
+            .unwrap_or_else(|e| panic!("get_frauds error: {:?}", e))
+            .pop();
+        if fraud.is_some_and(|f| f.state.is_some()) {
+            continue;
+        }
+        let state = proof.state();
+        let submission_delay = *state.submission_delay();
+        let block_confirmed = *state.block_confirmed();
+        let block_active = block_confirmed
+            + (submission_delay as f64 * config.benchmark_submissions.submission_delay_multiplier)
+                as u32;
+        if block_active > details.height {
+            continue;
+        }
+        let benchmark = ctx
+            .get_benchmarks(BenchmarksFilter::Id(benchmark_id.clone()), false)
+            .await
+            .unwrap_or_else(|e| panic!("get_proofs error: {:?}", e))
+            .pop()
+            .unwrap();
+        if benchmark.details.num_solutions == 0 {
+            continue;
+        }
+        let settings = &confirmed_precommits[benchmark_id].settings;
+        active_solutions.insert(
+            benchmark_id.clone(),
+            (settings.clone(), benchmark.details.num_solutions),
+        );
+    }
+    let mut active_players = HashMap::new();
+    for (settings, _) in active_solutions.values() {
+        let mut player = ctx
+            .get_players(PlayersFilter::Id(settings.player_id.clone()), None)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        player.block_data = Some(PlayerBlockData {
+            reward: None,
+            influence: None,
+            cutoff: None,
+            imbalance: None,
+            imbalance_penalty: None,
+            num_qualifiers_by_challenge: None,
+            round_earnings: None,
+            deposit: None,
+            rolling_deposit: None,
+            qualifying_percent_rolling_deposit: None,
+        });
+        active_players.insert(player.id.clone(), player);
+    }
+    let mut active_fee_players = HashMap::new();
+    for topup in mempool_topups.iter() {
+        let mut player = ctx
+            .get_players(PlayersFilter::Id(topup.details.player_id.clone()), None)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        if player.state.is_none() {
+            player.state = Some(PlayerState {
+                total_fees_paid: Some(PreciseNumber::from(0)),
+                available_fee_balance: Some(PreciseNumber::from(0)),
+            });
+        }
+        active_fee_players.insert(player.id.clone(), player);
+    }
+    for precommit in mempool_precommits.iter() {
+        let mut player = ctx
+            .get_players(
+                PlayersFilter::Id(precommit.settings.player_id.clone()),
+                None,
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        if player.state.is_none() {
+            player.state = Some(PlayerState {
+                total_fees_paid: Some(PreciseNumber::from(0)),
+                available_fee_balance: Some(PreciseNumber::from(0)),
+            });
+        }
+        active_fee_players.insert(player.id.clone(), player);
+    }
+    let mut prev_players = HashMap::<String, Player>::new();
+    for player_id in active_players.keys() {
+        let player = ctx
+            .get_players(
+                PlayersFilter::Id(player_id.clone()),
+                Some(BlockFilter::Id(details.prev_block_id.clone())),
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        prev_players.insert(player.id.clone(), player);
+    }
+    let mut prev_algorithms = HashMap::<String, Algorithm>::new();
+    for algorithm_id in active_algorithms.keys() {
+        let algorithm = ctx
+            .get_algorithms(
+                AlgorithmsFilter::Id(algorithm_id.clone()),
+                Some(BlockFilter::Id(details.prev_block_id.clone())),
+                false,
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        prev_algorithms.insert(algorithm_id.clone(), algorithm);
+    }
+    let mut prev_challenges = HashMap::<String, Challenge>::new();
+    for challenge_id in active_challenges.keys() {
+        let challenge = ctx
+            .get_challenges(
+                ChallengesFilter::Id(challenge_id.clone()),
+                Some(BlockFilter::Id(details.prev_block_id.clone())),
+            )
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        prev_challenges.insert(challenge_id.clone(), challenge);
+    }*/
 
-        cache.active_players.write().unwrap()
-            .get_mut(player_id).unwrap()
-            .block_data.as_mut().unwrap()
-            .cutoff                     = Some(cutoff);
-    });
+    return cache;
 }
-*/

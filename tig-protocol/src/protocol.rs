@@ -87,7 +87,7 @@ impl<T: Context + std::marker::Sync + std::marker::Send> Protocol<T>
     pub async fn add_block(&self) -> String 
     {
         let curr_block_id           = self.ctx.notify_add_new_block().unwrap(); // block waiting to be confirmed
-        let (mut block, mut cache)  = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap()).await;
+        let (mut block, mut cache)  = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap(), &self.ctx.get_config()).await;
 
         self.contracts.opow.update(&cache, &block);
         rayon::scope(|s| 
@@ -101,7 +101,9 @@ impl<T: Context + std::marker::Sync + std::marker::Send> Protocol<T>
         });
         self.contracts.rewards.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block);
         
-        // apply data
+        // commit data
+        let _ = self.contracts.opow.commit_updates(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block).unwrap();
+        let _ = self.contracts.challenge.commit_updates(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block).unwrap();
 
         return block.id;
     }
