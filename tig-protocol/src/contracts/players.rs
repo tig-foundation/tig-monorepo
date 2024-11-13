@@ -113,6 +113,52 @@ impl<T: Context> PlayerContract<T> {
         return ();
     }
 
+    pub fn submit_vote(&self, ctx: &T, player: &Player, breakthrough_id: Option<&String>, yes: bool) -> ContractResult<()> 
+    {
+        if ctx.get_breakthrough_details(breakthrough_id.unwrap()).is_none() 
+        {
+            return Err(format!("Breakthrough {} not found", breakthrough_id.unwrap()));
+        }
+
+        let curr_round  = ctx.get_block_details(ctx.get_next_block_id()).unwrap().round;
+        let config      = ctx.get_block_config(ctx.get_next_block_id()).unwrap();
+
+        let breakthrough_state = ctx.get_breakthrough_state(breakthrough_id.unwrap()).unwrap();
+        if breakthrough_state.round_pushed.is_none() || curr_round >= breakthrough_state.round_pushed.unwrap() &&
+            curr_round < breakthrough_state.round_pushed.unwrap() + config.breakthroughs.vote_period_rounds
+        {
+            return Err(format!("Breakthrough {} not in voting period", breakthrough_id.unwrap()));
+        }
+        
+        let player_state = ctx.get_player_state(&player.id).unwrap();
+        if player_state.votes.contains_key(breakthrough_id.unwrap())
+        {
+            return Err(format!("Player {} has already voted for {}", player.id, breakthrough_id.unwrap()));
+        }
+
+        let eligible_round      = breakthrough_state.round_pushed.unwrap() + config.breakthroughs.min_lock_period_to_vote;
+        let player_block_data   = ctx.get_player_block_data(&player.id).unwrap();
+        let mut total_deposit   = PreciseNumber::from(0);
+        for (round, deposit) in player_block_data.deposit_by_rounds.iter()
+        {
+            if *round >= eligible_round
+            {
+                total_deposit += deposit;
+            }
+        } 
+
+        let result = ctx.add_vote(breakthrough_id.unwrap(), &player.id, yes);
+        if result.is_err()
+        {
+            panic!("Failed to add vote: {}", result.err().unwrap());
+        }
+
+        ctx.get_player_state_mut(&player.id).unwrap().votes.insert(breakthrough_id.unwrap().to_string(), yes);
+        //vote fee stuff
+
+        return Ok(());
+    }
+
     /*
     submit_vote (player, breakthrough_id, yes/no)
     {
@@ -133,6 +179,24 @@ impl<T: Context> PlayerContract<T> {
     }
     */
 
+    pub fn submit_delegate(&self, ctx: &T, player: &Player, delegatee: &String) -> ContractResult<()>
+    {
+        let player_block_data = ctx.get_player_block_data(&player.id).unwrap();
+        for (round, deposit) in player_block_data.deposit_by_rounds.iter()
+        {
+            if *deposit > 0
+            {
+                break;
+            }
+        }
+
+        //ctx.get_player_state(player_id).unwrap().
+
+        //ctx.get_player_state_mut(&player.id).unwrap().delegatee = delegatee.to_string();
+
+        return Ok(());
+    }
+
     /*
     submit_delegate(player, delegatee)
     {
@@ -141,6 +205,11 @@ impl<T: Context> PlayerContract<T> {
         update player_state.delegatee
     }
     */
+
+    pub fn update_eth(&self, ctx: &T, player: &Player) -> ContractResult<()>
+    {
+        return Ok(());
+    }
 
     /*
     update_eth() {

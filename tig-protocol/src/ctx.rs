@@ -19,6 +19,8 @@ pub trait Context
     fn add_precommit(&self, settings: &BenchmarkSettings, details: &PrecommitDetails) -> ContextResult<String>;
     fn add_benchmark(&self, benchmark_id: &String, merkle_root: &MerkleHash, solution_nonces: &HashSet<u64>) -> ContextResult<String>;
 
+    fn add_vote(&self, breakthrough_id: &String, player_id: &String, yes: bool) -> ContextResult<String>;
+
     // PlayersContract functions
     fn get_player_deposit(&self, eth_block_num: &String, player_id: &String) -> ContextResult<Option<PreciseNumber>>;
     
@@ -33,7 +35,6 @@ pub trait Context
     fn get_block_data(&self, block_id: &String)     -> Option<&BlockData>;
     fn get_block_config(&self, block_id: &String)   -> Option<&ProtocolConfig>;
     fn get_next_block_id(&self)                     -> &String;
-
     // AlgorithmsStore functions
     fn get_algorithm_details(&self, algorithm_id: &String)                  -> Option<&AlgorithmDetails>;
     fn get_algorithm_state(&self, algorithm_id: &String, block_id: &String) -> Option<&AlgorithmState>;
@@ -84,4 +85,7 @@ pub trait Context
     fn get_wasm_state(&self, wasm_id: &String)      -> Option<&WasmState>;
 
     fn get_wasm_by_algorithm_id(&self, algorithm_id: &String) -> Option<&Wasm>;
+    // Breakthrough
+    fn get_breakthrough_details(&self, breakthrough_id: &String) -> Option<&BreakthroughDetails>;
+    fn get_breakthrough_state(&self, breakthrough_id: &String) -> Option<&BreakthroughState>;
 }
