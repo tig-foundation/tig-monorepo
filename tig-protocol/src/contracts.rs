@@ -20,17 +20,17 @@ use {
     std::sync::Arc,
 };
 
-pub struct Contracts<T: Context>
+pub struct Contracts<T: Context + Send + Sync>
 {
     pub benchmark:  BenchmarkContract<T>,
     pub challenge:  ChallengeContract<T>,
-    pub algorithm:  AlgorithmContract,
+    pub algorithm:  AlgorithmContract<T>,
     pub player:     PlayerContract<T>,
     pub opow:       OPoWContract<T>,
     pub rewards:    RewardsContract<T>,
 }
 
-impl<T: Context> Contracts<T>
+impl<T: Context + Send + Sync> Contracts<T>
 {
     pub fn new() -> Self 
     {

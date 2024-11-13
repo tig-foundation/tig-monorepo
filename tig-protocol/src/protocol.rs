@@ -11,7 +11,7 @@ use {
     tig_structs::{core::*, *},
 };
 
-pub struct Protocol<T: Context>
+pub struct Protocol<T: Context + Send + Sync>
 {
     ctx:        Arc<T>,
     contracts:  Arc<Contracts<T>>,
@@ -86,24 +86,25 @@ impl<T: Context + std::marker::Sync + std::marker::Send> Protocol<T>
 
     pub async fn add_block(&self) -> String 
     {
-        let curr_block_id           = self.ctx.notify_add_new_block().unwrap(); // block waiting to be confirmed
-        let (mut block, mut cache)  = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap(), &self.ctx.get_config()).await;
+        let curr_block_id           = self.ctx.notify_add_new_block().unwrap();
+        let prev_block_id           = self.ctx.get_prev_block_id();
 
-        self.contracts.opow.update(&cache, &block);
+        let (mut block, cache)      = crate::block::create_block(&Arc::into_inner(self.ctx.clone()).unwrap(), &self.ctx.get_config(), &curr_block_id).await;
+        block.id                    = curr_block_id;
+
+        self.contracts.opow.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block);
         rayon::scope(|s| 
         {
-            s.spawn(|_| self.contracts.algorithm.update(&cache, &block));
-            s.spawn(|_| self.contracts.challenge.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block));
-            
-            s.spawn(|_| futures::executor::block_on(
-                self.contracts.player.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block)
-            ));
+            s.spawn(|_| self.contracts.algorithm.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block, &prev_block_id));
+            s.spawn(|_| self.contracts.challenge.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block, &prev_block_id));
+            s.spawn(|_| self.contracts.player.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block, &prev_block_id));
         });
         self.contracts.rewards.update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block);
         
         // commit data
         let _ = self.contracts.opow.commit_updates(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block).unwrap();
         let _ = self.contracts.challenge.commit_updates(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block).unwrap();
+        let _ = self.contracts.algorithm.commit_update(&Arc::into_inner(self.ctx.clone()).unwrap(), &cache, &block).unwrap();
 
         return block.id;
     }

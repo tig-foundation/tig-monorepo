@@ -15,12 +15,17 @@ pub trait Context
 
     fn get_config(&self) -> &ProtocolConfig;
 
+    fn get_transaction(&self, tx_hash: &String) -> Option<&Transaction>;
+
     //add_
     fn add_precommit(&self, settings: &BenchmarkSettings, details: &PrecommitDetails) -> ContextResult<String>;
     fn add_benchmark(&self, benchmark_id: &String, merkle_root: &MerkleHash, solution_nonces: &HashSet<u64>) -> ContextResult<String>;
+    fn add_top_up(&self, tx_hash: &String, player_id: &String, amount: &PreciseNumber);
+    fn add_fraud(&self, benchmark_id: &String, fraud_message: &String);
+    fn add_algorithm(&self, details: &AlgorithmDetails, code: &String) -> ContextResult<String>;
 
     // PlayersContract functions
-    fn get_player_deposit(&self, eth_block_num: &String, player_id: &String) -> ContextResult<Option<PreciseNumber>>;
+    fn get_player_deposit(&self, eth_block_num: &String, player_id: &String) -> Option<PreciseNumber>;
     
     fn get_player_state(&self, player_id: &String)      -> Option<&PlayerState>;
     fn get_player_state_mut(&self, player_id: &String)  -> Option<&mut PlayerState>;
@@ -28,15 +33,20 @@ pub trait Context
     fn get_player_block_data(&self, player_id: &String)     -> Option<&PlayerBlockData>;
     fn get_player_block_data_mut(&self, player_id: &String) -> Option<&mut PlayerBlockData>;
 
+    fn get_player_block_data_for_block_id(&self, player_id: &String, block_id: &String) -> Option<&PlayerBlockData>;
+
     // BlocksStore functions
     fn get_block_details(&self, block_id: &String)  -> Option<&BlockDetails>;
     fn get_block_data(&self, block_id: &String)     -> Option<&BlockData>;
     fn get_block_config(&self, block_id: &String)   -> Option<&ProtocolConfig>;
-    fn get_next_block_id(&self)                     -> &String;
+    //fn get_next_block_id(&self)                     -> &String;
+    fn get_prev_block_id(&self)                     -> &String;
+    fn get_latest_block_id(&self)                   -> &String;
 
     // AlgorithmsStore functions
     fn get_algorithm_details(&self, algorithm_id: &String)                  -> Option<&AlgorithmDetails>;
     fn get_algorithm_state(&self, algorithm_id: &String, block_id: &String) -> Option<&AlgorithmState>;
+    fn get_algorithm_state_mut(&self, algorithm_id: &String, block_id: &String) -> Option<&mut AlgorithmState>;
 
     fn get_algorithm_data(&self, algorithm_id: &String, block_id: &String)      -> Option<&AlgorithmBlockData>;
     fn get_algorithm_data_mut(&self, algorithm_id: &String, block_id: &String)  -> Option<&mut AlgorithmBlockData>;
@@ -46,6 +56,8 @@ pub trait Context
     fn get_precommit_details(&self, benchmark_id: &String)      -> Option<&PrecommitDetails>;
     fn get_benchmark_settings(&self, benchmark_id: &String)     -> Option<&BenchmarkSettings>;
     fn get_precommit_state(&self, benchmark_id: &String)        -> Option<&PrecommitState>;
+    fn get_confirmed_precommits_by_height_started(&self, height: u64) -> Vec<&Precommit>;
+
     fn calc_benchmark_id(&self, settings: &BenchmarkSettings)   -> &String;
 
     // BenchmarksStore functions

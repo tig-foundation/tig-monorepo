@@ -22,23 +22,23 @@ use
 
 pub struct AddBlockCache 
 {
-    pub mempool_challenges:             RwLock<Vec<Challenge>>,
-    pub mempool_algorithms:             RwLock<Vec<Algorithm>>,
-    pub mempool_benchmarks:             RwLock<Vec<Benchmark>>,
-    pub mempool_precommits:             RwLock<Vec<Precommit>>,
-    pub mempool_proofs:                 RwLock<Vec<Proof>>,
-    pub mempool_frauds:                 RwLock<Vec<Fraud>>,
-    pub mempool_topups:                 RwLock<Vec<TopUp>>,
-    pub mempool_wasms:                  RwLock<Vec<Wasm>>,
-    pub confirmed_precommits:           RwLock<HashMap<String, Precommit>>,
-    pub active_challenges:              RwLock<HashMap<String, Challenge>>,
-    pub active_algorithms:              RwLock<HashMap<String, Algorithm>>,
-    pub active_solutions:               RwLock<HashMap<String, (BenchmarkSettings, u32)>>,
-    pub active_players:                 RwLock<HashMap<String, Player>>,
-    pub active_fee_players:             RwLock<HashMap<String, Player>>,
-    pub prev_challenges:                RwLock<HashMap<String, Challenge>>,
-    pub prev_algorithms:                RwLock<HashMap<String, Algorithm>>,
-    pub prev_players:                   RwLock<HashMap<String, Player>>,
+    //pub mempool_challenges:             RwLock<Vec<Challenge>>,
+    //pub mempool_algorithms:             RwLock<Vec<Algorithm>>,
+    //pub mempool_benchmarks:             RwLock<Vec<Benchmark>>,
+    //pub mempool_precommits:             RwLock<Vec<Precommit>>,
+    //pub mempool_proofs:                 RwLock<Vec<Proof>>,
+    //pub mempool_frauds:                 RwLock<Vec<Fraud>>,
+    //pub mempool_topups:                 RwLock<Vec<TopUp>>,
+    //pub mempool_wasms:                  RwLock<Vec<Wasm>>,
+    pub confirmed_precommits:           RwLock<HashMap<String, BenchmarkSettings>>,
+    pub active_challenges:              RwLock<HashSet<String>>,
+    pub active_algorithms:              RwLock<HashSet<String>>,
+    pub active_solutions:               RwLock<HashMap<String, u32>>,
+    pub active_players:                 RwLock<HashSet<String>>,
+    //pub active_fee_players:             RwLock<HashMap<String, Player>>,
+    //pub prev_challenges:                RwLock<HashMap<String, Challenge>>,
+    //pub prev_algorithms:                RwLock<HashMap<String, Algorithm>>,
+    //pub prev_players:                   RwLock<HashMap<String, Player>>,
     
     // more optimizedf prev fields
     //pub active_solutions:                           RwLock<Vec<(Arc<BenchmarkSettings>, u32)>>,
@@ -57,19 +57,24 @@ pub struct AddBlockCache
     pub commit_opow_add_qualifiers:                 RwLock<HashMap<String, (String, String, u32, Point)>>, // (challenge_id, algorithm_id, num_qualifiers, difficulty)
     pub commit_opow_frontiers:                      RwLock<HashMap<String, (Frontier, f64, Frontier)>>,     // (base_frontier, scaling_factor, scaled_frontier)
     pub commit_opow_influence:                      RwLock<HashMap<String, PreciseNumber>>,                 // (player_id, influence)
+    pub commit_opow_qualifying_percent_rolling_deposit: RwLock<HashMap<String, PreciseNumber>>, // (player_id, qualifying_percent_rolling_deposit)
+    pub commit_opow_player_imbalance:               RwLock<HashMap<String, (PreciseNumber, PreciseNumber)>>, // (player_id, (imbalance, imbalance_penalty))
+
+    pub commit_players_deposits:                    RwLock<HashMap<String, (PreciseNumber, PreciseNumber, PreciseNumber)>>, // (player_id, (rolling_deposit, deposit, qualifying_percent_rolling_deposit))
 }
 
 
 #[time]
 pub async fn create_block<T: Context>(
     ctx:                    &T,
-    config:                 &ProtocolConfig
+    config:                 &ProtocolConfig,
+    block_id:               &String
 )                                   -> (Block, Arc<AddBlockCache>)
 {
-    let cache                           = setup_cache(ctx, &config).await;
+    let cache                           = setup_cache(ctx, &config, &block_id).await;
     let block                           = Block 
     {
-        id                              : "".to_string(),
+        id                              : block_id.clone(),
         config                          : None,
         details                         : BlockDetails
         {
@@ -100,29 +105,30 @@ pub async fn create_block<T: Context>(
 #[time]
 async fn setup_cache<T: Context>(
     ctx:                    &T,
-    config:                 &ProtocolConfig
+    config:                 &ProtocolConfig,
+    block_id:               &String
 )                                   -> Arc<AddBlockCache>
 {
-    let latest_block = ctx.get_block_details(&ctx.get_next_block_id()).unwrap();
+    let latest_block = ctx.get_block_details(&block_id).unwrap();
     let cache = Arc::new(AddBlockCache 
     {
-        mempool_challenges              : RwLock::new(vec![]),
-        mempool_algorithms              : RwLock::new(vec![]),
-        mempool_benchmarks              : RwLock::new(vec![]),
-        mempool_precommits              : RwLock::new(vec![]),
-        mempool_proofs                  : RwLock::new(vec![]),
-        mempool_frauds                  : RwLock::new(vec![]),
-        mempool_topups                  : RwLock::new(vec![]),
-        mempool_wasms                   : RwLock::new(vec![]),
+        //mempool_challenges              : RwLock::new(vec![]),
+        //mempool_algorithms              : RwLock::new(vec![]),
+        //mempool_benchmarks              : RwLock::new(vec![]),
+        //mempool_precommits              : RwLock::new(vec![]),
+        //mempool_proofs                  : RwLock::new(vec![]),
+        //mempool_frauds                  : RwLock::new(vec![]),
+        //mempool_topups                  : RwLock::new(vec![]),
+        //mempool_wasms                   : RwLock::new(vec![]),
         confirmed_precommits            : RwLock::new(HashMap::new()),
-        active_fee_players              : RwLock::new(HashMap::new()),
-        active_challenges               : RwLock::new(HashMap::new()),
-        active_algorithms               : RwLock::new(HashMap::new()),
+        //active_fee_players              : RwLock::new(HashMap::new()),
+        active_challenges               : RwLock::new(HashSet::new()),
+        active_algorithms               : RwLock::new(HashSet::new()),
         active_solutions                : RwLock::new(HashMap::new()),
-        prev_players                    : RwLock::new(HashMap::new()),
-        prev_challenges                 : RwLock::new(HashMap::new()),
-        prev_algorithms                 : RwLock::new(HashMap::new()),
-        active_players                  : RwLock::new(HashMap::new()),
+        //prev_players                    : RwLock::new(HashMap::new()),
+        //prev_challenges                 : RwLock::new(HashMap::new()),
+        //prev_algorithms                 : RwLock::new(HashMap::new()),
+        active_players                  : RwLock::new(HashSet::new()),
         // new fields
         commit_algorithms_adoption                  : RwLock::new(HashMap::new()),
         commit_algorithms_merge_points              : RwLock::new(HashMap::new()),
@@ -138,44 +144,35 @@ async fn setup_cache<T: Context>(
         commit_opow_add_qualifiers                  : RwLock::new(HashMap::new()),
         commit_opow_frontiers                       : RwLock::new(HashMap::new()),
         commit_opow_influence                       : RwLock::new(HashMap::new()),
+        commit_opow_qualifying_percent_rolling_deposit: RwLock::new(HashMap::new()),
+        commit_opow_player_imbalance                : RwLock::new(HashMap::new()),
+
+        commit_players_deposits                     : RwLock::new(HashMap::new()),
     });
 
     // grab challenges
     // mempool
-    let mut challenges = Vec::new();
+    let mut challenges = HashSet::new();
     {
         for challenge in ctx.get_confirmed_challenges()
         {
             if challenge
-            .state.as_ref().unwrap()
-            .round_active
-            .is_some_and(|r| r <= latest_block.round)
-        {
-                let mut challenge       = challenge.clone();
-                challenge.block_data    = Some(ChallengeBlockData 
-                {
-                    num_qualifiers: None,
-                    solution_signature_threshold: None,
-                    scaled_frontier: None,
-                    base_frontier: None,
-                    scaling_factor: None,
-                    qualifier_difficulties: None,
-                    base_fee: None,
-                    per_nonce_fee: None,
-                });
-
-                challenges.push(challenge);
+                .state.as_ref().unwrap()
+                .round_active
+                .is_some_and(|r| r <= latest_block.round)
+            {
+                challenges.insert(challenge.id.clone());
             }
         }
     }
 
     // grab algorithms
-    let mut algorithms: Vec<_> = Vec::new();
+    let mut algorithms: HashSet<String> = HashSet::new();
     {
         let confirmed_algorithms        = ctx.get_confirmed_algorithms();
-        let challenges_with_algorithms  = algorithms
+        let challenges_with_algorithms  = confirmed_algorithms
             .iter()
-            .filter(|a: &&Algorithm| a.state().round_pushed.is_some())
+            .filter(|a| a.state().round_pushed.is_some())
             .map(|a| a.details.challenge_id.clone())
             .collect::<HashSet<String>>();
 
@@ -196,7 +193,7 @@ async fn setup_cache<T: Context>(
             if latest_block.round >= *state.round_pushed.as_ref().unwrap_or(&round_pushed)
                 && wasm.is_some_and(|w| w.details.compile_success)
             {
-                let mut algorithm   = algorithm.clone();
+                /*let mut algorithm   = algorithm.clone();
                 *algorithm.block_data.as_mut().unwrap() = AlgorithmBlockData 
                 {
                     reward: None,
@@ -209,18 +206,11 @@ async fn setup_cache<T: Context>(
                 if algorithm.state().round_pushed.is_none() 
                 {
                     algorithm.state.as_mut().unwrap().round_pushed = Some(round_pushed);
-                }
+                }*/
 
-                algorithms.push(algorithm);
+                algorithms.insert(algorithm.id.clone());
             }
         }
-    }
-
-    // grab precommits
-    let mut confirmed_precommits: HashMap<String, Precommit> = HashMap::new();
-    //for precommit in ctx.get_confirmed_precommits()
-    {
-    //    confirmed_precommits.insert(precommit.benchmark_id.clone(), precommit);
     }
 
     // grab solutions
@@ -258,14 +248,49 @@ async fn setup_cache<T: Context>(
                 continue;
             }
 
-            let settings = &confirmed_precommits[benchmark_id].settings;
             solutions.insert(
                 benchmark_id.clone(),
-                (settings.clone(), benchmark_details.num_solutions),
+                benchmark_details.num_solutions,
             );
         }
+
+        // grab precommits
+        let mut precommits: HashMap<String, BenchmarkSettings> = HashMap::new();
+        for precommit in ctx.get_confirmed_precommits_by_height_started(0)
+        {
+            precommits.insert(precommit.benchmark_id.clone(), precommit.settings.clone());
+        }
+
+        //grab players
+        let mut players = HashSet::new();
+        for (benchmark_id, _) in solutions.iter() 
+        {
+            players.insert(precommits[benchmark_id].player_id.clone());
+        }
+
+        /*let mut active_fee_players = HashMap::<String, PlayerState>::new();
+        for topup in topups.iter() 
+        {
+            let player_id = &topup.details.player_id;
+            let mut player_state = match ctx.get_player_state(player_id) 
+            {
+                Some(state) => state.clone(),
+                None        => PlayerState {
+                    total_fees_paid: Some(PreciseNumber::from(0)),
+                    available_fee_balance: Some(PreciseNumber::from(0))
+                }
+            };
+
+            active_fee_players.insert(player_id.clone(), player_state);
+        }*/
+
+        *cache.confirmed_precommits.write().unwrap()    = precommits;
+        *cache.active_challenges.write().unwrap()       = challenges;
+        *cache.active_algorithms.write().unwrap()       = algorithms;
+        *cache.active_solutions.write().unwrap()        = solutions;
+        *cache.active_players.write().unwrap()          = players;
     }
-    
+
     /*
     let from_block_started = details
         .height

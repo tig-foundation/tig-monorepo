@@ -58,12 +58,12 @@ impl<T: Context> BenchmarkContract<T>
             return Err("Invalid num nonces".to_string());
         }
 
-        let next_block_id               = ctx.get_next_block_id();
+        let curr_block_id               = ctx.get_latest_block_id();
         //make sure that the submission delay is within the lifespan period
         let benchmark_block_details     = ctx.get_block_details(&settings.block_id).unwrap();
         let benchmark_block             = ctx.get_block_data(&settings.block_id).expect(&format!("Expecting benchmark block to exist: {}", settings.block_id));
 
-        let latest_block_details        = ctx.get_block_details(next_block_id).unwrap();
+        let latest_block_details        = ctx.get_block_details(curr_block_id).unwrap();
 
         let config                      = ctx.get_block_config(&settings.block_id).unwrap();
         let submission_delay            = latest_block_details.height - benchmark_block_details.height + 1;
@@ -319,12 +319,10 @@ impl<T: Context> BenchmarkContract<T>
             }
         }
 
-        //add the proof to the mempool
-        //ctx.add_proof_to_mempool(benchmark_id, merkle_proofs)?;
-
-        //add fraud to the mempool if the proof is fraudulent
         if is_fraudulent.is_some()
         {
+            ctx.add_fraud(benchmark_id, &is_fraudulent.as_ref().unwrap());
+
             //ctx.add_fraud_to_mempool(benchmark_id, &is_fraudulent.clone().unwrap())?;
             return Ok(Err(is_fraudulent.unwrap()));
         }

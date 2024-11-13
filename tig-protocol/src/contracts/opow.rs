@@ -18,12 +18,12 @@ use {
     rayon::prelude::*,
 };
 
-pub struct OPoWContract<T>
+pub struct OPoWContract<T: Context + Send + Sync>
 {
     phantom: PhantomData<T>,
 }
 
-impl<T: Context> OPoWContract<T>
+impl<T: Context + Send + Sync> OPoWContract<T>
 {
     pub fn new() -> Self 
     {
@@ -37,27 +37,30 @@ impl<T: Context> OPoWContract<T>
         // FIXME
     }
 
-    pub fn update(&self, cache: &AddBlockCache, block: &Block)
+    pub fn update(&self, ctx: &T, cache: &AddBlockCache, block: &Block)
     {
         // update cutoffs
         {
             let config                      = block.config();
-            let mut phase_in_challenge_ids  : HashSet<String> = cache.active_challenges.read().unwrap().keys().cloned().collect();
-            for algorithm in cache.active_algorithms.read().unwrap().values() 
+            let mut phase_in_challenge_ids  : HashSet<String> = cache.active_challenges.read().unwrap().iter().cloned().collect();
+            for algorithm_id in cache.active_algorithms.read().unwrap().iter()
             {
-                if algorithm.state()
-                    .round_pushed.is_some_and(|r| r + 1 <= block.details.round)
+                let algorithm_state = ctx.get_algorithm_state(algorithm_id, &block.id).unwrap();
+                if algorithm_state.round_pushed
+                    .is_some_and(|r| r + 1 <= block.details.round)
                 {
-                    phase_in_challenge_ids.remove(&algorithm.details.challenge_id);
+                    let algorithm_details = ctx.get_algorithm_details(algorithm_id).unwrap();
+
+                    phase_in_challenge_ids.remove(&algorithm_details.challenge_id);
                 }
             }
         
             let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-            for (settings, num_solutions) in cache.active_solutions.read().unwrap().values() 
+            for (benchmark_id, num_solutions) in cache.active_solutions.read().unwrap().iter()
             {
                 *num_solutions_by_player_by_challenge
-                    .entry(settings.player_id.clone()).or_default()
-                    .entry(settings.challenge_id.clone()).or_default() += *num_solutions;
+                    .entry(cache.confirmed_precommits.read().unwrap()[benchmark_id].player_id.clone()).or_default()
+                    .entry(cache.confirmed_precommits.read().unwrap()[benchmark_id].challenge_id.clone()).or_default() += *num_solutions;
             }
         
             num_solutions_by_player_by_challenge.par_iter().for_each(|(player_id, num_solutions_by_challenge)| 
@@ -68,7 +71,7 @@ impl<T: Context> OPoWContract<T>
                 let min_cutoff          = config.qualifiers.min_cutoff.clone().unwrap();
                 let min_num_solutions   = cache
                     .active_challenges.read().unwrap()
-                    .keys()
+                    .iter()
                     .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0))
                     .min()
                     .unwrap();
@@ -81,7 +84,7 @@ impl<T: Context> OPoWContract<T>
                 {
                     let phase_in_min_num_solutions = cache
                         .active_challenges.read().unwrap()
-                        .keys().filter(|&id| !phase_in_challenge_ids.contains(id))
+                        .iter().filter(|&id| !phase_in_challenge_ids.contains(id))
                         .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0))
                         .min().unwrap();
 
@@ -108,38 +111,39 @@ impl<T: Context> OPoWContract<T>
 
         // update qualifiers
         {
-            /*let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
+            let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
             let active_solutions            = cache.active_solutions.read().unwrap();
-            for (settings, num_solutions) in active_solutions.values() 
+            for (benchmark_id, num_solutions) in active_solutions.iter() 
             {
+                let settings = ctx.get_benchmark_settings(benchmark_id).unwrap();
                 solutions_by_challenge
                     .entry(settings.challenge_id.clone()).or_default()
                     .push((settings, num_solutions));
             }
         
             let mut max_qualifiers_by_player = HashMap::<String, u32>::new();
-            for challenge in cache.active_challenges.write().unwrap().values_mut() 
+            for challenge in cache.active_challenges.read().unwrap().iter() 
             {
-                let block_data                      = challenge.block_data.as_mut().unwrap();
+                let block_data                      = ctx.get_challenge_data(challenge, &block.id).unwrap();
                 block_data.num_qualifiers           = Some(0);
                 block_data.qualifier_difficulties   = Some(HashSet::new());
             }
 
-            for algorithm in cache.active_algorithms.write().unwrap().values_mut() 
+            for algorithm in cache.active_algorithms.read().unwrap().iter() 
             {
-                let block_data                      = algorithm.block_data.as_mut().unwrap();
+                let block_data                      = ctx.get_algorithm_data(algorithm, &block.id).unwrap();
                 block_data.num_qualifiers_by_player = Some(HashMap::new());
             }
 
-            for player in cache.active_players.write().unwrap().values_mut() 
+            for player_id in cache.active_players.read().unwrap().iter() 
             {
-                let block_data = player.block_data.as_mut().unwrap();
+                let block_data = ctx.get_player_block_data_mut(player_id).unwrap();
                 block_data.num_qualifiers_by_challenge = Some(HashMap::new());
 
-                max_qualifiers_by_player.insert(player.id.clone(), *block_data.cutoff());
+                max_qualifiers_by_player.insert(player_id.clone(), *block_data.cutoff());
             }
         
-            cache.active_challenges.read().unwrap().par_iter().for_each(|(challenge_id, challenge)| 
+            cache.active_challenges.read().unwrap().par_iter().for_each(|challenge_id| 
             {
                 if !solutions_by_challenge.contains_key(challenge_id) 
                 {
@@ -153,7 +157,7 @@ impl<T: Context> OPoWContract<T>
                     .collect::<Frontier>();
 
                 let mut frontier_indexes = HashMap::<Point, usize>::new();
-                for (frontier_index, frontier) in pareto_algorithm(points, false).into_iter().enumerate() 
+                for (frontier_index, frontier) in tig_utils::pareto_algorithm(points, false).into_iter().enumerate() 
                 {
                     for point in frontier 
                     {
@@ -169,9 +173,9 @@ impl<T: Context> OPoWContract<T>
                     a_index.cmp(&b_index)
                 });
         
-                let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
-                let mut curr_frontier_index = 0;
-                let challenge_data       = challenge.block_data.as_mut().unwrap();
+                let mut max_qualifiers_by_player    = max_qualifiers_by_player.clone();
+                let mut curr_frontier_index         = 0;
+                let challenge_data                  = ctx.get_challenge_data(challenge_id, &block.id).unwrap();
 
                 for (settings, &num_solutions) in sorted_solutions.iter() 
                 {
@@ -181,7 +185,7 @@ impl<T: Context> OPoWContract<T>
                         challenge_id,
                         difficulty,
                         ..
-                    }                   = settings;
+                    } = settings;
         
                     if curr_frontier_index != frontier_indexes[difficulty]
                         && *challenge_data.num_qualifiers() > block.config().qualifiers.total_qualifiers_threshold
@@ -201,20 +205,8 @@ impl<T: Context> OPoWContract<T>
                     }
 
                     curr_frontier_index = frontier_indexes[difficulty];
-                    let player_data     = cache
-                        .active_players.write().unwrap()
-                        .get_mut(player_id)
-                        .unwrap()
-                        .block_data
-                        .as_mut()
-                        .unwrap();
-                    let algorithm_data  = cache
-                        .active_algorithms.write().unwrap()
-                        .get_mut(algorithm_id)
-                        .unwrap()
-                        .block_data
-                        .as_mut()
-                        .unwrap();
+                    let player_data     = ctx.get_player_block_data(player_id).unwrap();
+                    let algorithm_data  = ctx.get_algorithm_data(algorithm_id, &block.id).unwrap();
         
                     let max_qualifiers  = max_qualifiers_by_player.get(player_id).unwrap().clone();
                     let num_qualifiers  = num_solutions.min(max_qualifiers);
@@ -247,16 +239,16 @@ impl<T: Context> OPoWContract<T>
                         .unwrap()
                         .insert(difficulty.clone());*/
                 }
-            });*/
+            });
         }
 
         // update frontiers
         {
             let config = block.config();
-            cache.active_challenges.read().unwrap().par_iter().for_each(|(challenge_id, challenge)| 
+            cache.active_challenges.read().unwrap().par_iter().for_each(|challenge_id| 
             {
-                let block_data              = challenge.block_data.as_ref().unwrap();
-                let difficulty_parameters   = &config.difficulty.parameters[&challenge.id];
+                let block_data              = ctx.get_challenge_data(challenge_id, &block.id).unwrap();
+                let difficulty_parameters   = &config.difficulty.parameters[challenge_id];
                 let min_difficulty          = difficulty_parameters.min_difficulty();
                 let max_difficulty          = difficulty_parameters.max_difficulty();
                 let points                  = block_data
@@ -264,7 +256,7 @@ impl<T: Context> OPoWContract<T>
                     .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
                     .collect::<Frontier>();
 
-                /*let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
+                let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 
                 {
                     let base_frontier     : Frontier = vec![min_difficulty.clone()].into_iter().collect();
                     let scaling_factor    = 0.0;
@@ -274,7 +266,7 @@ impl<T: Context> OPoWContract<T>
                 } 
                 else 
                 {
-                    let base_frontier = pareto_algorithm(points, true)
+                    let base_frontier = tig_utils::pareto_algorithm(points, true)
                         .pop()
                         .unwrap()
                         .into_iter()
@@ -295,13 +287,11 @@ impl<T: Context> OPoWContract<T>
 
                 block_data.base_frontier      = Some(base_frontier);
                 block_data.scaled_frontier    = Some(scaled_frontier); 
-                block_data.scaling_factor     = Some(scaling_factor);*/
+                block_data.scaling_factor     = Some(scaling_factor);
 
-                /*
                 cache
                     .commit_opow_frontiers.write().unwrap()
                     .insert(challenge_id.to_string(), (base_frontier, scaling_factor, scaled_frontier));
-                */
             });
         }
 
@@ -315,17 +305,17 @@ impl<T: Context> OPoWContract<T>
             }
 
             let mut num_qualifiers_by_challenge = HashMap::<String, u32>::new();
-            for (_, challenge) in cache.active_challenges.read().unwrap().iter()
+            for challenge_id in cache.active_challenges.read().unwrap().iter()
             {
                 num_qualifiers_by_challenge.insert(
-                    challenge.id.to_string(),
-                    *challenge.block_data().num_qualifiers(),
+                    challenge_id.to_string(),
+                    *ctx.get_challenge_data(challenge_id, &block.id).unwrap().num_qualifiers(),
                 );
             }
 
             let total_deposit = cache
                 .active_players.read().unwrap().iter()
-                .map(|(_, p)| p.block_data().deposit.as_ref().unwrap())
+                .map(|player_id| ctx.get_player_block_data(player_id).unwrap().deposit.as_ref().unwrap())
                 .sum::<PreciseNumber>();
 
             let zero                    = PreciseNumber::from(0);
@@ -336,14 +326,12 @@ impl<T: Context> OPoWContract<T>
 
             for player_id in active_player_ids.iter()
             {
+                let player_data = ctx.get_player_block_data(player_id).unwrap();
                 let mut percent_qualifiers = Vec::<PreciseNumber>::new();
-                for (challenge_id, _) in cache.active_challenges.read().unwrap().iter() 
+                for challenge_id in cache.active_challenges.read().unwrap().iter() 
                 {
-                    let num_qualifiers              = num_qualifiers_by_challenge[challenge_id];
-                    percent_qualifiers.push(if *cache
-                        .active_players.read().unwrap()
-                        .get(player_id).unwrap()
-                        .block_data.as_ref().unwrap()
+                    let num_qualifiers = num_qualifiers_by_challenge[challenge_id];
+                    percent_qualifiers.push(if *player_data
                         .num_qualifiers_by_challenge()
                         .get(challenge_id).unwrap_or(&0) == 0 
                     {
@@ -351,10 +339,7 @@ impl<T: Context> OPoWContract<T>
                     } 
                     else 
                     {
-                        PreciseNumber::from(*cache
-                            .active_players.read().unwrap()
-                            .get(player_id).unwrap()
-                            .block_data.as_ref().unwrap()
+                        PreciseNumber::from(*player_data
                             .num_qualifiers_by_challenge()
                             .get(challenge_id)
                             .unwrap_or(&0)) / PreciseNumber::from(num_qualifiers)
@@ -367,7 +352,9 @@ impl<T: Context> OPoWContract<T>
                     ..
                 } = &config.optimisable_proof_of_work;
 
-                if enable_proof_of_deposit.is_some_and(|x| x) {
+                let qualifying_percent_rolling_deposit = None;
+                if enable_proof_of_deposit.is_some_and(|x| x) 
+                {
                     let max_percent_rolling_deposit = PreciseNumber::from_f64(avg_percent_qualifiers_multiplier.unwrap())
                             * percent_qualifiers.iter().sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
 
@@ -377,14 +364,10 @@ impl<T: Context> OPoWContract<T>
                     } 
                     else 
                     {
-                        cache
-                            .active_players.read().unwrap()
-                            .get(player_id).unwrap()
-                            .block_data.as_ref().unwrap()
-                            .deposit.as_ref().unwrap() / total_deposit
+                        *player_data.deposit.as_ref().unwrap() / total_deposit
                     };
 
-                    let qualifying_percent_rolling_deposit = if percent_rolling_deposit > max_percent_rolling_deposit 
+                    let qualifying_percent_rolling_deposit_ = if percent_rolling_deposit > max_percent_rolling_deposit 
                     {
                         max_percent_rolling_deposit
                     } 
@@ -393,13 +376,9 @@ impl<T: Context> OPoWContract<T>
                         percent_rolling_deposit
                     };
 
-                    percent_qualifiers.push(qualifying_percent_rolling_deposit.to_owned());
+                    percent_qualifiers.push(qualifying_percent_rolling_deposit_.clone());
 
-                    cache
-                        .active_players.write().unwrap()
-                        .get_mut(player_id).unwrap()
-                        .block_data.as_mut().unwrap()
-                        .qualifying_percent_rolling_deposit = Some(qualifying_percent_rolling_deposit.to_owned());
+                    cache.commit_opow_qualifying_percent_rolling_deposit.write().unwrap().insert(player_id.to_string(), qualifying_percent_rolling_deposit_.clone());
                 }
 
                 let mean        = percent_qualifiers.iter().sum::<PreciseNumber>() / PreciseNumber::from(percent_qualifiers.len());
@@ -419,7 +398,7 @@ impl<T: Context> OPoWContract<T>
 
                 weights.push(mean * (&one - &imbalance_penalty));
 
-                cache
+                /*cache
                     .active_players.write().unwrap()
                     .get_mut(player_id).unwrap()
                     .block_data.as_mut().unwrap()
@@ -429,7 +408,11 @@ impl<T: Context> OPoWContract<T>
                     .active_players.write().unwrap()
                     .get_mut(player_id).unwrap()
                     .block_data.as_mut().unwrap()
-                    .imbalance_penalty = Some(imbalance_penalty.to_owned());
+                    .imbalance_penalty = Some(imbalance_penalty.to_owned());*/
+
+                cache
+                    .commit_opow_player_imbalance.write().unwrap()
+                    .insert(player_id.to_string(), (imbalance.to_owned(), imbalance_penalty.to_owned()));
             }
 
             let total_weight = weights.iter().sum::<PreciseNumber>();
@@ -437,11 +420,12 @@ impl<T: Context> OPoWContract<T>
             
             for (player_id, &influence) in active_player_ids.iter().zip(influences.iter()) 
             {
-                // remove this later maybe
+                /*
                 cache
                     .active_players.write().unwrap()
                     .get_mut(player_id).unwrap()
                     .block_data.as_mut().unwrap().influence = Some(influence);
+                */
 
                 // keep this
                 cache
@@ -462,15 +446,45 @@ impl<T: Context> OPoWContract<T>
         }
 
         // commit qualifiers
+        for challenge in cache.active_challenges.read().unwrap().iter() 
+        {
+            let block_data                      : &mut ChallengeBlockData = ctx.get_challenge_data_mut(challenge, &block.id).unwrap();
+            block_data.num_qualifiers           = Some(0);
+            block_data.qualifier_difficulties   = Some(HashSet::new());
+        }
+
+        for algorithm in cache.active_algorithms.read().unwrap().iter() 
+        {
+            let block_data                      : &mut AlgorithmBlockData = ctx.get_algorithm_data_mut(algorithm, &block.id).unwrap();
+            block_data.num_qualifiers_by_player = Some(HashMap::new());
+        }
+
+        for player_id in cache.active_players.read().unwrap().iter() 
+        {
+            let block_data                          : &mut PlayerBlockData = ctx.get_player_block_data_mut(player_id).unwrap();
+            block_data.num_qualifiers_by_challenge  = Some(HashMap::new());
+        }
+
         for (challenge_id, (algorithm_id, player_id, num_qualifiers, difficulty)) in cache.commit_opow_add_qualifiers.read().unwrap().iter()
         {
             let algorithm_data  = ctx.get_algorithm_data_mut(algorithm_id, &block.id).unwrap();
             let player_data     = ctx.get_player_block_data_mut(player_id).unwrap();
             let challenge_data  = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
 
-            algorithm_data.num_qualifiers_by_player.as_mut().unwrap().insert(player_id.to_owned(), *num_qualifiers);
-            player_data.num_qualifiers_by_challenge.as_mut().unwrap().insert(challenge_id.to_owned(), *num_qualifiers);
-            challenge_data.qualifier_difficulties.as_mut().unwrap().insert(difficulty.to_owned());
+            if *num_qualifiers > 0 
+            {
+                *algorithm_data.num_qualifiers_by_player.as_mut().unwrap()
+                    .entry(player_id.clone())
+                    .or_default() += num_qualifiers;
+
+                *player_data.num_qualifiers_by_challenge.as_mut().unwrap()
+                    .entry(challenge_id.clone())
+                    .or_default() += num_qualifiers;
+
+                *challenge_data.num_qualifiers.as_mut().unwrap() += num_qualifiers;
+            }
+            
+            challenge_data.qualifier_difficulties.as_mut().unwrap().insert(difficulty.clone());
         }
 
         // commit frontiers
@@ -484,6 +498,19 @@ impl<T: Context> OPoWContract<T>
         }
 
         // commit influence
+        for (player_id, (imbalance, imbalance_penalty)) in cache.commit_opow_player_imbalance.read().unwrap().iter()
+        {
+            let player_data                 = ctx.get_player_block_data_mut(player_id).unwrap();
+            player_data.imbalance           = Some(imbalance.to_owned());
+            player_data.imbalance_penalty   = Some(imbalance_penalty.to_owned());
+        }
+
+        for (player_id, qualifying_percent_rolling_deposit) in cache.commit_opow_qualifying_percent_rolling_deposit.read().unwrap().iter()
+        {
+            let player_data                                 = ctx.get_player_block_data_mut(player_id).unwrap();
+            player_data.qualifying_percent_rolling_deposit  = Some(qualifying_percent_rolling_deposit.to_owned());
+        }
+
         for (player_id, influence) in cache.commit_opow_influence.read().unwrap().iter()
         {
             let player_data         = ctx.get_player_block_data_mut(player_id).unwrap();
