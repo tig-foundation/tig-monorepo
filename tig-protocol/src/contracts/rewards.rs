@@ -42,22 +42,24 @@ impl<T: Context> RewardsContract<T> {
         {
             let adoption_threshold                      = PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
             let zero                                    = PreciseNumber::from(0);
-            let eligible_algorithms_by_challenge        = Arc::new(RwLock::new(HashMap::<String, Vec<&Algorithm>>::new()));
+            let eligible_algorithms_by_challenge        = Arc::new(RwLock::new(HashMap::<String, Vec<(&String, &AlgorithmDetails, &AlgorithmBlockData)>>::new()));
             let algorithms                              = cache.active_algorithms.read().unwrap();
-            algorithms.par_iter().for_each(|(_, algorithm)|
+            algorithms.iter().for_each(|algorithm_id|
             {
-                let is_merged   = algorithm.state().round_merged.is_some();
-                let is_banned   = algorithm.state().banned.clone();
-                let data        = algorithm.block_data.as_ref().unwrap();
-                //data.reward     = Some(zero.clone());
+                let algorithm_state     = ctx.get_algorithm_state(algorithm_id, &block.id).unwrap();
+                let algorithm_details   = ctx.get_algorithm_details(algorithm_id).unwrap();
+                let algorithm_data      = ctx.get_algorithm_data(algorithm_id, &block.id).unwrap();
+                let is_merged           = algorithm_state.round_merged.is_some();
+                let is_banned           = algorithm_state.banned.clone();
+                //data.reward         = Some(zero.clone());
 
                 if !is_banned 
-                    && (*data.adoption() >= adoption_threshold || (is_merged && *data.adoption() > zero))
+                    && (*algorithm_data.adoption() >= adoption_threshold || (is_merged && *algorithm_data.adoption() > zero))
                 {
                     eligible_algorithms_by_challenge
                         .write().unwrap()
-                        .entry(algorithm.details.challenge_id.clone()).or_default()
-                        .push(algorithm);
+                        .entry(algorithm_details.challenge_id.clone()).or_default()
+                        .push((algorithm_id, algorithm_details, algorithm_data));
                 }
             });
 
@@ -75,18 +77,17 @@ impl<T: Context> RewardsContract<T> {
                 let total_adoption = algorithms.iter()
                     .fold(zero.clone(), |acc, algorithm| 
                     {
-                        acc + algorithm.block_data().adoption()
+                        acc + algorithm.2.adoption()
                     });
 
-                algorithms.par_iter().for_each(|algorithm| 
+                algorithms.iter().for_each(|(algorithm_id, algorithm_details, algorithm_data)| 
                 {
-                    let data        = algorithm.block_data.as_ref().unwrap();
-                    let adoption    = *data.adoption();
+                    let adoption    = algorithm_data.adoption();
                     //data.reward     = Some(reward_pool_per_challenge * adoption / total_adoption);
 
                     cache
                         .commit_innovator_rewards.write().unwrap()
-                        .insert(algorithm.details.challenge_id.clone(), (algorithm.id.clone(), reward_pool_per_challenge * adoption / total_adoption));
+                        .insert(algorithm_details.challenge_id.clone(), (algorithm_id.to_string(), reward_pool_per_challenge * adoption / total_adoption));
                 });
             });
         }
@@ -96,17 +97,32 @@ impl<T: Context> RewardsContract<T> {
             let config      = block.config();
             let reward_pool = PreciseNumber::from_f64(block_reward) * PreciseNumber::from_f64(config.rewards.distribution.benchmarkers);
 
-            /*for player in ctx.get_active_players().iter()
+            for player_id in cache.active_players.read().unwrap().iter()
             {
-                let data        = player.block_data.as_ref().unwrap();
+                let data        = ctx.get_player_block_data(player_id).unwrap();
                 let influence   = *data.influence();
 
                 cache
                     .commit_benchmarker_rewards.write().unwrap()
-                    .insert(player.id.clone(), influence * reward_pool);
+                    .insert(player_id.clone(), influence * reward_pool);
 
                 //data.reward     = Some(influence * reward_pool);
-            }*/
+            }
         }
+    }
+
+    pub fn commit_updates(&self, ctx: &T, cache: &AddBlockCache, block: &Block) -> ContractResult<()>
+    {
+        for (_, (algorithm_id, reward)) in cache.commit_innovator_rewards.read().unwrap().iter()
+        {
+            ctx.get_algorithm_data_mut(algorithm_id, &block.id).unwrap().reward = Some(reward.clone());
+        }
+
+        for (player_id, reward) in cache.commit_benchmarker_rewards.read().unwrap().iter()
+        {
+            ctx.get_player_block_data_mut(player_id).unwrap().reward = Some(reward.clone());
+        }
+
+        return Ok(());
     }
 }

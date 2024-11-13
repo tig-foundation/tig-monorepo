@@ -17,19 +17,19 @@ use {
     rayon::prelude::*,
 };
 
-pub struct ChallengeContract<T: Context>
+pub struct ChallengeContract<T: Context + Send + Sync>
 {
     phantom: PhantomData<T>,
 }
 
-impl<T: Context> ChallengeContract<T> 
+impl<T: Context + Send + Sync> ChallengeContract<T> 
 {
     pub fn new() -> Self 
     {
         return Self { phantom: PhantomData };
     }
 
-    pub fn update(&self, ctx: &T, cache: &AddBlockCache, block: &Block)
+    pub fn update(&self, ctx: &T, cache: &AddBlockCache, block: &Block, prev_block_id: &String)
     {
         // update solution signature thresholds
         {
@@ -39,8 +39,10 @@ impl<T: Context> ChallengeContract<T>
             let num_solutions_by_player_by_challenge = Arc::new(RwLock::new(HashMap::<String, HashMap<String, u32>>::new()));
             let new_solutions_by_player_by_challenge = Arc::new(RwLock::new(HashMap::<String, HashMap<String, u32>>::new()));
 
-            cache.active_solutions.read().unwrap().par_iter().for_each(|(benchmark_id, (settings, num_solutions))|
+            cache.active_solutions.read().unwrap().par_iter().for_each(|(benchmark_id, num_solutions)|
             {
+                let settings = ctx.get_benchmark_settings(benchmark_id).unwrap();
+
                 {
                     let mut map = num_solutions_by_player_by_challenge.write().unwrap();
                     *map.entry(settings.player_id.clone())
@@ -62,25 +64,26 @@ impl<T: Context> ChallengeContract<T>
                 .unwrap()
                 .into_inner()
                 .unwrap();
+
             let new_solutions_by_player_by_challenge = Arc::try_unwrap(new_solutions_by_player_by_challenge)
                 .unwrap()
                 .into_inner()
                 .unwrap();
 
             let solutions_rate_by_challenge = Arc::new(RwLock::new(HashMap::<String, u32>::new()));
-
             new_solutions_by_player_by_challenge.par_iter().for_each(|(player_id, new_solutions_by_challenge)| 
             {
-                let cutoff = *cache
+                /*let cutoff = *cache
                     .active_players.read().unwrap()
                     .get(player_id).unwrap()
                     .block_data.as_ref().unwrap()
-                    .cutoff();
+                    .cutoff();*/
 
+                let cutoff = ctx.get_player_block_data(player_id).unwrap().cutoff();
                 new_solutions_by_challenge.par_iter().for_each(|(challenge_id, new_solutions)| 
                 {
-                    let num_solutions   = num_solutions_by_player_by_challenge[player_id][challenge_id].clone();
-                    let delta           = new_solutions.saturating_sub(num_solutions - cutoff.min(num_solutions));
+                    let num_solutions   = num_solutions_by_player_by_challenge[player_id][challenge_id];
+                    let delta           = new_solutions.saturating_sub(num_solutions - cutoff.min(&num_solutions));
                     let mut map         = solutions_rate_by_challenge.write().unwrap();
 
                     *map.entry(challenge_id.clone()).or_default() += delta;
@@ -92,16 +95,19 @@ impl<T: Context> ChallengeContract<T>
                 .into_inner()
                 .unwrap();
 
-            cache.active_challenges.write().unwrap().par_iter().for_each(|(challenge_id, challenge)|
+            cache.active_challenges.write().unwrap().par_iter().for_each(|challenge_id|
             {
                 let max_threshold       = u32::MAX as f64;
-                let current_threshold   = match cache.prev_challenges.read().unwrap().get(&challenge.id)
+                /*let current_threshold   = match cache.prev_challenges.read().unwrap().get(&challenge.id)
                 {
                     Some(data) => *data.block_data.as_ref().unwrap().solution_signature_threshold() as f64,
                     None => max_threshold,
-                };
+                };*/
 
-                let current_rate        = *solutions_rate_by_challenge.get(&challenge.id).unwrap_or(&0) as f64;
+                let current_threshold   = ctx.get_challenge_data(challenge_id, &prev_block_id).unwrap()
+                    .solution_signature_threshold.unwrap_or(u32::MAX) as f64;
+
+                let current_rate        = *solutions_rate_by_challenge.get(challenge_id).unwrap_or(&0) as f64;
                 let equilibrium_rate    = config.qualifiers.total_qualifiers_threshold as f64
                     / config.benchmark_submissions.lifespan_period as f64;
                     
@@ -116,6 +122,7 @@ impl<T: Context> ChallengeContract<T>
                 };
 
                 let threshold_decay = config.solution_signature.threshold_decay.unwrap_or(0.99);
+                
                 //let block_data      = challenge.block_data.as_mut().unwrap();
                 /*
                 block_data.solution_signature_threshold = Some(
@@ -134,6 +141,7 @@ impl<T: Context> ChallengeContract<T>
         }
 
         // update fees
+        
         {
             let config = block.config();
             let PrecommitSubmissionsConfig {
@@ -144,10 +152,12 @@ impl<T: Context> ChallengeContract<T>
                 ..
             } = config.precommit_submissions();
 
-            let num_precommits_by_challenge = cache.mempool_precommits.read().unwrap().iter().fold(
+            // double check this
+            // important
+            let num_precommits_by_challenge = cache.confirmed_precommits.read().unwrap().iter().fold(
                 HashMap::<String, u32>::new(),
                 |mut map, precommit| {
-                    *map.entry(precommit.settings.challenge_id.clone())
+                    *map.entry(precommit.1.challenge_id.clone())
                         .or_default() += 1;
                     map
                 },
@@ -157,11 +167,11 @@ impl<T: Context> ChallengeContract<T>
             let one                     = PreciseNumber::from(1);
             let zero                    = PreciseNumber::from(0);
 
-            cache.active_challenges.read().unwrap().par_iter().for_each(|(challenge_id, challenge)|
+            cache.active_challenges.read().unwrap().par_iter().for_each(|challenge_id|
             {
                 let num_precommits = PreciseNumber::from(
                     num_precommits_by_challenge
-                        .get(&challenge.id)
+                        .get(challenge_id)
                         .unwrap_or(&0)
                         .clone(),
                 );
@@ -181,13 +191,10 @@ impl<T: Context> ChallengeContract<T>
                     percent_delta = max_fee_percent_delta;
                 }
 
-                let current_base_fee =
-                    match cache.prev_challenges.read().unwrap().get(&challenge.id)
-                    {
-                        Some(data)  => data.block_data.as_ref().unwrap().base_fee.as_ref().unwrap_or(&zero),
-                        None        => &zero,
-                    }
-                    .clone();
+                let current_base_fee = ctx.get_challenge_data(challenge_id, &prev_block_id).unwrap()
+                    .base_fee.as_ref()
+                    .unwrap_or(&zero).clone();
+
                 let mut base_fee = if num_precommits >= target_num_precommits 
                 {
                     current_base_fee * (one + percent_delta)
@@ -209,13 +216,14 @@ impl<T: Context> ChallengeContract<T>
 
                 cache
                     .commit_challenges_fees.write().unwrap()
-                    .insert(challenge.id.clone(), (base_fee, min_per_nonce_fee.clone()));
+                    .insert(challenge_id.clone(), (base_fee, min_per_nonce_fee.clone()));
             });
         }
     }
 
     pub fn commit_updates(&self, ctx: &T, cache: &AddBlockCache, block: &Block) -> ContractResult<()>
     {
+        // commit solution signature thresholds
         for (challenge_id, threshold) in cache.commit_challenges_solution_sig_thresholds.read().unwrap().iter()
         {
             let challenge_data = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
@@ -223,6 +231,7 @@ impl<T: Context> ChallengeContract<T>
             challenge_data.solution_signature_threshold = Some(*threshold);
         }
 
+        // commit fees
         for (challenge_id, (base_fee, per_nonce_fee)) in cache.commit_challenges_fees.read().unwrap().iter()
         {
             let challenge_data = ctx.get_challenge_data_mut(challenge_id, &block.id).unwrap();
@@ -231,6 +240,6 @@ impl<T: Context> ChallengeContract<T>
             challenge_data.per_nonce_fee    = Some(*per_nonce_fee);
         }
 
-        Ok(())
+        return Ok(());
     }
 }
