@@ -158,7 +158,7 @@ impl<T: Context + Send + Sync> AlgorithmContract<T>
         // update merge points
         {
             let config = block.config();
-            let adoption_threshold =PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
+            let adoption_threshold = PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
             cache.active_algorithms.read().unwrap().iter().for_each(|algorithm_id| 
             {
                 let algorithm_state   = ctx.get_algorithm_state(algorithm_id, &block.id).unwrap();

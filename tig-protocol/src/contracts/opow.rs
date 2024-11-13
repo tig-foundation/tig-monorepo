@@ -110,7 +110,7 @@ impl<T: Context + Send + Sync> OPoWContract<T>
         }
 
         // update qualifiers
-        {
+        /*{
             let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
             let active_solutions            = cache.active_solutions.read().unwrap();
             for (benchmark_id, num_solutions) in active_solutions.iter() 
@@ -293,7 +293,7 @@ impl<T: Context + Send + Sync> OPoWContract<T>
                     .commit_opow_frontiers.write().unwrap()
                     .insert(challenge_id.to_string(), (base_frontier, scaling_factor, scaled_frontier));
             });
-        }
+        }*/
 
         // update influence
         {
@@ -352,7 +352,7 @@ impl<T: Context + Send + Sync> OPoWContract<T>
                     ..
                 } = &config.optimisable_proof_of_work;
 
-                let qualifying_percent_rolling_deposit = None;
+                let qualifying_percent_rolling_deposit : Option<PreciseNumber> = None;
                 if enable_proof_of_deposit.is_some_and(|x| x) 
                 {
                     let max_percent_rolling_deposit = PreciseNumber::from_f64(avg_percent_qualifiers_multiplier.unwrap())
