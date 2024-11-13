@@ -121,7 +121,7 @@ impl<T: Context> BenchmarkContract<T>
             )
         };
         
-        match difficulty.within(lower_frontier, upper_frontier) 
+        match tig_utils::pareto_within(difficulty, lower_frontier, upper_frontier) 
         {
             PointCompareFrontiers::Above => 
             {
