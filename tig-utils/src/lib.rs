@@ -1,7 +1,5 @@
 mod eth;
 pub use eth::*;
-mod frontiers;
-pub use frontiers::*;
 mod hash;
 pub use hash::*;
 mod json;
@@ -14,3 +12,5 @@ pub use number::*;
 mod request;
 #[cfg(any(feature = "request", feature = "request-js"))]
 pub use request::*;
+mod ofrontiers;
+pub use ofrontiers::*;

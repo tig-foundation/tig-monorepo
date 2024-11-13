@@ -110,7 +110,7 @@ impl<T: Context + Send + Sync> OPoWContract<T>
         }
 
         // update qualifiers
-        /*{
+        {
             let mut solutions_by_challenge  = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
             let active_solutions            = cache.active_solutions.read().unwrap();
             for (benchmark_id, num_solutions) in active_solutions.iter() 
@@ -124,14 +124,14 @@ impl<T: Context + Send + Sync> OPoWContract<T>
             let mut max_qualifiers_by_player = HashMap::<String, u32>::new();
             for challenge in cache.active_challenges.read().unwrap().iter() 
             {
-                let block_data                      = ctx.get_challenge_data(challenge, &block.id).unwrap();
+                let block_data                      : &mut ChallengeBlockData = ctx.get_challenge_data_mut(challenge, &block.id).unwrap();
                 block_data.num_qualifiers           = Some(0);
                 block_data.qualifier_difficulties   = Some(HashSet::new());
             }
 
             for algorithm in cache.active_algorithms.read().unwrap().iter() 
             {
-                let block_data                      = ctx.get_algorithm_data(algorithm, &block.id).unwrap();
+                let block_data                      : &mut AlgorithmBlockData = ctx.get_algorithm_data_mut(algorithm, &block.id).unwrap();
                 block_data.num_qualifiers_by_player = Some(HashMap::new());
             }
 
@@ -157,7 +157,7 @@ impl<T: Context + Send + Sync> OPoWContract<T>
                     .collect::<Frontier>();
 
                 let mut frontier_indexes = HashMap::<Point, usize>::new();
-                for (frontier_index, frontier) in tig_utils::pareto_algorithm(points, false).into_iter().enumerate() 
+                for (frontier_index, frontier) in tig_utils::o_pareto_algorithm(&points, false).into_iter().enumerate() 
                 {
                     for point in frontier 
                     {
@@ -266,34 +266,34 @@ impl<T: Context + Send + Sync> OPoWContract<T>
                 } 
                 else 
                 {
-                    let base_frontier = tig_utils::pareto_algorithm(points, true)
+                    let mut base_frontier = tig_utils::o_pareto_algorithm(&points, true)
                         .pop()
                         .unwrap()
                         .into_iter()
-                        .map(|d| d.into_iter().map(|x| -x).collect())
-                        .collect::<Frontier>() // mirror the points back;
-                        .extend(&min_difficulty, &max_difficulty);
+                        .map(|d| d.into_iter().map(|x| -x).collect())               // mirror the points back;
+                        .collect::<Frontier>();
+    
+                    base_frontier.extend([min_difficulty.clone(), max_difficulty.clone()].into_iter());
 
                     let scaling_factor  = (*block_data.num_qualifiers() as f64
                         / config.qualifiers.total_qualifiers_threshold as f64)
                         .min(config.difficulty.max_scaling_factor);
 
-                    let scaled_frontier = base_frontier
-                        .scale(&min_difficulty, &max_difficulty, scaling_factor)
-                        .extend(&min_difficulty, &max_difficulty);
+                    let mut scaled_frontier = tig_utils::scale_frontier(&base_frontier, &min_difficulty, &max_difficulty, scaling_factor);
+                    scaled_frontier.extend([min_difficulty.clone(), max_difficulty.clone()].into_iter());
 
                     (base_frontier, scaling_factor, scaled_frontier)
                 };
 
-                block_data.base_frontier      = Some(base_frontier);
+                /*block_data.base_frontier      = Some(base_frontier);
                 block_data.scaled_frontier    = Some(scaled_frontier); 
-                block_data.scaling_factor     = Some(scaling_factor);
+                block_data.scaling_factor     = Some(scaling_factor);*/
 
                 cache
                     .commit_opow_frontiers.write().unwrap()
                     .insert(challenge_id.to_string(), (base_frontier, scaling_factor, scaled_frontier));
             });
-        }*/
+        }
 
         // update influence
         {
