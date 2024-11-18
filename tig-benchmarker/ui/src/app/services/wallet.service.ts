@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
   providedIn: 'root',
 })
 export class WalletService {
+  ready = signal(false);
   coinbaseWalletLink = new WalletLink({
     appName: 'TIG Benchmarker',
     appLogoUrl: 'https://tig.dev/favicon.ico',
@@ -15,12 +16,13 @@ export class WalletService {
   provider: any = null;
   signer: any = null;
   wallet: any = signal(null);
-  constructor() {}
+  constructor() {
+    
+  }
 
   async connectCoinbaseWallet() {
     try {
       this.coinbaseEthereum = this.coinbaseWalletLink.makeWeb3Provider();
-      console.log('Connecting to Coinbase Wallet...');
       this.provider = new ethers.BrowserProvider(this.coinbaseEthereum);
 
       // Request accounts from Coinbase Wallet

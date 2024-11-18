@@ -4,6 +4,7 @@ import { SettingsComponent } from './pages/settings/settings.component';
 import { SlaveManagerComponent } from './pages/slave-manager/slave-manager.component';
 import { JobManagerComponent } from './pages/job-manager/job-manager.component';
 import { AuthComponent } from './components/auth/auth.component';
+import { AuthGuard } from './gaurds/auth.guard';
 
 export const routes: Routes = [
   {
@@ -13,18 +14,17 @@ export const routes: Routes = [
   {
     path: 'home',
     component: HomeComponent,
-  },
-  {
-    path: 'jobs',
-    component: JobManagerComponent,
+    canActivate: [AuthGuard],
   },
   {
     path: 'slaves',
     component: SlaveManagerComponent,
+    canActivate: [AuthGuard],
   },
   {
     path: 'settings',
     component: SettingsComponent,
+    canActivate: [AuthGuard],
   },
   { path: '**', redirectTo: 'home' },
 ];

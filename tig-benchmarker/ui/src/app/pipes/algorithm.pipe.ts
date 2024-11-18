@@ -8,7 +8,6 @@ import { TigApisService } from '../services/tig-apis.service';
 export class AlgorithmPipe implements PipeTransform {
   tigService = inject(TigApisService);
   transform(value: unknown, ...args: unknown[]): unknown {
-    console.log('algo pipe',value)
     return this.tigService.algorithms().find((a: any) => a.id === value)?.name || 'Unknown';
   }
 

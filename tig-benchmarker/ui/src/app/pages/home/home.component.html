@@ -16,7 +16,7 @@
         }
       </div>
     </p-card>
-  </div> 
+  </div>
   <div class="col-4 p-4">
     <p-card header="Earnings" class="w-full">
       <div class="flex flex-column justify-content-center align-items-center">
@@ -158,7 +158,7 @@
         <td>
           <div class="flex justify-content-center align-items-center">
             {{ benchmark.solutions }} Solutions /
-            {{ benchmark.number_of_nonces }} Nonces
+            {{ benchmark.num_nonces }} Nonces
           </div>
         </td>
         <td>
@@ -175,12 +175,17 @@
           <div class="flex justify-content-center align-items-center">
             <p-tag
               [severity]="
-                benchmark.status == 'Completed'
+                benchmark.status == 'ACTIVE' ||
+                benchmark.status == 'ACTIVE QUALIFIER'
                   ? 'success'
-                  : benchmark.status == 'In Progress'
+                  : benchmark.status == 'NO SOLUTIONS'
                   ? 'warning'
-                  : 'info'
+                  : benchmark.status == 'PENDING PROOF' ||
+                    benchmark.status == 'PENDING BENCHMARK'
+                  ? 'info'
+                  : 'danger'
               "
+              [rounded]="true"
               [value]="benchmark.status"
             />
           </div>
@@ -462,7 +467,7 @@
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.number_of_nonces }}
+                  {{ benchmark.num_nonces }}
                 </div>
               </td>
               <td>
@@ -472,7 +477,12 @@
               </td>
               <td>
                 <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.solutions / benchmark.number_of_nonces }}
+                  @if(benchmark.solutions){
+                  {{
+                    benchmark.num_nonces / benchmark.solutions
+                      | number : "1.2-2"
+                  }}
+                  } @else { -}
                 </div>
               </td>
               <td>
@@ -512,13 +522,13 @@
     }
   </p-tabView>
 </p-card>
-}
-@else {
-  <div class="flex w-full justify-content-center align-items-center">
-    <p-progressSpinner 
-styleClass="w-4rem h-4rem" 
-strokeWidth="8" 
-fill="var(--surface-ground)" 
-animationDuration="1.5s" />
+} @else {
+<div class="flex w-full justify-content-center align-items-center">
+  <p-progressSpinner
+    styleClass="w-4rem h-4rem"
+    strokeWidth="8"
+    fill="var(--surface-ground)"
+    animationDuration="1.5s"
+  />
 </div>
 }

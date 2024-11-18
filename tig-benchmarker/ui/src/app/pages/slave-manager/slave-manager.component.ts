@@ -55,18 +55,26 @@ export class SlaveManagerComponent {
   }
   getMiningPanelData() {
     // Get challenges data
-    const temp_data = [
-      {
-        name: 'Slave 1',
-        id: 1,
-        api_key: '1231321',
-        last_updated: '1 hour ago',
-        reward: 0.0001,
-        reputation: 0.5,
-      },
-    ];
-    this.mining_panel_slaves.set(temp_data);
-    this.active_slaves.set(temp_data.length);
+    this.mining_panel_slaves.set(
+      this.tigService.slaves().map((s: any) => {
+        let last_batch_time = 0;
+        const last_batch = this.tigService
+          .batches()
+          .find((b: any) => b.assigned_slave === s.id);
+        console.log(last_batch);
+        if (last_batch) {
+          // get seconds from timestamp
+          last_batch_time =
+            (new Date().getTime() -
+              new Date(last_batch.completed_timestamp).getTime()) ;
+        }
+        return {
+          ...s,
+          last_batch: last_batch_time,
+        };
+      })
+    );
+    this.active_slaves.set(this.tigService.slaves().length);
   }
   getChallengesData() {
     const challenges_temp_data = [
@@ -87,11 +95,12 @@ export class SlaveManagerComponent {
     ];
     this.challenges_data.set(challenges_temp_data);
   }
+
   changeChallengeView(challenge: any) {
     const selected = this.tigService.challenges()[challenge];
     const batches = this.tigService
       .batches()
-      ?.filter((b:any) => b.challenge_id === selected.id);
+      ?.filter((b: any) => b.challenge_id === selected.id);
     const temp_slaves_challenge_data = [
       {
         name: 'Slave 1',
@@ -99,8 +108,8 @@ export class SlaveManagerComponent {
         recent_batches: 4,
         in_progress: 3,
         average_time_per_batch: 42,
-      }
-    ]
+      },
+    ];
     this.challenge_tabs_slave_table.set(temp_slaves_challenge_data);
 
     const temp_batches_challenge_data = [
@@ -111,8 +120,8 @@ export class SlaveManagerComponent {
         status: 3,
         slave: 42,
         elapsed_time: 42,
-      }
-    ]
+      },
+    ];
     this.challenge_tabs_batches_table.set(temp_batches_challenge_data);
   }
 }
