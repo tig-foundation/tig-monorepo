@@ -1,0 +1,283 @@
+use crate::{context::*, error::*};
+use anyhow::{anyhow, Result};
+use logging_timer::time;
+use rand::{seq::IteratorRandom, thread_rng, Rng};
+use std::collections::HashSet;
+use tig_structs::core::*;
+use tig_utils::*;
+
+#[time]
+pub(crate) async fn submit_precommit<T: Context>(
+    ctx: &T,
+    player_id: String,
+    settings: BenchmarkSettings,
+    num_nonces: u32,
+) -> Result<String> {
+    if player_id != settings.player_id {
+        return Err(anyhow!("Invalid settings.player_id. Must be {}", player_id));
+    }
+
+    if num_nonces == 0 {
+        return Err(anyhow!("Invalid num_nonces. Must be greater than 0"));
+    }
+
+    let config = ctx.get_config().await;
+
+    let latest_block_id = ctx.get_block_id(BlockFilter::LastConfirmed).await.unwrap();
+    if latest_block_id != settings.block_id {
+        return Err(anyhow!("Invalid block_id. Must be latest block"));
+    }
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+
+    // verify challenge is active
+    if !ctx
+        .get_challenge_state(&settings.challenge_id)
+        .await
+        .is_some_and(|s| s.round_active <= latest_block_details.round)
+    {
+        return Err(anyhow!("Invalid challenge '{}'", settings.challenge_id));
+    }
+
+    // verify algorithm is active
+    if !ctx
+        .get_algorithm_state(&settings.algorithm_id)
+        .await
+        .is_some_and(|s| {
+            !s.banned
+                && s.round_active
+                    .is_some_and(|r| r <= latest_block_details.round)
+        })
+    {
+        return Err(anyhow!("Invalid algorithm '{}'", settings.algorithm_id));
+    }
+
+    // verify difficulty
+    let difficulty = &settings.difficulty;
+    let difficulty_parameters = &config.challenges.difficulty_parameters[&settings.challenge_id];
+    if difficulty.len() != difficulty_parameters.len()
+        || difficulty
+            .iter()
+            .zip(difficulty_parameters.iter())
+            .any(|(d, p)| *d < p.min_value || *d > p.max_value)
+    {
+        return Err(anyhow!("Invalid difficulty '{:?}'", difficulty));
+    }
+
+    let challenge_data = ctx
+        .get_challenge_block_data(&settings.challenge_id, &latest_block_id)
+        .await
+        .unwrap();
+    let (lower_frontier, upper_frontier) = if challenge_data.scaling_factor > 1f64 {
+        (challenge_data.base_frontier, challenge_data.scaled_frontier)
+    } else {
+        (challenge_data.scaled_frontier, challenge_data.base_frontier)
+    };
+    if lower_frontier
+        .iter()
+        .any(|lower_point| difficulty.pareto_compare(lower_point) == ParetoCompare::BDominatesA)
+        || upper_frontier
+            .iter()
+            .any(|upper_point| difficulty.pareto_compare(upper_point) == ParetoCompare::ADominatesB)
+    {
+        return Err(anyhow!("Invalid difficulty. Out of bounds"));
+    }
+
+    // verify player has sufficient balance
+    let submission_fee =
+        challenge_data.base_fee + challenge_data.per_nonce_fee * PreciseNumber::from(num_nonces);
+    if !ctx
+        .get_player_state(&player_id)
+        .await
+        .is_some_and(|s| s.available_fee_balance >= submission_fee)
+    {
+        return Err(anyhow!("Insufficient balance"));
+    }
+
+    let benchmark_id = ctx
+        .confirm_precommit(
+            settings,
+            PrecommitDetails {
+                block_started: latest_block_details.height,
+                num_nonces,
+                rand_hash: hex::encode(thread_rng().gen::<[u8; 16]>()),
+                fee_paid: submission_fee,
+            },
+        )
+        .await?;
+    Ok(benchmark_id)
+}
+
+#[time]
+pub(crate) async fn submit_benchmark<T: Context>(
+    ctx: &T,
+    player_id: String,
+    benchmark_id: String,
+    merkle_root: MerkleHash,
+    solution_nonces: HashSet<u64>,
+) -> Result<()> {
+    // check benchmark is not duplicate
+    if ctx.get_benchmark_state(&benchmark_id).await.is_some() {
+        return Err(anyhow!("Duplicate benchmark: {}", benchmark_id));
+    }
+
+    // check player owns benchmark
+    let expected_player_id = ctx
+        .get_precommit_settings(&benchmark_id)
+        .await
+        .ok_or_else(|| anyhow!("No corresponding precommit: {}", benchmark_id))?
+        .player_id;
+    if player_id != expected_player_id {
+        return Err(anyhow!(
+            "Invalid submitting player: {}. Expected: {}",
+            player_id,
+            expected_player_id
+        ));
+    }
+
+    // check solution nonces is valid
+    let num_nonces = ctx
+        .get_precommit_details(&benchmark_id)
+        .await
+        .unwrap()
+        .num_nonces as u64;
+    if !solution_nonces.iter().all(|n| *n < num_nonces) {
+        return Err(anyhow!("Invalid solution nonces"));
+    }
+
+    // random sample nonces
+    let config = ctx.get_config().await;
+    let mut sampled_nonces = HashSet::new();
+    let mut rng = thread_rng();
+    let max_samples = config.benchmarks.max_samples;
+    if !solution_nonces.is_empty() {
+        for _ in 0..25 {
+            sampled_nonces.insert(*solution_nonces.iter().choose(&mut rng).unwrap());
+            if sampled_nonces.len() == max_samples {
+                break;
+            }
+        }
+    }
+    let max_samples = sampled_nonces.len() + config.benchmarks.min_num_solutions as usize;
+    for _ in 0..25 {
+        sampled_nonces.insert(rng.gen_range(0..num_nonces));
+        if sampled_nonces.len() == max_samples {
+            break;
+        }
+    }
+
+    ctx.confirm_benchmark(
+        benchmark_id,
+        BenchmarkDetails {
+            num_solutions: solution_nonces.len() as u32,
+            merkle_root,
+            sampled_nonces,
+        },
+        solution_nonces,
+    )
+    .await?;
+    Ok(())
+}
+
+#[time]
+pub(crate) async fn submit_proof<T: Context>(
+    ctx: &T,
+    player_id: String,
+    benchmark_id: String,
+    merkle_proofs: Vec<MerkleProof>,
+) -> Result<Result<(), String>> {
+    // check proof is not duplicate
+    if ctx.get_proof_state(&benchmark_id).await.is_some() {
+        return Err(anyhow!("Duplicate proof: {}", benchmark_id));
+    }
+
+    // check benchmark is submitted
+    let benchmark_details = ctx
+        .get_benchmark_details(&benchmark_id)
+        .await
+        .ok_or_else(|| anyhow!("No corresponding benchmark: {}", benchmark_id))?;
+
+    // check player owns benchmark
+    let settings = ctx.get_precommit_settings(&benchmark_id).await.unwrap();
+    if player_id != settings.player_id {
+        return Err(anyhow!(
+            "Invalid submitting player: {}. Expected: {}",
+            player_id,
+            settings.player_id
+        ));
+    }
+
+    // verify
+    let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
+    let proof_nonces: HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
+    let sampled_nonces = &benchmark_details.sampled_nonces;
+    if sampled_nonces != proof_nonces || sampled_nonces.len() != merkle_proofs.len() {
+        return Err(anyhow!(
+            "Invalid merkle proofs. Does not match sampled nonces"
+        ));
+    }
+
+    // verify merkle_proofs
+    let mut verification_result = Ok(());
+    let max_branch_len = (64 - (*precommit_details.num_nonces - 1).leading_zeros()) as usize;
+    for merkle_proof in merkle_proofs.iter() {
+        if merkle_proof.branch.0.len() > max_branch_len
+            || merkle_proof
+                .branch
+                .0
+                .iter()
+                .any(|(d, _)| *d as usize > max_branch_len)
+        {
+            return Err(ProtocolError::InvalidMerkleProof {
+                nonce: merkle_proof.leaf.nonce.clone(),
+            });
+        }
+        let output_meta_data = OutputMetaData::from(merkle_proof.leaf.clone());
+        let hash = MerkleHash::from(output_meta_data);
+        let result = merkle_proof
+            .branch
+            .calc_merkle_root(&hash, merkle_proof.leaf.nonce as usize);
+        if !result
+            .is_ok_and(|actual_merkle_root| actual_merkle_root == benchmark_details.merkle_root)
+        {
+            verification_result = Err(ProtocolError::InvalidMerkleProof {
+                nonce: merkle_proof.leaf.nonce.clone(),
+            });
+        }
+    }
+
+    if verification_result.is_ok() {
+        for p in merkle_proofs.iter() {
+            if ctx
+                .verify_solution(&settings, p.leaf.nonce, &p.leaf.solution)
+                .await
+                .unwrap_or_else(|e| panic!("verify_solution error: {:?}", e))
+                .is_err()
+            {
+                verification_result = Err(ProtocolError::InvalidSolution {
+                    nonce: p.leaf.nonce,
+                });
+            }
+        }
+    };
+    ctx.confirm_proof(benchmark_id, merkle_proofs)
+        .await
+        .unwrap_or_else(|e| panic!("add_proof_to_mempool error: {:?}", e));
+    if let Err(e) = verification_result {
+        submit_fraud(benchmark_id, e.to_string())
+            .await
+            .unwrap_or_else(|e| panic!("add_fraud_to_mempool error: {:?}", e));
+        return Ok(Err(e.to_string()));
+    }
+    Ok(Ok(()))
+}
+
+#[time]
+pub(crate) async fn submit_fraud<T: Context>(
+    ctx: &T,
+    player_id: String,
+    benchmark_id: String,
+    allegation: String,
+) -> ProtocolResult<Result<(), String>> {
+}
+
+// update active benchmarks

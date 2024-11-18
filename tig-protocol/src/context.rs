@@ -14,7 +14,6 @@ pub enum SubmissionType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AlgorithmsFilter {
-    Id(String),
     Name(String),
     TxHash(String),
     Mempool,
@@ -22,29 +21,25 @@ pub enum AlgorithmsFilter {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum BenchmarksFilter {
-    Id(String),
-    Mempool { from_block_started: u32 },
-    Confirmed { from_block_started: u32 },
+    Mempool,
+    Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockFilter {
-    Latest,
+    Current,
+    LastConfirmed,
     Height(u32),
-    Id(String),
     Round(u32),
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChallengesFilter {
-    Id(String),
-    Name(String),
     Mempool,
     Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum FraudsFilter {
-    BenchmarkId(String),
-    Mempool { from_block_started: u32 },
-    Confirmed { from_block_started: u32 },
+    Mempool,
+    Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayersFilter {
@@ -55,72 +50,69 @@ pub enum PlayersFilter {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum PrecommitsFilter {
-    BenchmarkId(String),
     Settings(BenchmarkSettings),
-    Mempool { from_block_started: u32 },
-    Confirmed { from_block_started: u32 },
+    Mempool,
+    Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProofsFilter {
-    BenchmarkId(String),
-    Mempool { from_block_started: u32 },
-    Confirmed { from_block_started: u32 },
+    Mempool,
+    Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum TopUpsFilter {
-    Id(String),
     PlayerId(String),
     Mempool,
     Confirmed,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum WasmsFilter {
-    AlgorithmId(String),
     Mempool,
     Confirmed,
 }
 #[allow(async_fn_in_trait)]
 pub trait Context {
-    async fn get_algorithms(
+    async fn get_algorithm_ids(&self, filter: AlgorithmsFilter) -> Vec<String>;
+    async fn get_algorithm_state(&self, algorithm_id: &String) -> Option<AlgorithmState>;
+    async fn get_benchmark_ids(&self, filter: BenchmarksFilter) -> Vec<String>;
+    async fn get_benchmark_details(&self, benchmark_id: &String) -> Option<BenchmarkDetails>;
+    async fn get_benchmark_state(&self, benchmark_id: &String) -> Option<BenchmarkState>;
+    async fn confirm_benchmark(
         &self,
-        filter: AlgorithmsFilter,
-        block_data: Option<BlockFilter>,
-        include_data: bool,
-    ) -> ContextResult<Vec<Algorithm>>;
-    async fn get_benchmarks(
+        benchmark_id: String,
+        details: BenchmarkDetails,
+        solution_nonces: HashSet<u64>,
+    ) -> ContextResult<()>;
+    async fn get_block_id(&self, filter: BlockFilter) -> Option<String>;
+    async fn get_block_details(&self, block_id: &String) -> Option<BlockDetails>;
+    async fn get_challenge_ids(&self, filter: ChallengesFilter) -> Vec<String>;
+    async fn get_challenge_state(&self, challenge_id: &String) -> Option<ChallengeState>;
+    async fn get_challenge_block_data(
         &self,
-        filter: BenchmarksFilter,
-        include_data: bool,
-    ) -> ContextResult<Vec<Benchmark>>;
-    async fn get_block(
+        challenge_id: &String,
+        block_id: &String,
+    ) -> Option<ChallengeBlockData>;
+    async fn get_config(&self) -> ProtocolConfig;
+    async fn get_fraud_ids(&self, filter: FraudsFilter) -> Vec<String>;
+    async fn get_player_ids(&self, filter: PlayersFilter) -> Vec<String>;
+    async fn get_player_state(&self, player_id: &String) -> Option<PlayerState>;
+    async fn get_player_block_data(
         &self,
-        filter: BlockFilter,
-        include_data: bool,
-    ) -> ContextResult<Option<Block>>;
-    async fn get_challenges(
+        player_id: &String,
+        block_id: &String,
+    ) -> Option<PlayerBlockData>;
+    async fn get_precommit_ids(&self, filter: PrecommitsFilter) -> Vec<String>;
+    async fn get_precommit_settings(&self, benchmark_id: &String) -> Option<BenchmarkSettings>;
+    async fn get_precommit_details(&self, benchmark_id: &String) -> Option<PrecommitDetails>;
+    async fn confirm_precommit(
         &self,
-        filter: ChallengesFilter,
-        block_data: Option<BlockFilter>,
-    ) -> ContextResult<Vec<Challenge>>;
-    async fn get_config(&self) -> ContextResult<ProtocolConfig>;
-    async fn get_frauds(
-        &self,
-        filter: FraudsFilter,
-        include_data: bool,
-    ) -> ContextResult<Vec<Fraud>>;
-    async fn get_players(
-        &self,
-        filter: PlayersFilter,
-        block_data: Option<BlockFilter>,
-    ) -> ContextResult<Vec<Player>>;
-    async fn get_precommits(&self, filter: PrecommitsFilter) -> ContextResult<Vec<Precommit>>;
-    async fn get_proofs(
-        &self,
-        filter: ProofsFilter,
-        include_data: bool,
-    ) -> ContextResult<Vec<Proof>>;
-    async fn get_topups(&self, filter: TopUpsFilter) -> ContextResult<Vec<TopUp>>;
-    async fn get_wasms(&self, filter: WasmsFilter) -> ContextResult<Vec<Wasm>>;
+        settings: BenchmarkSettings,
+        details: PrecommitDetails,
+    ) -> ContextResult<String>;
+    async fn get_proofs_ids(&self, filter: ProofsFilter) -> Vec<String>;
+    async fn get_proof_state(&self, benchmark_id: &String) -> Option<ProofState>;
+    async fn get_topup_ids(&self, filter: TopUpsFilter) -> Vec<String>;
+    async fn get_wasm_ids(&self, filter: WasmsFilter) -> Vec<String>;
     async fn verify_solution(
         &self,
         settings: &BenchmarkSettings,
