@@ -124,7 +124,7 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
 
             sample_nonces = data["sample_nonces"]
             start_nonce = int(batch["start_nonce"])
-            batch_size = int(batch["num_nonces"])
+            batch_size = int(batch["batch_size"])
 
             leafs = {}
             for nonce in sample_nonces:
@@ -156,7 +156,7 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
             submit_url = f"http://{master_ip}:{master_port}/submit-merkle-proofs/{batch_id}"
             logger.info(f"posting merkle proofs to {submit_url}")
 
-            async with session.post(f"{server_url}/proofs", json=merkle_proofs) as response:
+            async with session.post(f"{submit_url}/proofs", json=merkle_proofs) as response:
                 response_text = await resp.text() 
 
                 logger.info(f"response text: {resp.status}")
