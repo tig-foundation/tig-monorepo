@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 # Update the DATABASE_URL with your actual database credentials
-DATABASE_URL = "postgresql+psycopg2://"+os.environ.get("POSTGRES_USER")+":"+os.environ.get("POSTGRES_PASSWORD")+"@pgpool:5432/"+os.environ.get("POSTGRES_DB")
+DATABASE_URL = "postgresql+psycopg2://"+os.environ.get("POSTGRES_USER")+":"+os.environ.get("POSTGRES_PASSWORD")+"@db:5432/"+os.environ.get("POSTGRES_DB")
 
 engine = create_engine(
     DATABASE_URL,
