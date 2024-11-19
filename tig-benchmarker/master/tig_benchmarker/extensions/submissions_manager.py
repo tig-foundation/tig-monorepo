@@ -15,10 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from tig_benchmarker.database.init import SessionLocal, engine
 from tig_benchmarker.database.models.index import (
-    JobModel,
-    PrecommitRequestModel,
-    BenchmarkRequestModel,
-    ProofRequestModel
+    JobModel
 )
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -79,27 +76,14 @@ class SubmissionsManager:
    
     def handle_precommit(self, submit_precommit_req: SubmitPrecommitRequest):
         try:
-            # Create a PrecommitRequestModel entry
-            precommit_entry = PrecommitRequestModel(
-                challenge_id=submit_precommit_req.settings.challenge_id,  
-                settings=submit_precommit_req.settings.to_dict(),
-                num_nonces=submit_precommit_req.num_nonces,
-                timestamp=datetime.utcnow()
-            )
-            logger.info(f"Precommit Entry: {precommit_entry}")
-            self.db_session.add(precommit_entry)
-
             # Submit the precommit request
             success = self._post("precommit", submit_precommit_req)
 
             if success:
-                self.db_session.commit()
-                logger.debug(f"PrecommitRequestModel entry created with id {precommit_entry.id}")
                 logger.info(f"Precommit request for job_id '{submit_precommit_req.settings.challenge_id}' submitted successfully.")
             else:
                 logger.error(f"Failed to submit precommit request for job_id '{submit_precommit_req.settings.challenge_id}'.")
         except SQLAlchemyError as e:
-            self.db_session.rollback()
             logger.error(f"Database error during precommit submission: {e}")
         except Exception as e:
             self.db_session.rollback()
@@ -123,17 +107,6 @@ class SubmissionsManager:
             for job in eligible_jobs:
                 logger.debug(f"Processing Benchmark submission for job_id '{job.benchmark_id}'")
 
-                # Create a BenchmarkRequestModel entry
-                benchmark_entry = BenchmarkRequestModel(
-                    job_id=job.benchmark_id,
-                    benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
-                    merkle_root=str(job.merkle_root),
-                    solution_nonces=list(job.solution_nonces),
-                    timestamp=datetime.utcnow()
-                )
-                logger.info(f"Benchmark Entry: {benchmark_entry}")
-                self.db_session.add(benchmark_entry)
-                
                 # Update job's last_benchmark_submit_time
                 job.last_benchmark_submit_time = now
 
@@ -170,24 +143,12 @@ class SubmissionsManager:
                 JobModel.last_proof_submit_time < now - self.config.time_between_retries
             ).all()
 
-             
-
             if not eligible_jobs:
                 logger.debug("No Proof submissions to process")
                 return
 
             for job in eligible_jobs:
                 logger.debug(f"Processing Proof submission for job_id '{job.benchmark_id}'")
-
-                # # Create a ProofRequestModel entry
-                proof_entry = ProofRequestModel(
-                    job_id=job.benchmark_id,
-                    benchmark_id=job.benchmark_id,  # Assuming benchmark_id is same as job_id
-                    merkle_proofs=list(job.merkle_proofs.values()),
-                    timestamp=datetime.utcnow()
-                )
-                logger.info(f"Proof Entry: {proof_entry}")
-                self.db_session.add(proof_entry)
 
                 # Update job's last_proof_submit_time
                 job.last_proof_submit_time = now
