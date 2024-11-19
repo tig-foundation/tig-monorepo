@@ -342,17 +342,16 @@ class SlaveManager:
                     result = BatchResult.from_dict(batch_result_data.root)
                     
                     # Update JobModel's batch_merkle_roots
-                    job.batch_merkle_roots[batch_idx] = str(result.merkle_root)  # Assuming MerkleHash can be converted to string
+                    job.batch_merkle_roots[batch_idx] = str(result.merkle_root.to_str())  # Assuming MerkleHash can be converted to string
 
                     # Update solution_nonces
                     job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
-
                         
                     # Create BatchResultModel
                     batch_result = BatchResultModel(
                         benchmark_id=benchmark_id,
                         start_nonce=start_nonce,
-                        merkle_root=str(result.merkle_root),
+                        merkle_root=str(result.merkle_root.to_str()),
                         solution_nonces=result.solution_nonces,
                         merkle_proofs=[],
                         assigned_batch=assigned_batch  # Link to AssignedBatchModel
