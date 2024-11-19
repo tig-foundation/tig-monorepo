@@ -117,28 +117,28 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
             if resp.status != 200:
                 raise Exception(f"status {resp.status} when posting results to master: {response_text}")
             logger.debug(f"posting results took {now() - start} ms")
-            # Step 5: Calculate Merkle proofs for sampled nonces
 
+
+            # Step 5: Calculate Merkle proofs for sampled nonces
             data = json.loads(response_text)
 
             sample_nonces = data["sample_nonces"]
-
             start_nonce = int(batch["start_nonce"])
             batch_size = int(batch["num_nonces"])
 
             leafs = {}
-            for nonce in range(start_nonce, start_nonce + batch_size):
+            for nonce in sample_nonces:
                 file_path = f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}/{nonce}.json"
                 try:
                     with open(file_path) as f:
-                        leafs[nonce] = json.load(f)
+                        leafs[nonce] = OutputData.from_dict(json.load(f))
                 except FileNotFoundError:
-                    logger.error(f"File not found: {file_path}")
+                    print(f"File not found: {file_path}")
                 except json.JSONDecodeError:
-                    logger.error(f"Invalid JSON in file: {file_path}")
+                    print(f"Invalid JSON in file: {file_path}")
 
             merkle_tree = MerkleTree(
-                [OutputData.from_dict(x).to_merkle_hash() for x in leafs.values()],
+                [x.to_merkle_hash() for x in leafs.values()],
                 batch_size
             )
 
@@ -146,42 +146,29 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
                 MerkleProof(
                     leaf=leafs[n],
                     branch=merkle_tree.calc_merkle_branch(branch_idx=n - start_nonce)
-                )
+                ).to_dict()
                 for n in sample_nonces
             ]
+
+            # Submit proofs to the server
+            
+            start = now()
+            submit_url = f"http://{master_ip}:{master_port}/submit-merkle-proofs/{batch_id}"
+            logger.info(f"posting merkle proofs to {submit_url}")
+
+            async with session.post(f"{server_url}/proofs", json=merkle_proofs) as response:
+                response_text = await resp.text() 
+
+                logger.info(f"response text: {resp.status}")
+
+                if resp.status != 200:
+                    raise Exception(f"status {resp.status} when posting merkel proofs to master: {response_text}")
+                logger.debug(f"posting merkel proofs took {now() - start} ms")
+            
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
 
-# async def register_slave( master_ip, master_port, slave_name):
-#     slave_id = None
-#     # Step 1: Load slave id from file
-#     if os.path.exists("slave_id.txt"):
-#         with open("slave_id.txt", "r") as f:
-#             slave_id = int(f.read())
-    
-#     if slave_id is None:
-#         # Step 2: Register slave if not already registered
-#         cpu_cores = psutil.cpu_count(logical=False)
-#         cpu_threads = psutil.cpu_count(logical=True)
-#         memory = psutil.virtual_memory()
-
-#         slaveRegistration = {
-#             "slave_name": slave_name,
-#             "cpu_cores": cpu_cores,
-#             "cpu_threads": cpu_threads,
-#             "memory": memory.percent,
-#         }
-
-#         # Step 3: Send register slave request
-#         async with aiohttp.ClientSession() as session:
-#             async with session.post(f"http://{master_ip}:{master_port}/register_slave", json=slaveRegistration) as response:
-#                 response_json = await response.json()
-#                 slave_id = response_json["id"]
-#                 with open("slave_id.txt", "w") as f:
-#                     f.write(str(slave_id))
-
-#     return slave_id
 
 async def main(
     master_ip: str,
@@ -205,7 +192,6 @@ async def main(
                 headers = {
                     "User-Agent": slave_id
                 }
-
 
                 # Step 1: Query for job
                 start = now()

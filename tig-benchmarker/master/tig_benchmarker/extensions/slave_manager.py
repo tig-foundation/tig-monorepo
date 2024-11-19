@@ -392,7 +392,7 @@ class SlaveManager:
                 logger.error(f"Unexpected error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             
-        @self.app.post('/merkle-proofs/{batch_id}')
+        @self.app.post('/submit-merkle-proofs/{batch_id}')
         def get_merkle_proofs(batch_id, request: Request):
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
