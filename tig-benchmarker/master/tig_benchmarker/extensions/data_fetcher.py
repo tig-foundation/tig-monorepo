@@ -29,7 +29,7 @@ class DataFetcher:
         self.player_id = player_id
 
     def run(self) -> dict:
-        logger.debug("fetching latest block")
+        logger.debug("Fetching latest block")
         block_data = _get(f"{self.api_url}/get-block?include_data")
         block = Block.from_dict({k: v for k, v in block_data["block"].items() if k != 'data'})
         block.data = block_data["block"]["data"]
@@ -65,7 +65,7 @@ class DataFetcher:
             }
         }
 
-        logger.info(f"Player: {dummy_player}")
+        # logger.info(f"Player: {dummy_player}")
 
         player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), Player.from_dict(dummy_player))
         

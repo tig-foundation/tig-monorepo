@@ -21,16 +21,19 @@ class SlaveModel(Base):
     __tablename__ = 'slaves'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    slave = Column(String(255), unique=True, nullable=False)
+    name = Column(String(255), unique=True, nullable=False)
     num_of_cpus = Column(Integer, nullable=False)
     num_of_threads = Column(Integer, nullable=False)
     memory = Column(BigInteger, nullable=False)
     registered_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
 
+    # Relationships
+    batches = relationship("BatchModel", back_populates="slave", lazy="dynamic")
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
-            "slave_name": self.slave_name,
+            "slave_name": self.name,
             "num_of_cpus": self.num_of_cpus,
             "num_of_threads": self.num_of_threads,
             "memory": self.memory,
@@ -61,6 +64,7 @@ class JobModel(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
+    batches = relationship("BatchModel", back_populates="job")
 
     def to_dataclass(self) -> Job:
         return Job(
@@ -117,6 +121,29 @@ class JobModel(Base):
             ret.setdefault(batch_idx, []).append(nonce)
         return ret
     
+  
+    
 class BatchModel(Base):
     __tablename__ = 'batches'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    benchmark_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
+    slave_id = Column(Integer, ForeignKey('slaves.id'), nullable=False)
+    start_nonce = Column(Integer, nullable=False)
+    num_nonces = Column(Integer, nullable=False)
+    settings = Column(JSON, nullable=False)
+    wasm_vm_config = Column(JSON, nullable=False)
+    download_url = Column(String, nullable=False)
+    rand_hash = Column(String, nullable=False)
+    batch_size = Column(Integer, nullable=False)
+    sampled_nonces = Column(JSON, nullable=True)
+    solution_nonces = Column(JSON, nullable=True)
+    merkle_root = Column(String, nullable=True)
+    merkle_proofs = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
+
+    # Relationships
+    job = relationship("JobModel", back_populates="batches")
+    slave = relationship("SlaveModel", back_populates="batches")
 

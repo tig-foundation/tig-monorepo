@@ -39,32 +39,44 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 -- TODO: Add batch Table
 -- -- Create batches table
--- CREATE TABLE IF NOT EXISTS batches (
---     id SERIAL PRIMARY KEY,
---     settings JSONB NOT NULL,
---     settings_block_id VARCHAR NOT NULL REFERENCES blocks(id),
---     settings_player_id VARCHAR NOT NULL,
---     settings_difficulty JSONB NOT NULL,
---     settings_challenge_id VARCHAR NOT NULL,
---     settings_algorithm_id VARCHAR NOT NULL,
---     num_nonces INTEGER NOT NULL,
---     rand_hash VARCHAR NOT NULL,
---     wasm_vm_config JSONB NOT NULL,
---     download_url VARCHAR NOT NULL,
---     batch_size INTEGER NOT NULL,
---     challenge VARCHAR NOT NULL,
---     sampled_nonces JSONB,
---     merkle_root VARCHAR,
---     solution_nonces JSONB,
---     merkle_proofs JSONB,
---     batch_merkle_proofs JSONB,
---     batch_merkle_roots JSONB,
---     last_benchmark_submit_time INTEGER NOT NULL,
---     last_proof_submit_time INTEGER NOT NULL,
---     last_batch_retry_time JSONB NOT NULL,
---     created_at TIMESTAMP NOT NULL DEFAULT NOW()
--- );
+CREATE TABLE IF NOT EXISTS batches (
+    id SERIAL PRIMARY KEY,
+    benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
+    slave_id INTEGER NOT NULL REFERENCES slaves(id),
+    start_nonce INTEGER NOT NULL,
+    num_nonces INTEGER NOT NULL,
+    settings JSONB NOT NULL,
+    wasm_vm_config JSONB NOT NULL,
+    download_url VARCHAR NOT NULL,
+    rand_hash VARCHAR NOT NULL,
+    batch_size INTEGER NOT NULL,
+    sampled_nonces JSONB,
+    solution_nonces JSONB,
+    merkle_root VARCHAR,
+    merkle_proofs JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 
+-- Create a trigger function to update the updated_at field on row update
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- CREATE OR REPLACE TRIGGERs
+CREATE OR REPLACE TRIGGER trigger_update_batches_updated_at 
+BEFORE UPDATE ON batches 
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE OR REPLACE TRIGGER trigger_update_config_updated_at
+BEFORE UPDATE ON config
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 
 -- Initialize the Config Table only if it's empty
 INSERT INTO config (id, config_data)

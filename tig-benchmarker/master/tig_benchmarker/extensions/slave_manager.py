@@ -5,7 +5,7 @@ import re
 import signal
 import threading
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from tig_benchmarker.structs import *
@@ -14,9 +14,10 @@ from tig_benchmarker.database.init import SessionLocal, engine
 from sqlalchemy.orm.attributes import flag_modified
 from typing import Dict, List, Optional, Set
 import datetime
-from tig_benchmarker.database.models.index import JobModel, BatchResultModel, AssignedBatchModel, SlaveRegistryModel, ConfigModel
+from tig_benchmarker.database.models.index import JobModel, ConfigModel, SlaveModel, BatchModel
 from sqlalchemy.orm import sessionmaker
 from pydantic import BaseModel, ValidationError, RootModel
+from typing import Annotated
 import time
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -107,8 +108,8 @@ class SlaveManager:
                 num_of_threads = int(slave.get("num_of_threads"))
                 memory = int(slave.get("memory"))
 
-                slaveModel = SlaveRegistryModel(
-                    slave_name=name,
+                slaveModel = SlaveModel(
+                    name=name,
                     num_of_cpus=num_of_cpus,
                     num_of_threads=num_of_threads, 
                     memory = memory
@@ -142,9 +143,9 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.get("/get-batches")
-        def get_batches(request: Request):
+        def get_batches(slaveId: Annotated[str | None, Header()], request: Request):
             # Extract User-Agent header to identify the slave
-            slave_id = request.headers.get('User-Agent')
+            slave_id = slaveId
             if not slave_id:
                 logger.warning("Missing User-Agent header in get-batches request.")
                 raise HTTPException(status_code=403, detail="User-Agent header is required.")
@@ -166,6 +167,11 @@ class SlaveManager:
                 with self.db_session.begin():
                     # Fetch jobs from the database that are pending (merkle_root is None)
                     pending_jobs = self.db_session.query(JobModel).filter_by(merkle_root=None).all()
+                    slaveModel = self.db_session.query(SlaveModel).filter_by(id=slave_id).first()
+
+                    if not slaveModel:
+                        logger.warning(f"Slave '{slave_id}' requested batches but no matching slave found.")
+                        return HTTPException(status_code=404, detail="Slave not Registered.")
                     
                     for job in pending_jobs:
                         
@@ -178,13 +184,9 @@ class SlaveManager:
 
                         # Get max concurrent batches for this challenge
                         max_concurrent_batches = slave.max_concurrent_batches[job.challenge]
-                        
+
                         # Count currently assigned batches for this challenge and slave
-                        current_assigned = self.db_session.query(AssignedBatchModel).filter_by(
-                            benchmark_id=job.benchmark_id,
-                            assigned_slave=slave_id,
-                            completed_timestamp=None
-                        ).count()
+                        current_assigned = slaveModel.batches.count()
 
                         logger.info(f"Current assigned batches: {current_assigned}")
 
@@ -196,38 +198,22 @@ class SlaveManager:
                         for batch_idx in range(job.num_batches):
                             if available_slots <= 0:
                                 break  # Reached the max concurrent batches
-                            
+
+                            start_nonce = batch_idx * job.batch_size
+                            num_nonces = min(job.batch_size, job.num_nonces - start_nonce)
+
                             # Check if this batch is already assigned
-                            existing_assignment = self.db_session.query(AssignedBatchModel).filter_by(
+                            existing_assignment = self.db_session.query(BatchModel).filter_by(
                                 benchmark_id=job.benchmark_id,
-                                batch_idx=batch_idx
+                                start_nonce=start_nonce,
                             ).first()
 
                             logger.info(f"Current assigned batches: {current_assigned}")
 
                             if existing_assignment:
-                                if existing_assignment.completed_timestamp:
-                                    continue  # Skip if already completed
+                                continue  # Skip if already completed
+                                # if existing_assignment.completed_timestamp:
 
-                                start_nonce = batch_idx * job.batch_size
-                                num_nonces = min(job.batch_size, job.num_nonces - start_nonce)
-                                
-                                batch = Batch(
-                                    benchmark_id=job.benchmark_id,
-                                    start_nonce=start_nonce,
-                                    num_nonces=num_nonces,
-                                    settings=BenchmarkSettings.from_dict(job.settings),
-                                    sampled_nonces=job.sampled_nonces[batch_idx] if batch_idx in job.sampled_nonces else [],
-                                    wasm_vm_config=job.wasm_vm_config,
-                                    download_url=job.download_url,
-                                    rand_hash=job.rand_hash,
-                                    batch_size=job.batch_size
-                                )
-                                
-                                batches.append(batch.to_dict())
-                                selected_challenge = job.challenge
-                                continue  # Batch already assigned
-                            
                             # Check if batch is ready
                             if not (
                                 now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
@@ -241,25 +227,41 @@ class SlaveManager:
                             
                             # Assign the batch to this slave
                             assigned_timestamp = datetime.datetime.utcnow()
-                            assigned_batch = AssignedBatchModel(
-                                benchmark_id=job.benchmark_id,
-                                batch_idx=batch_idx,
-                                assigned_slave=slave_id,
-                                submitted_timestamp=assigned_timestamp,
-                                completed_timestamp=None
-                                # batch_result_id=None
-                            )
-                            self.db_session.add(assigned_batch)
+
+                            # assigned_batch = AssignedBatchModel(
+                            #     benchmark_id=job.benchmark_id,
+                            #     batch_idx=batch_idx,
+                            #     assigned_slave=slave_id,
+                            #     submitted_timestamp=assigned_timestamp,
+                            #     completed_timestamp=None
+                            #     # batch_result_id=None
+                            # )
                             
                             # Prepare the Batch data to return
-                            start_nonce = batch_idx * job.batch_size
-                            num_nonces = min(job.batch_size, job.num_nonces - start_nonce)
+                         
+
+                            batchSettings = BenchmarkSettings.from_dict(job.settings)
+
+                            batchModel = BatchModel(
+                                benchmark_id=slave_id,
+                                slave_id=slave_id,
+                                start_nonce=start_nonce,
+                                num_nonces=num_nonces,
+                                settings=batchSettings.to_dict(),
+                                wasm_vm_config=job.wasm_vm_config,
+                                download_url=job.download_url,
+                                rand_hash=job.rand_hash,
+                                batch_size=job.batch_size,
+                                sampled_nonces=job.sampled_nonces[batch_idx] if batch_idx in job.sampled_nonces else [],
+                            )
                             
+                            self.db_session.add(batchModel)
+
                             batch = Batch(
                                 benchmark_id=job.benchmark_id,
                                 start_nonce=start_nonce,
                                 num_nonces=num_nonces,
-                                settings=BenchmarkSettings.from_dict(job.settings),
+                                settings=batchSettings,
                                 sampled_nonces=job.sampled_nonces[batch_idx] if batch_idx in job.sampled_nonces else [],
                                 wasm_vm_config=job.wasm_vm_config,
                                 download_url=job.download_url,
@@ -287,11 +289,11 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.post("/submit-batch-result/{batch_id}")
-        def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request):
+        def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request, slaveId: Annotated[str | None, Header()]):
             Session = sessionmaker(bind=engine)
             session = Session()
             # Extract User-Agent header to identify the slave
-            slave_name = request.headers.get('User-Agent')
+            slave_name = slaveId
             if not slave_name:
                 logger.warning("Missing User-Agent header in submit-batch-result request.")
                 raise HTTPException(status_code=403, detail="User-Agent header is required.")

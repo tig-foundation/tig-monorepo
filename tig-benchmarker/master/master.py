@@ -35,10 +35,9 @@ def main():
     if not db_initialised:
         return
 
-    # # Get Config from db
+    # Get Config from db
     configModel = db_session.query(ConfigModel).first()
     config = Config.from_dict(configModel.config_data)
-    logger.info(f"Config: {config.api_url}")
 
     data_fetcher = DataFetcher(config.api_url, config.player_id)
     difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
@@ -90,7 +89,7 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Benchmarker")
-    parser.add_argument("config_path", help="Path to the configuration JSON file")
+    # parser.add_argument("config_path", help="Path to the configuration JSON file")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
