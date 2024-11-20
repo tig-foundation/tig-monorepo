@@ -117,7 +117,8 @@ class ClientManager:
             jobs_data = [
                 {
                     **job.to_dataclass().to_dict(),
-                    "batches": [ batch.to_dict() for batch in job.batches ]
+                    "batches": [ batch.to_dict() for batch in job.batches ],
+                    "created_at": str(job.created_at)
                 } for job in jobs
             ]
 
