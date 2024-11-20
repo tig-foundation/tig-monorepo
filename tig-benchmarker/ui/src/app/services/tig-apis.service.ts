@@ -39,17 +39,14 @@ export class TigApisService {
   async getConfig() {
     const url = `${this.base_url}/get-config`;
     const result = (await axios.get(url)).data;
-    console.log('getConfig', result);
     this.config.set(result);
     this.checkReady();
   }
 
   async saveConfig(data: any) {
-    console.log('saveConfig', data);
     try {
       const url = `${this.base_url}/update-config`;
       const result = (await axios.post(url, data)).data;
-      console.log('saveConfig', result);
       this.config.set(result);
       this.messageService.add({
         severity: 'success',
@@ -73,26 +70,82 @@ export class TigApisService {
 
   async getBenchmarks() {
     const url = `${this.base_url}/get-jobs`;
-    console.log('getBenchmarks', url);
     const result = (await axios.get(url)).data;
-    console.log('getBenchmarks', result);
     if (result) {
       this.benchmarks.set(
         result.map((b: any) => {
           let status = 'PENDING BENCHMARK';
-           if (b.last_proof_submit_time) {
+          if (b.last_proof_submit_time) {
             status = 'SUBMITTED';
           } else if (b.last_benchmark_submit_time) {
             status = 'PENDING PROOF';
-          } 
+          }
+          const num_solutions = b.solutions ? b.solutions.length : 0;
+
+          let time_elapsed = 0;
+          if (!b.last_proof_submit_time) {
+            const start_timestamp = b.created_at;
+            const start_normalizedTimestamp = start_timestamp.split('.')[0];
+            const start_date = new Date(start_normalizedTimestamp);
+            const seconds = Math.floor(start_date.getTime());
+            const now = Date.now();
+            time_elapsed = now - seconds;
+          } else {
+            const start_timestamp = b.created_at;
+            const start_normalizedTimestamp = start_timestamp.split('.')[0];
+            const start_date = new Date(start_normalizedTimestamp);
+            const seconds = Math.floor(start_date.getTime());
+
+            const end_timestamp = b.last_proof_submit_time;
+            const end_normalizedTimestamp = end_timestamp.split('.')[0];
+            const end_date = new Date(end_normalizedTimestamp);
+            const end_seconds = Math.floor(end_date.getTime());
+            time_elapsed = end_seconds - seconds;
+          }
+
+          const batches = b.batches.map((batch: any) => {
+            const batch_number =
+              Math.floor(batch.start_nonce / b.num_nonces) + 1;
+            const num_solutions = batch.solutions ? batch.solutions.length : 0;
+            const status = batch.merkle_proofs ? 'COMPLETED' : 'PENDING';
+            let time_elapsed = 0;
+            if (!batch.merkle_proofs) {
+              const start_timestamp = batch.created_at;
+              const start_normalizedTimestamp = start_timestamp.split('.')[0];
+              const start_date = new Date(start_normalizedTimestamp);
+              const seconds = Math.floor(start_date.getTime());
+              const now = Date.now();
+              time_elapsed = now - seconds;
+            } else {
+              const start_timestamp = batch.created_at;
+              const start_normalizedTimestamp = start_timestamp.split('.')[0];
+              const start_date = new Date(start_normalizedTimestamp);
+              const seconds = Math.floor(start_date.getTime());
+
+              const end_timestamp = batch.updated_at;
+              const end_normalizedTimestamp = end_timestamp.split('.')[0];
+              const end_date = new Date(end_normalizedTimestamp);
+              const end_seconds = Math.floor(end_date.getTime());
+              time_elapsed = end_seconds - seconds;
+            }
+            return {
+              ...batch,
+              batch_number,
+              num_solutions,
+              status,
+              time_elapsed,
+            };
+          });
+
           return {
             ...b,
             status: status,
-            time_elapsed: 0,
+            num_solutions,
+            time_elapsed,
+            batches,
           };
         })
       );
-      console.log('benchmarks', this.benchmarks());
     }
   }
 }
