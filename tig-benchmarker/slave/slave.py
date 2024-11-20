@@ -98,31 +98,9 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
         logger.info(f"Processing batch {batch_id}: {batch}")
 
-        # Step 2: Download WASM
-        wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
-        await download_wasm(session, batch['download_url'], wasm_path)
-
-        # Step 3: Run tig-worker
-        result = await run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path)
-
-        # Step 4: Submit results
-        start = now()
-        submit_url = f"http://{master_ip}:{master_port}/submit-batch-result/{batch_id}"
-        logger.info(f"posting results to {submit_url}")
-        async with session.post(submit_url, json=result, headers=headers) as resp:
-            response_text = await resp.text() 
-
-            logger.info(f"response text: {resp.status}")
-
-            if resp.status != 200:
-                raise Exception(f"status {resp.status} when posting results to master: {response_text}")
-            logger.debug(f"posting results took {now() - start} ms")
-
-
-            # Step 5: Calculate Merkle proofs for sampled nonces
-            data = json.loads(response_text)
-
-            sample_nonces = data["sample_nonces"]
+        # Step 1: Check if batch is already processed and call murkle proofs
+        if (len(batch["sampled_nonces"]) > 0 and os.path.isdir(f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}")):
+            sample_nonces = batch["sampled_nonces"]
             start_nonce = int(batch["start_nonce"])
             batch_size = int(batch["batch_size"])
 
@@ -150,13 +128,13 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
                 for n in sample_nonces
             ]
 
+
             # Submit proofs to the server
-            
             start = now()
             submit_url = f"http://{master_ip}:{master_port}/submit-merkle-proofs/{batch_id}"
             logger.info(f"posting merkle proofs to {submit_url}")
 
-            async with session.post(f"{submit_url}/proofs", json=merkle_proofs) as response:
+            async with session.post(f"{submit_url}", json={"merkle_proofs":merkle_proofs}, headers=headers) as resp:
                 response_text = await resp.text() 
 
                 logger.info(f"response text: {resp.status}")
@@ -164,7 +142,28 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
                 if resp.status != 200:
                     raise Exception(f"status {resp.status} when posting merkel proofs to master: {response_text}")
                 logger.debug(f"posting merkel proofs took {now() - start} ms")
-            
+
+        else:
+            # Step 2: Download WASM
+            wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
+            await download_wasm(session, batch['download_url'], wasm_path)
+
+            # Step 3: Run tig-worker
+            result = await run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path)
+
+            # Step 4: Submit results
+            start = now()
+            submit_url = f"http://{master_ip}:{master_port}/submit-batch-result/{batch_id}"
+            logger.info(f"posting results to {submit_url}")
+            async with session.post(submit_url, json=result, headers=headers) as resp:
+                response_text = await resp.text() 
+
+                logger.info(f"response text: {resp.status}")
+
+                if resp.status != 200:
+                    raise Exception(f"status {resp.status} when posting results to master: {response_text}")
+                logger.debug(f"posting results took {now() - start} ms")
+               
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")

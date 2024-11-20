@@ -81,7 +81,7 @@ class JobModel(Base):
             solution_nonces=self.solution_nonces,
             merkle_proofs={int(k): MerkleProof.from_dict(v) for k, v in self.merkle_proofs.items()},
             batch_merkle_proofs={int(k): MerkleProof.from_dict(v) for k, v in self.batch_merkle_proofs.items()},
-            batch_merkle_roots=[MerkleHash.from_string(root) if root else None for root in self.batch_merkle_roots],
+            batch_merkle_roots=[MerkleHash.from_str(root) if root else None for root in self.batch_merkle_roots],
             last_benchmark_submit_time=self.last_benchmark_submit_time,
             last_proof_submit_time=self.last_proof_submit_time,
             last_batch_retry_time=self.last_batch_retry_time

@@ -85,6 +85,9 @@ class Slave(RootModel[dict]):
 
 class BatchResultData(RootModel[dict]):
     pass
+
+class BatchMerkleProofData(RootModel[dict]):
+    pass
 class SlaveManager:
     def __init__(self, config: SlaveManagerConfig):
         self.config = config
@@ -166,7 +169,7 @@ class SlaveManager:
             try:
                 with self.db_session.begin():
                     # Fetch jobs from the database that are pending (merkle_root is None)
-                    pending_jobs = self.db_session.query(JobModel).filter_by(merkle_root=None).all()
+                    pending_jobs = self.db_session.query(JobModel).all()
                     slaveModel = self.db_session.query(SlaveModel).filter_by(id=slave_id).first()
 
                     if not slaveModel:
@@ -186,18 +189,18 @@ class SlaveManager:
                         max_concurrent_batches = slave.max_concurrent_batches[job.challenge]
 
                         # Count currently assigned batches for this challenge and slave
-                        current_assigned = slaveModel.batches.count()
+                        # current_assigned = slaveModel.batches.count()
 
-                        logger.info(f"Current assigned batches: {current_assigned}")
+                        # logger.info(f"Current assigned batches: {current_assigned}")
 
-                        available_slots = max_concurrent_batches - current_assigned
-                        if available_slots <= 0:
-                            continue  # No available slots for this challenge
+                        # available_slots = max_concurrent_batches - current_assigned
+                        # if available_slots <= 0:
+                        #     continue  # No available slots for this challenge
 
                         # Fetch available batches for this job
                         for batch_idx in range(job.num_batches):
-                            if available_slots <= 0:
-                                break  # Reached the max concurrent batches
+                            # if available_slots <= 0:
+                            #     break  # Reached the max concurrent batches
 
                             start_nonce = batch_idx * job.batch_size
                             num_nonces = min(job.batch_size, job.num_nonces - start_nonce)
@@ -208,11 +211,42 @@ class SlaveManager:
                                 start_nonce=start_nonce,
                             ).first()
 
-                            logger.info(f"Current assigned batches: {current_assigned}")
-
                             if existing_assignment:
+                                if len(job.sampled_nonces) > 0:
+                                    # Send Batch for proof submission
+
+                                    batch_sampled_nonces = []
+                                    for nonce in job.sampled_nonces:
+                                        # Check if nonce is in the batch
+                                        if nonce >= start_nonce and nonce < start_nonce + job.batch_size:
+                                            batch_sampled_nonces.append(nonce)
+
+                                    if len(batch_sampled_nonces) == 0:
+                                        continue
+
+
+                                    batchSettings = BenchmarkSettings.from_dict(job.settings)
+
+                                    batch = Batch(
+                                        benchmark_id=job.benchmark_id,
+                                        start_nonce=start_nonce,
+                                        num_nonces=num_nonces,
+                                        settings=batchSettings,
+                                        sampled_nonces=batch_sampled_nonces,
+                                        wasm_vm_config=job.wasm_vm_config,
+                                        download_url=job.download_url,
+                                        rand_hash=job.rand_hash,
+                                        batch_size=job.batch_size
+                                    )
+
+                                    existing_assignment.sampled_nonces = batch_sampled_nonces
+                                    
+                                    batches.append(batch.to_dict())
+                                    selected_challenge = job.challenge
+                                    # available_slots -= 1
+
                                 continue  # Skip if already completed
-                                # if existing_assignment.completed_timestamp:
+
 
                             # Check if batch is ready
                             if not (
@@ -224,21 +258,6 @@ class SlaveManager:
                                 )
                             ):
                                 continue  # Batch not ready
-                            
-                            # Assign the batch to this slave
-                            assigned_timestamp = datetime.datetime.utcnow()
-
-                            # assigned_batch = AssignedBatchModel(
-                            #     benchmark_id=job.benchmark_id,
-                            #     batch_idx=batch_idx,
-                            #     assigned_slave=slave_id,
-                            #     submitted_timestamp=assigned_timestamp,
-                            #     completed_timestamp=None
-                            #     # batch_result_id=None
-                            # )
-                            
-                            # Prepare the Batch data to return
-                         
 
                             batchSettings = BenchmarkSettings.from_dict(job.settings)
 
@@ -271,7 +290,7 @@ class SlaveManager:
                             
                             batches.append(batch.to_dict())
                             selected_challenge = job.challenge
-                            available_slots -= 1
+                            # available_slots -= 1
                     
                     logger.info(f"Batches: {batches}")
 
@@ -288,6 +307,7 @@ class SlaveManager:
                 logger.error(f"Database error during get_batches: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
+       
         @self.app.post("/submit-batch-result/{batch_id}")
         def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request, user_agent: Annotated[str | None, Header()]):
             Session = sessionmaker(bind=engine)
@@ -347,23 +367,21 @@ class SlaveManager:
                     batch.merkle_root = str(result.merkle_root.to_str())
                     batch.solution_nonces = result.solution_nonces
 
-                    # TODO: Filter sampled nonces based on start nonce and batch size
-                    if job.sampled_nonces is None:
-                        non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
-                        random.shuffle(result.solution_nonces)
-                        random.shuffle(non_solution_nonces)
-                        # num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
-                        sampled = (result.solution_nonces + non_solution_nonces)[:10]
-                    else:
-                        sampled = job.sampled_nonces
-
-                    logger.info(f"Sampled nonces: {sampled}")
+                    # if job.sampled_nonces is None:
+                    #     non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
+                    #     random.shuffle(result.solution_nonces)
+                    #     random.shuffle(non_solution_nonces)
+                    #     # num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
+                    #     sampled = (result.solution_nonces + non_solution_nonces)[:10]
+                    # else:
+                    #     sampled = job.sampled_nonces
+                    # logger.info(f"Sampled nonces: {sampled}")
                     
                     # Commit the transaction
                     session.commit()
 
                     logger.debug(f"Slave '{slave_name}' submitted batch result for benchmark '{benchmark_id}', start_nonce '{start_nonce}'.")
-                    return JSONResponse(content={"detail": "OK", "sample_nonces": sampled}, status_code=200)
+                    return JSONResponse(content={"detail": "OK"}, status_code=200)
             except SQLAlchemyError as e:
                 session.rollback()
                 logger.error(f"Database error during submit_batch_result: {e}")
@@ -375,8 +393,8 @@ class SlaveManager:
                 logger.error(f"Unexpected error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             
-        @self.app.post('/submit-merkle-proofs/{batch_id}')
-        def get_merkle_proofs(batch_id, request: Request):
+        @self.app.post("/submit-merkle-proofs/{batch_id}")
+        def get_merkle_proofs(batch_id, batch_merkle_proofs: BatchMerkleProofData, request: Request):
             # Extract User-Agent header to identify the slave
             slave_name = request.headers.get('User-Agent')
             if not slave_name:
@@ -397,6 +415,8 @@ class SlaveManager:
                 logger.warning(f"Invalid batch_id format: {batch_id}")
                 raise HTTPException(status_code=400, detail="Invalid batch_id format.")
             
+
+
             try:
                 with self.db_session.begin():
                     # Fetch the job from the database
@@ -404,18 +424,17 @@ class SlaveManager:
                     if not job:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent job '{benchmark_id}'.")
                         raise HTTPException(status_code=400, detail="Invalid benchmark_id.")
+
+                    # Get Request body/
+                    result = BatchMerkleProof.from_dict(batch_merkle_proofs.root)
                     
-                    # Get Request body
-                    result = BatchMerkleProof.from_dict(request.json())
-                    
-                    # Set the batch result's merkle proofs
-                    jobDataclass = job.to_dataclass()
-                    jobDataclass.batch_merkle_proofs.update({
-                        proof.leaf.nonce: proof
+   
+                    job.batch_merkle_proofs = {
+                        proof.leaf.nonce: proof.to_dict()
                         for proof in result.merkle_proofs
-                    })
-                    jobDict = jobDataclass.to_dict()
-                    job.batch_merkle_proofs = jobDict.get("batch_merkle_proofs")
+                    }
+                    
+                    flag_modified(job, "batch_merkle_proofs")
 
                     # Determine the batch index
                     batch_idx = start_nonce // job.batch_size
@@ -430,7 +449,10 @@ class SlaveManager:
                         raise HTTPException(status_code=400, detail="Invalid batch_idx.")
 
                     # Update batch
-                    batch.merkle_proofs = result.merkle_proofs
+                    batch.merkle_proofs = {
+                        proof.leaf.nonce: proof.to_dict()
+                        for proof in result.merkle_proofs
+                    }
 
                     # Commit the transaction
                     self.db_session.commit()
@@ -439,13 +461,13 @@ class SlaveManager:
 
             except SQLAlchemyError as e:
                 self.db_session.rollback()
-                logger.error(f"Database error during submit_batch_result: {e}")
+                logger.error(f"Database error during submit_merkle_proofs: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             except HTTPException as he:
                 raise he
             except Exception as e:
                 self.db_session.rollback()
-                logger.error(f"Unexpected error during submit_batch_result: {e}")
+                logger.error(f"Unexpected error during submit_merkle_proofs: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
     
     def start(self, host="0.0.0.0"):
