@@ -14,7 +14,7 @@ fn test_calc_solution_signature() {
 
     let output_data = OutputData {
         nonce: 123,
-        runtime_signature_arr: 456,
+        runtime_signature_arr: vec![(0, 456)],
         fuel_consumed: 789,
         solution: solution.clone(),
     };
