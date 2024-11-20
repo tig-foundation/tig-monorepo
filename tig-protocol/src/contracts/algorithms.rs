@@ -84,7 +84,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         active_algorithms_details,
         active_algorithms_state,
         active_algorithms_block_data,
-        prev_algorithms_block_data,
         active_opow_block_data,
         ..
     } = cache;
@@ -140,19 +139,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let is_merged = active_algorithms_state[algorithm_id].round_merged.is_some();
         let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
 
-        // first block of the round
-        let prev_merge_points = if block_details.height % config.rounds.blocks_per_round == 0 {
-            0
-        } else {
-            prev_algorithms_block_data
-                .get(algorithm_id)
-                .map_or(0, |d| d.merge_points)
-        };
-        algorithm_data.merge_points = if is_merged || algorithm_data.adoption < adoption_threshold {
-            prev_merge_points
-        } else {
-            prev_merge_points + 1
-        };
+        if !is_merged && algorithm_data.adoption >= adoption_threshold {
+            algorithm_data.merge_points += 1;
+        }
     }
 
     // update merges on last block of the round

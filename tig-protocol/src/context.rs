@@ -147,6 +147,5 @@ pub struct AddBlockCache {
     pub active_algorithms_state: HashMap<String, AlgorithmState>,
     pub active_algorithms_details: HashMap<String, AlgorithmDetails>,
     pub active_algorithms_block_data: HashMap<String, AlgorithmBlockData>,
-    pub prev_algorithms_block_data: HashMap<String, AlgorithmBlockData>,
     pub active_solutions: HashMap<String, (BenchmarkSettings, u32)>,
 }

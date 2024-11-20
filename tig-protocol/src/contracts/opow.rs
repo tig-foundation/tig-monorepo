@@ -242,7 +242,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         })
         .collect();
 
-    // FIXME minimum delegation
     for player_id in active_player_ids.iter() {
         let player_data = &active_players_block_data[player_id];
         let player_state = &active_players_state[player_id];
