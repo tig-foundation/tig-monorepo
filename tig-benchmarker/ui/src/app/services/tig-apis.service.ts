@@ -88,8 +88,9 @@ export class TigApisService {
             const start_normalizedTimestamp = start_timestamp.split('.')[0];
             const start_date = new Date(start_normalizedTimestamp);
             const seconds = Math.floor(start_date.getTime());
-            const now = Date.now();
-            
+            const utcDate1 = new Date(Date.now());
+            const utcDate2 = new Date(utcDate1.toUTCString());
+            const now = utcDate2.getTime();
             time_elapsed = now - seconds;
           } else {
             const start_timestamp = b.created_at;
@@ -115,7 +116,10 @@ export class TigApisService {
               const start_normalizedTimestamp = start_timestamp.split('.')[0];
               const start_date = new Date(start_normalizedTimestamp);
               const seconds = Math.floor(start_date.getTime());
-              const now = Date.now();
+
+              const utcDate1 = new Date(Date.now());
+              const utcDate2 = new Date(utcDate1.toUTCString());
+              const now = utcDate2.getTime();
               time_elapsed = now - seconds;
             } else {
               const start_timestamp = batch.created_at;
