@@ -243,15 +243,16 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         .collect();
 
     for player_id in active_player_ids.iter() {
-        let player_data = &active_players_block_data[player_id];
+        let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
-        if player_state.delegatee.is_none() {
+        if !active_opow_ids.contains(player_id) && player_state.delegatee.is_none() {
             continue;
         }
-        let mut delegatee = player_state.delegatee.clone().unwrap().value;
-        if active_opow_ids.contains(player_id) {
-            delegatee = player_id.clone();
+        let mut delegatee = player_id.clone();
+        if player_state.delegatee.is_some() {
+            delegatee = player_state.delegatee.clone().unwrap().value;
         }
+        player_data.delegatee = Some(delegatee.clone());
         if !active_opow_ids.contains(&delegatee) {
             continue;
         }
