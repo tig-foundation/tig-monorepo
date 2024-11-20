@@ -40,7 +40,6 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     DepositsConfig {
         lock_address: String,
-        min_lock_amount: PreciseNumber,
         min_lock_period_secs: u64,
         max_lock_period_rounds: u32,
         lock_period_multiplier: f64,
@@ -48,7 +47,8 @@ serializable_struct_with_getters! {
         default_reward_share: f64,
         reward_share_update_period: u32,
         delegatee_update_period: u32,
-        deposit_threshold_for_delegation: PreciseNumber,
+        delegator_min_deposit: PreciseNumber,
+        delegatee_min_deposit: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {

@@ -1,5 +1,6 @@
 use crate::context::*;
 use logging_timer::time;
+use serde::de;
 use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 use tig_utils::*;
@@ -27,7 +28,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_opow_ids = &block_data.active_ids[&ActiveType::OPoW];
 
     // update cutoffs
-    let self_deposit = active_opow_ids
+    let self_deposit = active_player_ids
         .iter()
         .map(|player_id| {
             (
@@ -245,21 +246,22 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for player_id in active_player_ids.iter() {
         let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
-        if !active_opow_ids.contains(player_id) && player_state.delegatee.is_none() {
+        if active_opow_ids.contains(player_id) {
+            player_data.delegatee = Some(player_id.clone());
+        } else if let Some(delegatee) = &player_state.delegatee {
+            if !active_opow_ids.contains(&delegatee.value)
+                || self_deposit[player_id] < config.deposits.delegator_min_deposit
+                || self_deposit[&delegatee.value] < config.deposits.delegatee_min_deposit
+            {
+                continue;
+            }
+            player_data.delegatee = Some(delegatee.value.clone());
+        } else {
             continue;
         }
-        let mut delegatee = player_id.clone();
-        if player_state.delegatee.is_some() {
-            delegatee = player_state.delegatee.clone().unwrap().value;
-        }
-        player_data.delegatee = Some(delegatee.clone());
-        if !active_opow_ids.contains(&delegatee) {
-            continue;
-        }
-        if self_deposit[&delegatee] < config.deposits.deposit_threshold_for_delegation {
-            continue;
-        }
-        let opow_data = active_opow_block_data.get_mut(&delegatee).unwrap();
+        let opow_data = active_opow_block_data
+            .get_mut(player_data.delegatee.as_ref().unwrap())
+            .unwrap();
         opow_data.delegators.insert(player_id.clone());
         opow_data.associated_deposit += player_data.weighted_deposit;
     }

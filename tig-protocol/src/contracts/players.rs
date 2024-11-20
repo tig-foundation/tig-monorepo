@@ -70,7 +70,7 @@ pub async fn submit_deposit<T: Context>(
     if linear_lock.cliff_timestamp != 0 {
         return Err(anyhow!("LinearLock with cliff not supported"));
     }
-    if linear_lock.amount < config.deposits.min_lock_amount {
+    if linear_lock.amount < config.deposits.delegator_min_deposit {
         return Err(anyhow!("LinearLock must be at least min_lock_amount"));
     }
     let now = SystemTime::now()
