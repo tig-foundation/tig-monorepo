@@ -13,7 +13,7 @@ pub async fn submit_algorithm<T: Context>(
     challenge_id: String,
 ) -> Result<String> {
     let config = ctx.get_config().await;
-    let latest_block_id = ctx.get_block_id(BlockFilter::Latest).await.unwrap();
+    let latest_block_id = ctx.get_latest_block_id().await;
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     if !ctx
         .get_challenge_state(&challenge_id)

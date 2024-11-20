@@ -224,14 +224,11 @@ pub enum TxType {
     Binary,
     Breakthrough,
     Challenge,
-    Delegate,
     Deposit,
     Fraud,
     Precommit,
     Proof,
-    RewardShare,
     Topup,
-    Vote,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -240,8 +237,8 @@ pub enum ActiveType {
     Breakthrough,
     Challenge,
     Deposit,
-    Player,
     OPoW,
+    Player,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -258,7 +255,7 @@ serializable_struct_with_getters! {
         num_confirmed: HashMap<TxType, u32>,
         num_active: HashMap<ActiveType, u32>,
         eth_block_num: Option<String>,
-        supply: HashMap<SupplyType, PreciseNumber>, // circulating, locked, burnt,
+        supply: HashMap<SupplyType, PreciseNumber>,
         timestamp: u64,
     }
 }
@@ -402,6 +399,7 @@ pub enum RewardType {
 }
 serializable_struct_with_getters! {
     PlayerBlockData {
+        delegatee: Option<String>,
         reward_by_type: HashMap<RewardType, PreciseNumber>,
         deposit_by_locked_period: Vec<PreciseNumber>,
         weighted_deposit: PreciseNumber,

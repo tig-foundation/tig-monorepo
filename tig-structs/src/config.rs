@@ -23,7 +23,7 @@ serializable_struct_with_getters! {
     BreakthroughsConfig {
         academic_fund_address: String,
         min_percent_yes_votes: f64,
-        vote_period_rounds: u32,
+        vote_period: u32,
         min_lock_period_to_vote: u32,
         submission_fee: PreciseNumber,
         adoption_threshold: f64,
@@ -56,7 +56,7 @@ serializable_struct_with_getters! {
         min_num_solutions: u32,
         submission_delay_multiplier: f64,
         max_samples: usize,
-        max_active_period_blocks: u32,
+        lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
         max_fee_percentage_delta: f64,
@@ -128,7 +128,7 @@ serializable_struct_with_getters! {
         submission_fee: PreciseNumber,
         adoption_threshold: f64,
         merge_points_threshold: u32,
-        push_delay: u32,
+        push_delay_period: u32,
     }
 }
 serializable_struct_with_getters! {

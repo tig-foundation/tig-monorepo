@@ -100,7 +100,7 @@ pub async fn set_delegatee<T: Context>(
     delegatee: String,
 ) -> Result<()> {
     let config = ctx.get_config().await;
-    let latest_block_id = ctx.get_block_id(BlockFilter::Latest).await.unwrap();
+    let latest_block_id = ctx.get_latest_block_id().await;
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
@@ -124,7 +124,7 @@ pub async fn set_reward_share<T: Context>(
     reward_share: f64,
 ) -> Result<()> {
     let config = ctx.get_config().await;
-    let latest_block_id = ctx.get_block_id(BlockFilter::Latest).await.unwrap();
+    let latest_block_id = ctx.get_latest_block_id().await;
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
