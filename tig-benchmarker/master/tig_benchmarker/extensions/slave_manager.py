@@ -143,9 +143,9 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.get("/get-batches")
-        def get_batches(user_agent: Annotated[str | None, Header()], request: Request):
+        def get_batches( request: Request):
             # Extract User-Agent header to identify the slave
-            slave_id = user_agent
+            slave_id = request.headers.get("User-Agent")
             if not slave_id:
                 logger.warning("Missing User-Agent header in get-batches request.")
                 raise HTTPException(status_code=403, detail="User-Agent header is required.")
@@ -320,25 +320,17 @@ class SlaveManager:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent job '{benchmark_id}'.")
                         raise HTTPException(status_code=400, detail="Invalid benchmark_id.")
 
+                    # Fetch the batch from the database
+                    batch = session.query(BatchModel).filter_by(benchmark_id=benchmark_id, start_nonce=start_nonce).first()
+                    if not batch:
+                        logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent batch '{batch_idx}' of job '{benchmark_id}'.")
+                        raise HTTPException(status_code=400, detail="Invalid batch_idx.")
+
                     # Determine the batch index
                     batch_idx = start_nonce // job.batch_size
                     if batch_idx >= job.num_batches:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result with invalid start_nonce '{start_nonce}'.")
                         raise HTTPException(status_code=400, detail="Invalid start_nonce.")
-                    
-                    # Fetch the AssignedBatchModel
-                    assigned_batch = session.query(AssignedBatchModel).filter_by(
-                        benchmark_id=benchmark_id,
-                        batch_idx=batch_idx,
-                        assigned_slave=slave_name,
-                        completed_timestamp=None
-                    ).first()
-
-                    logger.info(f"Assigned batch: {assigned_batch}")
-                    
-                    if not assigned_batch:
-                        logger.warning(f"Slave '{slave_name}' submitted a batch result for an unassigned or already completed batch '{batch_id}'.")
-                        raise HTTPException(status_code=400, detail="Batch not assigned or already completed.")
                     
                     # Get body from request
                     result = BatchResult.from_dict(batch_result_data.root)
@@ -349,21 +341,10 @@ class SlaveManager:
                     # Update solution_nonces
                     job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
                         
-                    # Create BatchResultModel
-                    batch_result = BatchResultModel(
-                        benchmark_id=benchmark_id,
-                        start_nonce=start_nonce,
-                        merkle_root=str(result.merkle_root.to_str()),
-                        solution_nonces=result.solution_nonces,
-                        merkle_proofs=[],
-                        assigned_batch=assigned_batch  # Link to AssignedBatchModel
-                    )
-                    session.add(batch_result)
-                    session.flush() # To get batch_result.id
-                    
-                    # Update AssignedBatchModel with completed_timestamp and batch_result_id
-                    assigned_batch.completed_timestamp = datetime.datetime.utcnow()
-                    # assigned_batch.batch_result_id = batch_result.id
+                    # Update batch
+
+                    batch.merkle_root = str(result.merkle_root.to_str())
+                    batch.solution_nonces = result.solution_nonces
 
                     # TODO: Filter sampled nonces based on start nonce and batch size
                     if job.sampled_nonces is None:
@@ -427,7 +408,28 @@ class SlaveManager:
                     result = BatchMerkleProof.from_dict(request.json())
                     
                     # Set the batch result's merkle proofs
-                    job.merkle_proofs = result.merkle_proofs
+                    jobDataclass = job.to_dataclass()
+                    jobDataclass.batch_merkle_proofs.update({
+                        proof.leaf.nonce: proof
+                        for proof in result.merkle_proofs
+                    })
+                    jobDict = jobDataclass.to_dict()
+                    job.batch_merkle_proofs = jobDict.get("batch_merkle_proofs")
+
+                    # Determine the batch index
+                    batch_idx = start_nonce // job.batch_size
+                    if batch_idx >= job.num_batches:
+                        logger.warning(f"Slave '{slave_name}' submitted a batch result with invalid start_nonce '{start_nonce}'.")
+                        raise HTTPException(status_code=400, detail="Invalid start_nonce.")
+
+                    # Fetch the batch from the database
+                    batch = self.db_session.query(BatchModel).filter_by(benchmark_id=benchmark_id, start_nonce=start_nonce).first()
+                    if not batch:
+                        logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent batch '{batch_idx}' of job '{benchmark_id}'.")
+                        raise HTTPException(status_code=400, detail="Invalid batch_idx.")
+
+                    # Update batch
+                    batch.merkle_proofs = result.merkle_proofs
 
                     # Commit the transaction
                     self.db_session.commit()

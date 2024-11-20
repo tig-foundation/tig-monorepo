@@ -196,11 +196,11 @@ async def main(
                 # Step 1: Query for job
                 start = now()
                 get_batch_url = f"http://{master_ip}:{master_port}/get-batches"
-                logger.info(f"fetching job from {get_batch_url}")
+                logger.info(f"Fetching job from {get_batch_url}")
                 async with session.get(get_batch_url, headers=headers) as resp:
-                    logger.info(f"response text: {resp.text()}")
                     if resp.status != 200:
                         raise Exception(f"status {resp.status} when fetching job: {await resp.text()}")
+                    logger.info(f"response text: {await resp.text()}")
                     batches = await resp.json(content_type=None)
                 logger.debug(f"fetching job: took {now() - start}ms")
 

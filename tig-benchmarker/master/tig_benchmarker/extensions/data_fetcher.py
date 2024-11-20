@@ -34,7 +34,7 @@ class DataFetcher:
         block = Block.from_dict({k: v for k, v in block_data["block"].items() if k != 'data'})
         block.data = block_data["block"]["data"]
         
-        logger.info(f"New block detected @ height {block.details.height}, fetching data")
+        # logger.info(f"New block detected @ height {block.details.height}, fetching data")
         urls = [
             f"{self.api_url}/get-algorithms?block_id={block.id}",
             f"{self.api_url}/get-players?player_type=benchmarker&block_id={block.id}",
