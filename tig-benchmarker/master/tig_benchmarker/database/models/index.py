@@ -64,7 +64,7 @@ class JobModel(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow(), nullable=False)
     
     # Relationships
-    batches = relationship("BatchModel", back_populates="job")
+    batches = relationship("BatchModel", back_populates="job", lazy="joined")
 
     def to_dataclass(self) -> Job:
         return Job(
@@ -146,4 +146,23 @@ class BatchModel(Base):
     # Relationships
     job = relationship("JobModel", back_populates="batches")
     slave = relationship("SlaveModel", back_populates="batches")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "benchmark_id": self.benchmark_id,
+            "slave_id": self.slave_id,
+            "start_nonce": self.start_nonce,
+            "num_nonces": self.num_nonces,
+            "settings": self.settings,
+            "sampled_nonces": self.sampled_nonces,
+            "wasm_vm_config": self.wasm_vm_config,
+            "download_url": self.download_url,
+            "rand_hash": self.rand_hash,
+            "batch_size": self.batch_size,
+            "sampled_nonces": self.sampled_nonces,
+            "merkle_root": self.merkle_root,
+            "merkle_proofs": self.merkle_proofs,
+            "created_at": str(self.created_at),
+            "updated_at": str(self.updated_at)
+        }
 

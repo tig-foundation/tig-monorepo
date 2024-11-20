@@ -243,7 +243,7 @@ class SlaveManager:
                             batchSettings = BenchmarkSettings.from_dict(job.settings)
 
                             batchModel = BatchModel(
-                                benchmark_id=slave_id,
+                                benchmark_id=job.benchmark_id,
                                 slave_id=slave_id,
                                 start_nonce=start_nonce,
                                 num_nonces=num_nonces,
