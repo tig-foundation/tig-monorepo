@@ -234,6 +234,7 @@ pub enum TxType {
 #[serde(rename_all = "lowercase")]
 pub enum ActiveType {
     Algorithm,
+    Benchmark,
     Breakthrough,
     Challenge,
     Deposit,
