@@ -143,9 +143,9 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.get("/get-batches")
-        def get_batches(slaveId: Annotated[str | None, Header()], request: Request):
+        def get_batches(user_agent: Annotated[str | None, Header()], request: Request):
             # Extract User-Agent header to identify the slave
-            slave_id = slaveId
+            slave_id = user_agent
             if not slave_id:
                 logger.warning("Missing User-Agent header in get-batches request.")
                 raise HTTPException(status_code=403, detail="User-Agent header is required.")
@@ -289,11 +289,11 @@ class SlaveManager:
                 raise HTTPException(status_code=500, detail="Internal server error.")
         
         @self.app.post("/submit-batch-result/{batch_id}")
-        def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request, slaveId: Annotated[str | None, Header()]):
+        def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request, user_agent: Annotated[str | None, Header()]):
             Session = sessionmaker(bind=engine)
             session = Session()
             # Extract User-Agent header to identify the slave
-            slave_name = slaveId
+            slave_name = user_agent
             if not slave_name:
                 logger.warning("Missing User-Agent header in submit-batch-result request.")
                 raise HTTPException(status_code=403, detail="User-Agent header is required.")
