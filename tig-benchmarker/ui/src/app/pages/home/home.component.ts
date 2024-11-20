@@ -8,18 +8,12 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
-import { EditSettingsDialogComponent } from '../../components/edit-settings-dialog/edit-settings-dialog.component';
 import { TigApisService } from '../../services/tig-apis.service';
 import { TabViewModule } from 'primeng/tabview';
-import { AsyncPipe, CurrencyPipe, DecimalPipe } from '@angular/common';
 import { ChartModule } from 'primeng/chart';
 import { IBenchmark } from '../../interfaces/IBenchmark';
-import { AlgorithmPipe } from '../../pipes/algorithm.pipe';
-import { ChallengePipe } from '../../pipes/challenge.pipe';
 import { TimeConverterPipe } from '../../pipes/time-converter.pipe';
-import { ICutoff } from '../../interfaces/ICutoff';
 import { PanelModule } from 'primeng/panel';
-import { IImbalance } from '../../interfaces/IImbalance';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -35,218 +29,49 @@ import { IImbalance } from '../../interfaces/IImbalance';
     IconFieldModule,
     FormsModule,
     ReactiveFormsModule,
-    EditSettingsDialogComponent,
     TabViewModule,
-    CurrencyPipe,
-    DecimalPipe,
     ChartModule,
-    AsyncPipe,
     TimeConverterPipe,
-    AlgorithmPipe,
-    ChallengePipe,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
 export class HomeComponent {
   tigService = inject(TigApisService);
-  price_usd: any = signal(null);
-  volume_24h: any = signal(null);
-  round_earnings: any = signal(null);
-  latest_earnings: any = signal(null);
-  available_fees: any = signal(null);
 
-  // Rewards Graph
-  rewards_data: any;
-  rewards_labels: any;
-  rewards_graph_options: any;
   // Benchmarks Table
   benchmarks: any = signal(null);
-
-  // Cutoff and Imbalance
-  cutoff: any = signal(null);
-  imbalance: any = signal(null);
-
-  // Challenges Table
-  challenge_table: any = signal(null);
-  challenge_summary: any = signal(null);
-
-  //Delegation Cards
-  locked_deposit: any = signal(null);
-  total_delegated: any = signal(null);
-  delegators: any = signal([]);
+  expandedRows = {};
 
   constructor() {
-    this.tigService.price_info$.subscribe((data: any) => {
-      if (data) {
-        this.price_usd.set(data.priceUsd);
-        this.volume_24h.set(data.volume?.h24);
-      }
-    });
-    // get Earnings and fees data
-    this.tigService.latest_block$.subscribe((data: any) => {
-      if (data) {
-        this.available_fees.set(
-          this.tigService.player_stats().available_fee_balance
-        );
-        this.round_earnings.set(this.tigService.player_stats().round_earnings);
-        this.latest_earnings.set(this.tigService.player_stats().reward);
-      }
-    });
     this.init();
   }
 
   init() {
-    this.getBenchmarks();
-    this.initiateChart();
-    this.getCutoffAndImbalance();
+    this.tigService.benchmarks$.subscribe((data: any) => {
+      console.log('benchmarks data', data);
+      this.getBenchmarks();
+    });
   }
 
   getBenchmarks() {
-    const benchmark_test_data: IBenchmark[] = this.tigService
-      .benchmarks()
-  
-
-    benchmark_test_data.map((b) => {
+    const benchmark_data: IBenchmark[] = this.tigService.benchmarks();
+    console.log('benchmark_data', benchmark_data);
+    benchmark_data.map((b) => {
       b.time_elapsed =
         new Date(b.end_time).getTime() - new Date(b.start_time).getTime();
     });
-    this.benchmarks.set(benchmark_test_data);
-
-    this.changeChallengeView(0);
+    this.benchmarks.set(benchmark_data);
   }
 
-  initiateChart() {
-    //get rewards data
-    this.rewards_labels = [
-      '1',
-      '2',
-      '3',
-      '4',
-      '5',
-      '6',
-      '7',
-      '8',
-      '9',
-      '10',
-      '11',
-      '12',
-      '13',
-      '14',
-      '15',
-      '16',
-      '17',
-      '18',
-      '19',
-      '20',
-      '21',
-      '22',
-      '23',
-      '24',
-      '25',
-    ];
-    const rewards_data = Array.from(
-      { length: 25 },
-      () => Math.floor(Math.random() * 550) / 100
+  expandAll() {
+    this.expandedRows = this.benchmarks().reduce(
+      (acc:any, p:any) => (acc[p.benchmark_id] = true) && acc,
+      {}
     );
-
-    // set chart data
-    const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
-    const textColorSecondary = documentStyle.getPropertyValue(
-      '--text-color-secondary'
-    );
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
-
-    this.rewards_data = {
-      labels: this.rewards_labels,
-      datasets: [
-        {
-          label: 'Block Rewards',
-          data: rewards_data,
-          fill: false,
-          tension: 0.4,
-        },
-      ],
-    };
-
-    this.rewards_graph_options = {
-      maintainAspectRatio: false,
-      aspectRatio: 0.6,
-      plugins: {
-        legend: {
-          labels: {
-            color: textColor,
-          },
-        },
-      },
-      scales: {
-        x: {
-          ticks: {
-            color: textColorSecondary,
-          },
-          grid: {
-            color: surfaceBorder,
-            drawBorder: false,
-          },
-        },
-        y: {
-          ticks: {
-            color: textColorSecondary,
-          },
-          grid: {
-            color: surfaceBorder,
-            drawBorder: false,
-          },
-        },
-      },
-    };
   }
 
-  getCutoffAndImbalance() {
-    const cutoff: ICutoff = {
-      cutoff: 0.5,
-      c001_qualifiers: 1,
-      c002_qualifiers: 2,
-      c003_qualifiers: 3,
-      c004_qualifiers: 4,
-      deposit: 100,
-    };
-
-    this.cutoff.set(cutoff);
-
-    const imbalance: IImbalance = {
-      imbalance: 25,
-      c001_qualifiers: 1,
-      c002_qualifiers: 2,
-      c003_qualifiers: 3,
-      c004_qualifiers: 4,
-      c001_solutions: 10,
-      c002_solutions: 20,
-      c003_solutions: 30,
-      c004_solutions: 40,
-      deposit: 100,
-      deposit_qualifiers: 50,
-    };
-
-    this.imbalance.set(imbalance);
-  }
-
-  changeChallengeView(challenge: any) {
-    const selected = this.tigService.challenges()[challenge];
-    this.challenge_table.set(
-      this.benchmarks().filter((b: any) => b.challenge_id === selected.id)
-    );
-    let solutions = 0;
-    this.challenge_table().forEach((element: any) => {
-      solutions = solutions + element.solutions;
-    });
-    // Set Challenge Summary Information
-    const summary = {
-      base_fee: 0, // SET BASE FEE HERE
-      solutions: solutions,
-      qualifiers: 0,
-    };
-    this.challenge_summary.set(summary);
+  collapseAll() {
+    this.expandedRows = {};
   }
 }

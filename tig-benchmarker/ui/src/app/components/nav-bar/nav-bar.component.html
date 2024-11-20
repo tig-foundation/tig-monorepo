@@ -154,48 +154,7 @@
     </svg>
   </div>
   <div class="w-full flex flex-column p-2">
-    @if(!wallet_service.wallet()){
-    <p-button
-      label="Connect Wallet"
-      [style]="{
-            width: '100%',
-            'margin-top':'15px',
-            'margin-bottom':'25px',
-            'margin-left':'5px',
-            'margin-right':'5px',
-          }"
-      [rounded]="true"
-      (onClick)="wallet_connector_visible = true"
-    />
-    <p-dialog
-      header="Connect Wallet"
-      [modal]="true"
-      [(visible)]="wallet_connector_visible"
-      [style]="{ width: '50rem' }"
-    >
-      <app-wallet-connector></app-wallet-connector>
-    </p-dialog>
-    } @else {
-    <div class="flex flex-column align-items-center">
-      <p class="mt-0 mb-0">Connected Account</p>
-      <p class="mt-0">{{ wallet_service.wallet().address_display }}</p>
-      <p class="mb-0">API key :</p>
-      <p class="mt-0">{{ wallet_service.wallet().address }}</p>
-      <p-button
-        label="Disconnect Wallet"
-        [style]="{
-            width: '100%',
-            'margin-top':'15px',
-            'margin-bottom':'25px',
-            'margin-left':'5px',
-            'margin-right':'5px',
-          }"
-        [rounded]="true"
-        (onClick)="wallet_service.disconnectWallet()"
-      />
-    </div>
-    }
-
+  
     <p-button
       label="Home"
       [style]="{
@@ -207,17 +166,7 @@
       [outlined]="true"
       (click)="router.navigate(['/'])"
     />
-    <p-button
-      label="Slave Manager"
-      [style]="{
-        width: '100%',
-        margin: '5px'
-      }"
-      icon="pi pi-server"
-      [rounded]="true"
-      [outlined]="true"
-      (click)="router.navigate(['/slaves'])"
-    />
+
     <p-button
       label="Settings"
       [style]="{
@@ -234,14 +183,11 @@
   <div class="w-full text-center" style="position: relative; bottom: 0">
     <p
       style="font-size: x-small; cursor: pointer"
-      (click)="tigService.initData()"
+      (click)="tigService.init()"
     >
       Data Refresh
     </p>
     <p-progressBar [value]="value" [style]="{ height: '6px' }" />
     <p style="font-size: x-small">Version : 1.0</p>
-    <p style="font-size: x-small" (click)="tigService.disconnect()">
-      Disconnect
-    </p>
   </div>
 </div>

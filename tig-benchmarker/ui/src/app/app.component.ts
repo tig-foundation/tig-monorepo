@@ -7,7 +7,6 @@ import { ButtonModule } from 'primeng/button';
 import { TigApisService } from './services/tig-apis.service';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
-import { AuthGuard } from './gaurds/auth.guard';
 
 @Component({
   selector: 'app-root',
@@ -20,11 +19,10 @@ import { AuthGuard } from './gaurds/auth.guard';
     ReactiveFormsModule,
     ToastModule,
     ButtonModule,
-  
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
-  providers: [MessageService,TigApisService],
+  providers: [MessageService, TigApisService],
 })
 export class AppComponent {
   tigService = inject(TigApisService);

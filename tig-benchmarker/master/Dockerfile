@@ -12,4 +12,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["python", "master.py", "./config.json"]
+CMD ["python", "master.py"]

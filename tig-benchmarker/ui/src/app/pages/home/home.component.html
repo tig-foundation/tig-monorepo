@@ -1,527 +1,213 @@
 @if(tigService.ready()){
-<div class="grid p-3">
-  <div class="col-4 p-4">
-    <p-card header="Price" class="w-full">
-      <div class="flex flex-column justify-content-center align-items-center">
-        @if(tigService.price_info()){
-        <p>
-          Price : <b>{{ tigService.price_info().priceUsd | currency }}</b>
-        </p>
-        <p>
-          24 Hour Volume :
-          <b>{{ tigService.price_info().volume.h24 | currency }}</b>
-        </p>
-        } @else {
-        <p>Could not get Price Info</p>
-        }
-      </div>
-    </p-card>
-  </div>
-  <div class="col-4 p-4">
-    <p-card header="Earnings" class="w-full">
-      <div class="flex flex-column justify-content-center align-items-center">
-        @if(round_earnings()){
-        <p>
-          Round Earnings : <b>{{ round_earnings() | number : "1.2-2" }}</b>
-        </p>
-        <p>
-          Latest Earnings : <b>{{ latest_earnings() | number : "1.2-2" }}</b>
-        </p>
-        } @else {
-        <p>Could not get Earnings Info</p>
-        }
-      </div>
-    </p-card>
-  </div>
-  <div class="col-4 p-4">
-    <p-card header="Fees" class="w-full">
-      <div class="flex flex-column justify-content-center align-items-center">
-        @if(available_fees()){
-        <p>
-          Available Fees : <b>{{ available_fees() | number : "1.2-2" }}</b>
-        </p>
-        <p-button label="Top Up" [rounded]="true"></p-button>
-        } @else {
-        <p>Could not get Fee Info</p>
-        }
-      </div>
-    </p-card>
-  </div>
-</div>
-<div class="w-full">
-  <p-chart
-    type="line"
-    [data]="rewards_data"
-    [options]="rewards_graph_options"
-  />
-</div>
-<br />
-<p-card header="Benchmarks">
-  @if(benchmarks()){
-  <p-table
-    #benchmarksTable
-    [value]="benchmarks()"
-    [tableStyle]="{ 'min-width': '50rem' }"
-    styleClass="p-datatable-striped"
-    [paginator]="true"
-    [rows]="5"
-    [rowsPerPageOptions]="[5, 10, 20]"
-    [globalFilterFields]="[
-      'age',
-      'challenge',
-      'algorithm',
-      'status',
-      'qualifiers',
-      'solutions',
-      'difficulty',
-      'submission_delay'
-    ]"
-  >
-    <ng-template pTemplate="caption">
-      <div class="flex">
-        <app-edit-settings-dialog
-          [title]="'Algorithm Settings'"
-          [view]="'algos'"
-        ></app-edit-settings-dialog>
-        <p-iconField iconPosition="left" class="ml-auto">
-          <p-inputIcon>
-            <i class="pi pi-search"></i>
-          </p-inputIcon>
-          <input
-            pInputText
-            type="text"
-            (input)="
-              benchmarksTable.filterGlobal(
-                $any($event.target).value || '',
-                'contains'
-              )
-            "
-            placeholder="Search keyword"
-          />
-        </p-iconField>
-      </div>
-    </ng-template>
-    <ng-template pTemplate="header">
-      <tr>
-        <th></th>
-        <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
-        <th pSortableColumn="challenge">
-          Challenge <p-sortIcon field="challenge" />
-        </th>
-        <th pSortableColumn="algorithm">
-          Algorithm <p-sortIcon field="algorithm" />
-        </th>
-        <th pSortableColumn="solutions">
-          # Solutions <p-sortIcon field="solutions" />
-        </th>
-        <th pSortableColumn="difficulty">
-          Difficulty <p-sortIcon field="difficulty" />
-        </th>
-        <th pSortableColumn="submission_delay">
-          Submission Delay <p-sortIcon field="submission_delay" />
-        </th>
-        <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
-        <th pSortableColumn="time_elapsed">
-          Time Elapsed <p-sortIcon field="time_elapsed" />
-        </th>
-      </tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-benchmark>
-      <tr>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            @if(benchmark.end_time){
-            <i class="pi pi-check" style="font-size: 1.5rem; color: green"></i>
-            } @else {
-            <i
-              class="pi pi-spin pi-spinner"
-              style="font-size: 1.5rem; color: var(--primary-color)"
-            ></i>
-            }
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.age }}
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.challenge_id | challengePipe }}
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.algorithm_id | algorithmPipe }}
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.solutions }} Solutions /
-            {{ benchmark.num_nonces }} Nonces
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.difficulty }}
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.submission_delay }}
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            <p-tag
-              [severity]="
-                benchmark.status == 'ACTIVE' ||
-                benchmark.status == 'ACTIVE QUALIFIER'
-                  ? 'success'
-                  : benchmark.status == 'NO SOLUTIONS'
-                  ? 'warning'
-                  : benchmark.status == 'PENDING PROOF' ||
-                    benchmark.status == 'PENDING BENCHMARK'
-                  ? 'info'
-                  : 'danger'
+<div class="flex flex-column justify-content-end p-2 mt-4">
+  <p-card header="Latest Jobs">
+    @if(benchmarks()){
+    <p-table
+      #benchmarksTable
+      [value]="benchmarks()"
+      [tableStyle]="{ 'min-width': '50rem' }"
+      styleClass="p-datatable-striped"
+      [paginator]="true"
+      [rows]="5"
+      [rowsPerPageOptions]="[5, 10, 20]"
+      [globalFilterFields]="[
+        'benchmark_id',
+        'challenge',
+        'algorithm',
+        'status',
+        'difficulty',
+        'batch_size'
+      ]"
+      dataKey="benchmark_id"
+      [expandedRowKeys]="expandedRows"
+    >
+      <ng-template pTemplate="caption">
+        <div class="flex">
+          <p-iconField iconPosition="left" class="ml-auto">
+            <p-inputIcon>
+              <i class="pi pi-search"></i>
+            </p-inputIcon>
+            <input
+              pInputText
+              type="text"
+              (input)="
+                benchmarksTable.filterGlobal(
+                  $any($event.target).value || '',
+                  'contains'
+                )
               "
-              [rounded]="true"
-              [value]="benchmark.status"
+              placeholder="Search keyword"
             />
-          </div>
-        </td>
-        <td>
-          <div class="flex justify-content-center align-items-center">
-            {{ benchmark.time_elapsed | timeConverter }}
-          </div>
-        </td>
-      </tr>
-    </ng-template>
-  </p-table>
-  } @else {
-  <div class="flex w-full justify-content-center align-items-center">
-    <p-progressSpinner
-      styleClass="w-4rem h-4rem"
-      strokeWidth="8"
-      fill="var(--surface-ground)"
-      animationDuration="1.5s"
-    />
-  </div>
-  }
-</p-card>
-<br />
+          </p-iconField>
+        </div>
+      </ng-template>
+      <ng-template pTemplate="header">
+        <tr>
+          <th></th>
+          <th pSortableColumn="age">
+            Benchmark ID <p-sortIcon field="benchmark_id" />
+          </th>
+          <th pSortableColumn="challenge">
+            Challenge <p-sortIcon field="challenge" />
+          </th>
+          <th pSortableColumn="algorithm">
+            Algorithm <p-sortIcon field="algorithm" />
+          </th>
+          <th pSortableColumn="difficulty">
+            Difficulty <p-sortIcon field="difficulty" />
+          </th>
+          <th pSortableColumn="batch_size">
+            Batch Size <p-sortIcon field="batch_size" />
+          </th>
 
-@if(cutoff()){
-<div class="grid p-3">
-  <div class="col-6 p-4">
-    <p-card>
-      <div class="grid">
-        <div class="cutoff-section col-6 flex justify-content-center">
-          <span class="cutoff-label">Cutoff</span>
-          <span class="cutoff-value">{{ cutoff().cutoff }}</span>
-          <span class="cutoff-equation">= 1.1 x min</span>
-        </div>
+          <th pSortableColumn="nonces">
+            # Nonces <p-sortIcon field="nonces" />
+          </th>
+          <th pSortableColumn="solutions">
+            # Solutions <p-sortIcon field="solutions" />
+          </th>
 
-        <div class="col-6">
-          <div
-            class="active-solutions-title"
-            style="text-align: center; width: 100%; justify-content: center"
-          >
-            active solutions
-          </div>
-          <div class="solutions-section">
-            <div class="solution-item">
-              <span class="solution-label">{{ "c001" | challengePipe }} :</span>
-              <span class="solution-value">{{ cutoff().c001_qualifiers }}</span>
+          <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
+          <th pSortableColumn="time_elapsed">
+            Elapsed Time <p-sortIcon field="time_elapsed" />
+          </th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-benchmark let-expanded="expanded">
+        <tr>
+          <td>
+            <p-button
+              type="button"
+              pRipple
+              [pRowToggler]="benchmark"
+              [text]="true"
+              [rounded]="true"
+              [plain]="true"
+              [icon]="benchmark ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+            />
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center text-xs">
+              {{ benchmark.benchmark_id }}
             </div>
-            <div class="solution-item highlighted">
-              <span class="solution-label">{{ "c002" | challengePipe }} :</span>
-              <span class="solution-value">{{ cutoff().c002_qualifiers }}</span>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.challenge }}
             </div>
-            <div class="solution-item">
-              <span class="solution-label">{{ "c003" | challengePipe }} :</span>
-              <span class="solution-value">{{ cutoff().c003_qualifiers }}</span>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.settings?.algorithm_id }}
             </div>
-            <div class="solution-item">
-              <span class="solution-label">{{ "c004" | challengePipe }} :</span>
-              <span class="solution-value">{{ cutoff().c004_qualifiers }}</span>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              [{{ benchmark.difficulty }}]
             </div>
-            <!-- More solutions can be added here -->
-          </div>
-          <div
-            class="solution-item"
-            style="text-align: center; width: 100%; justify-content: center"
-          >
-            <span class="solution-label">deposit : {{ cutoff().deposit }}</span>
-          </div>
-        </div>
-      </div>
-    </p-card>
-  </div>
-  <div class="col-6 p-4">
-    <p-card>
-      <div class="grid">
-        <div class="cutoff-section col-6 flex justify-content-center">
-          <span class="cutoff-label">Imbalance </span>
-          <span class="cutoff-value">{{ imbalance().imbalance }} %</span>
-        </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.batch_size }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.num_nonces }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.solution_nonces.length }}
+            </div>
+          </td>
 
-        <div class="col-6">
-          <div
-            class="active-solutions-title"
-            style="text-align: center; width: 100%; justify-content: center"
-          >
-            qualifying solutions
-          </div>
-          <div class="solutions-section">
-            <div class="solution-item">
-              <span class="solution-label">{{ "c001" | challengePipe }} :</span>
-              <span class="solution-value"
-                >{{ imbalance().c001_qualifiers }} of
-                {{ imbalance().c001_solutions }}</span
-              >
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              <p-tag
+                [severity]="
+                  benchmark.status == 'SUBMITTED'
+                    ? 'success'
+                    : benchmark.status == 'PENDING PROOF'
+                    ? 'info'
+                    : 'warning'
+                "
+                [rounded]="true"
+                [value]="benchmark.status"
+              />
             </div>
-            <div class="solution-item highlighted">
-              <span class="solution-label">{{ "c002" | challengePipe }} :</span>
-              <span class="solution-value"
-                >{{ imbalance().c002_qualifiers }} of
-                {{ imbalance().c002_solutions }}</span
-              >
-            </div>
-            <div class="solution-item">
-              <span class="solution-label">{{ "c003" | challengePipe }} :</span>
-              <span class="solution-value"
-                >{{ imbalance().c003_qualifiers }} of
-                {{ imbalance().c003_solutions }}</span
-              >
-            </div>
-            <div class="solution-item">
-              <span class="solution-label">{{ "c004" | challengePipe }} :</span>
-              <span class="solution-value"
-                >{{ imbalance().c004_qualifiers }} of
-                {{ imbalance().c004_solutions }}</span
-              >
-            </div>
-            <!-- More solutions can be added here -->
-          </div>
-          <div
-            class="solution-item"
-            style="text-align: center; width: 100%; justify-content: center"
-          >
-            <span class="solution-label"
-              >deposit : {{ imbalance().deposit_qualifiers }} of
-              {{ imbalance().deposit }}</span
-            >
-          </div>
-        </div>
-      </div>
-    </p-card>
-  </div>
-</div>
-}
+          </td>
 
-<p-card header="Challenges">
-  <p-tabView (onChange)="changeChallengeView($event.index)">
-    @for (challenge of tigService.challenges(); track $index) {
-    <p-tabPanel [header]="challenge.name">
-      <div class="grid">
-        <div class="col-4 p-4">
-          <p-card header="Base Fee" class="w-full">
-            <div
-              class="flex flex-column justify-content-center align-items-center"
-            >
-              @if(challenge_summary()){
-              <p>
-                <b>{{ challenge_summary().base_fee }}</b>
-              </p>
-              } @else {
-              <p>Could not get Summary Info</p>
-              }
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.time_elapsed | timeConverter }}
             </div>
-          </p-card>
-        </div>
-        <div class="col-4 p-4">
-          <p-card header="Solutions" class="w-full">
-            <div
-              class="flex flex-column justify-content-center align-items-center"
-            >
-              @if(challenge_summary()){
-              <p>
-                <b>{{ challenge_summary().solutions }}</b>
-              </p>
-              } @else {
-              <p>Could not get Summary Info</p>
-              }
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="rowexpansion" let-benchmark>
+        <tr>
+          <td colspan="10">
+            <div class="p-3">
+              <p-table [value]="benchmark.batches" dataKey="id">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th pSortableColumn="id">
+                      Batch No <p-sortIcon field="price" />
+                    </th>
+                    <th pSortableColumn="customer">
+                      Slave <p-sortIcon field="customer" />
+                    </th>
+                    <th pSortableColumn="date">
+                      # Nonces <p-sortIcon field="num_nonces" />
+                    </th>
+                    <th pSortableColumn="amount">
+                      # Solutions <p-sortIcon field="num_solutions" />
+                    </th>
+                    <th pSortableColumn="status">
+                      Status <p-sortIcon field="status" />
+                    </th>
+                    <th pSortableColumn="status">
+                      Elapsed Time <p-sortIcon field="elapsed_time" />
+                    </th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-batch>
+                  <tr>
+                    <td>{{ batch.bacth_number }}</td>
+                    <td>{{ batch.salve }}</td>
+                    <td>{{ batch.num_nonces }}</td>
+                    <td>{{ batch.num_solutions }}</td>
+                    <td>{{ batch.status }}</td>
+                    <td></td>
+                    <td>{{ batch.status }}</td>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                  <tr>
+                    <td colspan="6">
+                      There are no batches for this Benchmark yet.
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
             </div>
-          </p-card>
-        </div>
-        <div class="col-4 p-4">
-          <p-card header="Qualifiers" class="w-full">
-            <div
-              class="flex flex-column justify-content-center align-items-center"
-            >
-              @if(challenge_summary()){
-              <p>
-                <b>{{ challenge_summary().qualifiers }}</b>
-              </p>
-              } @else {
-              <p>Could not get Summary Info</p>
-              }
-            </div>
-          </p-card>
-        </div>
-      </div>
-      <p-card header="Benchmarks">
-        @if(challenge_table()){
-        <p-table
-          #benchmarksTable
-          [value]="challenge_table()"
-          [tableStyle]="{ 'min-width': '50rem' }"
-          styleClass="p-datatable-striped"
-          [paginator]="true"
-          [rows]="5"
-          [rowsPerPageOptions]="[5, 10, 20]"
-          [globalFilterFields]="[
-            'age',
-            'status',
-            'qualifiers',
-            'solutions',
-            'difficulty',
-            'submission_delay'
-          ]"
-        >
-          <ng-template pTemplate="caption">
-            <div class="flex">
-              <app-edit-settings-dialog
-                [title]="'Algorithm Settings'"
-                [view]="'algos'"
-              ></app-edit-settings-dialog>
-              <p-iconField iconPosition="left" class="ml-auto">
-                <p-inputIcon>
-                  <i class="pi pi-search"></i>
-                </p-inputIcon>
-                <input
-                  pInputText
-                  type="text"
-                  (input)="
-                    benchmarksTable.filterGlobal(
-                      $any($event.target).value || '',
-                      'contains'
-                    )
-                  "
-                  placeholder="Search keyword"
-                />
-              </p-iconField>
-            </div>
-          </ng-template>
-          <ng-template pTemplate="header">
-            <tr>
-              <th></th>
-              <th pSortableColumn="age">Age <p-sortIcon field="age" /></th>
-              <th pSortableColumn="difficulty">
-                Difficulty <p-sortIcon field="difficulty" />
-              </th>
-              <th pSortableColumn="solutions">
-                # Nonces <p-sortIcon field="solutions" />
-              </th>
-              <th pSortableColumn="solutions">
-                # Solutions <p-sortIcon field="solutions" />
-              </th>
-              <th pSortableColumn="submission_delay">
-                # Nonces per Solution <p-sortIcon field="submission_delay" />
-              </th>
-              <th pSortableColumn="status">
-                Status <p-sortIcon field="status" />
-              </th>
-              <th pSortableColumn="time_elapsed">
-                Time Elapsed <p-sortIcon field="time_elapsed" />
-              </th>
-            </tr>
-          </ng-template>
-          <ng-template pTemplate="body" let-benchmark>
-            <tr>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  @if(benchmark.end_time){
-                  <i
-                    class="pi pi-check"
-                    style="font-size: 1.5rem; color: green"
-                  ></i>
-                  } @else {
-                  <i
-                    class="pi pi-spin pi-spinner"
-                    style="font-size: 1.5rem; color: var(--primary-color)"
-                  ></i>
-                  }
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.age }}
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.difficulty }}
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.num_nonces }}
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.solutions }}
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  @if(benchmark.solutions){
-                  {{
-                    benchmark.num_nonces / benchmark.solutions
-                      | number : "1.2-2"
-                  }}
-                  } @else { -}
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  <p-tag
-                    [severity]="
-                      benchmark.status == 'Completed'
-                        ? 'success'
-                        : benchmark.status == 'In Progress'
-                        ? 'warning'
-                        : 'info'
-                    "
-                    [value]="benchmark.status"
-                  />
-                </div>
-              </td>
-              <td>
-                <div class="flex justify-content-center align-items-center">
-                  {{ benchmark.time_elapsed | timeConverter }}
-                </div>
-              </td>
-            </tr>
-          </ng-template>
-        </p-table>
-        } @else {
-        <div class="flex w-full justify-content-center align-items-center">
-          <p-progressSpinner
-            styleClass="w-4rem h-4rem"
-            strokeWidth="8"
-            fill="var(--surface-ground)"
-            animationDuration="1.5s"
-          />
-        </div>
-        }
-      </p-card>
-    </p-tabPanel>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+    } @else {
+    <div class="flex w-full justify-content-center align-items-center">
+      <p-progressSpinner
+        styleClass="w-4rem h-4rem"
+        strokeWidth="8"
+        fill="var(--surface-ground)"
+        animationDuration="1.5s"
+      />
+    </div>
     }
-  </p-tabView>
-</p-card>
+  </p-card>
+</div>
 } @else {
 <div class="flex w-full justify-content-center align-items-center">
   <p-progressSpinner
