@@ -1,75 +1,19 @@
-mod add_block;
 pub mod context;
 mod contracts;
-mod error;
-mod protocol;
 use context::*;
-pub use error::*;
-use std::collections::HashSet;
-use tig_structs::core::*;
 
-pub struct Protocol<T: Context> {
-    pub ctx: T,
-}
+pub use contracts::{
+    algorithms::{submit_algorithm, submit_binary},
+    benchmarks::{submit_benchmark, submit_fraud, submit_precommit, submit_proof},
+    players::{set_delegatee, set_reward_share, submit_deposit, submit_topup},
+};
 
-impl<'a, T: Context> Protocol<T> {
-    pub fn new(ctx: T) -> Self {
-        Self { ctx }
-    }
-
-    pub async fn submit_algorithm(
-        &self,
-        player: &Player,
-        details: AlgorithmDetails,
-        code: String,
-    ) -> ProtocolResult<String> {
-        algorithms::execute(&self.ctx, player, details, code).await
-    }
-
-    pub async fn submit_precommit(
-        &self,
-        player: &Player,
-        settings: BenchmarkSettings,
-        num_nonces: u32,
-    ) -> ProtocolResult<String> {
-        submit_precommit::execute(&self.ctx, player, settings, num_nonces).await
-    }
-
-    pub async fn submit_benchmark(
-        &self,
-        player: &Player,
-        benchmark_id: &String,
-        merkle_root: MerkleHash,
-        solution_nonces: HashSet<u64>,
-    ) -> ProtocolResult<()> {
-        benchmarks::execute(
-            &self.ctx,
-            player,
-            benchmark_id,
-            merkle_root,
-            solution_nonces,
-        )
-        .await
-    }
-
-    pub async fn submit_proof(
-        &self,
-        player: &Player,
-        benchmark_id: &String,
-        merkle_proofs: Vec<MerkleProof>,
-    ) -> ProtocolResult<Result<(), String>> {
-        submit_proof::execute(&self.ctx, player, benchmark_id, merkle_proofs).await
-    }
-
-    pub async fn submit_topup(&self, player: &Player, tx_hash: String) -> ProtocolResult<()> {
-        players::execute(&self.ctx, player, tx_hash).await
-    }
-
-    pub async fn verify_proof(&self, benchmark_id: &String) -> ProtocolResult<Result<(), String>> {
-        verify_proof::execute(&self.ctx, benchmark_id).await
-    }
-
-    pub async fn add_block(&self) -> String {
-        add_block::execute(&self.ctx).await
-    }
+pub async fn add_block<T: Context>(ctx: &T) {
+    let mut cache = ctx.build_block_cache().await;
+    contracts::players::update(&mut cache).await;
+    contracts::opow::update(&mut cache).await;
+    contracts::algorithms::update(&mut cache).await;
+    contracts::challenges::update(&mut cache).await;
+    contracts::rewards::update(&mut cache).await;
+    ctx.commit_block_cache(cache).await;
 }

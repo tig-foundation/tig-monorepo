@@ -1,64 +1,113 @@
-#[time]
-async fn update_innovator_rewards(block: &Block, cache: &mut AddBlockCache) {
-    let config = block.config();
+use crate::context::*;
+use logging_timer::time;
+use std::collections::HashMap;
+use tig_structs::core::*;
 
-    let adoption_threshold =
-        PreciseNumber::from_f64(config.algorithm_submissions.adoption_threshold);
+#[time]
+pub(crate) async fn update(cache: &mut AddBlockCache) {
+    let AddBlockCache {
+        config,
+        block_details,
+        block_data,
+        active_algorithms_state,
+        active_algorithms_block_data,
+        active_algorithms_details,
+        active_opow_block_data,
+        active_players_block_data,
+        active_players_state,
+        ..
+    } = cache;
+
+    let active_algorithm_ids = &block_data.active_ids[&ActiveType::Algorithm];
+
+    let block_reward = PreciseNumber::from_f64(
+        config
+            .rewards
+            .schedule
+            .iter()
+            .filter(|s| s.round_start <= block_details.round)
+            .last()
+            .unwrap_or_else(|| {
+                panic!(
+                    "get_block_reward error: Expecting a reward schedule for round {}",
+                    block_details.round
+                )
+            })
+            .block_reward,
+    );
+
+    // update innovator rewards
+    let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
     let zero = PreciseNumber::from(0);
-    let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<&mut Algorithm>>::new();
-    for algorithm in cache.active_algorithms.values_mut() {
-        let is_merged = algorithm.state().round_merged.is_some();
-        let is_banned = algorithm.state().banned.clone();
-        let data = algorithm.block_data.as_mut().unwrap();
-        data.reward = Some(zero.clone());
+    let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<String>>::new();
+    for algorithm_id in active_algorithm_ids.iter() {
+        let algorithm_state = &active_algorithms_state[algorithm_id];
+        let algorithm_data = &active_algorithms_block_data[algorithm_id];
+        let algorithm_details = &active_algorithms_details[algorithm_id];
+
+        let is_merged = algorithm_state.round_merged.is_some();
+        let is_banned = algorithm_state.banned;
 
         if !is_banned
-            && (*data.adoption() >= adoption_threshold || (is_merged && *data.adoption() > zero))
+            && (algorithm_data.adoption >= adoption_threshold
+                || (is_merged && algorithm_data.adoption > zero))
         {
             eligible_algorithms_by_challenge
-                .entry(algorithm.details.challenge_id.clone())
+                .entry(algorithm_details.challenge_id.clone())
                 .or_default()
-                .push(algorithm);
+                .push(algorithm_id.clone());
         }
     }
-    if eligible_algorithms_by_challenge.len() == 0 {
-        return;
+    if eligible_algorithms_by_challenge.len() > 0 {
+        let reward_pool_per_challenge = block_reward
+            * PreciseNumber::from_f64(config.rewards.distribution.algorithms)
+            / PreciseNumber::from(eligible_algorithms_by_challenge.len());
+
+        for algorithm_ids in eligible_algorithms_by_challenge.values() {
+            let total_adoption: PreciseNumber = algorithm_ids
+                .iter()
+                .map(|id| active_algorithms_block_data[id].adoption.clone())
+                .sum();
+            for algorithm_id in algorithm_ids.iter() {
+                let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
+                algorithm_data.reward =
+                    reward_pool_per_challenge * algorithm_data.adoption / total_adoption;
+
+                let algorithm_details = &active_algorithms_details[algorithm_id];
+                *active_players_block_data
+                    .get_mut(&algorithm_details.player_id)
+                    .unwrap()
+                    .reward_by_type
+                    .get_mut(&RewardType::Algorithm)
+                    .unwrap() += algorithm_data.reward;
+            }
+        }
     }
 
-    let reward_pool_per_challenge = PreciseNumber::from_f64(get_block_reward(block))
-        * PreciseNumber::from_f64(config.rewards.distribution.optimisations)
-        / PreciseNumber::from(eligible_algorithms_by_challenge.len());
+    // update benchmark rewards
+    let reward_pool = block_reward * PreciseNumber::from_f64(config.rewards.distribution.opow);
 
-    let zero = PreciseNumber::from(0);
-    for algorithms in eligible_algorithms_by_challenge.values_mut() {
-        let mut total_adoption = zero.clone();
-        for algorithm in algorithms.iter() {
-            total_adoption = total_adoption + algorithm.block_data().adoption();
-        }
+    for (player_id, opow_data) in active_opow_block_data.iter_mut() {
+        opow_data.reward = opow_data.influence * reward_pool;
+        opow_data.reward_share = active_players_state[player_id]
+            .reward_share
+            .as_ref()
+            .map_or(config.deposits.default_reward_share, |x| x.value)
+            .clone();
 
-        for algorithm in algorithms.iter_mut() {
-            let data = algorithm.block_data.as_mut().unwrap();
-            let adoption = *data.adoption();
-            data.reward = Some(reward_pool_per_challenge * adoption / total_adoption);
+        let shared_amount = opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share);
+        active_players_block_data
+            .get_mut(player_id)
+            .unwrap()
+            .reward_by_type
+            .insert(RewardType::Benchmarker, opow_data.reward - shared_amount);
+
+        for player_id in opow_data.delegators.iter() {
+            let player_data = active_players_block_data.get_mut(player_id).unwrap();
+            player_data.reward_by_type.insert(
+                RewardType::Delegator,
+                shared_amount * player_data.weighted_deposit / opow_data.associated_deposit,
+            );
         }
     }
 }
-
-#[time]
-async fn update_benchmarker_rewards(block: &Block, cache: &mut AddBlockCache) {
-    let config = block.config();
-
-    let reward_pool = PreciseNumber::from_f64(get_block_reward(block))
-        * PreciseNumber::from_f64(config.rewards.distribution.benchmarkers);
-
-    for player in cache.active_players.values_mut() {
-        let data = player.block_data.as_mut().unwrap();
-        let influence = *data.influence();
-        data.reward = Some(influence * reward_pool);
-    }
-}
-
-/*
-delegator rewards
-breakthrough rewards
-*/

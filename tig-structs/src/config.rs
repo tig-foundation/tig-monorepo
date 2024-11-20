@@ -15,7 +15,7 @@ serializable_struct_with_getters! {
         opow: OPoWConfig,
         rounds: RoundsConfig,
         rewards: RewardsConfig,
-        runtime: RuntimeConfig,
+        topups: TopUpsConfig,
     }
 }
 
@@ -28,7 +28,6 @@ serializable_struct_with_getters! {
         submission_fee: PreciseNumber,
         adoption_threshold: f64,
         merge_points_threshold: u32,
-        push_delay: u32,
     }
 }
 serializable_struct_with_getters! {
@@ -46,8 +45,10 @@ serializable_struct_with_getters! {
         max_lock_period_rounds: u32,
         lock_period_multiplier: f64,
         max_reward_share: f64,
-        deposit_to_qualifier_ratio: f64,
-        period_between_redelegate: u32,
+        default_reward_share: f64,
+        reward_share_update_period: u32,
+        delegatee_update_period: u32,
+        deposit_threshold_for_delegation: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
@@ -60,6 +61,7 @@ serializable_struct_with_getters! {
         min_base_fee: PreciseNumber,
         max_fee_percentage_delta: f64,
         target_num_precommits: u32,
+        runtime_config: RuntimeConfig,
     }
 }
 serializable_struct_with_getters! {
@@ -106,17 +108,19 @@ impl MinMaxDifficulty for Vec<DifficultyParameter> {
 serializable_struct_with_getters! {
     OPoWConfig {
         imbalance_multiplier: f64,
-        enable_proof_of_deposit: Option<bool>,
-        cutoff_phase_in_period: Option<u32>,
+        cutoff_phase_in_period: u32,
         cutoff_multiplier: f64,
         total_qualifiers_threshold: u32,
-        min_cutoff: Option<u32>,
-        deposit_to_cutoff_cap_ratio: f64,
+        min_cutoff: u32,
+        max_deposit_to_qualifier_ratio: f64,
+        deposit_multiplier: f64,
+        deposit_to_cutoff_ratio: f64,
     }
 }
 serializable_struct_with_getters! {
     RoundsConfig {
         blocks_per_round: u32,
+        seconds_between_blocks: u32,
     }
 }
 serializable_struct_with_getters! {
@@ -135,8 +139,8 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     DistributionConfig {
-        benchmarkers: f64,
-        optimisations: f64,
+        opow: f64,
+        algorithms: f64,
         breakthroughs: f64,
     }
 }

@@ -1,168 +1,205 @@
-use crate::{context::*, error::*};
+use crate::context::*;
+use anyhow::{anyhow, Result};
 use logging_timer::time;
-use std::collections::HashSet;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tig_structs::core::*;
 use tig_utils::*;
 
 #[time]
-pub(crate) async fn submit_topup<T: Context>(
+pub async fn submit_topup<T: Context>(
     ctx: &T,
     player_id: String,
     tx_hash: String,
-    event_log_idx: u32,
-    amount: PreciseNumber,
-    verify_event_log: bool,
-) -> ProtocolResult<()> {
-    if verify_event_log {
-        let block = ctx
-            .get_block(BlockFilter::LastConfirmed, false)
-            .await
-            .unwrap_or_else(|e| panic!("get_block error: {:?}", e))
-            .expect("No latest block found");
+    log_idx: Option<usize>,
+) -> Result<String> {
+    let config = ctx.get_config().await;
 
-        if ctx
-            .get_topups(TopUpsFilter::Id(tx_hash.clone()))
-            .await
-            .unwrap_or_else(|e| panic!("get_topups error: {:?}", e))
-            .first()
-            .is_some()
-        {
-            return Err(ProtocolError::DuplicateTransaction {
-                tx_hash: tx_hash.clone(),
-            });
-        }
-
-        let transaction =
-            ctx.get_transaction(&tx_hash)
-                .await
-                .map_err(|_| ProtocolError::InvalidTransaction {
-                    tx_hash: tx_hash.clone(),
-                })?;
-        if player.id != transaction.sender {
-            return Err(ProtocolError::InvalidTransactionSender {
-                tx_hash: tx_hash.clone(),
-                expected_sender: player.id.clone(),
-                actual_sender: transaction.sender.clone(),
-            });
-        }
-        let burn_address = block.config().erc20.burn_address.clone();
-        if transaction.receiver != burn_address {
-            return Err(ProtocolError::InvalidTransactionReceiver {
-                tx_hash: tx_hash.clone(),
-                expected_receiver: burn_address,
-                actual_receiver: transaction.receiver.clone(),
-            });
-        }
-
-        let expected_amount = block.config().precommit_submissions().topup_amount.clone();
-        if transaction.amount != expected_amount {
-            return Err(ProtocolError::InvalidTransactionAmount {
-                tx_hash: tx_hash.clone(),
-                expected_amount: jsonify(&expected_amount),
-                actual_amount: jsonify(&transaction.amount),
-            });
-        }
-    };
-    ctx.confirm_topup(
-        &tx_hash,
-        TopUpDetails {
-            player_id: player.id.clone(),
-            amount: topup_amount,
-        },
-    )
-    .await;
-    Ok(())
-}
-
-#[time]
-pub(crate) async fn submit_deposit<T: Context>(
-    ctx: &T,
-    player_id: String,
-    tx_hash: String,
-    log_idx: u32,
-    amount: PreciseNumber,
-    start_timestamp: u64,
-    end_timestamp: u64,
-    verify_event_log: bool,
-) -> ProtocolResult<()> {
-    if !skip_verification {};
-    ctx.confirm_deposit(
-        &tx_hash,
-        TopUpDetails {
-            player_id: player.id.clone(),
-            amount: topup_amount,
-        },
-    )
-    .await;
-    Ok(())
-}
-
-#[time]
-pub(crate) async fn submit_vote<T: Context>(
-    ctx: &T,
-    player_id: String,
-    breakthrough_id: String,
-    yes_vote: bool,
-) -> ProtocolResult<()> {
-    let lastest_block_id = ctx.get_block_id(BlockFilter::LastConfirmed).await.unwrap();
-    let breakthrough = ctx.get_breakthrough_state(&breakthrough_id).await.unwrap();
-    // check breakthrough exists
-    // check breakthrough is voteable
-    // check player hasnt already voted
-    // check player has deposit
-
-    let player_data = ctx
-        .get_player_block_data(&player_id, &lastest_block_id)
+    let transfer = get_transfer(&config.erc20.rpc_url, &tx_hash, log_idx.clone())
         .await
-        .unwrap();
-
-    // confirm vote
-    Ok(())
+        .map_err(|_| anyhow!("Invalid transaction: {}", tx_hash))?;
+    if transfer.erc20 != config.erc20.token_address {
+        return Err(anyhow!("Transfer asset must be TIG token"));
+    }
+    if transfer.sender != player_id {
+        return Err(anyhow!("Transfer must be from player"));
+    }
+    if transfer.receiver != config.topups.topup_address {
+        return Err(anyhow!("Transfer must send to topup_address"));
+    }
+    if transfer.amount < config.topups.min_topup_amount {
+        return Err(anyhow!("Transfer must be at least min_topup_amount"));
+    }
+    let topup_id = ctx
+        .add_topup_to_mempool(TopUpDetails {
+            player_id,
+            tx_hash,
+            amount: transfer.amount,
+            log_idx: transfer.log_idx,
+        })
+        .await?;
+    Ok(topup_id)
 }
 
 #[time]
-pub(crate) async fn submit_delegate<T: Context>(
+pub async fn submit_deposit<T: Context>(
+    ctx: &T,
+    player_id: String,
+    tx_hash: String,
+    log_idx: Option<usize>,
+) -> Result<String> {
+    let config = ctx.get_config().await;
+
+    let linear_lock = get_linear_lock(&config.erc20.rpc_url, &tx_hash, log_idx.clone())
+        .await
+        .map_err(|_| anyhow!("Invalid transaction: {}", tx_hash))?;
+    if linear_lock.locker != config.deposits.lock_address {
+        return Err(anyhow!("Deposit must be LinearLock of TIG token"));
+    }
+    if linear_lock.erc20 != config.erc20.token_address {
+        return Err(anyhow!("LinearLock asset must be TIG token"));
+    }
+    if linear_lock.owner != player_id {
+        return Err(anyhow!("LinearLock must be owned by player"));
+    }
+    if linear_lock.can_cancel {
+        return Err(anyhow!("LinearLock must not be cancelable"));
+    }
+    if linear_lock.can_transfer {
+        return Err(anyhow!("LinearLock with transferrable not supported"));
+    }
+    if linear_lock.cliff_timestamp != 0 {
+        return Err(anyhow!("LinearLock with cliff not supported"));
+    }
+    if linear_lock.amount < config.deposits.min_lock_amount {
+        return Err(anyhow!("LinearLock must be at least min_lock_amount"));
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    if linear_lock.end_timestamp <= now {
+        return Err(anyhow!("LinearLock is already expired"));
+    }
+    let deposit_id = ctx
+        .add_deposit_to_mempool(DepositDetails {
+            player_id,
+            tx_hash,
+            amount: linear_lock.amount,
+            log_idx: linear_lock.log_idx,
+            start_timestamp: linear_lock.start_timestamp,
+            end_timestamp: linear_lock.end_timestamp,
+        })
+        .await?;
+    Ok(deposit_id)
+}
+
+#[time]
+pub async fn set_delegatee<T: Context>(
     ctx: &T,
     player_id: String,
     delegatee: String,
-) -> ProtocolResult<()> {
-    // check any player_block_data.deposit_by_rounds is non-zero
-    // check block_confirmed of last delegate + period_between_redelegate < curr_block.height
-    // update player_state.delegatee
-    // confirm delegate
+) -> Result<()> {
+    let config = ctx.get_config().await;
+    let latest_block_id = ctx.get_block_id(BlockFilter::Latest).await.unwrap();
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+    let player_state = ctx.get_player_state(&player_id).await.unwrap();
+
+    if player_state.delegatee.is_some_and(|d| {
+        latest_block_details.height - d.block_set < config.deposits.delegatee_update_period
+    }) {
+        return Err(anyhow!(
+            "Can only update delegatee every {} blocks",
+            config.deposits.delegatee_update_period
+        ));
+    }
+
+    ctx.set_player_delegatee(player_id, delegatee).await?;
     Ok(())
 }
 
-// update_deposits
+#[time]
+pub async fn set_reward_share<T: Context>(
+    ctx: &T,
+    player_id: String,
+    reward_share: f64,
+) -> Result<()> {
+    let config = ctx.get_config().await;
+    let latest_block_id = ctx.get_block_id(BlockFilter::Latest).await.unwrap();
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+    let player_state = ctx.get_player_state(&player_id).await.unwrap();
+
+    if player_state.delegatee.is_some_and(|d| {
+        latest_block_details.height - d.block_set < config.deposits.reward_share_update_period
+    }) {
+        return Err(anyhow!(
+            "Can only update reward share every {} blocks",
+            config.deposits.reward_share_update_period
+        ));
+    }
+
+    if reward_share > config.deposits.max_reward_share {
+        return Err(anyhow!(
+            "Reward share cannot exceed {}%",
+            config.deposits.max_reward_share * 100.0
+        ));
+    }
+
+    ctx.set_player_reward_share(player_id, reward_share).await?;
+    Ok(())
+}
 
 #[time]
-async fn update_deposits<T: Context>(ctx: &T, block: &Block, cache: &mut AddBlockCache) {
-    let decay = match &block
-        .config()
-        .optimisable_proof_of_work
-        .rolling_deposit_decay
-    {
-        Some(decay) => PreciseNumber::from_f64(*decay),
-        None => return, // Proof of deposit not implemented for these blocks
-    };
-    let eth_block_num = block.details.eth_block_num();
-    let zero = PreciseNumber::from(0);
-    let one = PreciseNumber::from(1);
-    for player in cache.active_players.values_mut() {
-        let rolling_deposit = match &cache.prev_players.get(&player.id).unwrap().block_data {
-            Some(data) => data.rolling_deposit.clone(),
-            None => None,
-        }
-        .unwrap_or_else(|| zero.clone());
+pub(crate) async fn update(cache: &mut AddBlockCache) {
+    let AddBlockCache {
+        config,
+        block_details,
+        active_deposit_details,
+        active_players_block_data,
+        ..
+    } = cache;
 
-        let data = player.block_data.as_mut().unwrap();
-        let deposit = ctx
-            .get_player_deposit(eth_block_num, &player.id)
-            .await
-            .unwrap()
-            .unwrap_or_else(|| zero.clone());
-        data.rolling_deposit = Some(decay * rolling_deposit + (one - decay) * deposit);
-        data.deposit = Some(deposit);
-        data.qualifying_percent_rolling_deposit = Some(zero.clone());
+    let seconds_till_round_end = (block_details.round * config.rounds.blocks_per_round
+        - block_details.height)
+        * config.rounds.seconds_between_blocks;
+    let seconds_per_round = config.rounds.seconds_between_blocks * config.rounds.blocks_per_round;
+    let mut round_timestamps = vec![
+        block_details.timestamp,
+        block_details.timestamp + seconds_till_round_end as u64,
+    ];
+    let max_lock_period_rounds = config.deposits.max_lock_period_rounds as usize;
+    for _ in 2..=max_lock_period_rounds {
+        round_timestamps.push(round_timestamps.last().unwrap() + seconds_per_round as u64);
+    }
+
+    for deposit in active_deposit_details.values() {
+        let total_time = PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp);
+        for i in 0..max_lock_period_rounds {
+            if round_timestamps[i + 1] <= deposit.start_timestamp {
+                continue;
+            }
+            if round_timestamps[i] >= deposit.end_timestamp {
+                break;
+            }
+            let start = if round_timestamps[i] <= deposit.start_timestamp {
+                deposit.start_timestamp
+            } else {
+                round_timestamps[i]
+            };
+            // all deposits above max_lock_period_rounds get the same max weight
+            let end = if round_timestamps[i + 1] >= deposit.end_timestamp
+                || i + 1 == max_lock_period_rounds
+            {
+                deposit.end_timestamp
+            } else {
+                round_timestamps[i + 1]
+            };
+            let amount = deposit.amount * PreciseNumber::from(end - start) / total_time;
+            let weight = PreciseNumber::from(i + 1);
+            let player_data = active_players_block_data
+                .get_mut(&deposit.player_id)
+                .unwrap();
+            *player_data.deposit_by_locked_period.get_mut(i).unwrap() += amount;
+            player_data.weighted_deposit += amount * weight;
+        }
     }
 }

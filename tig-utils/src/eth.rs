@@ -2,10 +2,26 @@ use crate::number::PreciseNumber;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Transaction {
+pub struct Transfer {
+    pub erc20: String,
     pub sender: String,
     pub receiver: String,
     pub amount: PreciseNumber,
+    pub log_idx: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LinearLock {
+    pub locker: String,
+    pub erc20: String,
+    pub owner: String,
+    pub can_cancel: bool,
+    pub can_transfer: bool,
+    pub start_timestamp: u64,
+    pub cliff_timestamp: u64,
+    pub end_timestamp: u64,
+    pub amount: PreciseNumber,
+    pub log_idx: usize,
 }
 
 #[cfg(feature = "web3")]
@@ -32,11 +48,11 @@ mod web3_feature {
     pub const ERC20_TRANSFER_TOPIC: &str =
         "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-    pub async fn get_transaction(
+    pub async fn get_transfer(
         rpc_url: &str,
-        erc20_address: &str,
         tx_hash: &str,
-    ) -> Result<super::Transaction> {
+        log_idx: Option<usize>,
+    ) -> Result<super::Transfer> {
         let transport = web3::transports::Http::new(rpc_url)?;
         let eth = web3::Web3::new(transport).eth();
 
@@ -51,13 +67,13 @@ mod web3_feature {
         }
 
         // Find the Transfer event log
-        let erc20_address = H160::from_str(erc20_address.trim_start_matches("0x")).unwrap();
         let transfer_topic = H256::from_slice(&hex::decode(ERC20_TRANSFER_TOPIC)?);
-        let transfer_log = receipt
+        let (log_idx, transfer_log) = receipt
             .logs
             .iter()
-            .find(|log| {
-                log.address == erc20_address
+            .enumerate()
+            .find(|(idx, log)| {
+                (log_idx.is_none() || log_idx.is_some_and(|i| i == *idx))
                     && !log.topics.is_empty()
                     && log.topics[0] == transfer_topic
             })
@@ -68,6 +84,7 @@ mod web3_feature {
         }
 
         // Extract transfer details from the event
+        let erc20 = format!("0x{}", hex::encode(&transfer_log.address.as_bytes()));
         let sender = format!(
             "0x{}",
             hex::encode(&transfer_log.topics[1].as_bytes()[12..])
@@ -78,10 +95,82 @@ mod web3_feature {
         );
         let amount = PreciseNumber::from_hex_str(&hex::encode(&transfer_log.data.0))?;
 
-        Ok(super::Transaction {
+        Ok(super::Transfer {
+            erc20,
             sender,
             receiver,
             amount,
+            log_idx,
+        })
+    }
+
+    pub const SABLIERV2_CREATELOCKUPLINEARSTREAM_TOPIC: &str =
+        "44cb432df42caa86b7ec73644ab8aec922bc44c71c98fc330addc75b88adbc7c";
+
+    pub async fn get_linear_lock(
+        rpc_url: &str,
+        tx_hash: &str,
+        log_idx: Option<usize>,
+    ) -> Result<super::LinearLock> {
+        let transport = web3::transports::Http::new(rpc_url)?;
+        let eth = web3::Web3::new(transport).eth();
+
+        let tx_hash = H256::from_slice(hex::decode(tx_hash.trim_start_matches("0x"))?.as_slice());
+        let receipt = eth
+            .transaction_receipt(tx_hash)
+            .await?
+            .ok_or_else(|| anyhow!("Receipt for transaction {} not found", tx_hash))?;
+
+        if !receipt.status.is_some_and(|x| x.as_u64() == 1) {
+            return Err(anyhow!("Transaction not confirmed"));
+        }
+
+        // Find the Transfer event log
+        let linear_lock_topic =
+            H256::from_slice(&hex::decode(SABLIERV2_CREATELOCKUPLINEARSTREAM_TOPIC)?);
+        let (log_idx, transfer_log) = receipt
+            .logs
+            .iter()
+            .enumerate()
+            .find(|(idx, log)| {
+                (log_idx.is_none() || log_idx.is_some_and(|i| i == *idx))
+                    && !log.topics.is_empty()
+                    && log.topics[0] == linear_lock_topic
+            })
+            .ok_or_else(|| anyhow!("No ERC20 transfer event found"))?;
+
+        if transfer_log.topics.len() != 4 {
+            return Err(anyhow!("Invalid CreateLinearLockStream event format"));
+        }
+
+        // Extract transfer details from the event
+        let locker = format!("0x{}", hex::encode(&transfer_log.address.as_bytes()));
+        let owner = format!(
+            "0x{}",
+            hex::encode(&transfer_log.topics[2].as_bytes()[12..])
+        );
+        let erc20 = format!(
+            "0x{}",
+            hex::encode(&transfer_log.topics[3].as_bytes()[12..])
+        );
+        let amount = PreciseNumber::from_hex_str(&hex::encode(&transfer_log.data.0[64..96]))?;
+        let can_cancel = transfer_log.data.0[159] == 1;
+        let can_transfer = transfer_log.data.0[191] == 1;
+        let start_timestamp = u64::from_be_bytes(transfer_log.data.0[216..224].try_into().unwrap());
+        let cliff_timestamp = u64::from_be_bytes(transfer_log.data.0[248..256].try_into().unwrap());
+        let end_timestamp = u64::from_be_bytes(transfer_log.data.0[280..288].try_into().unwrap());
+
+        Ok(super::LinearLock {
+            locker,
+            erc20,
+            owner,
+            amount,
+            can_cancel,
+            can_transfer,
+            start_timestamp,
+            cliff_timestamp,
+            end_timestamp,
+            log_idx,
         })
     }
 

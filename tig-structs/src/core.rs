@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tig_utils::{jsonify, u64s_from_str, u8s_from_str};
-pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transaction, U256};
+pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transfer, U256};
 
 serializable_struct_with_getters! {
     Algorithm {
@@ -11,7 +11,6 @@ serializable_struct_with_getters! {
         details: AlgorithmDetails,
         state: AlgorithmState,
         block_data: Option<AlgorithmBlockData>,
-        round_earnings: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
@@ -54,13 +53,6 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    Delegate {
-        id: String,
-        details: DelegateDetails,
-        state: DelegateState,
-    }
-}
-serializable_struct_with_getters! {
     Deposit {
         id: String,
         details: DepositDetails,
@@ -78,7 +70,6 @@ serializable_struct_with_getters! {
     OPoW {
         player_id: String,
         block_data: Option<OPoWBlockData>,
-        round_earnings: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
@@ -87,7 +78,6 @@ serializable_struct_with_getters! {
         details: PlayerDetails,
         state: PlayerState,
         block_data: Option<PlayerBlockData>,
-        round_earnings_by_type: HashMap<RewardType, PreciseNumber>,
     }
 }
 serializable_struct_with_getters! {
@@ -113,24 +103,10 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    RewardShare {
-        id: String,
-        details: RewardShareDetails,
-        state: RewardShareState,
-    }
-}
-serializable_struct_with_getters! {
     TopUp {
         id: String,
         details: TopUpDetails,
         state: TopUpState,
-    }
-}
-serializable_struct_with_getters! {
-    Vote {
-        id: String,
-        details: VoteDetails,
-        state: VoteState,
     }
 }
 
@@ -259,6 +235,16 @@ pub enum TxType {
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
+pub enum ActiveType {
+    Algorithm,
+    Breakthrough,
+    Challenge,
+    Deposit,
+    Player,
+    OPoW,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
 pub enum SupplyType {
     Circulating,
     Locked,
@@ -270,7 +256,7 @@ serializable_struct_with_getters! {
         height: u32,
         round: u32,
         num_confirmed: HashMap<TxType, u32>,
-        num_active: HashMap<String, u32>,
+        num_active: HashMap<ActiveType, u32>,
         eth_block_num: Option<String>,
         supply: HashMap<SupplyType, PreciseNumber>, // circulating, locked, burnt,
         timestamp: u64,
@@ -279,7 +265,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     BlockData {
         confirmed_ids: HashMap<TxType, HashSet<String>>,
-        active_ids: HashMap<String, HashSet<String>>,
+        active_ids: HashMap<ActiveType, HashSet<String>>,
     }
 }
 
@@ -352,7 +338,7 @@ serializable_struct_with_getters! {
     DepositDetails {
         player_id: String,
         tx_hash: String,
-        log_idx: u32,
+        log_idx: usize,
         amount: PreciseNumber,
         start_timestamp: u64,
         end_timestamp: u64,
@@ -378,7 +364,7 @@ serializable_struct_with_getters! {
         cutoff: u32,
         associated_deposit: PreciseNumber,
         delegators: HashSet<String>,
-        deposit_share: PreciseNumber,
+        reward_share: f64,
         imbalance: PreciseNumber,
         influence: PreciseNumber,
         reward: PreciseNumber,
@@ -392,13 +378,18 @@ serializable_struct_with_getters! {
         is_multisig: bool,
     }
 }
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PlayerValue<T> {
+    pub value: T,
+    pub block_set: u32,
+}
 serializable_struct_with_getters! {
     PlayerState {
         total_fees_paid: PreciseNumber,
         available_fee_balance: PreciseNumber,
-        delegatee: String,
-        votes: HashMap<String, bool>,
-        reward_share: PreciseNumber,
+        delegatee: Option<PlayerValue<String>>,
+        votes: HashMap<String, PlayerValue<bool>>,
+        reward_share: Option<PlayerValue<f64>>,
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -412,7 +403,7 @@ pub enum RewardType {
 serializable_struct_with_getters! {
     PlayerBlockData {
         reward_by_type: HashMap<RewardType, PreciseNumber>,
-        deposit_by_rounds: HashMap<u32, PreciseNumber>,
+        deposit_by_locked_period: Vec<PreciseNumber>,
         weighted_deposit: PreciseNumber,
     }
 }
@@ -458,44 +449,17 @@ impl OutputData {
     }
 }
 
-// RewardShare child structs
-serializable_struct_with_getters! {
-    RewardShareDetails {
-        player_id: String,
-        share: PreciseNumber,
-    }
-}
-serializable_struct_with_getters! {
-    RewardShareState {
-        block_confirmed: u32,
-    }
-}
-
 // TopUp child structs
 serializable_struct_with_getters! {
     TopUpDetails {
         player_id: String,
         tx_hash: String,
-        log_idx: u32,
+        log_idx: usize,
         amount: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
     TopUpState {
-        block_confirmed: u32,
-    }
-}
-
-// Vote child structs
-serializable_struct_with_getters! {
-    VoteDetails {
-        player_id: String,
-        breakthrough_id: String,
-        is_breakthrough: bool,
-    }
-}
-serializable_struct_with_getters! {
-    VoteState {
         block_confirmed: u32,
     }
 }
