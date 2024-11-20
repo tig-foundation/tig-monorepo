@@ -337,6 +337,7 @@ class SlaveManager:
                     
                     # Update JobModel's batch_merkle_roots
                     job.batch_merkle_roots[batch_idx] = str(result.merkle_root.to_str())  # Assuming MerkleHash can be converted to string
+                    flag_modified(job, "batch_merkle_roots")
 
                     # Update solution_nonces
                     job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))

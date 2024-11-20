@@ -121,15 +121,15 @@ class SubmissionsManager:
                 success = self._post("benchmark", submit_benchmark_req)
 
                 if success:
-                    self.db_session.commit()
+                    session.commit()
                     logger.info(f"Benchmark request for job_id '{job.benchmark_id}' submitted successfully.")
                 else:
                     logger.error(f"Failed to submit benchmark request for job_id '{job.benchmark_id}'.")
         except SQLAlchemyError as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Database error during benchmark submissions: {e}")
         except Exception as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Unexpected error during benchmark submissions: {e}")
 
     def handle_proof_submissions(self, now: int):
@@ -140,6 +140,7 @@ class SubmissionsManager:
             eligible_jobs = session.query(JobModel).filter(
                 func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0) != 0,
                 func.coalesce(func.jsonb_array_length(JobModel.merkle_proofs), 0) == func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0),
+                JobModel.last_benchmark_submit_time != 0,
                 JobModel.last_proof_submit_time < now - self.config.time_between_retries
             ).all()
 
@@ -163,15 +164,15 @@ class SubmissionsManager:
                 success = self._post("proof", submit_proof_req)
 
                 if success:
-                    self.db_session.commit()
+                    session.commit()
                     logger.info(f"Proof request for job_id '{job.benchmark_id}' submitted successfully.")
                 else:
                     logger.error(f"Failed to submit proof request for job_id '{job.benchmark_id}'.")
         except SQLAlchemyError as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Database error during proof submissions: {e}")
         except Exception as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Unexpected error during proof submissions: {e}")
     
     def run(self, submit_precommit_req: Optional[SubmitPrecommitRequest]):
