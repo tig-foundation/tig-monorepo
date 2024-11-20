@@ -54,7 +54,6 @@ export class SettingsComponent {
   };
   async ngOnInit() {
     this.tigService.config$.subscribe((data: any) => {
-      console.log('data', data);
       this.setCode(data);
     });
   }

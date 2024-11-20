@@ -103,7 +103,7 @@
           </td>
           <td>
             <div class="flex justify-content-center align-items-center">
-              [{{ benchmark.difficulty }}]
+              [{{ benchmark.settings?.difficulty }}]
             </div>
           </td>
           <td>
@@ -118,7 +118,7 @@
           </td>
           <td>
             <div class="flex justify-content-center align-items-center">
-              {{ benchmark.solution_nonces.length }}
+              {{ benchmark.num_solutions }}
             </div>
           </td>
 
@@ -153,10 +153,10 @@
                 <ng-template pTemplate="header">
                   <tr>
                     <th pSortableColumn="id">
-                      Batch No <p-sortIcon field="price" />
+                      Batch No <p-sortIcon field="batch_number" />
                     </th>
                     <th pSortableColumn="customer">
-                      Slave <p-sortIcon field="customer" />
+                      Slave <p-sortIcon field="slave_id" />
                     </th>
                     <th pSortableColumn="date">
                       # Nonces <p-sortIcon field="num_nonces" />
@@ -174,13 +174,56 @@
                 </ng-template>
                 <ng-template pTemplate="body" let-batch>
                   <tr>
-                    <td>{{ batch.bacth_number }}</td>
-                    <td>{{ batch.salve }}</td>
-                    <td>{{ batch.num_nonces }}</td>
-                    <td>{{ batch.num_solutions }}</td>
-                    <td>{{ batch.status }}</td>
-                    <td></td>
-                    <td>{{ batch.status }}</td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.batch_number }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.slave_id }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.num_nonces }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.num_solutions }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        <p-tag
+                          [severity]="
+                            batch.status == 'COMPLETED'
+                              ? 'success'
+                              : 'warning'
+                          "
+                          [rounded]="true"
+                          [value]="batch.status"
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.time_elapsed | timeConverter }}
+                      </div>
+                    </td>
                   </tr>
                 </ng-template>
                 <ng-template pTemplate="emptymessage">

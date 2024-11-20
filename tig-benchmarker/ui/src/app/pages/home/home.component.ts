@@ -49,18 +49,12 @@ export class HomeComponent {
 
   init() {
     this.tigService.benchmarks$.subscribe((data: any) => {
-      console.log('benchmarks data', data);
       this.getBenchmarks();
     });
   }
 
   getBenchmarks() {
     const benchmark_data: IBenchmark[] = this.tigService.benchmarks();
-    console.log('benchmark_data', benchmark_data);
-    benchmark_data.map((b) => {
-      b.time_elapsed =
-        new Date(b.end_time).getTime() - new Date(b.start_time).getTime();
-    });
     this.benchmarks.set(benchmark_data);
   }
 
