@@ -241,13 +241,6 @@ pub enum ActiveType {
     OPoW,
     Player,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum SupplyType {
-    Circulating,
-    Locked,
-    Burnt,
-}
 serializable_struct_with_getters! {
     BlockDetails {
         prev_block_id: String,
@@ -255,8 +248,6 @@ serializable_struct_with_getters! {
         round: u32,
         num_confirmed: HashMap<TxType, u32>,
         num_active: HashMap<ActiveType, u32>,
-        eth_block_num: Option<String>,
-        supply: HashMap<SupplyType, PreciseNumber>,
         timestamp: u64,
     }
 }
