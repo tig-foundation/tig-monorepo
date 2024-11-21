@@ -301,7 +301,6 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ChallengeState {
-        block_confirmed: u32,
         round_active: u32,
     }
 }
