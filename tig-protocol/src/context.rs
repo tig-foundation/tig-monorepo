@@ -66,7 +66,6 @@ pub struct AddBlockCache {
     pub active_players_state: HashMap<String, PlayerState>,
     pub active_players_block_data: HashMap<String, PlayerBlockData>,
     pub active_opow_block_data: HashMap<String, OPoWBlockData>,
-    pub active_challenges_state: HashMap<String, ChallengeState>,
     pub active_challenges_block_data: HashMap<String, ChallengeBlockData>,
     pub active_algorithms_state: HashMap<String, AlgorithmState>,
     pub active_algorithms_details: HashMap<String, AlgorithmDetails>,
