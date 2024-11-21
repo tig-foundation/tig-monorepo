@@ -42,7 +42,6 @@ serializable_struct_with_getters! {
         lock_address: String,
         min_lock_period_secs: u64,
         max_lock_period_rounds: u32,
-        lock_period_multiplier: f64,
         max_reward_share: f64,
         default_reward_share: f64,
         reward_share_update_period: u32,

@@ -250,7 +250,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             player_data.delegatee = Some(player_id.clone());
         } else if let Some(delegatee) = &player_state.delegatee {
             if !active_opow_ids.contains(&delegatee.value)
-                || self_deposit[player_id] < config.deposits.delegator_min_deposit
+                // || self_deposit[player_id] < config.deposits.delegator_min_deposit
                 || self_deposit[&delegatee.value] < config.deposits.delegatee_min_deposit
             {
                 continue;
