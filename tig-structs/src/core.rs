@@ -318,19 +318,6 @@ serializable_struct_with_getters! {
     }
 }
 
-// Delegate child structs
-serializable_struct_with_getters! {
-    DelegateDetails {
-        player_id: String,
-        delegatee: String,
-    }
-}
-serializable_struct_with_getters! {
-    DelegateState {
-        block_confirmed: u32,
-    }
-}
-
 // Deposit child structs
 serializable_struct_with_getters! {
     DepositDetails {
