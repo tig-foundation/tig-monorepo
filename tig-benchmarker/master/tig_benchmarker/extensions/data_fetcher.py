@@ -30,7 +30,7 @@ class DataFetcher:
 
     def run(self) -> dict:
         logger.debug("Fetching latest block")
-        block_data = _get(f"{self.api_url}/get-block?include_data")
+        block_data = _get(f"{self.api_url}/get-block")
         block = Block.from_dict({k: v for k, v in block_data["block"].items() if k != 'data'})
         block.data = block_data["block"]["data"]
         

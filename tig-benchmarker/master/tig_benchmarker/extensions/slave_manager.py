@@ -196,6 +196,7 @@ class SlaveManager:
                         # available_slots = max_concurrent_batches - current_assigned
                         # if available_slots <= 0:
                         #     continue  # No available slots for this challenge
+                        batchSettings = BenchmarkSettings.from_dict(job.settings)
 
                         # Fetch available batches for this job
                         for batch_idx in range(job.num_batches):
@@ -223,9 +224,6 @@ class SlaveManager:
 
                                     if len(batch_sampled_nonces) == 0:
                                         continue
-
-
-                                    batchSettings = BenchmarkSettings.from_dict(job.settings)
 
                                     batch = Batch(
                                         benchmark_id=job.benchmark_id,
@@ -258,8 +256,6 @@ class SlaveManager:
                                 )
                             ):
                                 continue  # Batch not ready
-
-                            batchSettings = BenchmarkSettings.from_dict(job.settings)
 
                             batchModel = BatchModel(
                                 benchmark_id=job.benchmark_id,
@@ -414,7 +410,6 @@ class SlaveManager:
             except ValueError:
                 logger.warning(f"Invalid batch_id format: {batch_id}")
                 raise HTTPException(status_code=400, detail="Invalid batch_id format.")
-            
 
 
             try:

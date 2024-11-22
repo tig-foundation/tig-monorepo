@@ -187,7 +187,7 @@ class JobManager:
                         if proof_data:
                             merkle_proof = MerkleProof(
                                 leaf=proof_data['leaf'],
-                                branch=MerkleBranch(proof_data['branch']['stems'] + upper_stems)
+                                branch=MerkleBranch(int(proof_data['branch']['stems']) + upper_stems)
                             )
                             job_model.merkle_proofs[str(nonce)] = merkle_proof.to_dict()
 
