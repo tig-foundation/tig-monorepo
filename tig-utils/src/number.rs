@@ -31,6 +31,11 @@ impl PreciseNumber {
         &self.0
     }
 
+    pub fn to_f64(&self) -> f64 {
+        let value = self.0.as_u128() as f64;
+        value / 10f64.powi(Self::DECIMALS as i32)
+    }
+
     pub fn from<T: Into<U256>>(value: T) -> Self {
         Self(value.into() * PreciseNumber::PRECISION)
     }

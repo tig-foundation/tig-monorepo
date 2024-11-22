@@ -12,6 +12,7 @@ pub fn compute_solution(
     wasm: &[u8],
     max_memory: u64,
     max_fuel: u64,
+    fuel_per_signature: u64,
 ) -> Result<(OutputData, Option<String>)> {
     let seed = settings.calc_seed(rand_hash, nonce);
     let serialized_challenge = match settings.challenge_id.as_str() {
@@ -43,7 +44,6 @@ pub fn compute_solution(
     };
 
     let mut config = Config::default();
-    config.update_runtime_signature(true);
     config.consume_fuel(true);
 
     let limits = StoreLimitsBuilder::new()
@@ -56,6 +56,8 @@ pub fn compute_solution(
     let mut store = Store::new(&engine, limits);
     store.limiter(|lim| lim);
     store.set_fuel(max_fuel).unwrap();
+    store.set_fuel_per_signature(fuel_per_signature);
+    store.update_runtime_signature(u64::from_le_bytes(seed[..8].try_into().unwrap()));
     let linker = Linker::new(&engine);
     let module = Module::new(store.engine(), wasm).expect("Failed to instantiate module");
 
@@ -130,11 +132,11 @@ pub fn compute_solution(
     }
 
     // Get runtime signature
-    let runtime_signature = store.get_runtime_signature();
+    let runtime_signature_arr = store.get_runtime_signature_arr().clone();
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
     let solution_data = OutputData {
         nonce,
-        runtime_signature,
+        runtime_signature_arr,
         fuel_consumed,
         solution,
     };
