@@ -78,8 +78,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     .get_mut(&algorithm_details.player_id)
                     .unwrap()
                     .reward_by_type
-                    .get_mut(&RewardType::Algorithm)
-                    .unwrap() += algorithm_data.reward;
+                    .entry(RewardType::Algorithm)
+                    .or_insert_with(|| zero.clone()) += algorithm_data.reward;
             }
         }
     }
