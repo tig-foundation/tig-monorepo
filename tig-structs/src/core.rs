@@ -349,7 +349,7 @@ serializable_struct_with_getters! {
 // Player child structs
 serializable_struct_with_getters! {
     PlayerDetails {
-        name: String,
+        name: Option<String>,
         is_multisig: bool,
     }
 }

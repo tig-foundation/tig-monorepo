@@ -255,7 +255,7 @@ mod web3_feature {
         }
     ]"#;
 
-    pub async fn lookup_ens_name(rpc_url: &str, address: &str) -> Result<String> {
+    pub async fn lookup_ens_name(rpc_url: &str, address: &str) -> Result<Option<String>> {
         let transport = web3::transports::Http::new(rpc_url)?;
         let eth = web3::Web3::new(transport).eth();
 
@@ -271,11 +271,11 @@ mod web3_feature {
             .query("getNames", (addresses,), None, Options::default(), None)
             .await?;
 
-        // Return first name or address if empty
+        // Return first name or none if empty
         Ok(if !names[0].is_empty() {
-            names[0].clone()
+            Some(names[0].clone())
         } else {
-            address.to_string()
+            None
         })
     }
 }
