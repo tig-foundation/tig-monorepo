@@ -103,18 +103,14 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
             sample_nonces = batch["sampled_nonces"]
             start_nonce = int(batch["start_nonce"])
             batch_size = int(batch["batch_size"])
+            num_nonces = int(batch["num_nonces"])
 
             leafs = {}
-            for nonce in sample_nonces:
+            for nonce in range(start_nonce, start_nonce + num_nonces):
                 file_path = f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}/{nonce}.json"
-                try:
-                    with open(file_path) as f:
-                        leafs[nonce] = OutputData.from_dict(json.load(f))
-                except FileNotFoundError:
-                    print(f"File not found: {file_path}")
-                except json.JSONDecodeError:
-                    print(f"Invalid JSON in file: {file_path}")
-
+                with open(file_path) as f:
+                    leafs[nonce] = OutputData.from_dict(json.load(f)) 
+                
             merkle_tree = MerkleTree(
                 [x.to_merkle_hash() for x in leafs.values()],
                 batch_size
@@ -127,7 +123,6 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
                 ).to_dict()
                 for n in sample_nonces
             ]
-
 
             # Submit proofs to the server
             start = now()

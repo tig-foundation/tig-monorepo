@@ -7,6 +7,7 @@ from tig_benchmarker.utils import *
 
 from tig_benchmarker.database.init import SessionLocal
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm.attributes import flag_modified
 
 from tig_benchmarker.database.models.index import JobModel
 from typing import Dict, List
@@ -184,12 +185,17 @@ class JobManager:
 
                     for nonce in set(nonces):
                         proof_data = job_model.batch_merkle_proofs.get(str(nonce))
+
+                        logger.info(f"Proof data: {proof_data}")
+
                         if proof_data:
+                            proof_data  = MerkleProof.from_dict(proof_data)
                             merkle_proof = MerkleProof(
-                                leaf=proof_data['leaf'],
-                                branch=MerkleBranch(int(proof_data['branch']['stems']) + upper_stems)
+                                leaf=proof_data.leaf,
+                                branch=MerkleBranch(proof_data.branch.stems + upper_stems)
                             )
                             job_model.merkle_proofs[str(nonce)] = merkle_proof.to_dict()
+                            flag_modified(job_model, "merkle_proofs")
 
             # Commit all changes
             self.db_session.commit()

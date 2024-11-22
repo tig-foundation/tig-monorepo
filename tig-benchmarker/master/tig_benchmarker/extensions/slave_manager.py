@@ -213,7 +213,7 @@ class SlaveManager:
                             ).first()
 
                             if existing_assignment:
-                                if len(job.sampled_nonces) > 0:
+                                if len(job.sampled_nonces) > 0 and len(job.merkle_proofs) != len(job.sampled_nonces):
                                     # Send Batch for proof submission
 
                                     batch_sampled_nonces = []
@@ -362,16 +362,6 @@ class SlaveManager:
 
                     batch.merkle_root = str(result.merkle_root.to_str())
                     batch.solution_nonces = result.solution_nonces
-
-                    # if job.sampled_nonces is None:
-                    #     non_solution_nonces = list(set(range(start_nonce, start_nonce + job.batch_size)) - set(result.solution_nonces))
-                    #     random.shuffle(result.solution_nonces)
-                    #     random.shuffle(non_solution_nonces)
-                    #     # num_nonces_to_sample = int(len(result.solution_nonces) * self.config.num_nonces_to_sample)
-                    #     sampled = (result.solution_nonces + non_solution_nonces)[:10]
-                    # else:
-                    #     sampled = job.sampled_nonces
-                    # logger.info(f"Sampled nonces: {sampled}")
                     
                     # Commit the transaction
                     session.commit()
