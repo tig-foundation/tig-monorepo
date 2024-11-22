@@ -1,9 +1,18 @@
-use tig_utils::{Frontier, ParetoCompare, PointCompareFrontiers, pareto_compare, pareto_frontier, scale_point, scale_frontier, extend_frontier, pareto_within};
+use tig_utils::{
+    extend_frontier, pareto_compare, pareto_frontier, pareto_within, scale_frontier, scale_point,
+    Frontier, ParetoCompare, PointCompareFrontiers,
+};
 
 #[test]
 fn test_pareto_compare() {
-    assert_eq!(pareto_compare(&vec![1, 0], &vec![1, 0]), ParetoCompare::Equal);
-    assert_eq!(pareto_compare(&vec![0, 1], &vec![0, 1]), ParetoCompare::Equal);
+    assert_eq!(
+        pareto_compare(&vec![1, 0], &vec![1, 0]),
+        ParetoCompare::Equal
+    );
+    assert_eq!(
+        pareto_compare(&vec![0, 1], &vec![0, 1]),
+        ParetoCompare::Equal
+    );
     assert_eq!(
         pareto_compare(&vec![1, 1], &vec![0, 1]),
         ParetoCompare::ADominatesB
