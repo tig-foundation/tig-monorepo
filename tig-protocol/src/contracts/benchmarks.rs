@@ -150,18 +150,18 @@ pub async fn submit_benchmark<T: Context>(
     let max_samples = config.benchmarks.max_samples;
     if !solution_nonces.is_empty() {
         for _ in 0..25 {
-            sampled_nonces.insert(*solution_nonces.iter().choose(&mut rng).unwrap());
             if sampled_nonces.len() == max_samples {
                 break;
             }
+            sampled_nonces.insert(*solution_nonces.iter().choose(&mut rng).unwrap());
         }
     }
-    let max_samples = sampled_nonces.len() + config.benchmarks.min_num_solutions as usize;
+    let max_samples = sampled_nonces.len() + config.benchmarks.max_samples;
     for _ in 0..25 {
-        sampled_nonces.insert(rng.gen_range(0..num_nonces));
         if sampled_nonces.len() == max_samples {
             break;
         }
+        sampled_nonces.insert(rng.gen_range(0..num_nonces));
     }
 
     ctx.add_benchmark_to_mempool(
