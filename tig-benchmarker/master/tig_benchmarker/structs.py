@@ -11,13 +11,16 @@ class AlgorithmDetails(FromDict):
     name: str
     player_id: str
     challenge_id: str
-    tx_hash: str
+    breakthrough_id: Optional[str]
+    type: str
+    fee_paid: PreciseNumber
 
 @dataclass
 class AlgorithmState(FromDict):
     block_confirmed: int
     round_submitted: int
-    round_pushed: Optional[int]
+    round_pushed: int
+    round_active: int
     round_merged: Optional[int]
     banned: bool
 
@@ -27,7 +30,6 @@ class AlgorithmBlockData(FromDict):
     adoption: PreciseNumber
     merge_points: int
     reward: PreciseNumber
-    round_earnings: PreciseNumber
 
 @dataclass
 class Algorithm(FromDict):
@@ -35,7 +37,6 @@ class Algorithm(FromDict):
     details: AlgorithmDetails
     state: AlgorithmState
     block_data: Optional[AlgorithmBlockData]
-    code: Optional[str]
 
 @dataclass
 class BenchmarkSettings(FromDict):
@@ -51,13 +52,13 @@ class BenchmarkSettings(FromDict):
 @dataclass
 class PrecommitDetails(FromDict):
     block_started: int
-    num_nonces: Optional[int] # Optional for backwards compatibility
-    fee_paid: Optional[int] # Optional for backwards compatibility
+    num_nonces: int
+    rand_hash: str
+    fee_paid: PreciseNumber
 
 @dataclass
 class PrecommitState(FromDict):
     block_confirmed: int
-    rand_hash: Optional[str] # Optional for backwards compatibility
 
 @dataclass
 class Precommit(FromDict):
@@ -69,12 +70,12 @@ class Precommit(FromDict):
 @dataclass
 class BenchmarkDetails(FromDict):
     num_solutions: int
-    merkle_root: Optional[MerkleHash] # Optional for backwards compatibility
+    merkle_root: MerkleHash
+    sampled_nonces: List[int]
 
 @dataclass
 class BenchmarkState(FromDict):
     block_confirmed: int
-    sampled_nonces: List[int]
 
 @dataclass
 class Benchmark(FromDict):
@@ -100,7 +101,7 @@ class OutputMetaData(FromDict):
 @dataclass
 class OutputData(FromDict):
     nonce: int
-    runtime_signature: int
+    runtime_signature_arr: List[Tuple[int,int]]
     fuel_consumed: int
     solution: dict
 
@@ -110,7 +111,7 @@ class OutputData(FromDict):
     def to_output_metadata(self) -> OutputMetaData:
         return OutputMetaData(
             nonce=self.nonce,
-            runtime_signature=self.runtime_signature,
+            runtime_signature=self.runtime_signature_arr[-1][1],
             fuel_consumed=self.fuel_consumed,
             solution_signature=self.calc_solution_signature()
         )
@@ -121,17 +122,22 @@ class OutputData(FromDict):
 @dataclass
 class MerkleProof(FromDict):
     leaf: OutputData
-    branch: Optional[MerkleBranch] # Optional for backwards compatibility
+    branch: MerkleBranch
+
+@dataclass
+class ProofDetails(FromDict):
+    submission_delay: int
+    block_active: int
 
 @dataclass
 class ProofState(FromDict):
     block_confirmed: int
-    submission_delay: int
 
 @dataclass
 class Proof(FromDict):
     benchmark_id: str
-    state: Optional[ProofState]
+    details: ProofDetails
+    state: ProofState
     merkle_proofs: Optional[List[MerkleProof]]
 
 @dataclass
@@ -149,35 +155,14 @@ class BlockDetails(FromDict):
     prev_block_id: str
     height: int
     round: int
-    eth_block_num: Optional[str] # Optional for backwards compatability
-    fees_paid: Optional[PreciseNumber] # Optional for backwards compatability
-    num_confirmed_challenges: Optional[int] # Optional for backwards compatability
-    num_confirmed_algorithms: Optional[int] # Optional for backwards compatability
-    num_confirmed_benchmarks: Optional[int] # Optional for backwards compatability
-    num_confirmed_precommits: Optional[int] # Optional for backwards compatability
-    num_confirmed_proofs: Optional[int] # Optional for backwards compatability
-    num_confirmed_frauds: Optional[int] # Optional for backwards compatability
-    num_confirmed_topups: Optional[int] # Optional for backwards compatability
-    num_confirmed_wasms: Optional[int] # Optional for backwards compatability
-    num_active_challenges: Optional[int] # Optional for backwards compatability
-    num_active_algorithms: Optional[int] # Optional for backwards compatability
-    num_active_benchmarks: Optional[int] # Optional for backwards compatability
-    num_active_players: Optional[int] # Optional for backwards compatability
+    timestamp: int
+    num_confirmed: Dict[str, int]
+    num_active: Dict[str, int]
 
 @dataclass
 class BlockData(FromDict):
-    confirmed_challenge_ids: Set[int]
-    confirmed_algorithm_ids: Set[int]
-    confirmed_benchmark_ids: Set[int]
-    confirmed_precommit_ids: Set[int]
-    confirmed_proof_ids: Set[int]
-    confirmed_fraud_ids: Set[int]
-    confirmed_topup_ids: Set[int]
-    confirmed_wasm_ids: Set[int]
-    active_challenge_ids: Set[int]
-    active_algorithm_ids: Set[int]
-    active_benchmark_ids: Set[int]
-    active_player_ids: Set[int]
+    confirmed_ids: Dict[str, Set[int]]
+    active_ids: Dict[str, Set[int]]
 
 @dataclass
 class Block(FromDict):
@@ -192,8 +177,7 @@ class ChallengeDetails(FromDict):
 
 @dataclass
 class ChallengeState(FromDict):
-    block_confirmed: int
-    round_active: Optional[int]
+    round_active: int
 
 @dataclass
 class ChallengeBlockData(FromDict):
@@ -203,8 +187,8 @@ class ChallengeBlockData(FromDict):
     base_frontier: Frontier
     scaled_frontier: Frontier
     scaling_factor: float
-    base_fee: Optional[PreciseNumber]
-    per_nonce_fee: Optional[PreciseNumber]
+    base_fee: PreciseNumber
+    per_nonce_fee: PreciseNumber
 
 @dataclass
 class Challenge(FromDict):
@@ -214,55 +198,69 @@ class Challenge(FromDict):
     block_data: Optional[ChallengeBlockData]
 
 @dataclass
+class OPoWBlockData(FromDict):
+    num_qualifiers_by_challenge: Dict[str, int]
+    cutoff: int
+    associated_deposit: PreciseNumber
+    delegators: Set[str]
+    reward_share: float
+    imbalance: PreciseNumber
+    influence: PreciseNumber
+    reward: PreciseNumber
+
+@dataclass
+class OPoW(FromDict):
+    player_id: str
+    block_data: Optional[OPoWBlockData]
+
+@dataclass
 class PlayerDetails(FromDict):
     name: str
     is_multisig: bool
 
 @dataclass
-class PlayerBlockData(FromDict):
-    num_qualifiers_by_challenge: Optional[Dict[str, int]]
-    cutoff: Optional[int]
-    deposit: Optional[PreciseNumber]
-    rolling_deposit: Optional[PreciseNumber]
-    qualifying_percent_rolling_deposit: Optional[PreciseNumber]
-    imbalance: Optional[PreciseNumber]
-    imbalance_penalty: Optional[PreciseNumber]
-    influence: Optional[PreciseNumber]
-    reward: Optional[PreciseNumber]
-    round_earnings: PreciseNumber
-
-@dataclass
 class PlayerState(FromDict):
     total_fees_paid: PreciseNumber
     available_fee_balance: PreciseNumber
+    delegatee: Optional[dict]
+    votes: dict
+    reward_share: Optional[dict]
+
+@dataclass
+class PlayerBlockData(FromDict):
+    delegatee: Optional[str]
+    reward_by_type: Dict[str, PreciseNumber]
+    deposit_by_locked_period: List[PreciseNumber]
+    weighted_deposit: PreciseNumber
 
 @dataclass
 class Player(FromDict):
     id: str
     details: PlayerDetails
-    state: Optional[PlayerState]
+    state: PlayerState
     block_data: Optional[PlayerBlockData]
 
 @dataclass
-class WasmDetails(FromDict):
+class BinaryDetails(FromDict):
     compile_success: bool
     download_url: Optional[str]
-    checksum: Optional[str]
 
 @dataclass
-class WasmState(FromDict):
+class BinaryState(FromDict):
     block_confirmed: int
 
 @dataclass
-class Wasm(FromDict):
+class Binary(FromDict):
     algorithm_id: str
-    details: WasmDetails
-    state: WasmState
+    details: BinaryDetails
+    state: BinaryState
 
 @dataclass
 class TopUpDetails(FromDict):
     player_id: str
     amount: PreciseNumber
+    log_idx: int
+    tx_hash: str
 
 @dataclass
 class TopUpState(FromDict):
@@ -279,39 +277,22 @@ class DifficultyData(FromDict):
     num_solutions: int
     num_nonces: int
     difficulty: Point
-    
+
 @dataclass
-class Job(FromDict):
-    benchmark_id: str
-    settings: BenchmarkSettings
-    num_nonces: int
-    rand_hash: str
-    wasm_vm_config: Dict[str, int]
-    download_url: str
-    batch_size: int
-    challenge: str
-    sampled_nonces: Optional[List[int]] = field(default_factory=list)
-    merkle_root: Optional[MerkleHash] = None
-    solution_nonces: List[int] = field(default_factory=list)  # Removed duplicate
-    merkle_proofs: Dict[int, MerkleProof] = field(default_factory=dict)
-    batch_merkle_proofs: Dict[int, MerkleProof] = field(default_factory=dict)
-    batch_merkle_roots: List[Optional[MerkleHash]] = field(default_factory=list)
-    last_benchmark_submit_time: int = 0
-    last_proof_submit_time: int = 0
-    last_batch_retry_time: List[int] = field(default_factory=list)
+class DepositDetails(FromDict):
+    player_id: str
+    amount: PreciseNumber
+    log_idx: int
+    tx_hash: str
+    start_timestamp: int
+    end_timestamp: int
 
-    def __post_init__(self):
-        self.batch_merkle_roots = [None] * self.num_batches
-        self.last_batch_retry_time = [0] * self.num_batches
+@dataclass
+class DepositState(FromDict):
+    block_confirmed: int
 
-    @property
-    def num_batches(self) -> int:
-        return (self.num_nonces + self.batch_size - 1) // self.batch_size
-
-    @property
-    def sampled_nonces_by_batch_idx(self) -> Dict[int, List[int]]:
-        ret = {}
-        for nonce in self.sampled_nonces:
-            batch_idx = nonce // self.batch_size
-            ret.setdefault(batch_idx, []).append(nonce)
-        return ret
+@dataclass
+class Deposit(FromDict):
+    id: str
+    details: DepositDetails
+    state: DepositState

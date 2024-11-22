@@ -30,25 +30,25 @@ class DataFetcher:
 
     def run(self) -> dict:
         logger.debug("Fetching latest block")
-        block_data = _get(f"{self.api_url}/get-block")
+        block_data = _get(f"{self.api_url}/get-block?include_data")
         block = Block.from_dict({k: v for k, v in block_data["block"].items() if k != 'data'})
         block.data = block_data["block"]["data"]
         
         # logger.info(f"New block detected @ height {block.details.height}, fetching data")
         urls = [
             f"{self.api_url}/get-algorithms?block_id={block.id}",
-            f"{self.api_url}/get-players?player_type=benchmarker&block_id={block.id}",
+            f"{self.api_url}/get-opow?block_id={block.id}",
             f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}",
             f"{self.api_url}/get-challenges?block_id={block.id}",
-            f"{self.api_url}/get-fee-balance?player_id={self.player_id}&block_id={block.id}"
+            f"{self.api_url}/get-player?player_id={self.player_id}&block_id={block.id}"
         ]
         
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
-            algorithms_data, players_data, benchmarks_data, challenges_data, fee_data = list(executor.map(_get, urls))
+            algorithms_data, opow_data, benchmarks_data, challenges_data, player_data = list(executor.map(_get, urls))
 
         # Parse algorithms and wasms
         algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data.get("algorithms", [])}
-        wasms = {w["algorithm_id"]: Wasm.from_dict(w) for w in algorithms_data.get("wasms", [])}
+        binarys = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data.get("binarys", [])}
 
 
         
@@ -60,14 +60,15 @@ class DataFetcher:
                 "is_multisig": False
             },
             "state": {
-                "total_fees_paid":  fee_data['state']['total_fees_paid'],
-                "available_fee_balance": fee_data['state']['available_fee_balance']
+                "total_fees_paid":  0,
+                "available_fee_balance": 0,
+                "votes": {}
             }
         }
 
         # logger.info(f"Player: {dummy_player}")
 
-        player = next((Player.from_dict(p) for p in players_data.get("players", []) if p["id"] == self.player_id), Player.from_dict(dummy_player))
+        player = Player.from_dict(player_data["player"]) if player_data["player"] is not None else Player.from_dict(dummy_player)
         
         # Parse precommits, benchmarks, proofs, frauds
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data.get("precommits", [])}
@@ -96,7 +97,7 @@ class DataFetcher:
         return {
             "block": block,
             "algorithms": algorithms,
-            "wasms": wasms,
+            "binarys": binarys,
             "player": player,
             "precommits": precommits,
             "benchmarks": benchmarks,
