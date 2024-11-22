@@ -268,10 +268,7 @@ pub fn scale_frontier(
         .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
         .collect::<Frontier>();
 
-    return pareto_frontier(&mirrored_frontier)
-        .iter()
-        .map(|d| d.iter().map(|x| -x).collect())
-        .collect();
+    return pareto_frontier(&mirrored_frontier).iter().map(|d| d.iter().map(|x| -x).collect()).collect();
 }
 
 pub fn o_pareto_algorithm(
@@ -284,8 +281,10 @@ pub fn o_pareto_algorithm(
         return vec![];
     }
 
+    let points_inverted                     = points.iter().map(|d| d.iter().map(|x| -x).collect()).collect::<Vec<Point>>();
+
     let mut frontiers                       = Vec::new();
-    let (mut remaining_points, indices)     = unique_with_indices(points);
+    let (mut remaining_points, indices)     = unique_with_indices(&points_inverted);
 
     //remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
 
@@ -323,7 +322,7 @@ pub fn o_pareto_algorithm(
         }
     }
 
-    return frontiers;
+    return frontiers.iter().map(|d| d.iter().map(|x| x.iter().map(|y| -y).collect()).collect::<Frontier>()).collect();
 }
 
 pub fn pareto_frontier(

@@ -30,7 +30,7 @@ fn test_pareto_frontier() {
     .collect();
     assert_eq!(
         pareto_frontier(&points),
-        vec![vec![2, 2], vec![3, 1], vec![1, 3]]
+        vec![vec![3, 1], vec![2, 2], vec![1, 3]]
             .into_iter()
             .collect::<Frontier>()
     );
@@ -75,7 +75,7 @@ fn test_extend() {
         .collect();
     assert_eq!(
         extend_frontier(&frontier, &vec![0, 0], &vec![10, 10]),
-        vec![vec![4, 0], vec![3, 1], vec![2, 2], vec![0, 4]]
+        vec![vec![3, 1], vec![2, 2], vec![0, 4], vec![4, 0]]
             .into_iter()
             .collect::<Frontier>()
     );
