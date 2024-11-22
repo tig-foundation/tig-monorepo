@@ -40,7 +40,7 @@ class DataFetcher:
             f"{self.api_url}/get-opow?block_id={block.id}",
             f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}",
             f"{self.api_url}/get-challenges?block_id={block.id}",
-            f"{self.api_url}/get-player?player_id={self.player_id}&block_id={block.id}"
+            f"{self.api_url}/get-player-data?player_id={self.player_id}&block_id={block.id}"
         ]
         
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
@@ -97,7 +97,7 @@ class DataFetcher:
         return {
             "block": block,
             "algorithms": algorithms,
-            "binarys": binarys,
+            "wasms": binarys,
             "player": player,
             "precommits": precommits,
             "benchmarks": benchmarks,
