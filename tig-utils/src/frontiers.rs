@@ -70,7 +70,7 @@ fn is_pareto_front_2d(costs: &Vec<Vec<i32>>) -> Vec<bool> {
     return on_front;
 }
 
-pub fn o_is_pareto_front(
+pub fn is_pareto_front(
     costs: &Vec<Vec<i32>>,
     assume_unique_lexsorted: bool,
     pre_sorted_along_x: Option<bool>,
@@ -213,7 +213,7 @@ pub fn scale_frontier(
         .collect();
 }
 
-pub fn o_pareto_algorithm(points: &Vec<Vec<i32>>, only_one: bool) -> Vec<Vec<Point>> {
+pub fn pareto_algorithm(points: &Vec<Vec<i32>>, only_one: bool) -> Vec<Vec<Point>> {
     if points.len() == 0 {
         return vec![];
     }
@@ -229,7 +229,7 @@ pub fn o_pareto_algorithm(points: &Vec<Vec<i32>>, only_one: bool) -> Vec<Vec<Poi
     //remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
 
     while true {
-        let on_front = o_is_pareto_front(&remaining_points, true, Some(true));
+        let on_front = is_pareto_front(&remaining_points, true, Some(true));
 
         // Extract frontier points
         let frontier: Vec<_> = remaining_points
@@ -270,7 +270,7 @@ pub fn o_pareto_algorithm(points: &Vec<Vec<i32>>, only_one: bool) -> Vec<Vec<Poi
 }
 
 pub fn pareto_frontier(frontier: &Frontier) -> Frontier {
-    return o_pareto_algorithm(frontier, true).first().unwrap().to_vec();
+    return pareto_algorithm(frontier, true).first().unwrap().to_vec();
 }
 
 pub fn extend_frontier(frontier: &Frontier, min_point: &Point, max_point: &Point) -> Frontier {

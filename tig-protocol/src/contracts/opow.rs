@@ -120,7 +120,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .map(|(settings, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
-        for (frontier_index, frontier) in o_pareto_algorithm(&points, false).into_iter().enumerate()
+        for (frontier_index, frontier) in pareto_algorithm(&points, false).into_iter().enumerate()
         {
             for point in frontier {
                 frontier_indexes.insert(point, frontier_index);
@@ -202,7 +202,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let scaled_frontier = base_frontier.clone();
             (base_frontier, scaling_factor, scaled_frontier)
         } else {
-            let mut base_frontier = o_pareto_algorithm(&points, true)
+            let mut base_frontier = pareto_algorithm(&points, true)
                 .pop()
                 .unwrap()
                 .into_iter()

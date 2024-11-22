@@ -12,5 +12,5 @@ pub use number::*;
 mod request;
 #[cfg(any(feature = "request", feature = "request-js"))]
 pub use request::*;
-mod ofrontiers;
-pub use ofrontiers::*;
+mod frontiers;
+pub use frontiers::*;
