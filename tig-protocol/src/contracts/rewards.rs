@@ -86,24 +86,32 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update benchmark rewards
     let reward_pool = block_reward * PreciseNumber::from_f64(config.rewards.distribution.opow);
-
-    for (player_id, opow_data) in active_opow_block_data.iter_mut() {
+    let zero = PreciseNumber::from(0);
+    for (delegatee, opow_data) in active_opow_block_data.iter_mut() {
         opow_data.reward = opow_data.influence * reward_pool;
-        opow_data.reward_share = active_players_state[player_id]
+        opow_data.reward_share = active_players_state[delegatee]
             .reward_share
             .as_ref()
             .map_or(config.deposits.default_reward_share, |x| x.value)
             .clone();
 
-        let shared_amount = opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share);
+        let shared_amount = if opow_data.associated_deposit == zero {
+            zero.clone()
+        } else {
+            opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share)
+        };
         active_players_block_data
-            .get_mut(player_id)
+            .get_mut(delegatee)
             .unwrap()
             .reward_by_type
             .insert(RewardType::Benchmarker, opow_data.reward - shared_amount);
 
-        for player_id in opow_data.delegators.iter() {
-            let player_data = active_players_block_data.get_mut(player_id).unwrap();
+        if shared_amount == zero {
+            continue;
+        }
+
+        for delegator in opow_data.delegators.iter() {
+            let player_data = active_players_block_data.get_mut(delegator).unwrap();
             player_data.reward_by_type.insert(
                 RewardType::Delegator,
                 shared_amount * player_data.weighted_deposit / opow_data.associated_deposit,

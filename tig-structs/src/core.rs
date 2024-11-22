@@ -131,8 +131,8 @@ serializable_struct_with_getters! {
     AlgorithmState {
         block_confirmed: u32,
         round_submitted: u32,
-        round_pushed: Option<u32>,
-        round_active: Option<u32>,
+        round_pushed: u32,
+        round_active: u32,
         round_merged: Option<u32>,
         banned: bool,
     }
@@ -270,7 +270,7 @@ serializable_struct_with_getters! {
     BreakthroughState {
         block_confirmed: u32,
         round_submitted: u32,
-        round_pushed: Option<u32>,
+        round_pushed: u32,
         round_active: Option<u32>,
         round_merged: Option<u32>,
         vote_tally: HashMap<bool, PreciseNumber>,
@@ -403,6 +403,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     ProofDetails {
         submission_delay: u32,
+        block_active: u32,
     }
 }
 serializable_struct_with_getters! {

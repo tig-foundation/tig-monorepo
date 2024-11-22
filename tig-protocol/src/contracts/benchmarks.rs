@@ -1,7 +1,7 @@
 use crate::context::*;
 use anyhow::{anyhow, Result};
 use logging_timer::time;
-use rand::{seq::IteratorRandom, thread_rng, Rng};
+use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use std::collections::HashSet;
 use tig_structs::core::*;
 use tig_utils::*;
@@ -12,6 +12,7 @@ pub async fn submit_precommit<T: Context>(
     player_id: String,
     settings: BenchmarkSettings,
     num_nonces: u32,
+    seed: u64,
 ) -> Result<String> {
     if player_id != settings.player_id {
         return Err(anyhow!("Invalid settings.player_id. Must be {}", player_id));
@@ -47,7 +48,7 @@ pub async fn submit_precommit<T: Context>(
     if !ctx
         .get_algorithm_state(&settings.algorithm_id)
         .await
-        .is_some_and(|s| !s.banned && s.round_active.is_some_and(|r| r <= block_details.round))
+        .is_some_and(|s| !s.banned && s.round_active <= block_details.round)
     {
         return Err(anyhow!("Invalid algorithm '{}'", settings.algorithm_id));
     }
@@ -100,7 +101,7 @@ pub async fn submit_precommit<T: Context>(
             PrecommitDetails {
                 block_started: block_details.height,
                 num_nonces,
-                rand_hash: hex::encode(thread_rng().gen::<[u8; 16]>()),
+                rand_hash: hex::encode(StdRng::seed_from_u64(seed).gen::<[u8; 16]>()),
                 fee_paid: submission_fee,
             },
         )
@@ -115,6 +116,7 @@ pub async fn submit_benchmark<T: Context>(
     benchmark_id: String,
     merkle_root: MerkleHash,
     solution_nonces: HashSet<u64>,
+    seed: u64,
 ) -> Result<()> {
     // check benchmark is not duplicate
     if ctx.get_benchmark_details(&benchmark_id).await.is_some() {
@@ -144,7 +146,7 @@ pub async fn submit_benchmark<T: Context>(
     // random sample nonces
     let config = ctx.get_config().await;
     let mut sampled_nonces = HashSet::new();
-    let mut rng = thread_rng();
+    let mut rng = StdRng::seed_from_u64(seed);
     let max_samples = config.benchmarks.max_samples;
     if !solution_nonces.is_empty() {
         for _ in 0..25 {
@@ -181,7 +183,7 @@ pub async fn submit_proof<T: Context>(
     player_id: String,
     benchmark_id: String,
     merkle_proofs: Vec<MerkleProof>,
-) -> Result<()> {
+) -> Result<Result<()>> {
     // check proof is not duplicate
     if ctx.get_proof_details(&benchmark_id).await.is_some() {
         return Err(anyhow!("Duplicate proof: {}", benchmark_id));
@@ -247,14 +249,14 @@ pub async fn submit_proof<T: Context>(
 
     ctx.add_proof_to_mempool(benchmark_id.clone(), merkle_proofs)
         .await?;
-    match verification_result {
+    Ok(match verification_result {
         Ok(_) => Ok(()),
         Err(e) => {
             let allegation = e.to_string();
             let _ = submit_fraud(ctx, benchmark_id, allegation).await;
             Err(e)
         }
-    }
+    })
 }
 
 #[time]
