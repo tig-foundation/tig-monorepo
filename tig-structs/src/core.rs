@@ -228,7 +228,7 @@ pub enum TxType {
     Fraud,
     Precommit,
     Proof,
-    Topup,
+    TopUp,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]

@@ -11,6 +11,7 @@ pub async fn submit_algorithm<T: Context>(
     player_id: String,
     algorithm_name: String,
     challenge_id: String,
+    code: String,
 ) -> Result<String> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;
@@ -32,14 +33,17 @@ pub async fn submit_algorithm<T: Context>(
     }
 
     let algorithm_id = ctx
-        .add_algorithm_to_mempool(AlgorithmDetails {
-            name: algorithm_name,
-            challenge_id,
-            player_id,
-            breakthrough_id: None,
-            r#type: AlgorithmType::Wasm,
-            fee_paid: config.algorithms.submission_fee,
-        })
+        .add_algorithm_to_mempool(
+            AlgorithmDetails {
+                name: algorithm_name,
+                challenge_id,
+                player_id,
+                breakthrough_id: None,
+                r#type: AlgorithmType::Wasm,
+                fee_paid: config.algorithms.submission_fee,
+            },
+            code,
+        )
         .await?;
     Ok(algorithm_id)
 }

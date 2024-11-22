@@ -5,7 +5,11 @@ use tig_structs::{config::*, core::*};
 #[allow(async_fn_in_trait)]
 pub trait Context {
     async fn get_algorithm_state(&self, algorithm_id: &String) -> Option<AlgorithmState>;
-    async fn add_algorithm_to_mempool(&self, details: AlgorithmDetails) -> Result<String>;
+    async fn add_algorithm_to_mempool(
+        &self,
+        details: AlgorithmDetails,
+        code: String,
+    ) -> Result<String>;
     async fn get_benchmark_details(&self, benchmark_id: &String) -> Option<BenchmarkDetails>;
     async fn add_benchmark_to_mempool(
         &self,
