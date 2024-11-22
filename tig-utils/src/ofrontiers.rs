@@ -1,4 +1,5 @@
 // optimized pareto impl
+use std::cmp::min;
 pub type Point      = Vec<i32>;
 pub type Frontier   = Vec<Point>;
 
@@ -149,7 +150,7 @@ pub fn unique_with_indices(
     return (unique, indices);
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum ParetoCompare
 {
     ADominatesB,
@@ -190,7 +191,7 @@ pub fn pareto_compare(
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum PointCompareFrontiers
 {
     Below,
@@ -331,4 +332,27 @@ pub fn pareto_frontier(
                                         -> Frontier
 {
     return o_pareto_algorithm(frontier, true).first().unwrap().to_vec();
+}
+
+pub fn extend_frontier(
+    frontier:                       &Frontier,
+    min_point:                      &Point,
+    max_point:                      &Point
+)                                           -> Frontier
+{
+    let mut frontier = frontier.clone();
+    (0..min_point.len()).into_iter().for_each(|i| 
+    {
+        let mut d = min_point.clone();
+        if let Some(v) = frontier.iter().map(|d| d[i]).max() 
+        {
+            d[i] = v;
+        }
+        if !frontier.contains(&d) {
+            d[i] = min(d[i] + 1, max_point[i]);
+            frontier.push(d);
+        }
+    });
+
+    return frontier;
 }
