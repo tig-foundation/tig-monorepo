@@ -128,7 +128,7 @@ pub async fn set_reward_share<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if player_state.delegatee.is_some_and(|d| {
+    if player_state.reward_share.is_some_and(|d| {
         latest_block_details.height - d.block_set < config.deposits.reward_share_update_period
     }) {
         return Err(anyhow!(
