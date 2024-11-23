@@ -239,6 +239,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         })
         .collect();
 
+    for player_id in active_opow_ids.iter() {
+        let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
+        opow_data.self_deposit = self_deposit[player_id].clone();
+    }
+
     for player_id in active_player_ids.iter() {
         let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
