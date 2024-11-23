@@ -114,13 +114,18 @@ pub async fn set_delegatee<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if player_state.delegatee.is_some_and(|d| {
-        latest_block_details.height - d.block_set < config.deposits.delegatee_update_period
-    }) {
-        return Err(anyhow!(
-            "Can only update delegatee every {} blocks",
-            config.deposits.delegatee_update_period
-        ));
+    if let Some(curr_delegatee) = &player_state.delegatee {
+        if curr_delegatee.value == delegatee {
+            return Err(anyhow!("Delegatee is already set to {}", delegatee));
+        }
+        if latest_block_details.height - curr_delegatee.block_set
+            < config.deposits.delegatee_update_period
+        {
+            return Err(anyhow!(
+                "Can only update delegatee every {} blocks",
+                config.deposits.delegatee_update_period
+            ));
+        }
     }
 
     ctx.set_player_delegatee(player_id, delegatee).await?;
@@ -138,13 +143,22 @@ pub async fn set_reward_share<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if player_state.reward_share.is_some_and(|d| {
-        latest_block_details.height - d.block_set < config.deposits.reward_share_update_period
-    }) {
-        return Err(anyhow!(
-            "Can only update reward share every {} blocks",
-            config.deposits.reward_share_update_period
-        ));
+    if let Some(curr_reward_share) = &player_state.reward_share {
+        if curr_reward_share.value == reward_share {
+            return Err(anyhow!("Reward share is already set to {}", reward_share));
+        }
+        if latest_block_details.height - curr_reward_share.block_set
+            < config.deposits.reward_share_update_period
+        {
+            return Err(anyhow!(
+                "Can only update reward share every {} blocks",
+                config.deposits.reward_share_update_period
+            ));
+        }
+    }
+
+    if reward_share < 0.0 {
+        return Err(anyhow!("Reward share cannot be negative"));
     }
 
     if reward_share > config.deposits.max_reward_share {
