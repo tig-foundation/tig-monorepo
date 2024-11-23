@@ -46,11 +46,18 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let algorithm_details = &active_algorithms_details[algorithm_id];
 
         let is_merged = algorithm_state.round_merged.is_some();
-        let is_banned = algorithm_state.banned;
+        if algorithm_state.banned {
+            continue;
+        }
 
-        if !is_banned
-            && (algorithm_data.adoption >= adoption_threshold
-                || (is_merged && algorithm_data.adoption > zero))
+        active_players_block_data
+            .get_mut(&algorithm_details.player_id)
+            .unwrap()
+            .reward_by_type
+            .insert(RewardType::Algorithm, zero.clone());
+
+        if (algorithm_data.adoption >= adoption_threshold
+            || (is_merged && algorithm_data.adoption > zero))
         {
             eligible_algorithms_by_challenge
                 .entry(algorithm_details.challenge_id.clone())
@@ -78,8 +85,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     .get_mut(&algorithm_details.player_id)
                     .unwrap()
                     .reward_by_type
-                    .entry(RewardType::Algorithm)
-                    .or_insert_with(|| zero.clone()) += algorithm_data.reward;
+                    .get_mut(&RewardType::Algorithm)
+                    .unwrap() += algorithm_data.reward;
             }
         }
     }
