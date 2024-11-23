@@ -80,6 +80,16 @@ pub async fn submit_deposit<T: Context>(
     if linear_lock.end_timestamp <= now {
         return Err(anyhow!("LinearLock is already expired"));
     }
+
+    let min_duration = config.deposits.min_lock_period
+        * config.rounds.blocks_per_round
+        * config.rounds.seconds_between_blocks;
+    if linear_lock.end_timestamp - linear_lock.start_timestamp < min_duration as u64 {
+        return Err(anyhow!(
+            "LinearLock must be at least {} round",
+            config.deposits.min_lock_period
+        ));
+    }
     let deposit_id = ctx
         .add_deposit_to_mempool(DepositDetails {
             player_id,
@@ -166,14 +176,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         block_details.timestamp,
         block_details.timestamp + seconds_till_round_end as u64,
     ];
-    let max_lock_period_rounds = config.deposits.max_lock_period_rounds as usize;
-    for _ in 2..=max_lock_period_rounds {
+    let lock_period_cap = config.deposits.lock_period_cap as usize;
+    for _ in 2..=lock_period_cap {
         round_timestamps.push(round_timestamps.last().unwrap() + seconds_per_round as u64);
     }
 
     for deposit in active_deposit_details.values() {
         let total_time = PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp);
-        for i in 0..max_lock_period_rounds {
+        for i in 0..lock_period_cap {
             if round_timestamps[i + 1] <= deposit.start_timestamp {
                 continue;
             }
@@ -186,13 +196,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 round_timestamps[i]
             };
             // all deposits above max_lock_period_rounds get the same max weight
-            let end = if round_timestamps[i + 1] >= deposit.end_timestamp
-                || i + 1 == max_lock_period_rounds
-            {
-                deposit.end_timestamp
-            } else {
-                round_timestamps[i + 1]
-            };
+            let end =
+                if round_timestamps[i + 1] >= deposit.end_timestamp || i + 1 == lock_period_cap {
+                    deposit.end_timestamp
+                } else {
+                    round_timestamps[i + 1]
+                };
             let amount = deposit.amount * PreciseNumber::from(end - start) / total_time;
             let weight = PreciseNumber::from(i + 1);
             let player_data = active_players_block_data
