@@ -315,16 +315,17 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             / PreciseNumber::from_f64(
                 active_challenge_ids.len() as f64 + config.opow.deposit_multiplier,
             );
-        let mean = (sum_percent_qualifiers + percent_deposit)
-            / PreciseNumber::from(active_challenge_ids.len() + 1);
-        let variance = percent_qualifiers.variance();
+        let mut qualifiers_and_deposit = percent_qualifiers;
+        qualifiers_and_deposit.push(percent_deposit);
+        let mean = qualifiers_and_deposit.arithmetic_mean();
+        let variance = qualifiers_and_deposit.variance();
         let cv_sqr = if mean == zero {
             zero.clone()
         } else {
             variance / (mean * mean)
         };
 
-        let imbalance = cv_sqr / (num_challenges - one);
+        let imbalance = cv_sqr / num_challenges; // no need minus 1, because deposit is extra factor
         weights
             .push(weighted_mean * PreciseNumber::approx_inv_exp(imbalance_multiplier * imbalance));
         opow_data.imbalance = imbalance;
