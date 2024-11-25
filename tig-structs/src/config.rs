@@ -21,7 +21,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     BreakthroughsConfig {
-        orphaned_address: String,
+        bootstrap_address: String,
         min_percent_yes_votes: f64,
         vote_period: u32,
         min_lock_period_to_vote: u32,
