@@ -1,4 +1,4 @@
-use crate::serializable_struct_with_getters;
+use crate::{core::AlgorithmType, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use tig_utils::Point;
@@ -51,6 +51,12 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    RuntimeConfig {
+        max_memory: u64,
+        max_fuel: u64,
+    }
+}
+serializable_struct_with_getters! {
     BenchmarksConfig {
         min_num_solutions: u32,
         submission_delay_multiplier: f64,
@@ -58,6 +64,7 @@ serializable_struct_with_getters! {
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
+        runtime_configs: HashMap<AlgorithmType, RuntimeConfig>,
     }
 }
 serializable_struct_with_getters! {
@@ -67,16 +74,8 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    RuntimeConfig {
-        max_memory: u64,
-        max_fuel: u64,
-        fuel_per_signature: u64,
-    }
-}
-serializable_struct_with_getters! {
     ChallengesConfig {
         max_scaling_factor: f64,
-        runtime_configs: HashMap<String, RuntimeConfig>,
         difficulty_parameters: HashMap<String, Vec<DifficultyParameter>>,
     }
 }

@@ -111,7 +111,7 @@ serializable_struct_with_getters! {
 }
 
 // Algorithm child structs
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AlgorithmType {
     Wasm,
