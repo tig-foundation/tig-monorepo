@@ -21,7 +21,7 @@ class Batch(FromDict):
     num_nonces: int
     settings: BenchmarkSettings
     sampled_nonces: List[int]
-    wasm_vm_config: dict
+    runtime_config: dict
     download_url: str
     rand_hash: str
     batch_size: int
@@ -91,7 +91,7 @@ class SlaveManager:
                         num_nonces=min(job.batch_size, job.num_nonces - start_nonce),
                         settings=job.settings.to_dict(),
                         sampled_nonces=sampled_nonces_by_batch_idx.get(batch_idx, []),
-                        wasm_vm_config=job.wasm_vm_config,
+                        runtime_config=job.runtime_config,
                         download_url=job.download_url,
                         rand_hash=job.rand_hash,
                         batch_size=job.batch_size

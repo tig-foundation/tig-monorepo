@@ -43,17 +43,14 @@ class DataFetcher:
         logger.info(f"new block @ height {block.details.height}, fetching data")
         tasks = [
             _get(f"{self.api_url}/get-algorithms?block_id={block.id}"),
-            _get(f"{self.api_url}/get-players?player_type=benchmarker&block_id={block.id}"),
             _get(f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}"),
             _get(f"{self.api_url}/get-challenges?block_id={block.id}")
         ]
         
-        algorithms_data, players_data, benchmarks_data, challenges_data = await asyncio.gather(*tasks)
+        algorithms_data, benchmarks_data, challenges_data = await asyncio.gather(*tasks)
 
         algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data["algorithms"]}
-        wasms = {w["algorithm_id"]: Wasm.from_dict(w) for w in algorithms_data["wasms"]}
-        
-        player = next((Player.from_dict(p) for p in players_data["players"] if p["id"] == self.player_id), None)
+        wasms = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data["binarys"]}
         
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data["precommits"]}
         benchmarks = {b["id"]: Benchmark.from_dict(b) for b in benchmarks_data["benchmarks"]}
@@ -75,7 +72,6 @@ class DataFetcher:
             "block": block,
             "algorithms": algorithms,
             "wasms": wasms,
-            "player": player,
             "precommits": precommits,
             "benchmarks": benchmarks,
             "proofs": proofs,

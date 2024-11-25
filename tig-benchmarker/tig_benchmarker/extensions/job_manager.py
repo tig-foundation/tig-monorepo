@@ -16,7 +16,7 @@ class Job(FromDict):
     settings: BenchmarkSettings
     num_nonces: int
     rand_hash: str
-    wasm_vm_config: Dict[str, int]
+    runtime_config: Dict[str, int]
     download_url: str
     batch_size: int
     challenge: str
@@ -73,7 +73,7 @@ class JobManager:
         benchmarks: Dict[str, Benchmark],
         proofs: Dict[str, Proof],
         challenges: Dict[str, Challenge],
-        wasms: Dict[str, Wasm],
+        wasms: Dict[str, Binary],
         **kwargs
     ):
         job_idxs = {
@@ -97,8 +97,8 @@ class JobManager:
                 benchmark_id=benchmark_id,
                 settings=x.settings,
                 num_nonces=x.details.num_nonces,
-                rand_hash=x.state.rand_hash,
-                wasm_vm_config=block.config["wasm_vm"],
+                rand_hash=x.details.rand_hash,
+                runtime_config=block.config["benchmarks"]["runtime_configs"]["wasm"],
                 batch_size=self.config.batch_sizes[c_name],
                 challenge=c_name,
                 download_url=next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
@@ -114,7 +114,7 @@ class JobManager:
             if len(job.sampled_nonces) > 0:
                 continue
             logger.info(f"updating job from confirmed benchmark {benchmark_id}")
-            job.sampled_nonces = x.state.sampled_nonces
+            job.sampled_nonces = x.details.sampled_nonces
             for batch_idx in job.sampled_nonces_by_batch_idx:
                 job.last_batch_retry_time[batch_idx] = 0
 
