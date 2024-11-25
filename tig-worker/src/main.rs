@@ -85,11 +85,6 @@ fn cli() -> Command {
                         .value_parser(clap::value_parser!(u64)),
                 )
                 .arg(
-                    arg!(--interval [INTERVAL] "Optional amount of fuel between signatures")
-                        .default_value("200000000")
-                        .value_parser(clap::value_parser!(u64)),
-                )
-                .arg(
                     arg!(--mem [MEM] "Optional maximum memory parameter for WASM VM")
                         .default_value("1000000000")
                         .value_parser(clap::value_parser!(u64)),
@@ -118,7 +113,6 @@ fn main() {
             sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u64>("mem").unwrap(),
             *sub_m.get_one::<u64>("fuel").unwrap(),
-            *sub_m.get_one::<u64>("interval").unwrap(),
         ),
         Some(("verify_solution", sub_m)) => verify_solution(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
@@ -136,7 +130,6 @@ fn main() {
             sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u64>("mem").unwrap(),
             *sub_m.get_one::<u64>("fuel").unwrap(),
-            *sub_m.get_one::<u64>("interval").unwrap(),
             sub_m
                 .get_many::<u64>("sampled")
                 .map(|values| values.cloned().collect())
@@ -157,7 +150,6 @@ fn compute_solution(
     wasm_path: PathBuf,
     max_memory: u64,
     max_fuel: u64,
-    fuel_per_signature: u64,
 ) -> Result<()> {
     let settings = load_settings(&settings);
     let wasm = load_wasm(&wasm_path);
@@ -169,7 +161,6 @@ fn compute_solution(
         wasm.as_slice(),
         max_memory,
         max_fuel,
-        fuel_per_signature,
     )?;
     println!("{}", jsonify(&output_data));
     if let Some(err_msg) = err_msg {
@@ -208,7 +199,6 @@ fn compute_batch(
     wasm_path: PathBuf,
     max_memory: u64,
     max_fuel: u64,
-    fuel_per_signature: u64,
     sampled_nonces: Vec<u64>,
     num_workers: usize,
 ) -> Result<()> {
@@ -257,7 +247,6 @@ fn compute_batch(
                         wasm.as_slice(),
                         max_memory,
                         max_fuel,
-                        fuel_per_signature,
                     )?;
                     let is_solution = err_msg.is_none()
                         && worker::verify_solution(

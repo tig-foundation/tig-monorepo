@@ -185,7 +185,7 @@ impl From<OutputData> for OutputMetaData {
     fn from(data: OutputData) -> Self {
         OutputMetaData {
             solution_signature: data.calc_solution_signature(),
-            runtime_signature: data.runtime_signature_arr.last().unwrap().1,
+            runtime_signature: data.runtime_signature,
             fuel_consumed: data.fuel_consumed,
             nonce: data.nonce,
         }
@@ -415,7 +415,7 @@ pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     OutputData {
         nonce: u64,
-        runtime_signature_arr: Vec<(u64, u64)>,
+        runtime_signature: u64,
         fuel_consumed: u64,
         solution: Solution,
     }
