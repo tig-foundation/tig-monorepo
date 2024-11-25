@@ -264,11 +264,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .get_mut(player_data.delegatee.as_ref().unwrap())
             .unwrap();
         opow_data.delegators.insert(player_id.clone());
-        opow_data.associated_deposit += player_data.weighted_deposit;
+        opow_data.delegated_weighted_deposit += player_data.weighted_deposit;
     }
     let total_deposit = active_opow_block_data
         .values()
-        .map(|d| d.associated_deposit)
+        .map(|d| d.delegated_weighted_deposit)
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
@@ -298,7 +298,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mut percent_deposit = if total_deposit == zero {
             zero.clone()
         } else {
-            opow_data.associated_deposit / total_deposit
+            opow_data.delegated_weighted_deposit / total_deposit
         };
         let mean_percent_qualifiers = percent_qualifiers.arithmetic_mean();
         let max_deposit_to_qualifier_ratio =

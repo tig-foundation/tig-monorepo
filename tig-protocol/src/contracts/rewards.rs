@@ -102,7 +102,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .map_or(config.deposits.default_reward_share, |x| x.value)
             .clone();
 
-        let shared_amount = if opow_data.associated_deposit == zero {
+        let shared_amount = if opow_data.delegated_weighted_deposit == zero {
             zero.clone()
         } else {
             opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share)
@@ -121,7 +121,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let player_data = active_players_block_data.get_mut(delegator).unwrap();
             player_data.reward_by_type.insert(
                 RewardType::Delegator,
-                shared_amount * player_data.weighted_deposit / opow_data.associated_deposit,
+                shared_amount * player_data.weighted_deposit / opow_data.delegated_weighted_deposit,
             );
         }
     }

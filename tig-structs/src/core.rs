@@ -337,7 +337,7 @@ serializable_struct_with_getters! {
         num_qualifiers_by_challenge: HashMap<String, u32>,
         cutoff: u32,
         self_deposit: PreciseNumber,
-        associated_deposit: PreciseNumber,
+        delegated_weighted_deposit: PreciseNumber,
         delegators: HashSet<String>,
         reward_share: f64,
         imbalance: PreciseNumber,
