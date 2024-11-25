@@ -181,7 +181,6 @@ class ChallengeState(FromDict):
 
 @dataclass
 class ChallengeBlockData(FromDict):
-    solution_signature_threshold: int
     num_qualifiers: int
     qualifier_difficulties: Set[Point]
     base_frontier: Frontier
@@ -201,7 +200,7 @@ class Challenge(FromDict):
 class OPoWBlockData(FromDict):
     num_qualifiers_by_challenge: Dict[str, int]
     cutoff: int
-    associated_deposit: PreciseNumber
+    delegated_weighted_deposit: PreciseNumber
     delegators: Set[str]
     reward_share: float
     imbalance: PreciseNumber

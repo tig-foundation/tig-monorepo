@@ -66,7 +66,7 @@ class JobManager:
                     settings=precommit.settings,
                     num_nonces=precommit.details.num_nonces,
                     rand_hash=precommit.details.rand_hash,
-                    wasm_vm_config=block.config['benchmarks']['runtime_config'],
+                    wasm_vm_config=block.config['benchmarks']['runtime_configs']['wasm'],
                     batch_size=self.config.batch_sizes.get(challenge_name),
                     challenge=challenge_name,
                     download_url=download_url
