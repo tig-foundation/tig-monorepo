@@ -21,7 +21,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     BreakthroughsConfig {
-        academic_fund_address: String,
+        orphaned_address: String,
         min_percent_yes_votes: f64,
         vote_period: u32,
         min_lock_period_to_vote: u32,
@@ -58,9 +58,6 @@ serializable_struct_with_getters! {
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
-        max_fee_percentage_delta: f64,
-        target_num_precommits: u32,
-        runtime_config: RuntimeConfig,
     }
 }
 serializable_struct_with_getters! {
@@ -73,15 +70,13 @@ serializable_struct_with_getters! {
     RuntimeConfig {
         max_memory: u64,
         max_fuel: u64,
+        fuel_per_signature: u64,
     }
 }
 serializable_struct_with_getters! {
     ChallengesConfig {
-        max_percent_delta: Option<f64>,
-        threshold_decay: Option<f64>,
-        equilibrium_rate_multiplier: f64,
-        percent_error_multiplier: Option<f64>,
         max_scaling_factor: f64,
+        runtime_configs: HashMap<String, RuntimeConfig>,
         difficulty_parameters: HashMap<String, Vec<DifficultyParameter>>,
     }
 }

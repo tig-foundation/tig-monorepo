@@ -297,7 +297,6 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ChallengeBlockData {
-        solution_signature_threshold: u32,
         num_qualifiers: u32,
         qualifier_difficulties: HashSet<Point>,
         base_frontier: Frontier,
