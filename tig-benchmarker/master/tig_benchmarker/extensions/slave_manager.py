@@ -29,7 +29,7 @@ class Batch(FromDict):
     num_nonces: int
     settings: BenchmarkSettings
     sampled_nonces: List[int]
-    wasm_vm_config: dict
+    runtime_config: dict
     download_url: str
     rand_hash: str
     batch_size: int
@@ -70,7 +70,7 @@ class AssignedBatch(FromDict):
     num_nonces: int
     settings: BenchmarkSettings
     sampled_nonces: List[int]
-    wasm_vm_config: dict
+    runtime_config: dict
     download_url: str
     rand_hash: str
     batch_size: int
@@ -231,7 +231,7 @@ class SlaveManager:
                                         num_nonces=num_nonces,
                                         settings=batchSettings,
                                         sampled_nonces=batch_sampled_nonces,
-                                        wasm_vm_config=job.wasm_vm_config,
+                                        runtime_config=job.runtime_config,
                                         download_url=job.download_url,
                                         rand_hash=job.rand_hash,
                                         batch_size=job.batch_size
@@ -263,7 +263,7 @@ class SlaveManager:
                                 start_nonce=start_nonce,
                                 num_nonces=num_nonces,
                                 settings=batchSettings.to_dict(),
-                                wasm_vm_config=job.wasm_vm_config,
+                                runtime_config=job.runtime_config,
                                 download_url=job.download_url,
                                 rand_hash=job.rand_hash,
                                 batch_size=job.batch_size,
@@ -278,7 +278,7 @@ class SlaveManager:
                                 num_nonces=num_nonces,
                                 settings=batchSettings,
                                 sampled_nonces=job.sampled_nonces[batch_idx] if batch_idx in job.sampled_nonces else [],
-                                wasm_vm_config=job.wasm_vm_config,
+                                runtime_config=job.runtime_config,
                                 download_url=job.download_url,
                                 rand_hash=job.rand_hash,
                                 batch_size=job.batch_size

@@ -48,7 +48,7 @@ class JobModel(Base):
     settings = Column(JSON, nullable=False)
     num_nonces = Column(Integer, nullable=False)
     rand_hash = Column(String, nullable=False)
-    wasm_vm_config = Column(JSON, nullable=False)
+    runtime_config = Column(JSON, nullable=False)
     download_url = Column(String, nullable=False)
     batch_size = Column(Integer, nullable=False)
     challenge = Column(String, nullable=False)
@@ -72,7 +72,7 @@ class JobModel(Base):
             settings=BenchmarkSettings.from_dict(self.settings),
             num_nonces=self.num_nonces,
             rand_hash=self.rand_hash,
-            wasm_vm_config=self.wasm_vm_config,
+            runtime_config=self.runtime_config,
             download_url=self.download_url,
             batch_size=self.batch_size,
             challenge=self.challenge,
@@ -94,7 +94,7 @@ class JobModel(Base):
             settings=job.settings.to_dict(),
             num_nonces=job.num_nonces,
             rand_hash=job.rand_hash,
-            wasm_vm_config=job.wasm_vm_config,
+            runtime_config=job.runtime_config,
             download_url=job.download_url,
             batch_size=job.batch_size,
             challenge=job.challenge,
@@ -132,7 +132,7 @@ class BatchModel(Base):
     start_nonce = Column(Integer, nullable=False)
     num_nonces = Column(Integer, nullable=False)
     settings = Column(JSON, nullable=False)
-    wasm_vm_config = Column(JSON, nullable=False)
+    runtime_config = Column(JSON, nullable=False)
     download_url = Column(String, nullable=False)
     rand_hash = Column(String, nullable=False)
     batch_size = Column(Integer, nullable=False)
@@ -155,7 +155,7 @@ class BatchModel(Base):
             "num_nonces": self.num_nonces,
             "settings": self.settings,
             "sampled_nonces": self.sampled_nonces,
-            "wasm_vm_config": self.wasm_vm_config,
+            "runtime_config": self.runtime_config,
             "download_url": self.download_url,
             "rand_hash": self.rand_hash,
             "batch_size": self.batch_size,

@@ -302,7 +302,7 @@ class Job(FromDict):
     settings: BenchmarkSettings
     num_nonces: int
     rand_hash: str
-    wasm_vm_config: Dict[str, int]
+    runtime_config: Dict[str, int]
     download_url: str
     batch_size: int
     challenge: str

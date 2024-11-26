@@ -39,8 +39,8 @@ async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_
         str(batch["num_nonces"]),
         str(batch["batch_size"]), 
         wasm_path,
-        "--mem", str(batch["wasm_vm_config"]["max_memory"]),
-        "--fuel", str(batch["wasm_vm_config"]["max_fuel"]),
+        "--mem", str(batch["runtime_config"]["max_memory"]),
+        "--fuel", str(batch["runtime_config"]["max_fuel"]),
         "--workers", str(num_workers),
         "--output", f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}",
     ]
