@@ -94,6 +94,7 @@ async def register_slave(session, master_ip, master_port, slave_name):
 
 
 async def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
+    batch_id = None
     try:
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
         logger.info(f"Processing batch {batch_id}: {batch}")
