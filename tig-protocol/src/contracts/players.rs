@@ -70,7 +70,7 @@ pub async fn submit_deposit<T: Context>(
     if linear_lock.cliff_timestamp != 0 {
         return Err(anyhow!("LinearLock with cliff not supported"));
     }
-    if linear_lock.amount < config.deposits.delegator_min_deposit {
+    if linear_lock.amount < config.deposits.min_lock_amount {
         return Err(anyhow!("LinearLock must be at least min_lock_amount"));
     }
     let now = SystemTime::now()
@@ -79,6 +79,16 @@ pub async fn submit_deposit<T: Context>(
         .as_secs();
     if linear_lock.end_timestamp <= now {
         return Err(anyhow!("LinearLock is already expired"));
+    }
+
+    let min_duration = config.deposits.min_lock_period
+        * config.rounds.blocks_per_round
+        * config.rounds.seconds_between_blocks;
+    if linear_lock.end_timestamp - linear_lock.start_timestamp < min_duration as u64 {
+        return Err(anyhow!(
+            "LinearLock must be at least {} round",
+            config.deposits.min_lock_period
+        ));
     }
     let deposit_id = ctx
         .add_deposit_to_mempool(DepositDetails {
@@ -104,13 +114,18 @@ pub async fn set_delegatee<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if player_state.delegatee.is_some_and(|d| {
-        latest_block_details.height - d.block_set < config.deposits.delegatee_update_period
-    }) {
-        return Err(anyhow!(
-            "Can only update delegatee every {} blocks",
-            config.deposits.delegatee_update_period
-        ));
+    if let Some(curr_delegatee) = &player_state.delegatee {
+        if curr_delegatee.value == delegatee {
+            return Err(anyhow!("Delegatee is already set to {}", delegatee));
+        }
+        if latest_block_details.height - curr_delegatee.block_set
+            < config.deposits.delegatee_update_period
+        {
+            return Err(anyhow!(
+                "Can only update delegatee every {} blocks",
+                config.deposits.delegatee_update_period
+            ));
+        }
     }
 
     ctx.set_player_delegatee(player_id, delegatee).await?;
@@ -128,13 +143,22 @@ pub async fn set_reward_share<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if player_state.delegatee.is_some_and(|d| {
-        latest_block_details.height - d.block_set < config.deposits.reward_share_update_period
-    }) {
-        return Err(anyhow!(
-            "Can only update reward share every {} blocks",
-            config.deposits.reward_share_update_period
-        ));
+    if let Some(curr_reward_share) = &player_state.reward_share {
+        if curr_reward_share.value == reward_share {
+            return Err(anyhow!("Reward share is already set to {}", reward_share));
+        }
+        if latest_block_details.height - curr_reward_share.block_set
+            < config.deposits.reward_share_update_period
+        {
+            return Err(anyhow!(
+                "Can only update reward share every {} blocks",
+                config.deposits.reward_share_update_period
+            ));
+        }
+    }
+
+    if reward_share < 0.0 {
+        return Err(anyhow!("Reward share cannot be negative"));
     }
 
     if reward_share > config.deposits.max_reward_share {
@@ -166,14 +190,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         block_details.timestamp,
         block_details.timestamp + seconds_till_round_end as u64,
     ];
-    let max_lock_period_rounds = config.deposits.max_lock_period_rounds as usize;
-    for _ in 2..=max_lock_period_rounds {
+    let lock_period_cap = config.deposits.lock_period_cap as usize;
+    for _ in 2..=lock_period_cap {
         round_timestamps.push(round_timestamps.last().unwrap() + seconds_per_round as u64);
     }
 
     for deposit in active_deposit_details.values() {
         let total_time = PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp);
-        for i in 0..max_lock_period_rounds {
+        for i in 0..lock_period_cap {
             if round_timestamps[i + 1] <= deposit.start_timestamp {
                 continue;
             }
@@ -186,13 +210,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 round_timestamps[i]
             };
             // all deposits above max_lock_period_rounds get the same max weight
-            let end = if round_timestamps[i + 1] >= deposit.end_timestamp
-                || i + 1 == max_lock_period_rounds
-            {
-                deposit.end_timestamp
-            } else {
-                round_timestamps[i + 1]
-            };
+            let end =
+                if round_timestamps[i + 1] >= deposit.end_timestamp || i + 1 == lock_period_cap {
+                    deposit.end_timestamp
+                } else {
+                    round_timestamps[i + 1]
+                };
             let amount = deposit.amount * PreciseNumber::from(end - start) / total_time;
             let weight = PreciseNumber::from(i + 1);
             let player_data = active_players_block_data

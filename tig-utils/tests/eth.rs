@@ -150,7 +150,7 @@ mod tests {
             )
             .await
             .unwrap(),
-            "luc.eth".to_string()
+            Some("luc.eth".to_string())
         );
         assert_eq!(
             tig_utils::lookup_ens_name(
@@ -159,7 +159,7 @@ mod tests {
             )
             .await
             .unwrap(),
-            "harrisandtrotter.eth".to_string()
+            Some("harrisandtrotter.eth".to_string())
         );
         assert_eq!(
             tig_utils::lookup_ens_name(
@@ -168,7 +168,7 @@ mod tests {
             )
             .await
             .unwrap(),
-            "vitalik.eth".to_string()
+            Some("vitalik.eth".to_string())
         );
     }
 }
