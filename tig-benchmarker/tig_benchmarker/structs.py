@@ -19,8 +19,8 @@ class AlgorithmDetails(FromDict):
 class AlgorithmState(FromDict):
     block_confirmed: int
     round_submitted: int
-    round_pushed: int
-    round_active: int
+    round_pushed: Optional[int]
+    round_active: Optional[int]
     round_merged: Optional[int]
     banned: bool
 
