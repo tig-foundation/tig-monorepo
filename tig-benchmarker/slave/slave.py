@@ -58,45 +58,15 @@ async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_
     logger.debug(f"batch result: {result}")
     return result
 
-async def register_slave(session, master_ip, master_port, slave_name):
-    # Get Slave ID from disk
-    slave_id = None
-
-    # Check if slave_id.txt exists
-    if os.path.exists("slave_id.txt"):
-        with open("slave_id.txt", "r") as f:
-            slave_id = f.read()
-
-    if slave_id is None:
-        # Register Slave with Master
-        start = now()
-        logger.info(f"Registering slave '{slave_name}' with master at {master_ip}:{master_port}")
-
-        slave_data = {
-            "name": slave_name,
-            "num_of_cpus": psutil.cpu_count(logical=False),
-            "num_of_threads": psutil.cpu_count(logical=True),
-            "memory": psutil.virtual_memory().total,
-        }
-
-        async with session.post(f"http://{master_ip}:{master_port}/register-slave", json=slave_data) as resp:
-            if resp.status != 200:
-                raise Exception(f"status {resp.status} when registering slave: {await resp.text()}")
-            data = await resp.json()
-            logger.debug(f"Registering slave took {now() - start}ms")
-            logger.info(f"Slave '{slave_name}' registered with ID {slave_id}")
-            with open("slave_id.txt", "w") as f:
-                f.write(str(data.get("id")))
-    else:
-        logger.info(f"Slave '{slave_name}' already registered with ID {slave_id}")
-
-    return slave_id
-
 
 async def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
     batch_id = None
     try:
+        print("--------------------------------")
+        print(batch)
+        print(type(batch))
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
+        print("--------------------------------")
         logger.info(f"Processing batch {batch_id}: {batch}")
 
         # Step 1: Check if batch is already processed and call murkle proofs
@@ -182,7 +152,8 @@ async def main(
         while True:
             try:
                 # Step 0: Register Slave
-                slave_id = await register_slave(session, master_ip, master_port, slave_name)
+                slave_id = slave_name
+        
 
                 headers = {
                     "User-Agent": slave_id
