@@ -170,7 +170,7 @@ class SlaveManager:
                 with self.db_session.begin():
                     # Fetch jobs from the database that are pending (merkle_root is None)
                     pending_jobs = self.db_session.query(JobModel).all()
-                    slaveModel = self.db_session.query(SlaveModel).filter_by(id=slave_id).first()
+                    slaveModel = self.db_session.query(SlaveModel).filter_by(name=slave_id).first()
 
                     if not slaveModel:
                         logger.warning(f"Slave '{slave_id}' requested batches but no matching slave found.")
@@ -259,7 +259,7 @@ class SlaveManager:
 
                             batchModel = BatchModel(
                                 benchmark_id=job.benchmark_id,
-                                slave_id=slave_id,
+                                slave_name=slave_id,
                                 start_nonce=start_nonce,
                                 num_nonces=num_nonces,
                                 settings=batchSettings.to_dict(),

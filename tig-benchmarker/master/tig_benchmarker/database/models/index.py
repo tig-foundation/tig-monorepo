@@ -128,7 +128,7 @@ class BatchModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     benchmark_id = Column(String, ForeignKey('jobs.benchmark_id'), nullable=False)
-    slave_id = Column(Integer, ForeignKey('slaves.id'), nullable=False)
+    slave_name = Column(String, ForeignKey('slaves.name'), nullable=False)
     start_nonce = Column(Integer, nullable=False)
     num_nonces = Column(Integer, nullable=False)
     settings = Column(JSON, nullable=False)
@@ -150,7 +150,7 @@ class BatchModel(Base):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "benchmark_id": self.benchmark_id,
-            "slave_id": self.slave_id,
+            "slave_name": self.slave_name,
             "start_nonce": self.start_nonce,
             "num_nonces": self.num_nonces,
             "settings": self.settings,

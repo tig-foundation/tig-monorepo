@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE TABLE IF NOT EXISTS batches (
     id SERIAL PRIMARY KEY,
     benchmark_id VARCHAR NOT NULL REFERENCES jobs(benchmark_id) ON DELETE CASCADE,
-    slave_id INTEGER NOT NULL REFERENCES slaves(id),
+    slave_name VARCHAR NOT NULL REFERENCES slaves(name),
     start_nonce INTEGER NOT NULL,
     num_nonces INTEGER NOT NULL,
     settings JSONB NOT NULL,
