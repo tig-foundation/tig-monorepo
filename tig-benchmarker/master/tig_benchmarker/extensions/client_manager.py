@@ -89,6 +89,8 @@ class ClientManager:
 
         @self.app.post("/update-config")
         async def update_config(config_update: ConfigUpdate):
+            print("Received config update")
+            logger.debug("Received config update")
             try:
                 new_config = config_update.root
                 # Validate the incoming config if needed
