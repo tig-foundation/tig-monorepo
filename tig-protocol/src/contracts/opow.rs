@@ -43,7 +43,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     let mut phase_in_challenge_ids: HashSet<String> = active_challenge_ids.clone();
     for algorithm_id in active_algorithm_ids.iter() {
-        if active_algorithms_state[algorithm_id].round_active + 1 <= block_details.round {
+        if active_algorithms_state[algorithm_id]
+            .round_active
+            .as_ref()
+            .is_some_and(|r| *r + 1 <= block_details.round)
+        {
             phase_in_challenge_ids.remove(&active_algorithms_details[algorithm_id].challenge_id);
         }
     }
@@ -272,7 +276,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
-    let one = PreciseNumber::from(1);
     let imbalance_multiplier = PreciseNumber::from_f64(config.opow.imbalance_multiplier);
     let num_challenges = PreciseNumber::from(active_challenge_ids.len());
 
