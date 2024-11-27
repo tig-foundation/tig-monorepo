@@ -306,8 +306,8 @@ class SlaveManager:
        
         @self.app.post("/submit-batch-result/{batch_id}")
         def submit_batch_result(batch_id: str, batch_result_data: BatchResultData, request: Request, user_agent: Annotated[str | None, Header()]):
-            Session = sessionmaker(bind=engine)
-            session = Session()
+            #Session = sessionmaker(bind=engine)
+            #session = Session()
             # Extract User-Agent header to identify the slave
             slave_name = user_agent
             if not slave_name:
@@ -329,15 +329,15 @@ class SlaveManager:
                 raise HTTPException(status_code=400, detail="Invalid batch_id format.")
             
             try:
-                with session.begin():
+                with self.db_session.begin():
                     # Fetch the job from the database
-                    job = session.query(JobModel).filter_by(benchmark_id=benchmark_id).first()
+                    job = self.db_session.query(JobModel).filter_by(benchmark_id=benchmark_id).first()
                     if not job:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent job '{benchmark_id}'.")
                         raise HTTPException(status_code=400, detail="Invalid benchmark_id.")
 
                     # Fetch the batch from the database
-                    batch = session.query(BatchModel).filter_by(benchmark_id=benchmark_id, start_nonce=start_nonce).first()
+                    batch = self.db_session.query(BatchModel).filter_by(benchmark_id=benchmark_id, start_nonce=start_nonce).first()
                     if not batch:
                         logger.warning(f"Slave '{slave_name}' submitted a batch result for non-existent batch '{batch_idx}' of job '{benchmark_id}'.")
                         raise HTTPException(status_code=400, detail="Invalid batch_idx.")
@@ -364,18 +364,18 @@ class SlaveManager:
                     batch.solution_nonces = result.solution_nonces
                     
                     # Commit the transaction
-                    session.commit()
+                    self.db_session.commit()
 
                     logger.debug(f"Slave '{slave_name}' submitted batch result for benchmark '{benchmark_id}', start_nonce '{start_nonce}'.")
                     return JSONResponse(content={"detail": "OK"}, status_code=200)
             except SQLAlchemyError as e:
-                session.rollback()
+                self.db_session.rollback()
                 logger.error(f"Database error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             except HTTPException as he:
                 raise he
             except Exception as e:
-                session.rollback()
+                self.db_session.rollback()
                 logger.error(f"Unexpected error during submit_batch_result: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error.")
             
