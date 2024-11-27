@@ -48,7 +48,7 @@ pub async fn submit_precommit<T: Context>(
     if !ctx
         .get_algorithm_state(&settings.algorithm_id)
         .await
-        .is_some_and(|s| !s.banned && s.round_active <= block_details.round)
+        .is_some_and(|s| !s.banned && s.round_active.is_some_and(|r| r <= block_details.round))
     {
         return Err(anyhow!("Invalid algorithm '{}'", settings.algorithm_id));
     }

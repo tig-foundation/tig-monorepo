@@ -56,8 +56,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .reward_by_type
             .insert(RewardType::Algorithm, zero.clone());
 
-        if (algorithm_data.adoption >= adoption_threshold
-            || (is_merged && algorithm_data.adoption > zero))
+        if algorithm_data.adoption >= adoption_threshold
+            || (is_merged && algorithm_data.adoption > zero)
         {
             eligible_algorithms_by_challenge
                 .entry(algorithm_details.challenge_id.clone())

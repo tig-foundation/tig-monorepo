@@ -28,6 +28,9 @@ async def main(config: Config):
     last_block_id = None
     jobs = []
 
+    config.player_id = config.player_id.lower()
+    config.api_url = config.api_url.rstrip("/")
+
     data_fetcher = DataFetcher(config.api_url, config.player_id)
     difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
     job_manager = JobManager(config.job_manager_config, jobs)
