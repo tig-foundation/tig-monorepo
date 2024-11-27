@@ -101,7 +101,7 @@ class OutputMetaData(FromDict):
 @dataclass
 class OutputData(FromDict):
     nonce: int
-    runtime_signature_arr: List[Tuple[int,int]]
+    runtime_signature: int
     fuel_consumed: int
     solution: dict
 
@@ -111,7 +111,7 @@ class OutputData(FromDict):
     def to_output_metadata(self) -> OutputMetaData:
         return OutputMetaData(
             nonce=self.nonce,
-            runtime_signature=self.runtime_signature_arr[-1][1],
+            runtime_signature=self.runtime_signature,
             fuel_consumed=self.fuel_consumed,
             solution_signature=self.calc_solution_signature()
         )
