@@ -94,9 +94,9 @@ class ClientManager:
             logger.debug("Received config update")
             try:
                 config_update = await request.json()
-                #lowercase addr
-                #strip slashes from api urls
                 new_config = config_update
+                new_config["player_id"] = new_config["player_id"].lower()
+                new_config["api_url"] = new_config["api_url"].rstrip('/')
                 # Validate the incoming config if needed
                 config = self.db_session.query(ConfigModel).first()
                 if config:
