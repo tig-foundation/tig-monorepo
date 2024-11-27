@@ -66,16 +66,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let phase_in_start = (block_details.round - 1) * config.rounds.blocks_per_round;
         let phase_in_period = config.opow.cutoff_phase_in_period;
         let phase_in_end = phase_in_start + phase_in_period;
-        let min_cutoff = config.opow.min_cutoff;
         let cutoff_cap = (self_deposit[player_id] / deposit_to_cutoff_cap_ratio).to_f64() as u32;
         let min_num_solutions = active_challenge_ids
             .iter()
             .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
             .min()
             .unwrap();
-        let mut cutoff = min_cutoff
-            .max((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32)
-            .max(cutoff_cap);
+        let mut cutoff = cutoff_cap
+            .min((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32);
         // if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
         if phase_in_end > block_details.height {
             let phase_in_min_num_solutions = active_challenge_ids
@@ -84,9 +82,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
                 .min()
                 .unwrap();
-            let phase_in_cutoff = min_cutoff.max(
-                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
-            );
+            // let phase_in_cutoff = cutoff_cap.min(
+            //     (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
+            // );
+            let phase_in_cutoff =
+                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32;
             let phase_in_weight =
                 (phase_in_end - block_details.height) as f64 / phase_in_period as f64;
             cutoff = (phase_in_cutoff as f64 * phase_in_weight

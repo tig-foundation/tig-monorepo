@@ -104,7 +104,6 @@ serializable_struct_with_getters! {
         cutoff_phase_in_period: u32,
         cutoff_multiplier: f64,
         total_qualifiers_threshold: u32,
-        min_cutoff: u32,
         max_deposit_to_qualifier_ratio: f64,
         deposit_multiplier: f64,
         deposit_to_cutoff_ratio: f64,
