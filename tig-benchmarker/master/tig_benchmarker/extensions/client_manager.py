@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError, RootModel
 from tig_benchmarker.database.init import SessionLocal
 from tig_benchmarker.database.models.index import ConfigModel, JobModel, SlaveModel
+from fastapi import Request
 
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -88,11 +89,14 @@ class ClientManager:
                 raise HTTPException(status_code=500, detail="Internal Server Error")
 
         @self.app.post("/update-config")
-        async def update_config(config_update: ConfigUpdate):
+        async def update_config(request: Request):
             print("Received config update")
             logger.debug("Received config update")
             try:
-                new_config = config_update.root
+                config_update = await request.json()
+                #lowercase addr
+                #strip slashes from api urls
+                new_config = config_update
                 # Validate the incoming config if needed
                 config = self.db_session.query(ConfigModel).first()
                 if config:
