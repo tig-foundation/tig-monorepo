@@ -209,7 +209,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|d| d.into_iter().map(|x| -x).collect())
                 .collect::<Frontier>(); // mirror the points back;
 
-            extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
+            base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
             let scaling_factor = (challenge_data.num_qualifiers as f64
                 / config.opow.total_qualifiers_threshold as f64)
                 .min(config.challenges.max_scaling_factor);
@@ -220,7 +220,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 &max_difficulty,
                 scaling_factor,
             );
-            extend_frontier(&scaled_frontier, &min_difficulty, &max_difficulty);
+            scaled_frontier = extend_frontier(&scaled_frontier, &min_difficulty, &max_difficulty);
 
             (base_frontier, scaling_factor, scaled_frontier)
         };
