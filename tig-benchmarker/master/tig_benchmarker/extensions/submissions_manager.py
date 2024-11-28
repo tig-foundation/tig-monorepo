@@ -90,11 +90,11 @@ class SubmissionsManager:
             logger.error(f"Unexpected error during precommit submission: {e}")
 
     def handle_benchmark_submissions(self, now: int):
-        Session = sessionmaker(bind=engine)
-        session = Session()
+        #Session = sessionmaker(bind=engine)
+        #session = Session()
         try:
             # Fetch jobs eligible for benchmark submission
-            eligible_jobs = session.query(JobModel).filter(
+            eligible_jobs = self.db_session.query(JobModel).filter(
                 JobModel.merkle_root.isnot(None),
                 func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0) == 0,
                 JobModel.last_benchmark_submit_time < now - self.config.time_between_retries
@@ -118,25 +118,27 @@ class SubmissionsManager:
                 )
 
                 # Submit the benchmark request
+
                 success = self._post("benchmark", submit_benchmark_req)
+                time.sleep(5)
 
                 if success:
-                    session.commit()
+                    self.db_session.commit()
                     logger.info(f"Benchmark request for job_id '{job.benchmark_id}' submitted successfully.")
                 else:
                     logger.error(f"Failed to submit benchmark request for job_id '{job.benchmark_id}'.")
         except SQLAlchemyError as e:
-            session.rollback()
+            self.db_session.rollback()
             logger.error(f"Database error during benchmark submissions: {e}")
         except Exception as e:
-            session.rollback()
+            self.db_session.rollback()
             logger.error(f"Unexpected error during benchmark submissions: {e}")
 
     def handle_proof_submissions(self, now: int):
-        Session = sessionmaker(bind=engine)
-        session = Session()
+        #Session = sessionmaker(bind=engine)
+        #session = Session()
         try:
-            eligible_jobs = session.query(JobModel).filter(
+            eligible_jobs = self.db_session.query(JobModel).filter(
                 JobModel.last_proof_submit_time < now - self.config.time_between_retries,
                 JobModel.last_benchmark_submit_time != 0
             ).all()
@@ -169,21 +171,21 @@ class SubmissionsManager:
 
 
                 # Submit the proof request
-                time.sleep(10)
+                time.sleep(5)
                 success = self._post("proof", submit_proof_req) 
 
                 success = False
 
                 if success:
-                    session.commit()
+                    self.db_session.commit()
                     logger.info(f"Proof request for job_id '{job.benchmark_id}' submitted successfully.")
                 else:
                     logger.error(f"Failed to submit proof request for job_id '{job.benchmark_id}'.")
         except SQLAlchemyError as e:
-            session.rollback()
+            self.db_session.rollback()
             logger.error(f"Database error during proof submissions: {e}")
         except Exception as e:
-            session.rollback()
+            self.db_session.rollback()
             logger.error(f"Unexpected error during proof submissions: {e}")
     
     def run(self, submit_precommit_req: Optional[SubmitPrecommitRequest]):

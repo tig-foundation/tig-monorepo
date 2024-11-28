@@ -97,7 +97,6 @@ class JobManager:
 
                 flag_modified(job_model, "sampled_nonces")
                 flag_modified(job_model, "last_batch_retry_time")
-                # maybe add to db here 
 
 
             # Prune jobs based on proofs and precommits
