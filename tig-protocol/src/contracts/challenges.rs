@@ -12,6 +12,5 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for challenge_data in active_challenges_block_data.values_mut() {
         challenge_data.base_fee = config.benchmarks.min_base_fee;
         challenge_data.per_nonce_fee = config.benchmarks.min_per_nonce_fee;
-        challenge_data.solution_signature_threshold = u32::MAX;
     }
 }

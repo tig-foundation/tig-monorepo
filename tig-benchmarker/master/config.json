@@ -38,25 +38,25 @@
         "max_pending_benchmarks": 4,
         "algo_selection": {
             "satisfiability": {
-                "algorithm": "schnoing",
+                "algorithm": "sat_global_opt",
                 "num_nonces": 1000,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "vehicle_routing": {
-                "algorithm": "clarke_wright",
+                "algorithm": "advanced_routing",
                 "num_nonces": 1000,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "knapsack": {
-                "algorithm": "dynamic",
+                "algorithm": "classic_quadkp",
                 "num_nonces": 1000,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "vector_search": {
-                "algorithm": "optimal_ann",
+                "algorithm": "invector_hybrid",
                 "num_nonces": 1000,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"

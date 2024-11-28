@@ -46,6 +46,8 @@ class JobManager:
                 for c in challenges.values()
             }
 
+            print(precommits)
+
             # Create jobs from confirmed precommits
             for benchmark_id, precommit in precommits.items():
                 if benchmark_id in job_map or benchmark_id in proofs:
@@ -66,7 +68,7 @@ class JobManager:
                     settings=precommit.settings,
                     num_nonces=precommit.details.num_nonces,
                     rand_hash=precommit.details.rand_hash,
-                    wasm_vm_config=block.config['benchmarks']['runtime_configs']['wasm'],
+                    runtime_config=block.config['benchmarks']['runtime_configs']['wasm'],
                     batch_size=self.config.batch_sizes.get(challenge_name),
                     challenge=challenge_name,
                     download_url=download_url
@@ -92,8 +94,12 @@ class JobManager:
 
                 logger.info(f"Updating job from confirmed benchmark {benchmark_id}")
                 job_model.sampled_nonces = benchmark.details.sampled_nonces
-                # Reset last_batch_retry_time for all batches
+                # Reset last_batch_rxetry_time for all batches
                 job_model.last_batch_retry_time = [0] * job_model.num_batches
+
+                flag_modified(job_model, "sampled_nonces")
+                flag_modified(job_model, "last_batch_retry_time")
+
 
             # Prune jobs based on proofs and precommits
             # Identify benchmark_ids to prune

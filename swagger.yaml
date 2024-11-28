@@ -112,6 +112,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetBenchmarkDataResponse'
+  /get-round-earnings:
+    get:
+      tags:
+        - GET
+      summary: Get round earnings for a specific round
+      description: |-
+        # Notes
+      parameters:
+        - name: round
+          in: query
+          description: Id of round
+          required: true
+          schema:
+            type: integer
+            format: uint32
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRoundEarningsResponse'
   /get-block:
     get:
       tags:
@@ -119,23 +141,13 @@ paths:
       summary: Get latest block for a round
       description: |-
         # Notes
-        
-        * Specify query parameter `<round>` to get the latest block for that round. 
-        
-        * Omit query parameter `<round>` to get the latest block for the current round.
-        
         * Set `<include_data>` to `true` to include data for `block.data`.
       parameters:
-        - name: round
-          in: query
-          required: false
-          schema:
-            type: integer
         - name: include_data
           in: query
           required: false
           schema:
-            type: boolean
+            type: bool
       responses:
         '200':
           description: Success
@@ -143,6 +155,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetBlockResponse'
+  /get-difficulty-data:
+    get:
+      tags:
+        - GET
+      summary: Get difficulty data for a specific block and challenge id
+      description: |-
+        # Notes
+
+        * Query parameter `<block_id>` must be latest block for **CURRENT** round. Use `/get-block` endpoint
+
+        * Query parameter `<challenge_id>` must be a valid challenge id
+      parameters:
+        - name: block_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MD5'
+        - name: challenge_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDifficultyDataResponse'
   /get-challenges:
     get:
       tags:
@@ -165,6 +206,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetChallengesResponse'
+  /get-opow:
+    get:
+      tags:
+        - GET
+      summary: Get data for OPoW at a specific block
+      description: |-
+        # Notes
+        
+        * Query parameter `<block_id>` must be latest block for **CURRENT** round. Use `/get-block` endpoint
+      parameters:
+        - name: block_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetOPoWResponse'
   /get-fee-balance:
     get:
       tags:
@@ -233,6 +296,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPlayersResponse'
+  /get-player-data:
+    get:
+      tags:
+        - GET
+      summary: Get data for a specific player
+      description: |-
+        # Notes
+        
+        * Query parameter `<block_id>` can be latest block for **ANY** round. Use `/get-block` endpoint
+        
+        * Query parameter `<player_id>` must be a valid player id
+      parameters:
+        - name: block_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MD5'
+        - name: player_id
+          in: query
+          description: Id of player
+          required: true
+          schema:
+            $ref: '#/components/schemas/Address'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPlayerDataResponse'
   /get-wasm-blob:
     get:
       tags:
@@ -252,6 +345,24 @@ paths:
               schema:
                 type: string
                 format: binary
+  /get-binary-blob:
+    get:
+      tags:
+        - GET
+      summary: Get binary blob url redirect for a specific algorithm
+      parameters:
+        - name: algorithm_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/AlgorithmId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            text/plain:
+              schema:
+                type: string
   /request-api-key:
     post:
       tags:
@@ -276,6 +387,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RequestApiKeyResponse'
+  /set-delegatee:
+    post:
+      tags:
+        - POST
+      summary: 
+      description: |-
+        # Notes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetDelegateeRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetDelegateeResponse'
+  /set-reward-share:
+    post:
+      tags:
+        - POST
+      summary: 
+      description: |-
+        # Notes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetRewardShareRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetRewardShareResponse'
   /submit-algorithm:
     post:
       tags:
@@ -307,6 +468,10 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitAlgorithmResponse'
   /submit-precommit:
     post:
       tags:
@@ -425,6 +590,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubmitTopupResponse'
+  /submit-deposit:
+    post:
+      tags:
+        - POST
+      summary: Submit a deposit
+      description: |-
+        # Notes
+        
+        * This endpoint can only be invoked once every few seconds
+
+        * `<tx_hash>`
+        * `<log_idx>`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitDepositRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitDepositResponse'
 components:
   schemas:
     Address:
@@ -441,8 +636,11 @@ components:
           $ref: '#/components/schemas/AlgorithmState'
         block_data:
           $ref: '#/components/schemas/AlgorithmBlockData'
-        code:
-          type: string
+    AlgorithmType:
+      type: string
+      enum:
+        - wasm
+        - ptx
     AlgorithmDetails:
       type: object
       properties:
@@ -452,8 +650,12 @@ components:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-        tx_hash:
-          $ref: '#/components/schemas/TxHash'
+        breakthrough_id:
+          $ref: '#/components/schemas/MD5'
+        type:
+          $ref: '#/components/schemas/AlgorithmType'
+        fee_paid:
+          $ref: '#/components/schemas/PreciseNumber'
     AlgorithmId:
       type: string
       pattern: ^c[0-9]{3}_a[0-9]{3}$
@@ -477,6 +679,9 @@ components:
         round_merged:
           type: integer
           format: uint32
+        round_active:
+          type: integer
+          format: uint32
         banned:
           type: boolean
     AlgorithmBlockData:
@@ -487,17 +692,13 @@ components:
           additionalProperties:
             type: integer
             format: uint32
-          example:
-            "0x100af566d1b9809915fd03ebee5e02e2e7926d98": 10
-            "0x0000000000000000000000000000000000000001": 15
+          example: {"0x1234...": 5, "0x5678...": 3}
         adoption:
           $ref: '#/components/schemas/PreciseNumber'
         merge_points:
           type: integer
           format: uint32
         reward:
-          $ref: '#/components/schemas/PreciseNumber'
-        round_earnings:
           $ref: '#/components/schemas/PreciseNumber'
     Benchmark:
       type: object
@@ -534,17 +735,17 @@ components:
           format: uint32
         merkle_root:
           $ref: '#/components/schemas/MerkleHash'
-    BenchmarkState:
-      type: object
-      properties:
-        block_confirmed:
-          type: integer
-          format: uint32
         sampled_nonces:
           type: array
           items:
             type: integer
             format: uint64
+    BenchmarkState:
+      type: object
+      properties:
+        block_confirmed:
+          type: integer
+          format: uint32  
     Block:
       type: object
       properties:
@@ -556,6 +757,29 @@ components:
           $ref: '#/components/schemas/BlockData'
         config:
           $ref: '#/components/schemas/ProtocolConfig'
+    TxType:
+      type: string
+      enum:
+        - algorithm
+        - benchmark
+        - binary
+        - breakthrough
+        - challenge
+        - deposit
+        - fraud
+        - precommit
+        - proof
+        - topup
+    ActiveType
+      type: string
+      enum:
+        - algorithm
+        - benchmark
+        - breakthrough
+        - challenge
+        - deposit
+        - opow
+        - player
     BlockDetails:
       type: object
       properties:
@@ -567,57 +791,38 @@ components:
         round:
           type: integer
           format: uint32
+        num_confirmed:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint32
+          example: {"algorithm": 5, "benchmark": 3}
+        num_active:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint32
+          example: {"algorithm": 5, "benchmark": 3}
+        timestamp:
+          type: integer
+          format: uint64
     BlockData:
       type: object
       properties:
-        confirmed_challenge_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/ChallengeId'
-        confirmed_algorithm_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/AlgorithmId'
-        confirmed_benchmark_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/MD5'
-        confirmed_precommit_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/MD5'
-        confirmed_proof_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/MD5'
-        confirmed_fraud_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/MD5'
-        confirmed_topup_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/MD5'
-        confirmed_wasm_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/AlgorithmId'
-        active_challenge_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/ChallengeId'
-        active_algorithm_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/AlgorithmId'
-        active_benchmark_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/MD5'
-        active_player_ids:
-          type: array
-          items:
-            $ref: '#/components/schemas/Address'
+        confirmed_ids:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example: {"algorithm": ["abc123", "def456"], "benchmark": ["xyz789"]}
+        active_ids:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example: {"algorithm": ["abc123", "def456"], "benchmark": ["xyz789"]}
     Challenge:
       type: object
       properties:
@@ -665,9 +870,6 @@ components:
     ChallengeState:
       type: object
       properties:
-        block_confirmed:
-          type: integer
-          format: uint32
         round_active:
           type: integer
           format: uint32
@@ -695,33 +897,19 @@ components:
     PlayerBlockData:
       type: object
       properties:
-        num_qualifiers_by_challenge:
+        delegatee:
+          type: string
+          nullable: true
+        reward_by_type:
           type: object
           additionalProperties:
-            type: integer
-            format: uint32
-          example:
-            c001: 10
-            c002: 15
-            c003: 20
-        cutoff:
-          type: integer
-          format: uint32
-        deposit:
-          $ref: '#/components/schemas/PreciseNumber'
-        rolling_deposit:
-          $ref: '#/components/schemas/PreciseNumber'
-        qualifying_percent_rolling_deposit:
-          $ref: '#/components/schemas/PreciseNumber'
-        imbalance:
-          $ref: '#/components/schemas/PreciseNumber'
-        imbalance_penalty:
-          $ref: '#/components/schemas/PreciseNumber'
-        influence:
-          $ref: '#/components/schemas/PreciseNumber'
-        reward:
-          $ref: '#/components/schemas/PreciseNumber'
-        round_earnings:
+            $ref: '#/components/schemas/PreciseNumber'
+          example: {"algorithm": 1000000, "breakthrough": 500000}
+        deposit_by_locked_period:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreciseNumber'
+        weighted_deposit:
           $ref: '#/components/schemas/PreciseNumber'
     PlayerDetails:
       type: object
@@ -730,6 +918,14 @@ components:
           $ref: '#/components/schemas/Address'
         is_multisig:
           type: boolean
+    PlayerValueDelegatee:
+      type: object
+      properties:
+        value:
+          $ref: '#/components/schemas/Address'
+        block_set:
+          type: integer
+          format: uint32
     PlayerState:
       type: object
       properties:
@@ -737,9 +933,37 @@ components:
           $ref: '#/components/schemas/PreciseNumber'
         available_fee_balance:
           $ref: '#/components/schemas/PreciseNumber'
+        delegatee:
+          $ref: '#/components/schemas/PlayerValueDelegatee'
+        votes:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              value:
+                type: boolean
+              block_set:
+                type: integer
+                format: uint32
+        reward_share:
+          type: number
+          format: double
     PreciseNumber:
       type: integer
       format: uint256
+    PrecommitDetails:
+      type: object
+      properties:
+        block_started:
+          type: integer
+          format: uint32
+        num_nonces:
+          type: integer
+          format: uint32
+        rand_hash:
+          type: string
+        fee_paid:
+          $ref: '#/components/schemas/PreciseNumber'
     Precommit:
       type: object
       properties:
@@ -751,7 +975,40 @@ components:
           $ref: '#/components/schemas/BenchmarkSettings'
         state:
           $ref: '#/components/schemas/PrecommitState'
-    PrecommitDetails:
+    DepositDetails:
+      type: object
+      properties:
+        player_id:
+          $ref: '#/components/schemas/Address'
+        tx_hash:
+          $ref: '#/components/schemas/TxHash'
+        log_idx:
+          type: integer
+          format: uint64
+        amount:
+          $ref: '#/components/schemas/PreciseNumber'
+        start_timestamp:
+          type: integer
+          format: uint64
+        end_timestamp:
+          type: integer
+          format: uint64
+    DepositState:
+      type: object
+      properties:
+        block_confirmed:
+          type: integer
+          format: uint32
+    Deposit:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/MD5'
+        details:
+          $ref: '#/components/schemas/DepositDetails'
+        state:
+          $ref: '#/components/schemas/DepositState'
+    DepositDetails:
       type: object
       properties:
         block_started:
@@ -768,8 +1025,6 @@ components:
         block_confirmed:
           type: integer
           format: uint32
-        rand_hash:
-          type: string
     MerkleProof:
       type: object
       properties:
@@ -794,9 +1049,6 @@ components:
         block_confirmed:
           type: integer
           format: uint32
-        submission_delay:
-          type: integer
-          format: uint32
     OutputData:
       type: object
       properties:
@@ -804,13 +1056,19 @@ components:
           type: integer
           format: uint64
         runtime_signature:
-          type: integer
-          format: uint64
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+              format: uint64
         fuel_consumed:
           type: integer
           format: uint64
         solution:
           type: object
+          additionalProperties:
+            type: string
     Fraud:
       type: object
       properties:
@@ -840,6 +1098,11 @@ components:
       properties:
         player_id:
           $ref: '#/components/schemas/Address'
+        tx_hash:
+          $ref: '#/components/schemas/TxHash'
+        log_idx:
+          type: integer
+          format: uint64
         amount:
           $ref: '#/components/schemas/PreciseNumber'
     TopUpState:
@@ -870,6 +1133,54 @@ components:
         block_confirmed:
           type: integer
           format: uint32
+    DifficultyData:
+      type: object
+      properties:
+        num_nonces:
+          type: integer
+          format: uint64
+        num_solutions:
+          type: integer
+          format: uint64
+        difficulty:
+          type: array
+          items:
+            type: integer
+            format: uint32
+    OPoWBlockData:
+      type: object
+      properties:
+        num_qualifiers_by_challenge:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint32
+          example: {"c001": 5, "c002": 3}
+        cutoff:
+          type: integer
+          format: uint32
+        associated_deposit:
+          $ref: '#/components/schemas/PreciseNumber'
+        delegators:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        reward_share:
+          type: number
+          format: double
+        imbalance:
+          $ref: '#/components/schemas/PreciseNumber'
+        influence:
+          $ref: '#/components/schemas/PreciseNumber'
+        reward:
+          $ref: '#/components/schemas/PreciseNumber'
+    OPoW:
+      type: object
+      properties:
+        player_id:
+          $ref: '#/components/schemas/Address'
+        block_data:
+          $ref: '#/components/schemas/OPoWBlockData'
     MD5:
       type: string
       pattern: ^[a-f0-9]{32}$
@@ -890,14 +1201,18 @@ components:
     GetAlgorithmsResponse:
       type: object
       properties:
-        block_id:
-          $ref: '#/components/schemas/MD5'
-        block_details:
-          $ref: '#/components/schemas/BlockDetails'
         algorithms:
           type: array
           items:
             $ref: '#/components/schemas/Algorithm'
+        breakthroughs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Breakthrough'
+        binaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Binary'
     GetBenchmarksResponse:
       type: object
       properties:
@@ -936,14 +1251,24 @@ components:
     GetChallengesResponse:
       type: object
       properties:
-        block_id:
-          $ref: '#/components/schemas/MD5'
-        block_details:
-          $ref: '#/components/schemas/BlockDetails'
         challenges:
           type: array
           items:
             $ref: '#/components/schemas/Challenge'
+    GetDifficultyDataResponse:
+      type: object
+      properties:
+        difficulty_data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DifficultyData'
+    GetOPoWResponse:
+      type: object
+      properties:
+        opow:
+          type: array
+          items:
+            $ref: '#/components/schemas/OPoW'
     GetPlayersResponse:
       type: object
       properties:
@@ -955,6 +1280,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Player'
+    GetPlayerDataResponse:
+      type: object
+      properties:
+        player:
+          $ref: '#/components/schemas/Player'
+        deposits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deposit'
+        topups:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopUp'
+    GetRoundEarningsResponse:
+      #todo 
     GetFeeBalanceResponse:
       type: object
       properties:
@@ -967,10 +1307,10 @@ components:
     RequestApiKeyRequest:
       type: object
       properties:
-        address:
-          $ref: '#/components/schemas/Address'
         signature:
           $ref: '#/components/schemas/Signature'
+        address:
+          $ref: '#/components/schemas/Address'
     RequestApiKeyResponse:
       type: object
       properties:
@@ -978,6 +1318,27 @@ components:
           $ref: '#/components/schemas/MD5'
         name:
           type: string
+    SetDelegateeRequest:
+      type: object
+      properties:
+        delegatee:
+          $ref: '#/components/schemas/Address'
+    SetDelegateeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+    SetRewardShareRequest:
+      type: object
+      properties:
+        share:
+          type: number
+          format: double
+    SetRewardShareResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
     SubmitAlgorithmRequest:
       type: object
       properties:
@@ -985,10 +1346,13 @@ components:
           $ref: '#/components/schemas/AlgorithmName'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-        tx_hash:
-          $ref: '#/components/schemas/TxHash'
         code:
           type: string
+    SubmitAlgorithmResponse:
+      type: object
+      properties:
+        algorithm_id:
+          $ref: '#/components/schemas/MD5'
     SubmitPrecommitRequest:
       type: object
       properties:
@@ -1043,3 +1407,16 @@ components:
       properties:
         ok:
           type: boolean
+    SubmitDepositRequest:
+      type: object
+      properties:
+        tx_hash:
+          $ref: '#/components/schemas/TxHash'
+        log_idx:
+          type: integer
+          format: uint32
+    SubmitDepositResponse:
+      type: object
+      properties:
+        deposit_id:
+          $ref: '#/components/schemas/MD5'

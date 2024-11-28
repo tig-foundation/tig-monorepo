@@ -101,7 +101,7 @@ class OutputMetaData(FromDict):
 @dataclass
 class OutputData(FromDict):
     nonce: int
-    runtime_signature_arr: List[Tuple[int,int]]
+    runtime_signature: int
     fuel_consumed: int
     solution: dict
 
@@ -111,7 +111,7 @@ class OutputData(FromDict):
     def to_output_metadata(self) -> OutputMetaData:
         return OutputMetaData(
             nonce=self.nonce,
-            runtime_signature=self.runtime_signature_arr[-1][1],
+            runtime_signature=self.runtime_signature,
             fuel_consumed=self.fuel_consumed,
             solution_signature=self.calc_solution_signature()
         )
@@ -181,7 +181,6 @@ class ChallengeState(FromDict):
 
 @dataclass
 class ChallengeBlockData(FromDict):
-    solution_signature_threshold: int
     num_qualifiers: int
     qualifier_difficulties: Set[Point]
     base_frontier: Frontier
@@ -201,7 +200,7 @@ class Challenge(FromDict):
 class OPoWBlockData(FromDict):
     num_qualifiers_by_challenge: Dict[str, int]
     cutoff: int
-    associated_deposit: PreciseNumber
+    delegated_weighted_deposit: PreciseNumber
     delegators: Set[str]
     reward_share: float
     imbalance: PreciseNumber
@@ -303,7 +302,7 @@ class Job(FromDict):
     settings: BenchmarkSettings
     num_nonces: int
     rand_hash: str
-    wasm_vm_config: Dict[str, int]
+    runtime_config: Dict[str, int]
     download_url: str
     batch_size: int
     challenge: str
