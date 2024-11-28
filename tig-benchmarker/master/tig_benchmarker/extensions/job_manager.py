@@ -46,6 +46,8 @@ class JobManager:
                 for c in challenges.values()
             }
 
+            print(precommits)
+
             # Create jobs from confirmed precommits
             for benchmark_id, precommit in precommits.items():
                 if benchmark_id in job_map or benchmark_id in proofs:
@@ -97,7 +99,6 @@ class JobManager:
 
                 flag_modified(job_model, "sampled_nonces")
                 flag_modified(job_model, "last_batch_retry_time")
-                # maybe add to db here 
 
 
             # Prune jobs based on proofs and precommits
