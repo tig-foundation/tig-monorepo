@@ -92,8 +92,13 @@ class JobManager:
 
                 logger.info(f"Updating job from confirmed benchmark {benchmark_id}")
                 job_model.sampled_nonces = benchmark.details.sampled_nonces
-                # Reset last_batch_retry_time for all batches
+                # Reset last_batch_rxetry_time for all batches
                 job_model.last_batch_retry_time = [0] * job_model.num_batches
+
+                flag_modified(job_model, "sampled_nonces")
+                flag_modified(job_model, "last_batch_retry_time")
+                # maybe add to db here 
+
 
             # Prune jobs based on proofs and precommits
             # Identify benchmark_ids to prune
