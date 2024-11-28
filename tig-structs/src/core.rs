@@ -111,7 +111,7 @@ serializable_struct_with_getters! {
 }
 
 // Algorithm child structs
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AlgorithmType {
     Wasm,
@@ -131,8 +131,8 @@ serializable_struct_with_getters! {
     AlgorithmState {
         block_confirmed: u32,
         round_submitted: u32,
-        round_pushed: u32,
-        round_active: u32,
+        round_pushed: Option<u32>,
+        round_active: Option<u32>,
         round_merged: Option<u32>,
         banned: bool,
     }
@@ -185,7 +185,7 @@ impl From<OutputData> for OutputMetaData {
     fn from(data: OutputData) -> Self {
         OutputMetaData {
             solution_signature: data.calc_solution_signature(),
-            runtime_signature: data.runtime_signature_arr.last().unwrap().1,
+            runtime_signature: data.runtime_signature,
             fuel_consumed: data.fuel_consumed,
             nonce: data.nonce,
         }
@@ -297,7 +297,6 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ChallengeBlockData {
-        solution_signature_threshold: u32,
         num_qualifiers: u32,
         qualifier_difficulties: HashSet<Point>,
         base_frontier: Frontier,
@@ -337,7 +336,8 @@ serializable_struct_with_getters! {
     OPoWBlockData {
         num_qualifiers_by_challenge: HashMap<String, u32>,
         cutoff: u32,
-        associated_deposit: PreciseNumber,
+        self_deposit: PreciseNumber,
+        delegated_weighted_deposit: PreciseNumber,
         delegators: HashSet<String>,
         reward_share: f64,
         imbalance: PreciseNumber,
@@ -415,7 +415,7 @@ pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     OutputData {
         nonce: u64,
-        runtime_signature_arr: Vec<(u64, u64)>,
+        runtime_signature: u64,
         fuel_consumed: u64,
         solution: Solution,
     }

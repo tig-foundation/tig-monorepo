@@ -43,7 +43,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     let mut phase_in_challenge_ids: HashSet<String> = active_challenge_ids.clone();
     for algorithm_id in active_algorithm_ids.iter() {
-        if active_algorithms_state[algorithm_id].round_active + 1 <= block_details.round {
+        if active_algorithms_state[algorithm_id]
+            .round_active
+            .as_ref()
+            .is_some_and(|r| *r + 1 <= block_details.round)
+        {
             phase_in_challenge_ids.remove(&active_algorithms_details[algorithm_id].challenge_id);
         }
     }
@@ -247,6 +251,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         })
         .collect();
 
+    for player_id in active_opow_ids.iter() {
+        let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
+        opow_data.self_deposit = self_deposit[player_id].clone();
+    }
+
     for player_id in active_player_ids.iter() {
         let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
@@ -267,15 +276,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .get_mut(player_data.delegatee.as_ref().unwrap())
             .unwrap();
         opow_data.delegators.insert(player_id.clone());
-        opow_data.associated_deposit += player_data.weighted_deposit;
+        opow_data.delegated_weighted_deposit += player_data.weighted_deposit;
     }
     let total_deposit = active_opow_block_data
         .values()
-        .map(|d| d.associated_deposit)
+        .map(|d| d.delegated_weighted_deposit)
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
-    let one = PreciseNumber::from(1);
     let imbalance_multiplier = PreciseNumber::from_f64(config.opow.imbalance_multiplier);
     let num_challenges = PreciseNumber::from(active_challenge_ids.len());
 
@@ -301,7 +309,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mut percent_deposit = if total_deposit == zero {
             zero.clone()
         } else {
-            opow_data.associated_deposit / total_deposit
+            opow_data.delegated_weighted_deposit / total_deposit
         };
         let mean_percent_qualifiers = percent_qualifiers.arithmetic_mean();
         let max_deposit_to_qualifier_ratio =
@@ -318,16 +326,17 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             / PreciseNumber::from_f64(
                 active_challenge_ids.len() as f64 + config.opow.deposit_multiplier,
             );
-        let mean = (sum_percent_qualifiers + percent_deposit)
-            / PreciseNumber::from(active_challenge_ids.len() + 1);
-        let variance = percent_qualifiers.variance();
+        let mut qualifiers_and_deposit = percent_qualifiers;
+        qualifiers_and_deposit.push(percent_deposit);
+        let mean = qualifiers_and_deposit.arithmetic_mean();
+        let variance = qualifiers_and_deposit.variance();
         let cv_sqr = if mean == zero {
             zero.clone()
         } else {
             variance / (mean * mean)
         };
 
-        let imbalance = cv_sqr / (num_challenges - one);
+        let imbalance = cv_sqr / num_challenges; // no need minus 1, because deposit is extra factor
         weights
             .push(weighted_mean * PreciseNumber::approx_inv_exp(imbalance_multiplier * imbalance));
         opow_data.imbalance = imbalance;

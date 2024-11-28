@@ -46,11 +46,18 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let algorithm_details = &active_algorithms_details[algorithm_id];
 
         let is_merged = algorithm_state.round_merged.is_some();
-        let is_banned = algorithm_state.banned;
+        if algorithm_state.banned {
+            continue;
+        }
 
-        if !is_banned
-            && (algorithm_data.adoption >= adoption_threshold
-                || (is_merged && algorithm_data.adoption > zero))
+        active_players_block_data
+            .get_mut(&algorithm_details.player_id)
+            .unwrap()
+            .reward_by_type
+            .insert(RewardType::Algorithm, zero.clone());
+
+        if algorithm_data.adoption >= adoption_threshold
+            || (is_merged && algorithm_data.adoption > zero)
         {
             eligible_algorithms_by_challenge
                 .entry(algorithm_details.challenge_id.clone())
@@ -95,7 +102,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .map_or(config.deposits.default_reward_share, |x| x.value)
             .clone();
 
-        let shared_amount = if opow_data.associated_deposit == zero {
+        let shared_amount = if opow_data.delegated_weighted_deposit == zero {
             zero.clone()
         } else {
             opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share)
@@ -114,7 +121,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let player_data = active_players_block_data.get_mut(delegator).unwrap();
             player_data.reward_by_type.insert(
                 RewardType::Delegator,
-                shared_amount * player_data.weighted_deposit / opow_data.associated_deposit,
+                shared_amount * player_data.weighted_deposit / opow_data.delegated_weighted_deposit,
             );
         }
     }

@@ -1,4 +1,4 @@
-use crate::serializable_struct_with_getters;
+use crate::{core::AlgorithmType, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use tig_utils::Point;
@@ -21,7 +21,7 @@ serializable_struct_with_getters! {
 
 serializable_struct_with_getters! {
     BreakthroughsConfig {
-        academic_fund_address: String,
+        bootstrap_address: String,
         min_percent_yes_votes: f64,
         vote_period: u32,
         min_lock_period_to_vote: u32,
@@ -40,14 +40,20 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     DepositsConfig {
         lock_address: String,
-        min_lock_period_secs: u64,
-        max_lock_period_rounds: u32,
+        min_lock_amount: PreciseNumber,
+        min_lock_period: u32,
+        lock_period_cap: u32,
         max_reward_share: f64,
         default_reward_share: f64,
         reward_share_update_period: u32,
         delegatee_update_period: u32,
-        delegator_min_deposit: PreciseNumber,
         delegatee_min_deposit: PreciseNumber,
+    }
+}
+serializable_struct_with_getters! {
+    RuntimeConfig {
+        max_memory: u64,
+        max_fuel: u64,
     }
 }
 serializable_struct_with_getters! {
@@ -58,9 +64,7 @@ serializable_struct_with_getters! {
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
-        max_fee_percentage_delta: f64,
-        target_num_precommits: u32,
-        runtime_config: RuntimeConfig,
+        runtime_configs: HashMap<AlgorithmType, RuntimeConfig>,
     }
 }
 serializable_struct_with_getters! {
@@ -70,17 +74,7 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    RuntimeConfig {
-        max_memory: u64,
-        max_fuel: u64,
-    }
-}
-serializable_struct_with_getters! {
     ChallengesConfig {
-        max_percent_delta: Option<f64>,
-        threshold_decay: Option<f64>,
-        equilibrium_rate_multiplier: f64,
-        percent_error_multiplier: Option<f64>,
         max_scaling_factor: f64,
         difficulty_parameters: HashMap<String, Vec<DifficultyParameter>>,
     }
