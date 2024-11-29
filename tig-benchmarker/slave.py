@@ -7,6 +7,7 @@ import aiohttp
 import asyncio
 import subprocess
 import time
+import threading
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -54,6 +55,7 @@ async def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
     return result
 
 async def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers):
+    batch_id = None
     try:
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
         logger.info(f"Processing batch {batch_id}: {batch}")
@@ -77,14 +79,38 @@ async def process_batch(session, master_ip, master_port, tig_worker_path, downlo
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
 
+pending_jobs = []
+pending_jobs_lock = threading.Lock()
+def process_pending_jobs():
+    while True:
+        if len(pending_jobs) == 0:
+            time.sleep(1)
+            continue
+        to_remove = []
+        for i, (batch, future) in enumerate(pending_jobs):
+            if future.done():
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Error processing batch {batch['benchmark_id']}_{batch['start_nonce']}: {e}")
+                to_remove.append(i)
+
+        if len(to_remove) > 0:
+            pending_jobs_lock.acquire()
+            for i in reversed(to_remove):
+                pending_jobs.pop(i)
+            pending_jobs_lock.release()
+
 async def main(
     master_ip: str,
     tig_worker_path: str,
     download_wasms_folder: str,
     num_workers: int,
     slave_name: str,
-    master_port: int
+    master_port: int,
 ):
+    print(f"Starting slave {slave_name}")
+
     if not os.path.exists(tig_worker_path):
         raise FileNotFoundError(f"tig-worker not found at path: {tig_worker_path}")
     os.makedirs(download_wasms_folder, exist_ok=True)
@@ -93,25 +119,42 @@ async def main(
         "User-Agent": slave_name
     }
     
+    has_exceeded_pending_jobs_limit = False
+    last_pending_jobs = 0
     async with aiohttp.ClientSession() as session:
         while True:
             try:
+                if has_exceeded_pending_jobs_limit:
+                    if len(pending_jobs) < last_pending_jobs:
+                        has_exceeded_pending_jobs_limit = False
+                    else:
+                        await asyncio.sleep(0.5)
+
+                        continue
+
                 # Step 1: Query for job
                 start = now()
-                get_batch_url = f"http://{master_ip}:{master_port}/get-batches"
+                get_batch_url = f"http://{master_ip}:{master_port}/get-batch"
                 logger.info(f"fetching job from {get_batch_url}")
                 async with session.get(get_batch_url, headers=headers) as resp:
                     if resp.status != 200:
                         raise Exception(f"status {resp.status} when fetching job: {await resp.text()}")
-                    batches = await resp.json(content_type=None)
+                    else if resp.status == 425: # too early
+                        has_exceeded_pending_jobs_limit = True
+                        last_pending_jobs = len(pending_jobs)
+
+                        raise Exception(f"too many pending jobs, cooling down for 5 seconds")
+                    batch = await resp.json(content_type=None)
+                    batch = batch[0]
+                    print(f"Fetched batch: {batch}")
                 logger.debug(f"fetching job: took {now() - start}ms")
 
-                # Process batches concurrently
-                tasks = [
+                future = asyncio.ensure_future(
                     process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers)
-                    for batch in batches
-                ]
-                await asyncio.gather(*tasks)
+                )
+                pending_jobs_lock.acquire()
+                pending_jobs.append((batch, future))
+                pending_jobs_lock.release()
 
             except Exception as e:
                 logger.error(e)
@@ -134,4 +177,5 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO
     )
 
+    threading.Thread(target=process_pending_jobs, daemon=True).start()
     asyncio.run(main(args.master_ip, args.tig_worker_path, args.download, args.workers, args.name, args.port))

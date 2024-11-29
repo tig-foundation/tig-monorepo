@@ -108,6 +108,60 @@ class SlaveManager:
                 logger.debug(f"{slave_name} get-batches: (challenge: {selected_challenge}, #batches: {len(batches)}, batch_ids: {[b.benchmark_id for b in batches]})")
                 return jsonify([b.to_dict() for b in batches])
 
+        @app.route('/get-batch', methods=['GET'])
+        def get_batch():
+            if (slave_name := request.headers.get('User-Agent', None)) is None:
+                return "User-Agent header is required", 403
+            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
+                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
+                return "Unregistered slave", 403
+            
+            slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
+
+            now = int(time.time() * 1000)
+            batch = None
+            selected_challenge = None
+            for job in self.jobs:
+                if (
+                    job.challenge not in slave.max_concurrent_batches or 
+                    (selected_challenge is not None and job.challenge != selected_challenge)
+                ):
+                    continue
+                sampled_nonces_by_batch_idx = job.sampled_nonces_by_batch_idx
+                for batch_idx in range(job.num_batches):
+                    if not (
+                        now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
+                        (
+                            job.batch_merkle_roots[batch_idx] is None or
+                            not set(sampled_nonces_by_batch_idx.get(batch_idx, [])).issubset(job.merkle_proofs)
+                        )
+                    ):
+                        continue
+                    job.last_batch_retry_time[batch_idx] = now
+                    selected_challenge = job.challenge
+                    start_nonce = batch_idx * job.batch_size
+                    batch = Batch(
+                        benchmark_id=job.benchmark_id,
+                        start_nonce=start_nonce,
+                        num_nonces=min(job.batch_size, job.num_nonces - start_nonce),
+                        settings=job.settings.to_dict(),
+                        sampled_nonces=sampled_nonces_by_batch_idx.get(batch_idx, []),
+                        runtime_config=job.runtime_config,
+                        download_url=job.download_url,
+                        rand_hash=job.rand_hash,
+                        batch_size=job.batch_size
+                    )
+                    break
+                if batch is not None:
+                    break
+
+            if batch is None:
+                logger.debug(f"{slave_name} get-batch: None available")
+                return "No batches available", 503
+            else:
+                logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
+                return jsonify([batch.to_dict()])
+
         @app.route('/submit-batch-result/<batch_id>', methods=['POST'])
         async def submit_batch_result(batch_id):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
