@@ -1,219 +1,290 @@
-use rand::Rng;
+// optimized pareto impl
 use std::cmp::min;
-use std::collections::HashSet;
-
 pub type Point = Vec<i32>;
-pub type Frontier<P = Point> = HashSet<P>;
+pub type Frontier = Vec<Point>;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum PointCompareFrontiers {
-    Below,
-    Within,
-    Above,
+fn is_pareto_front_2d(costs: &Vec<Vec<i32>>) -> Vec<bool> {
+    let n_observations = costs.len();
+    if n_observations == 0 {
+        return vec![];
+    }
+
+    let mut indices: Vec<usize> = (0..n_observations).collect();
+
+    // sort by y, then x
+    indices.sort_by(|&a, &b| {
+        costs[a][1]
+            .cmp(&costs[b][1])
+            .then(costs[a][0].cmp(&costs[b][0]))
+    });
+
+    let mut on_front = vec![true; n_observations];
+    let mut stack = Vec::new();
+
+    // First pass: check dominance based on x-coordinate
+    for &curr_idx in &indices {
+        while let Some(&top_idx) = stack.last() {
+            let cost1: &Vec<i32> = &costs[top_idx];
+            let cost2: &Vec<i32> = &costs[curr_idx];
+
+            if cost1[0] <= cost2[0] {
+                break;
+            }
+
+            stack.pop();
+        }
+
+        if let Some(&top_idx) = stack.last() {
+            let cost1: &Vec<i32> = &costs[top_idx];
+            let cost2: &Vec<i32> = &costs[curr_idx];
+
+            if cost1[0] <= cost2[0] {
+                on_front[curr_idx] = false;
+            }
+        }
+
+        stack.push(curr_idx);
+    }
+
+    // Second pass: handle points with equal y-coordinates
+    let mut i = 0;
+    while i < indices.len() {
+        let mut j = i + 1;
+        while j < indices.len() && costs[indices[j]][1] == costs[indices[i]][1] {
+            j += 1;
+        }
+
+        if j - i > 1 {
+            let min_x_idx = indices[i..j].iter().min_by_key(|&&k| costs[k][0]).unwrap();
+
+            for &k in &indices[i..j] {
+                if k != *min_x_idx {
+                    on_front[k] = false;
+                }
+            }
+        }
+
+        i = j;
+    }
+
+    return on_front;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+pub fn is_pareto_front(
+    costs: &Vec<Vec<i32>>,
+    assume_unique_lexsorted: bool,
+    pre_sorted_along_x: Option<bool>,
+) -> Vec<bool> {
+    let apply_unique = !assume_unique_lexsorted;
+    let (unique_costs, order_inv) = if apply_unique {
+        let (unique, indices) = unique_with_indices(costs);
+
+        (Some(unique), Some(indices))
+    } else {
+        (None, None)
+    };
+
+    let on_front = if unique_costs.is_some() {
+        is_pareto_front_2d(&unique_costs.unwrap())
+    } else {
+        is_pareto_front_2d(costs)
+    };
+
+    if let Some(inv) = order_inv {
+        return inv.iter().map(|&i| on_front[i]).collect();
+    }
+
+    return on_front;
+}
+
+// will be about 1.3x faster if we use this and cache it somehow instead of calling it repeatedely on the same points
+use std::collections::HashMap;
+pub fn unique_with_indices(arr: &Vec<Vec<i32>>) -> (Vec<Vec<i32>>, Vec<usize>) {
+    let n = arr.len();
+    let mut unique = Vec::with_capacity(n);
+    let mut indices = Vec::with_capacity(n);
+    let mut seen = HashMap::with_capacity(n);
+
+    for (i, point) in arr.iter().enumerate() {
+        if let Some(&idx) = seen.get(point) {
+            indices.push(idx);
+        } else {
+            seen.insert(point, unique.len());
+            unique.push(point.clone());
+            indices.push(unique.len() - 1);
+        }
+    }
+
+    return (unique, indices);
+}
+
+#[derive(PartialEq, Debug)]
 pub enum ParetoCompare {
     ADominatesB,
     Equal,
     BDominatesA,
 }
 
-pub trait PointOps {
-    type Point;
-
-    fn pareto_compare(&self, other: &Self) -> ParetoCompare;
-    fn scale(&self, min_point: &Self, max_point: &Self, multiplier: f64) -> Self::Point;
-    fn within(
-        &self,
-        lower_frontier: &Frontier<Self::Point>,
-        upper_frontier: &Frontier<Self::Point>,
-    ) -> PointCompareFrontiers;
-}
-pub trait FrontierOps {
-    type Point;
-
-    fn pareto_frontier(&self) -> Frontier<Self::Point>;
-    fn extend(&self, min_point: &Self::Point, max_point: &Self::Point) -> Frontier<Self::Point>;
-    fn scale(
-        &self,
-        min_point: &Self::Point,
-        max_point: &Self::Point,
-        multiplier: f64,
-    ) -> Frontier<Self::Point>;
-    fn sample<T: Rng>(&self, rng: &mut T) -> Self::Point;
-}
-
-impl PointOps for Point {
-    type Point = Point;
-
-    fn pareto_compare(&self, other: &Self) -> ParetoCompare {
-        let mut a_dominate_b = false;
-        let mut b_dominate_a = false;
-        for (a_val, b_val) in self.iter().zip(other) {
-            if a_val < b_val {
-                b_dominate_a = true;
-            } else if a_val > b_val {
-                a_dominate_b = true;
-            }
-        }
-        if a_dominate_b == b_dominate_a {
-            ParetoCompare::Equal
-        } else if a_dominate_b {
-            ParetoCompare::ADominatesB
-        } else {
-            ParetoCompare::BDominatesA
+pub fn pareto_compare(point: &Point, other: &Point) -> ParetoCompare {
+    let mut a_dominate_b = false;
+    let mut b_dominate_a = false;
+    for (a_val, b_val) in point.iter().zip(other) {
+        if a_val < b_val {
+            b_dominate_a = true;
+        } else if a_val > b_val {
+            a_dominate_b = true;
         }
     }
-    fn scale(
-        &self,
-        min_point: &Self::Point,
-        max_point: &Self::Point,
-        multiplier: f64,
-    ) -> Self::Point {
-        self.iter()
-            .enumerate()
-            .map(|(i, value)| {
-                // Calculate the offset for the current dimension
-                let offset = ((value - min_point[i] + 1) as f64) * multiplier;
-                // Scale the point and clamp it between min_point and max_point
-                (min_point[i] + offset.ceil() as i32 - 1).clamp(min_point[i], max_point[i])
-            })
-            .collect()
+
+    if a_dominate_b == b_dominate_a {
+        return ParetoCompare::Equal;
+    } else if a_dominate_b {
+        return ParetoCompare::ADominatesB;
+    } else {
+        return ParetoCompare::BDominatesA;
     }
-    fn within(
-        &self,
-        lower_frontier: &Frontier<Self::Point>,
-        upper_frontier: &Frontier<Self::Point>,
-    ) -> PointCompareFrontiers {
-        // Check if the point is not dominated by any point in the lower frontier
-        if lower_frontier
-            .iter()
-            .any(|lower_point| self.pareto_compare(lower_point) == ParetoCompare::BDominatesA)
-        {
+}
+
+#[derive(PartialEq, Debug)]
+pub enum PointCompareFrontiers {
+    Below,
+    Within,
+    Above,
+}
+
+pub fn pareto_within(
+    point: &Point,
+    lower_frontier: &Frontier,
+    upper_frontier: &Frontier,
+) -> PointCompareFrontiers {
+    for point_ in lower_frontier.iter() {
+        if pareto_compare(point, point_) == ParetoCompare::BDominatesA {
             return PointCompareFrontiers::Below;
         }
+    }
 
-        // Check if the point does not dominate any point in the upper frontier
-        if upper_frontier
-            .iter()
-            .any(|upper_point| self.pareto_compare(upper_point) == ParetoCompare::ADominatesB)
-        {
+    for point_ in upper_frontier.iter() {
+        if pareto_compare(point, point_) == ParetoCompare::ADominatesB {
             return PointCompareFrontiers::Above;
         }
-
-        PointCompareFrontiers::Within
     }
+
+    return PointCompareFrontiers::Within;
 }
 
-impl FrontierOps for Frontier {
-    type Point = Point;
+pub fn scale_point(point: &Point, min_point: &Point, max_point: &Point, multiplier: f64) -> Point {
+    return point
+        .iter()
+        .enumerate()
+        .map(|(i, value)| {
+            let offset = ((value - min_point[i] + 1) as f64) * multiplier;
+            (min_point[i] + offset.ceil() as i32 - 1).clamp(min_point[i], max_point[i])
+        })
+        .collect();
+}
 
-    fn pareto_frontier(&self) -> Frontier<Self::Point> {
-        let mut frontier = self.clone();
-
-        for point in self.iter() {
-            if !frontier.contains(point) {
-                continue;
-            }
-
-            let mut dominated_points = HashSet::new();
-            for other_point in frontier.iter() {
-                match point.pareto_compare(other_point) {
-                    ParetoCompare::ADominatesB => {
-                        dominated_points.insert(other_point.clone());
-                    }
-                    ParetoCompare::BDominatesA => {
-                        dominated_points.insert(point.clone());
-                        break;
-                    }
-                    ParetoCompare::Equal => {}
-                }
-            }
-            frontier = frontier.difference(&dominated_points).cloned().collect();
-        }
-
-        frontier
+pub fn scale_frontier(
+    frontier: &Frontier,
+    min_point: &Point,
+    max_point: &Point,
+    multiplier: f64,
+) -> Frontier {
+    if frontier.is_empty() {
+        return vec![];
     }
-    fn extend(&self, min_point: &Self::Point, max_point: &Self::Point) -> Frontier<Self::Point> {
-        let mut frontier = self.clone();
-        (0..min_point.len()).into_iter().for_each(|i| {
-            let mut d = min_point.clone();
-            if let Some(v) = frontier.iter().map(|d| d[i]).max() {
-                d[i] = v;
-            }
-            if !frontier.contains(&d) {
-                d[i] = min(d[i] + 1, max_point[i]);
-                frontier.insert(d);
-            }
-        });
-        frontier
+
+    let scaled_frontier = frontier
+        .iter()
+        .map(|point| scale_point(&point, min_point, max_point, multiplier))
+        .collect();
+
+    if multiplier > 1.0 {
+        return pareto_frontier(&scaled_frontier);
     }
-    fn scale(
-        &self,
-        min_point: &Self::Point,
-        max_point: &Self::Point,
-        multiplier: f64,
-    ) -> Frontier<Self::Point> {
-        let frontier: Frontier<Self::Point> = self
+
+    let mirrored_frontier = scaled_frontier
+        .into_iter()
+        .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+        .collect::<Frontier>();
+
+    return pareto_frontier(&mirrored_frontier)
+        .iter()
+        .map(|d| d.iter().map(|x| -x).collect())
+        .collect();
+}
+
+pub fn pareto_algorithm(points: &Vec<Vec<i32>>, only_one: bool) -> Vec<Vec<Point>> {
+    if points.len() == 0 {
+        return vec![];
+    }
+
+    let points_inverted = points
+        .iter()
+        .map(|d| d.iter().map(|x| -x).collect())
+        .collect::<Vec<Point>>();
+
+    let mut frontiers = Vec::new();
+    let (mut remaining_points, indices) = unique_with_indices(&points_inverted);
+
+    //remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
+
+    while true {
+        let on_front = is_pareto_front(&remaining_points, true, Some(true));
+
+        // Extract frontier points
+        let frontier: Vec<_> = remaining_points
             .iter()
-            .map(|point| point.scale(min_point, max_point, multiplier))
+            .zip(on_front.iter())
+            .filter(|(_, &is_front)| is_front)
+            .map(|(point, _)| point.to_vec())
             .collect();
-        if multiplier > 1.0 {
-            frontier.pareto_frontier()
-        } else {
-            frontier
-                .into_iter()
-                .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
+
+        frontiers.push(frontier);
+
+        let new_points: Vec<_> = remaining_points
+            .iter()
+            .zip(on_front.iter())
+            .filter(|(_, &is_front)| !is_front)
+            .map(|(point, _)| point.to_vec())
+            .collect();
+
+        if new_points.is_empty() {
+            break;
+        }
+
+        remaining_points = new_points;
+
+        if only_one {
+            break;
+        }
+    }
+
+    return frontiers
+        .iter()
+        .map(|d| {
+            d.iter()
+                .map(|x| x.iter().map(|y| -y).collect())
                 .collect::<Frontier>()
-                .pareto_frontier()
-                .iter()
-                .map(|d| d.iter().map(|x| -x).collect())
-                .collect()
+        })
+        .collect();
+}
+
+pub fn pareto_frontier(frontier: &Frontier) -> Frontier {
+    return pareto_algorithm(frontier, true).first().unwrap().to_vec();
+}
+
+pub fn extend_frontier(frontier: &Frontier, min_point: &Point, max_point: &Point) -> Frontier {
+    let mut frontier = frontier.clone();
+    (0..min_point.len()).into_iter().for_each(|i| {
+        let mut d = min_point.clone();
+        if let Some(v) = frontier.iter().map(|d| d[i]).max() {
+            d[i] = v;
         }
-    }
-    fn sample<R: Rng>(&self, rng: &mut R) -> Self::Point {
-        // FIXME only works for 2 dimensional points
-        // Potential strategy for >2d: triangulate -> sample triangle -> sample point in triangle
-        match self.iter().next() {
-            None => panic!("Frontier is empty"),
-            Some(point) => {
-                if point.len() != 2 {
-                    panic!("Only 2 dimensional points are supported");
-                }
-            }
-        };
-        // randomly pick a dimension
-        let dim = (rng.next_u32() % 2) as usize;
-        let dim2 = (dim + 1) % 2;
-
-        // sort points by that dimension
-        let mut sorted_points: Vec<&Point> = self.iter().collect();
-        sorted_points.sort_by(|a, b| a[dim].cmp(&b[dim]));
-
-        // sample value in that dimension
-        let min_v = sorted_points.first().unwrap()[dim];
-        let max_v = sorted_points.last().unwrap()[dim];
-        let rand_v = rng.gen_range(min_v..=max_v);
-
-        // interpolate value in the other dimension
-        match sorted_points.binary_search_by(|point| point[dim].cmp(&rand_v)) {
-            Ok(idx) => sorted_points[idx].clone(),
-            Err(idx) => {
-                let a = sorted_points[idx - 1];
-                let b = sorted_points[idx];
-                let ratio = (rand_v - a[dim]) as f64 / (b[dim] - a[dim]) as f64;
-                let rand_v2 = (a[dim2] as f64 + ratio * (b[dim2] - a[dim2]) as f64).ceil() as i32;
-                // a is smaller than b in dim, but larger in dim2
-                if rand_v2 == a[dim2] {
-                    a.clone()
-                } else {
-                    (0..2)
-                        .into_iter()
-                        .map(|i| if i == dim { rand_v } else { rand_v2 })
-                        .collect()
-                }
-            }
+        if !frontier.contains(&d) {
+            d[i] = min(d[i] + 1, max_point[i]);
+            frontier.push(d);
         }
-    }
+    });
+
+    return frontier;
 }
