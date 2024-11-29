@@ -124,8 +124,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .map(|(settings, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
-        for (frontier_index, frontier) in pareto_algorithm(&points, false).into_iter().enumerate()
-        {
+        for (frontier_index, frontier) in pareto_algorithm(&points, false).into_iter().enumerate() {
             for point in frontier {
                 frontier_indexes.insert(point, frontier_index);
             }
@@ -314,9 +313,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mean_percent_qualifiers = percent_qualifiers.arithmetic_mean();
         let max_deposit_to_qualifier_ratio =
             PreciseNumber::from_f64(config.opow.max_deposit_to_qualifier_ratio);
-        if mean_percent_qualifiers != zero
-            && percent_deposit / mean_percent_qualifiers > max_deposit_to_qualifier_ratio
-        {
+        if mean_percent_qualifiers == zero {
+            percent_deposit = zero.clone();
+        } else if percent_deposit / mean_percent_qualifiers > max_deposit_to_qualifier_ratio {
             percent_deposit = mean_percent_qualifiers * max_deposit_to_qualifier_ratio;
         }
 
