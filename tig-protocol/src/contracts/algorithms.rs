@@ -281,4 +281,19 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .round_merged = Some(block_details.round + 1);
         }
     }
+
+    // update breakthroughs
+    if (block_details.height + 1) % config.rounds.blocks_per_round == 0 {
+        let yes_threshold = PreciseNumber::from_f64(config.breakthroughs.min_percent_yes_votes);
+        let zero = PreciseNumber::from(0);
+        for breakthrough in voting_breakthroughs_state.values_mut() {
+            if breakthrough.round_vote_ends == block_details.round + 1 {
+                let yes = &breakthrough.vote_tally[&true];
+                let no = &breakthrough.vote_tally[&false];
+                let total = yes + no;
+                breakthrough.voted_breakthrough =
+                    Some(total != zero && yes / total >= yes_threshold);
+            }
+        }
+    }
 }
