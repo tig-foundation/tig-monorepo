@@ -264,6 +264,7 @@ serializable_struct_with_getters! {
         name: String,
         player_id: String,
         challenge_id: String,
+        fee_paid: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
@@ -271,9 +272,11 @@ serializable_struct_with_getters! {
         block_confirmed: u32,
         round_submitted: u32,
         round_pushed: u32,
-        round_active: Option<u32>,
-        round_merged: Option<u32>,
+        round_vote_ends: u32,
         vote_tally: HashMap<bool, PreciseNumber>,
+        voted_breakthrough: Option<bool>,
+        round_merged: Option<u32>,
+        banned: bool,
     }
 }
 serializable_struct_with_getters! {

@@ -11,6 +11,7 @@ pub async fn submit_algorithm<T: Context>(
     player_id: String,
     algorithm_name: String,
     challenge_id: String,
+    breakthrough_id: Option<String>,
     code: String,
 ) -> Result<String> {
     let config = ctx.get_config().await;
@@ -22,6 +23,12 @@ pub async fn submit_algorithm<T: Context>(
         .is_some_and(|s| s.round_active <= latest_block_details.round)
     {
         return Err(anyhow!("Invalid challenge '{}'", challenge_id));
+    }
+
+    if let Some(breakthrough_id) = &breakthrough_id {
+        if ctx.get_breakthrough_state(breakthrough_id).await.is_none() {
+            return Err(anyhow!("Invalid breakthrough '{}'", breakthrough_id));
+        }
     }
 
     if !ctx
@@ -38,7 +45,7 @@ pub async fn submit_algorithm<T: Context>(
                 name: algorithm_name,
                 challenge_id,
                 player_id,
-                breakthrough_id: None,
+                breakthrough_id,
                 r#type: AlgorithmType::Wasm,
                 fee_paid: config.algorithms.submission_fee,
             },
@@ -46,6 +53,47 @@ pub async fn submit_algorithm<T: Context>(
         )
         .await?;
     Ok(algorithm_id)
+}
+
+#[time]
+pub async fn submit_breakthrough<T: Context>(
+    ctx: &T,
+    player_id: String,
+    breakthrough_name: String,
+    challenge_id: String,
+    evidence: HashMap<String, String>,
+) -> Result<String> {
+    let config = ctx.get_config().await;
+    let latest_block_id = ctx.get_latest_block_id().await;
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+    if !ctx
+        .get_challenge_state(&challenge_id)
+        .await
+        .is_some_and(|s| s.round_active <= latest_block_details.round)
+    {
+        return Err(anyhow!("Invalid challenge '{}'", challenge_id));
+    }
+
+    if !ctx
+        .get_player_state(&player_id)
+        .await
+        .is_some_and(|s| s.available_fee_balance >= config.breakthroughs.submission_fee)
+    {
+        return Err(anyhow!("Insufficient balance"));
+    }
+
+    let breakthrough_id = ctx
+        .add_breakthrough_to_mempool(
+            BreakthroughDetails {
+                name: breakthrough_name,
+                challenge_id,
+                player_id,
+                fee_paid: config.breakthroughs.submission_fee,
+            },
+            evidence,
+        )
+        .await?;
+    Ok(breakthrough_id)
 }
 
 #[time]
@@ -88,12 +136,41 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         active_algorithms_details,
         active_algorithms_state,
         active_algorithms_block_data,
+        active_breakthroughs_state,
+        active_breakthroughs_block_data,
         active_opow_block_data,
+        voting_breakthroughs_state,
+        active_players_state,
+        active_players_block_data,
         ..
     } = cache;
 
     let active_algorithm_ids = &block_data.active_ids[&ActiveType::Algorithm];
+    let active_breakthrough_ids = &block_data.active_ids[&ActiveType::Breakthrough];
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
+
+    // update votes
+    for breakthrough_state in voting_breakthroughs_state.values_mut() {
+        breakthrough_state.vote_tally = HashMap::from([
+            (true, PreciseNumber::from(0)),
+            (false, PreciseNumber::from(0)),
+        ]);
+    }
+    for (player_id, player_state) in active_players_state.iter() {
+        let player_data = &active_players_block_data[player_id];
+        for (breakthrough_id, vote) in player_state.votes.iter() {
+            let yes = vote.value;
+            if let Some(breakthrough_state) = voting_breakthroughs_state.get_mut(breakthrough_id) {
+                let n = breakthrough_state.round_vote_ends - block_details.round;
+                let votes: PreciseNumber = player_data
+                    .deposit_by_locked_period
+                    .iter()
+                    .skip(n as usize)
+                    .sum();
+                *breakthrough_state.vote_tally.get_mut(&yes).unwrap() += votes;
+            }
+        }
+    }
 
     // update adoption
     let mut algorithms_by_challenge = HashMap::<String, Vec<String>>::new();
@@ -133,11 +210,19 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             active_algorithms_block_data
                 .get_mut(algorithm_id)
                 .unwrap()
-                .adoption = adoption;
+                .adoption = adoption.clone();
+
+            if let Some(breakthrough_id) = &active_algorithms_details[algorithm_id].breakthrough_id
+            {
+                active_breakthroughs_block_data
+                    .get_mut(breakthrough_id)
+                    .unwrap()
+                    .adoption += adoption;
+            }
         }
     }
 
-    // updat merge points
+    // update algorithm merge points
     let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
     for algorithm_id in active_algorithm_ids.iter() {
         let is_merged = active_algorithms_state[algorithm_id].round_merged.is_some();
@@ -148,7 +233,22 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
     }
 
-    // update merges on last block of the round
+    // update breakthrough merge points
+    let adoption_threshold = PreciseNumber::from_f64(config.breakthroughs.adoption_threshold);
+    for breakthrough_id in active_breakthrough_ids.iter() {
+        let is_merged = active_breakthroughs_state[breakthrough_id]
+            .round_merged
+            .is_some();
+        let breakthrough_data = active_breakthroughs_block_data
+            .get_mut(breakthrough_id)
+            .unwrap();
+
+        if !is_merged && breakthrough_data.adoption >= adoption_threshold {
+            breakthrough_data.merge_points += 1;
+        }
+    }
+
+    // update merges at last block of the round
     if (block_details.height + 1) % config.rounds.blocks_per_round == 0 {
         for algorithm_ids in algorithms_by_challenge.values() {
             let algorithm_id = algorithm_ids
@@ -164,6 +264,19 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
             active_algorithms_state
                 .get_mut(algorithm_id)
+                .unwrap()
+                .round_merged = Some(block_details.round + 1);
+        }
+
+        for breakthrough_id in active_breakthrough_ids.iter() {
+            if active_breakthroughs_block_data[breakthrough_id].merge_points
+                < config.breakthroughs.merge_points_threshold
+            {
+                continue;
+            }
+
+            active_breakthroughs_state
+                .get_mut(breakthrough_id)
                 .unwrap()
                 .round_merged = Some(block_details.round + 1);
         }

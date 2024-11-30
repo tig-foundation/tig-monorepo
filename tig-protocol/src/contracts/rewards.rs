@@ -15,10 +15,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         active_opow_block_data,
         active_players_block_data,
         active_players_state,
+        active_breakthroughs_state,
+        active_breakthroughs_block_data,
+        active_breakthroughs_details,
         ..
     } = cache;
 
     let active_algorithm_ids = &block_data.active_ids[&ActiveType::Algorithm];
+    let active_breakthrough_ids = &block_data.active_ids[&ActiveType::Breakthrough];
+    let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
 
     let block_reward = PreciseNumber::from_f64(
         config
@@ -36,7 +41,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .block_reward,
     );
 
-    // update innovator rewards
+    // update algorithm rewards
     let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
     let zero = PreciseNumber::from(0);
     let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<String>>::new();
@@ -89,6 +94,41 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     .unwrap() += algorithm_data.reward;
             }
         }
+    }
+
+    // update breakthrough rewards
+    let adoption_threshold = PreciseNumber::from_f64(config.breakthroughs.adoption_threshold);
+    let reward_pool_per_challenge = block_reward
+        * PreciseNumber::from_f64(config.rewards.distribution.breakthroughs)
+        / PreciseNumber::from(active_challenge_ids.len());
+    for breakthrough_id in active_breakthrough_ids.iter() {
+        let breakthrough_state = &active_breakthroughs_state[breakthrough_id];
+        let breakthrough_details = &active_breakthroughs_details[breakthrough_id];
+        let breakthrough_data = &active_breakthroughs_block_data[breakthrough_id];
+
+        let is_merged = breakthrough_state.round_merged.is_some();
+        if breakthrough_state.banned {
+            continue;
+        }
+
+        let reward = if breakthrough_data.adoption >= adoption_threshold
+            || (is_merged && breakthrough_data.adoption > zero)
+        {
+            reward_pool_per_challenge * breakthrough_data.adoption
+        } else {
+            zero.clone()
+        };
+
+        *active_players_block_data
+            .get_mut(&breakthrough_details.player_id)
+            .unwrap()
+            .reward_by_type
+            .entry(RewardType::Breakthrough)
+            .or_insert(zero.clone()) += reward;
+        active_breakthroughs_block_data
+            .get_mut(breakthrough_id)
+            .unwrap()
+            .reward = reward;
     }
 
     // update benchmark rewards
