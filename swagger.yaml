@@ -38,6 +38,8 @@ paths:
           * `wasm_blob`: `https://github.com/tig-foundation/tig-monorepo/blob/<branch>/tig-algorithms/wasm/<branch>.wasm`
         
           where `<branch>` is `<challenge_name>/<algorithm_name>`
+          
+        * `names` is a map of `<player_id>` to ENS name (only if one exists)
       parameters:
         - name: block_id
           in: query
@@ -212,6 +214,8 @@ paths:
         
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
         * Each opow is for a specific Benchmarker. `opow.block_data.reward` is the reward before any sharing amongst delegators
+        
+        * `names` is a map of `<player_id>` to ENS name (only if one exists)
       parameters:
         - name: block_id
           in: query
@@ -267,7 +271,7 @@ paths:
         * `algorithms` is a map of `<algorithm_id>` to `uint256`
         * `opow` is a map of `<player_id>` to `uint256`
         * `players` is a map of `<player_id>` to dict of reward types (algorithm, benchmark, breakthroughs, delegator)
-        * `names` is a map of `<player_id>` to names
+        * `names` is a map of `<player_id>` to ENS name (only if one exists)
       parameters:
         - name: round
           in: query
@@ -1294,6 +1298,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Binary'
+        names:
+          type: object
+          additionalProperties:
+            type: string
     GetBenchmarksResponse:
       type: object
       properties:
@@ -1350,6 +1358,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OPoW'
+        names:
+          type: object
+          additionalProperties:
+            type: string
     GetPlayerDataResponse:
       type: object
       properties:
