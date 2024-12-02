@@ -4,7 +4,10 @@ import logging
 import re
 import signal
 import time
+import random
+import threading
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 import uvicorn
 from tig_benchmarker.extensions.job_manager import Job
@@ -47,87 +50,35 @@ class SlaveManager:
     def __init__(self, config: SlaveManagerConfig, jobs: List[Job]):
         self.config = config
         self.jobs = jobs
+        self.assigned = {}
+        self.concurrent = {}
 
     def start(self):
         app = FastAPI()
 
-        @app.get('/get-batches')
-        def get_batches(request: Request):
-            slave_name = request.headers.get('User-Agent')
-            if slave_name is None:
-                raise HTTPException(status_code=403, detail="User-Agent header is required")
-            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
-                raise HTTPException(status_code=403, detail="Unregistered slave")
-            
-            slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
-
-            now = int(time.time() * 1000)
-            batches = []
-            selected_challenge = None
-            max_concurrent_batches = None
-            for job in self.jobs:
-                if (
-                    job.challenge not in slave.max_concurrent_batches or 
-                    (selected_challenge is not None and job.challenge != selected_challenge)
-                ):
-                    continue
-                sampled_nonces_by_batch_idx = job.sampled_nonces_by_batch_idx
-                for batch_idx in range(job.num_batches):
-                    if not (
-                        now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
-                        (
-                            job.batch_merkle_roots[batch_idx] is None or
-                            not set(sampled_nonces_by_batch_idx.get(batch_idx, [])).issubset(job.merkle_proofs)
-                        )
-                    ):
-                        continue
-                    job.last_batch_retry_time[batch_idx] = now
-                    selected_challenge = job.challenge
-                    max_concurrent_batches = slave.max_concurrent_batches[job.challenge]
-                    start_nonce = batch_idx * job.batch_size
-                    batches.append(Batch(
-                        benchmark_id=job.benchmark_id,
-                        start_nonce=start_nonce,
-                        num_nonces=min(job.batch_size, job.num_nonces - start_nonce),
-                        settings=job.settings.to_dict(),
-                        sampled_nonces=sampled_nonces_by_batch_idx.get(batch_idx, []),
-                        runtime_config=job.runtime_config,
-                        download_url=job.download_url,
-                        rand_hash=job.rand_hash,
-                        batch_size=job.batch_size
-                    ))
-                    if len(batches) >= max_concurrent_batches:
-                        break
-                if max_concurrent_batches is not None and len(batches) >= max_concurrent_batches:
-                    break
-
-            if len(batches) == 0:
-                logger.debug(f"{slave_name} get-batches: None available")
-                raise HTTPException(status_code=503, detail="No batches available")
-            else:
-                logger.debug(f"{slave_name} get-batches: (challenge: {selected_challenge}, #batches: {len(batches)}, batch_ids: {[b.benchmark_id for b in batches]})")
-                return [b.to_dict() for b in batches]
-
-        @app.get('/get-batch')
+        @app.route('/get-batch', methods=['GET'])
         def get_batch(request: Request):
-            slave_name = request.headers.get('User-Agent')
-            if slave_name is None:
-                raise HTTPException(status_code=403, detail="User-Agent header is required")
+            if (slave_name := request.headers.get('User-Agent', None)) is None:
+                return "User-Agent header is required", 403
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
-                raise HTTPException(status_code=403, detail="Unregistered slave")
-            
+                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
+                return "Unregistered slave", 403
+
             slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
 
             now = int(time.time() * 1000)
             batch = None
-            selected_challenge = None
+            
+            concurrent = self.concurrent.get(slave_name, {"count": 0, "challenge": None})
+            selected_challenge = concurrent["challenge"]
+
+            count = concurrent["count"]
+            if selected_challenge is not None and count >= slave.max_concurrent_batches[selected_challenge]:
+                logger.debug(f"{slave_name} get-batch: max concurrent batches reached")
+                raise HTTPException(status_code=425, detail="Max concurrent batches reached")
+
             for job in self.jobs:
-                if (
-                    job.challenge not in slave.max_concurrent_batches or 
-                    (selected_challenge is not None and job.challenge != selected_challenge)
-                ):
+                if selected_challenge is not None and job.challenge != selected_challenge:
                     continue
                 sampled_nonces_by_batch_idx = job.sampled_nonces_by_batch_idx
                 for batch_idx in range(job.num_batches):
@@ -159,21 +110,37 @@ class SlaveManager:
 
             if batch is None:
                 logger.debug(f"{slave_name} get-batch: None available")
+                print('batch is none')
+
                 raise HTTPException(status_code=503, detail="No batches available")
             else:
+                batch_id = f"{batch.benchmark_id}_{batch.start_nonce}"
+                if (old_slave_name := self.assigned.pop(batch_id, None)) is not None:
+                    logger.warning(f"{old_slave_name} was assigned batch {batch_id} but did not submit result")
+                    self.concurrent[old_slave_name]["count"] -= 1
+                self.assigned[batch_id] = slave_name
+                if slave_name not in self.concurrent:
+                    self.concurrent[slave_name] = {"challenge": selected_challenge, "count": 0}
+
+                self.concurrent[slave_name]["count"] += 1
+                self.assigned[batch_id] = slave_name
                 logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
-                return [batch.to_dict()]
+                return JSONResponse(content=jsonable_encoder(batch))
 
         @app.post('/submit-batch-result/{batch_id}')
-        def submit_batch_result(request: Request, batch_id: str):
-            slave_name = request.headers.get('User-Agent')
-            if slave_name is None:
+        async def submit_batch_result(batch_id: str, request: Request):
+            if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")
-            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting submit-batch-result request")
+            if slave_name != self.assigned.get(batch_id, None):
+                raise HTTPException(status_code=400, detail=f"Slave submitted result for {batch_id}, but either took too long, or was not assigned this batch.")
+            self.assigned.pop(batch_id)
+            self.concurrent[slave_name]["count"] -= 1
+            if self.concurrent[slave_name]["count"] == 0:
+                self.concurrent.pop(slave_name)
+
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
-            result = BatchResult.from_dict(request.json())
+            result = BatchResult.from_dict(await request.json())
             job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
             logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)}, #proofs: {len(result.merkle_proofs)})")
             if job is None:
@@ -188,5 +155,8 @@ class SlaveManager:
             })
             return {"status": "OK"}
 
-        uvicorn.run(app, host="0.0.0.0", port=self.config.port)
+        thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=self.config.port))
+        thread.daemon = True
+        thread.start()
+
         logger.info(f"webserver started on 0.0.0.0:{self.config.port}")

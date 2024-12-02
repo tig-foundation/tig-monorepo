@@ -5,7 +5,7 @@ import os
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, Any
-
+from concurrent.futures import ThreadPoolExecutor
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 def _get(url: str) -> Dict[str, Any]:
@@ -39,9 +39,9 @@ class DataFetcher:
 
         logger.info(f"new block @ height {block.details.height}, fetching data")
         tasks = [
-            _get(f"{self.api_url}/get-algorithms?block_id={block.id}"),
-            _get(f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}"),
-            _get(f"{self.api_url}/get-challenges?block_id={block.id}")
+            f"{self.api_url}/get-algorithms?block_id={block.id}",
+            f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}",
+            f"{self.api_url}/get-challenges?block_id={block.id}"
         ]
         
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.

@@ -131,14 +131,14 @@ def main(
             get_batch_url = f"http://{master_ip}:{master_port}/get-batch"
             logger.info(f"fetching job from {get_batch_url}")
             resp = session.get(get_batch_url, headers=headers)
-            if resp.status_code != 200:
-                raise Exception(f"status {resp.status_code} when fetching job: {resp.text}")
-            elif resp.status_code == 425: # too early
+            if resp.status_code == 425: # too early
                 has_exceeded_pending_jobs_limit = True
                 last_pending_jobs = len(pending_jobs)
                 raise Exception(f"too many pending jobs, cooling down for 5 seconds")
+            elif resp.status_code != 200:
+                raise Exception(f"status {resp.status_code} when fetching job: {resp.text}")
             
-            batch = resp.json()[0]
+            batch = resp.json()
             print(f"Fetched batch: {batch}")
             logger.debug(f"fetching job: took {now() - start}ms")
 
@@ -153,7 +153,7 @@ def main(
             pending_jobs_lock.release()
 
         except Exception as e:
-            logger.error(e)
+            logger.error(f"Error processing batch: {e}")
             time.sleep(5)
 
 if __name__ == "__main__":

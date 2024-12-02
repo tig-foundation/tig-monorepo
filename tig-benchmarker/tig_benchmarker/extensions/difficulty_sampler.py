@@ -155,6 +155,7 @@ class DifficultySampler:
         self.config = config
         self.valid_difficulties = {}
         self.frontiers = {}
+        self.challenges = {}
 
     def on_new_block(self, challenges: Dict[str, Challenge], **kwargs):
         for c in challenges.values():
@@ -168,12 +169,14 @@ class DifficultySampler:
             self.valid_difficulties[c.details.name] = calc_valid_difficulties(list(upper_frontier), list(lower_frontier))
             self.frontiers[c.details.name] = calc_all_frontiers(self.valid_difficulties[c.details.name])
 
+        self.challenges = [c.details.name for c in challenges.values()]
+
     def run(self) -> Dict[str, Point]:
         samples = {}
-        for c_name in challenges.values():
+        for c_name in self.challenges:
             found_valid = False
 
-            if self.config.selected_difficulties[c_name] is not None:
+            if self.config.selected_difficulties.get(c_name) is not None:
                 min_x = min(p[0] for p in self.valid_difficulties[c_name])
                 max_x = max(p[0] for p in self.valid_difficulties[c_name])
                 min_y = min(p[1] for p in self.valid_difficulties[c_name])
@@ -183,7 +186,7 @@ class DifficultySampler:
                 random.shuffle(difficulties_)
 
                 for selected_difficulty in difficulties_:
-                    if selected_difficulty[0] >= min_x and selected_difficulty[0] <= max_x and
+                    if selected_difficulty[0] >= min_x and selected_difficulty[0] <= max_x and \
                     selected_difficulty[1] >= min_y and selected_difficulty[1] <= max_y:
                         samples[c_name] = selected_difficulty
                         logger.debug(f"Sampled difficulty {selected_difficulty} for challenge {c_name}")
