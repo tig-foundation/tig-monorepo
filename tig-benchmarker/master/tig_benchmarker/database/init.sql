@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     merkle_proofs JSONB,
     batch_merkle_proofs JSONB,
     batch_merkle_roots JSONB,
-    last_benchmark_submit_time INTEGER NOT NULL,
-    last_proof_submit_time INTEGER NOT NULL,
+    last_benchmark_submit_time BIGINT NOT NULL,
+    last_proof_submit_time BIGINT NOT NULL,
     last_batch_retry_time JSONB NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

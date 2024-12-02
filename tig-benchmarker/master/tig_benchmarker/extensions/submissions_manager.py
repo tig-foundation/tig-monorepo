@@ -121,33 +121,41 @@ class SubmissionsManager:
                 success = self._post("benchmark", submit_benchmark_req)
 
                 if success:
-                    self.db_session.commit()
+                    session.commit()
                     logger.info(f"Benchmark request for job_id '{job.benchmark_id}' submitted successfully.")
                 else:
                     logger.error(f"Failed to submit benchmark request for job_id '{job.benchmark_id}'.")
         except SQLAlchemyError as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Database error during benchmark submissions: {e}")
         except Exception as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Unexpected error during benchmark submissions: {e}")
 
     def handle_proof_submissions(self, now: int):
         Session = sessionmaker(bind=engine)
         session = Session()
         try:
-            # Fetch jobs eligible for proof submission
             eligible_jobs = session.query(JobModel).filter(
-                func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0) != 0,
-                func.coalesce(func.jsonb_array_length(JobModel.merkle_proofs), 0) == func.coalesce(func.jsonb_array_length(JobModel.sampled_nonces), 0),
-                JobModel.last_proof_submit_time < now - self.config.time_between_retries
+                JobModel.last_proof_submit_time < now - self.config.time_between_retries,
+                JobModel.last_benchmark_submit_time != 0
             ).all()
 
-            if not eligible_jobs:
+            # Filtering in Application Code
+            filtered_jobs: list[JobModel] = []
+            for job in eligible_jobs:
+                # Ensure sampled_nonces and merkle_proofs are not None and are dictionaries
+                if isinstance(job.sampled_nonces, list) and isinstance(job.merkle_proofs, dict):
+                    num_sampled_nonces = len(job.sampled_nonces)
+                    num_merkle_proofs = len(job.merkle_proofs)
+                    if num_sampled_nonces != 0 and num_merkle_proofs == num_sampled_nonces:
+                        filtered_jobs.append(job)
+
+            if not filtered_jobs:
                 logger.debug("No Proof submissions to process")
                 return
 
-            for job in eligible_jobs:
+            for job in filtered_jobs:
                 logger.debug(f"Processing Proof submission for job_id '{job.benchmark_id}'")
 
                 # Update job's last_proof_submit_time
@@ -156,22 +164,26 @@ class SubmissionsManager:
                 # Prepare the submission request
                 submit_proof_req = SubmitProofRequest(
                     benchmark_id=job.benchmark_id,
-                    merkle_proofs=list(job.merkle_proofs.values())
+                    merkle_proofs=list(MerkleProof.from_dict(p) for p in job.merkle_proofs.values())
                 )
 
+
                 # Submit the proof request
-                success = self._post("proof", submit_proof_req)
+                time.sleep(10)
+                success = self._post("proof", submit_proof_req) 
+
+                success = False
 
                 if success:
-                    self.db_session.commit()
+                    session.commit()
                     logger.info(f"Proof request for job_id '{job.benchmark_id}' submitted successfully.")
                 else:
                     logger.error(f"Failed to submit proof request for job_id '{job.benchmark_id}'.")
         except SQLAlchemyError as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Database error during proof submissions: {e}")
         except Exception as e:
-            self.db_session.rollback()
+            session.rollback()
             logger.error(f"Unexpected error during proof submissions: {e}")
     
     def run(self, submit_precommit_req: Optional[SubmitPrecommitRequest]):

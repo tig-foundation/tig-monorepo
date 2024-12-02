@@ -109,9 +109,9 @@ export class TigApisService {
             const batch_number =
               Math.floor(batch.start_nonce / b.num_nonces) + 1;
             const num_solutions = batch.solutions ? batch.solutions.length : 0;
-            const status = batch.merkle_proofs ? 'COMPLETED' : 'PENDING';
+            const status = batch.created_at != batch.updated_at ? 'COMPLETED' : 'PENDING';
             let time_elapsed = 0;
-            if (!batch.merkle_proofs) {
+            if (batch.created_at != batch.updated_at) {
               const start_timestamp = batch.created_at;
               const start_normalizedTimestamp = start_timestamp.split('.')[0];
               const start_date = new Date(start_normalizedTimestamp);

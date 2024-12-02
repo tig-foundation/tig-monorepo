@@ -7,6 +7,7 @@ from tig_benchmarker.utils import *
 
 from tig_benchmarker.database.init import SessionLocal
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm.attributes import flag_modified
 
 from tig_benchmarker.database.models.index import JobModel
 from typing import Dict, List
@@ -31,7 +32,7 @@ class JobManager:
         benchmarks: Dict[str, Benchmark],
         proofs: Dict[str, Proof],
         challenges: Dict[str, Challenge],
-        wasms: Dict[str, Wasm],
+        wasms: Dict[str, Binary],
         **kwargs
     ):
         try:
@@ -64,8 +65,8 @@ class JobManager:
                     benchmark_id=benchmark_id,
                     settings=precommit.settings,
                     num_nonces=precommit.details.num_nonces,
-                    rand_hash=precommit.state.rand_hash,
-                    wasm_vm_config=block.config.get("wasm_vm"),
+                    rand_hash=precommit.details.rand_hash,
+                    wasm_vm_config=block.config['benchmarks']['runtime_configs']['wasm'],
                     batch_size=self.config.batch_sizes.get(challenge_name),
                     challenge=challenge_name,
                     download_url=download_url
@@ -90,7 +91,7 @@ class JobManager:
                     continue  # Skip if already updated
 
                 logger.info(f"Updating job from confirmed benchmark {benchmark_id}")
-                job_model.sampled_nonces = benchmark.state.sampled_nonces
+                job_model.sampled_nonces = benchmark.details.sampled_nonces
                 # Reset last_batch_retry_time for all batches
                 job_model.last_batch_retry_time = [0] * job_model.num_batches
 
@@ -184,12 +185,17 @@ class JobManager:
 
                     for nonce in set(nonces):
                         proof_data = job_model.batch_merkle_proofs.get(str(nonce))
+
+                        logger.info(f"Proof data: {proof_data}")
+
                         if proof_data:
+                            proof_data  = MerkleProof.from_dict(proof_data)
                             merkle_proof = MerkleProof(
-                                leaf=proof_data['leaf'],
-                                branch=MerkleBranch(proof_data['branch']['stems'] + upper_stems)
+                                leaf=proof_data.leaf,
+                                branch=MerkleBranch(proof_data.branch.stems + upper_stems)
                             )
                             job_model.merkle_proofs[str(nonce)] = merkle_proof.to_dict()
+                            flag_modified(job_model, "merkle_proofs")
 
             # Commit all changes
             self.db_session.commit()

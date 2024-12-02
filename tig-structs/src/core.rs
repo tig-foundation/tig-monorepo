@@ -3,23 +3,29 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tig_utils::{jsonify, u64s_from_str, u8s_from_str};
-pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transaction, U256};
+pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transfer, U256};
 
 serializable_struct_with_getters! {
     Algorithm {
         id: String,
         details: AlgorithmDetails,
-        state: Option<AlgorithmState>,
+        state: AlgorithmState,
         block_data: Option<AlgorithmBlockData>,
-        code: Option<String>,
     }
 }
 serializable_struct_with_getters! {
     Benchmark {
         id: String,
         details: BenchmarkDetails,
-        state: Option<BenchmarkState>,
+        state: BenchmarkState,
         solution_nonces: Option<HashSet<u64>>,
+    }
+}
+serializable_struct_with_getters! {
+    Binary {
+        algorithm_id: String,
+        details: BinaryDetails,
+        state: BinaryState,
     }
 }
 serializable_struct_with_getters! {
@@ -31,18 +37,46 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    Breakthrough {
+        id: String,
+        details: BreakthroughDetails,
+        state: BreakthroughState,
+        block_data: Option<BreakthroughBlockData>,
+    }
+}
+serializable_struct_with_getters! {
     Challenge {
         id: String,
         details: ChallengeDetails,
-        state: Option<ChallengeState>,
+        state: ChallengeState,
         block_data: Option<ChallengeBlockData>,
+    }
+}
+serializable_struct_with_getters! {
+    Deposit {
+        id: String,
+        details: DepositDetails,
+        state: DepositState,
+    }
+}
+serializable_struct_with_getters! {
+    Fraud {
+        benchmark_id: String,
+        state: FraudState,
+        allegation: Option<String>,
+    }
+}
+serializable_struct_with_getters! {
+    OPoW {
+        player_id: String,
+        block_data: Option<OPoWBlockData>,
     }
 }
 serializable_struct_with_getters! {
     Player {
         id: String,
         details: PlayerDetails,
-        state: Option<PlayerState>,
+        state: PlayerState,
         block_data: Option<PlayerBlockData>,
     }
 }
@@ -51,69 +85,64 @@ serializable_struct_with_getters! {
         benchmark_id: String,
         details: PrecommitDetails,
         settings: BenchmarkSettings,
-        state: Option<PrecommitState>,
+        state: PrecommitState,
     }
 }
 serializable_struct_with_getters! {
     MerkleProof {
         leaf: OutputData,
-        branch: Option<MerkleBranch>,
+        branch: MerkleBranch,
     }
 }
 serializable_struct_with_getters! {
     Proof {
         benchmark_id: String,
-        state: Option<ProofState>,
+        details: ProofDetails,
+        state: ProofState,
         merkle_proofs: Option<Vec<MerkleProof>>,
-    }
-}
-serializable_struct_with_getters! {
-    Fraud {
-        benchmark_id: String,
-        state: Option<FraudState>,
-        allegation: Option<String>,
     }
 }
 serializable_struct_with_getters! {
     TopUp {
         id: String,
         details: TopUpDetails,
-        state: Option<TopUpState>,
-    }
-}
-serializable_struct_with_getters! {
-    Wasm {
-        algorithm_id: String,
-        details: WasmDetails,
-        state: Option<WasmState>,
+        state: TopUpState,
     }
 }
 
 // Algorithm child structs
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlgorithmType {
+    Wasm,
+    Ptx,
+}
 serializable_struct_with_getters! {
     AlgorithmDetails {
         name: String,
         player_id: String,
         challenge_id: String,
-        tx_hash: String,
+        breakthrough_id: Option<String>,
+        r#type: AlgorithmType,
+        fee_paid: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
     AlgorithmState {
-        block_confirmed: Option<u32>,
-        round_submitted: Option<u32>,
-        round_pushed: Option<u32>,
+        block_confirmed: u32,
+        round_submitted: u32,
+        round_pushed: u32,
+        round_active: u32,
         round_merged: Option<u32>,
         banned: bool,
     }
 }
 serializable_struct_with_getters! {
     AlgorithmBlockData {
-        num_qualifiers_by_player: Option<HashMap<String, u32>>,
-        adoption: Option<PreciseNumber>,
-        merge_points: Option<u32>,
-        reward: Option<PreciseNumber>,
-        round_earnings: Option<PreciseNumber>,
+        num_qualifiers_by_player: HashMap<String, u32>,
+        adoption: PreciseNumber,
+        merge_points: u32,
+        reward: PreciseNumber,
     }
 }
 
@@ -135,13 +164,13 @@ impl BenchmarkSettings {
 serializable_struct_with_getters! {
     BenchmarkDetails {
         num_solutions: u32,
-        merkle_root: Option<MerkleHash>,
+        merkle_root: MerkleHash,
+        sampled_nonces: HashSet<u64>,
     }
 }
 serializable_struct_with_getters! {
     BenchmarkState {
-        block_confirmed: Option<u32>,
-        sampled_nonces: Option<HashSet<u64>>,
+        block_confirmed: u32,
     }
 }
 serializable_struct_with_getters! {
@@ -156,7 +185,7 @@ impl From<OutputData> for OutputMetaData {
     fn from(data: OutputData) -> Self {
         OutputMetaData {
             solution_signature: data.calc_solution_signature(),
-            runtime_signature: data.runtime_signature,
+            runtime_signature: data.runtime_signature_arr.last().unwrap().1,
             fuel_consumed: data.fuel_consumed,
             nonce: data.nonce,
         }
@@ -173,42 +202,85 @@ impl From<OutputData> for MerkleHash {
     }
 }
 
+// Binary child structs
+serializable_struct_with_getters! {
+    BinaryDetails {
+        compile_success: bool,
+        download_url: Option<String>,
+    }
+}
+serializable_struct_with_getters! {
+    BinaryState {
+        block_confirmed: u32,
+    }
+}
+
 // Block child structs
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum TxType {
+    Algorithm,
+    Benchmark,
+    Binary,
+    Breakthrough,
+    Challenge,
+    Deposit,
+    Fraud,
+    Precommit,
+    Proof,
+    TopUp,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum ActiveType {
+    Algorithm,
+    Benchmark,
+    Breakthrough,
+    Challenge,
+    Deposit,
+    OPoW,
+    Player,
+}
 serializable_struct_with_getters! {
     BlockDetails {
         prev_block_id: String,
         height: u32,
         round: u32,
-        eth_block_num: Option<String>,
-        fees_paid: Option<PreciseNumber>,
-        num_confirmed_challenges: Option<u32>,
-        num_confirmed_algorithms: Option<u32>,
-        num_confirmed_benchmarks: Option<u32>,
-        num_confirmed_precommits: Option<u32>,
-        num_confirmed_proofs: Option<u32>,
-        num_confirmed_frauds: Option<u32>,
-        num_confirmed_topups: Option<u32>,
-        num_confirmed_wasms: Option<u32>,
-        num_active_challenges: Option<u32>,
-        num_active_algorithms: Option<u32>,
-        num_active_benchmarks: Option<u32>,
-        num_active_players: Option<u32>,
+        num_confirmed: HashMap<TxType, u32>,
+        num_active: HashMap<ActiveType, u32>,
+        timestamp: u64,
     }
 }
 serializable_struct_with_getters! {
     BlockData {
-        confirmed_challenge_ids: HashSet<String>,
-        confirmed_algorithm_ids: HashSet<String>,
-        confirmed_benchmark_ids: HashSet<String>,
-        confirmed_precommit_ids: HashSet<String>,
-        confirmed_proof_ids: HashSet<String>,
-        confirmed_fraud_ids: HashSet<String>,
-        confirmed_topup_ids: HashSet<String>,
-        confirmed_wasm_ids: HashSet<String>,
-        active_challenge_ids: HashSet<String>,
-        active_algorithm_ids: HashSet<String>,
-        active_benchmark_ids: HashSet<String>,
-        active_player_ids: HashSet<String>,
+        confirmed_ids: HashMap<TxType, HashSet<String>>,
+        active_ids: HashMap<ActiveType, HashSet<String>>,
+    }
+}
+
+// Breakthrough child structs
+serializable_struct_with_getters! {
+    BreakthroughDetails {
+        name: String,
+        player_id: String,
+        challenge_id: String,
+    }
+}
+serializable_struct_with_getters! {
+    BreakthroughState {
+        block_confirmed: u32,
+        round_submitted: u32,
+        round_pushed: u32,
+        round_active: Option<u32>,
+        round_merged: Option<u32>,
+        vote_tally: HashMap<bool, PreciseNumber>,
+    }
+}
+serializable_struct_with_getters! {
+    BreakthroughBlockData {
+        adoption: PreciseNumber,
+        merge_points: u32,
+        reward: PreciseNumber,
     }
 }
 
@@ -220,48 +292,95 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ChallengeState {
-        block_confirmed: Option<u32>,
-        round_active: Option<u32>,
+        round_active: u32,
     }
 }
 serializable_struct_with_getters! {
     ChallengeBlockData {
-        solution_signature_threshold: Option<u32>,
-        num_qualifiers: Option<u32>,
-        qualifier_difficulties: Option<HashSet<Point>>,
-        base_frontier: Option<Frontier>,
-        scaled_frontier: Option<Frontier>,
-        scaling_factor: Option<f64>,
-        base_fee: Option<PreciseNumber>,
-        per_nonce_fee: Option<PreciseNumber>,
+        solution_signature_threshold: u32,
+        num_qualifiers: u32,
+        qualifier_difficulties: HashSet<Point>,
+        base_frontier: Frontier,
+        scaled_frontier: Frontier,
+        scaling_factor: f64,
+        base_fee: PreciseNumber,
+        per_nonce_fee: PreciseNumber,
+    }
+}
+
+// Deposit child structs
+serializable_struct_with_getters! {
+    DepositDetails {
+        player_id: String,
+        tx_hash: String,
+        log_idx: usize,
+        amount: PreciseNumber,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    }
+}
+serializable_struct_with_getters! {
+    DepositState {
+        block_confirmed: u32,
+    }
+}
+
+// Fraud child structs
+serializable_struct_with_getters! {
+    FraudState {
+        block_confirmed: u32,
+    }
+}
+
+// OPoW child structs
+serializable_struct_with_getters! {
+    OPoWBlockData {
+        num_qualifiers_by_challenge: HashMap<String, u32>,
+        cutoff: u32,
+        associated_deposit: PreciseNumber,
+        delegators: HashSet<String>,
+        reward_share: f64,
+        imbalance: PreciseNumber,
+        influence: PreciseNumber,
+        reward: PreciseNumber,
     }
 }
 
 // Player child structs
 serializable_struct_with_getters! {
     PlayerDetails {
-        name: String,
+        name: Option<String>,
         is_multisig: bool,
     }
 }
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PlayerValue<T> {
+    pub value: T,
+    pub block_set: u32,
+}
 serializable_struct_with_getters! {
     PlayerState {
-        total_fees_paid: Option<PreciseNumber>,
-        available_fee_balance: Option<PreciseNumber>,
+        total_fees_paid: PreciseNumber,
+        available_fee_balance: PreciseNumber,
+        delegatee: Option<PlayerValue<String>>,
+        votes: HashMap<String, PlayerValue<bool>>,
+        reward_share: Option<PlayerValue<f64>>,
     }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum RewardType {
+    Benchmarker,
+    Algorithm,
+    Breakthrough,
+    Delegator,
 }
 serializable_struct_with_getters! {
     PlayerBlockData {
-        num_qualifiers_by_challenge: Option<HashMap<String, u32>>,
-        cutoff: Option<u32>,
-        deposit: Option<PreciseNumber>,
-        rolling_deposit: Option<PreciseNumber>,
-        qualifying_percent_rolling_deposit: Option<PreciseNumber>,
-        imbalance: Option<PreciseNumber>,
-        imbalance_penalty: Option<PreciseNumber>,
-        influence: Option<PreciseNumber>,
-        reward: Option<PreciseNumber>,
-        round_earnings: Option<PreciseNumber>,
+        delegatee: Option<String>,
+        reward_by_type: HashMap<RewardType, PreciseNumber>,
+        deposit_by_locked_period: Vec<PreciseNumber>,
+        weighted_deposit: PreciseNumber,
     }
 }
 
@@ -269,29 +388,34 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
-        num_nonces: Option<u32>,
-        fee_paid: Option<PreciseNumber>,
+        num_nonces: u32,
+        rand_hash: String,
+        fee_paid: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
     PrecommitState {
-        block_confirmed: Option<u32>,
-        rand_hash: Option<String>,
+        block_confirmed: u32,
     }
 }
 
 // Proof child structs
 serializable_struct_with_getters! {
+    ProofDetails {
+        submission_delay: u32,
+        block_active: u32,
+    }
+}
+serializable_struct_with_getters! {
     ProofState {
-        block_confirmed: Option<u32>,
-        submission_delay: Option<u32>,
+        block_confirmed: u32,
     }
 }
 pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     OutputData {
         nonce: u64,
-        runtime_signature: u64,
+        runtime_signature_arr: Vec<(u64, u64)>,
         fuel_consumed: u64,
         solution: Solution,
     }
@@ -302,35 +426,17 @@ impl OutputData {
     }
 }
 
-// Fraud child structs
-serializable_struct_with_getters! {
-    FraudState {
-        block_confirmed: Option<u32>,
-    }
-}
-
 // TopUp child structs
 serializable_struct_with_getters! {
     TopUpDetails {
         player_id: String,
+        tx_hash: String,
+        log_idx: usize,
         amount: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
     TopUpState {
-        block_confirmed: Option<u32>,
-    }
-}
-
-// Wasm child structs
-serializable_struct_with_getters! {
-    WasmDetails {
-        compile_success: bool,
-        download_url: Option<String>,
-    }
-}
-serializable_struct_with_getters! {
-    WasmState {
-        block_confirmed: Option<u32>,
+        block_confirmed: u32,
     }
 }
