@@ -33,7 +33,7 @@ class Batch(FromDict):
 class BatchResult(FromDict):
     merkle_root: MerkleHash
     solution_nonces: List[int]
-    merkle_proofs: List[MerkleProof]
+    #merkle_proofs: List[MerkleProof]
 
 @dataclass
 class SlaveConfig(FromDict):
@@ -142,17 +142,17 @@ class SlaveManager:
             start_nonce = int(start_nonce)
             result = BatchResult.from_dict(await request.json())
             job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
-            logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)}, #proofs: {len(result.merkle_proofs)})")
+            logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)})")
             if job is None:
                 logger.warning(f"{slave_name} submit-batch-result: no job found with benchmark_id {benchmark_id}")
                 raise HTTPException(status_code=400, detail="Invalid benchmark_id")
             batch_idx = start_nonce // job.batch_size
             job.batch_merkle_roots[batch_idx] = result.merkle_root
             job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
-            job.batch_merkle_proofs.update({
-                x.leaf.nonce: x
-                for x in result.merkle_proofs
-            })
+            #job.batch_merkle_proofs.update({
+            #    x.leaf.nonce: x
+            #     for x in result.merkle_proofs
+            #})
             return {"status": "OK"}
 
         thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=self.config.port))

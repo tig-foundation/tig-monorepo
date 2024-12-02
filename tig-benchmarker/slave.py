@@ -25,7 +25,7 @@ def download_wasm(session, download_url, wasm_path):
         logger.debug(f"downloading WASM: took {now() - start}ms")
     logger.debug(f"WASM Path: {wasm_path}")
 
-def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
+def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
     start = now()
     cmd = [
         tig_worker_path, "compute_batch",
@@ -38,9 +38,10 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
         "--mem", str(batch["runtime_config"]["max_memory"]),
         "--fuel", str(batch["runtime_config"]["max_fuel"]),
         "--workers", str(num_workers),
+        "--output", f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}",
     ]
-    if batch["sampled_nonces"]:
-        cmd += ["--sampled", *map(str, batch["sampled_nonces"])]
+    #if batch["sampled_nonces"]:
+    #    cmd += ["--sampled", *map(str, batch["sampled_nonces"])]
     logger.info(f"computing batch: {' '.join(cmd)}")
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -53,7 +54,7 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers):
     logger.debug(f"batch result: {result}")
     return result
 
-def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers):
+def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
     batch_id = None
     try:
         batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
@@ -64,7 +65,7 @@ def process_batch(session, master_ip, master_port, tig_worker_path, download_was
         download_wasm(session, batch['download_url'], wasm_path)
 
         # Step 3: Run tig-worker
-        result = run_tig_worker(tig_worker_path, batch, wasm_path, num_workers)
+        result = run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path)
 
         # Step 4: Submit results
         start = now()
@@ -103,6 +104,7 @@ def main(
     num_workers: int,
     slave_name: str,
     master_port: int,
+    output_path: str,
 ):
     print(f"Starting slave {slave_name}")
 
@@ -144,7 +146,7 @@ def main(
 
             thread = threading.Thread(
                 target=process_batch,
-                args=(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers)
+                args=(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path)
             )
             thread.start()
             
@@ -165,6 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, default=randomname.get_name(), help="Name for the slave (default: randomly generated)")
     parser.add_argument("--port", type=int, default=5115, help="Port for master (default: 5115)")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
+    parser.add_argument("--output", type=str, default="results", help="Folder to output results to (default: output)")
     
     args = parser.parse_args()
     
@@ -174,4 +177,4 @@ if __name__ == "__main__":
     )
 
     threading.Thread(target=process_pending_jobs, daemon=True).start()
-    main(args.master_ip, args.tig_worker_path, args.download, args.workers, args.name, args.port)
+    main(args.master_ip, args.tig_worker_path, args.download, args.workers, args.name, args.port, args.output)
