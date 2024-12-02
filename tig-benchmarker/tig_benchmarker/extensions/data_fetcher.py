@@ -30,7 +30,7 @@ class DataFetcher:
 
     def run(self) -> dict:
         logger.debug("fetching latest block")
-        block_data = await _get(f"{self.api_url}/get-block")
+        block_data = _get(f"{self.api_url}/get-block")
         block = Block.from_dict(block_data["block"])
 
         if self._cache is not None and block.id == self._cache["block"].id:
