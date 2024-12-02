@@ -5,6 +5,10 @@ from dataclasses import dataclass, fields, is_dataclass, asdict
 from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, get_args
 import json
 import time
+from tig_benchmarker.sql import PostgresDB
+
+db = PostgresDB(host="localhost", port=5432, dbname="postgres", user="postgres", password="mysecretpassword")
+print(db)
 
 T = TypeVar('T', bound='DataclassBase')
 
@@ -214,3 +218,4 @@ def u64s_from_str(input: str) -> List[int]:
 
 def now():
     return int(time.time() * 1000)
+

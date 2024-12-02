@@ -30,10 +30,14 @@ class Batch(FromDict):
     batch_size: int
 
 @dataclass
-class BatchResult(FromDict):
+class BatchRoots(FromDict):
     merkle_root: MerkleHash
     solution_nonces: List[int]
     #merkle_proofs: List[MerkleProof]
+
+@dataclass
+class BatchProof(FromDict):
+    merkle_proofs: List[MerkleProof]
 
 @dataclass
 class SlaveConfig(FromDict):
@@ -127,12 +131,12 @@ class SlaveManager:
                 logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
                 return JSONResponse(content=jsonable_encoder(batch))
 
-        @app.post('/submit-batch-result/{batch_id}')
-        async def submit_batch_result(batch_id: str, request: Request):
+        @app.post('/submit-batch-roots/{batch_id}')
+        async def submit_batch_roots(batch_id: str, request: Request):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")
             if slave_name != self.assigned.get(batch_id, None):
-                raise HTTPException(status_code=400, detail=f"Slave submitted result for {batch_id}, but either took too long, or was not assigned this batch.")
+                raise HTTPException(status_code=400, detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch.")
             self.assigned.pop(batch_id)
             self.concurrent[slave_name]["count"] -= 1
             if self.concurrent[slave_name]["count"] == 0:
@@ -140,11 +144,11 @@ class SlaveManager:
 
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
-            result = BatchResult.from_dict(await request.json())
+            result = BatchRoots.from_dict(await request.json())
             job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
-            logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)})")
+            logger.debug(f"{slave_name} submit-batch-roots: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)})")
             if job is None:
-                logger.warning(f"{slave_name} submit-batch-result: no job found with benchmark_id {benchmark_id}")
+                logger.warning(f"{slave_name} submit-batch-roots: no job found with benchmark_id {benchmark_id}")
                 raise HTTPException(status_code=400, detail="Invalid benchmark_id")
             batch_idx = start_nonce // job.batch_size
             job.batch_merkle_roots[batch_idx] = result.merkle_root
@@ -155,6 +159,37 @@ class SlaveManager:
             #})
             return {"status": "OK"}
 
+        @app.post('/submit-batch-proofs/{batch_id}')
+        async def submit_batch_proofs(batch_id: str, request: Request):
+            if (slave_name := request.headers.get('User-Agent', None)) is None:
+                raise HTTPException(status_code=403, detail="User-Agent header is required")
+           
+            if slave_name != self.assigned.get(batch_id, None):
+                raise HTTPException(status_code=400, detail=f"Slave submitted proofs for {batch_id}, but either took too long, or was not assigned this batch.")
+
+            self.assigned.pop(batch_id)
+            self.concurrent[slave_name]["count"] -= 1
+            if self.concurrent[slave_name]["count"] == 0:
+                self.concurrent.pop(slave_name)
+
+            benchmark_id, start_nonce = batch_id.split("_")
+            start_nonce = int(start_nonce)
+
+            result = BatchProof.from_dict(await request.json())
+            logger.debug(f"{slave_name} submit-batch-proofs: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #proofs: {len(result.merkle_proofs)})")
+
+            job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
+            if job is None:
+                logger.warning(f"{slave_name} submit-batch-proofs: no job found with benchmark_id {benchmark_id}")
+                raise HTTPException(status_code=400, detail="Invalid benchmark_id")
+
+            job.batch_merkle_proofs.update({
+                x.leaf.nonce: x
+                for x in result.merkle_proofs
+            })
+
+            return {"status": "OK"}
+            
         thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=self.config.port))
         thread.daemon = True
         thread.start()

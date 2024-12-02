@@ -69,12 +69,12 @@ def process_batch(session, master_ip, master_port, tig_worker_path, download_was
 
         # Step 4: Submit results
         start = now()
-        submit_url = f"http://{master_ip}:{master_port}/submit-batch-result/{batch_id}"
+        submit_url = f"http://{master_ip}:{master_port}/submit-batch-roots/{batch_id}"
         logger.info(f"posting results to {submit_url}")
         resp = session.post(submit_url, json=result, headers=headers)
         if resp.status_code != 200:
-            raise Exception(f"status {resp.status_code} when posting results to master: {resp.text}")
-        logger.debug(f"posting results took {now() - start} ms")
+            raise Exception(f"status {resp.status_code} when posting roots to master: {resp.text}")
+        logger.debug(f"posting roots took {now() - start} ms")
 
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
