@@ -1,5 +1,4 @@
-import aiohttp
-import asyncio
+import requests
 import json
 import logging
 import os
@@ -9,20 +8,18 @@ from typing import Dict, Any
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-async def _get(url: str) -> Dict[str, Any]:
-    async with aiohttp.ClientSession() as session:
-        logger.debug(f"fetching from {url}")
-        async with session.get(url) as resp:
-            text = await resp.text()
-            if resp.status == 200:
-                return json.loads(text)
-            else:
-                if resp.headers.get("Content-Type") == "text/plain":
-                    err_msg = f"status code {resp.status} from {url}: {text}"
-                else:
-                    err_msg = f"status code {resp.status} from {url}"
-                logger.error(err_msg)
-                raise Exception(err_msg)
+def _get(url: str) -> Dict[str, Any]:
+    logger.debug(f"Fetching from {url}")
+    resp = requests.get(url, timeout=10)  # Added timeout for robustness
+    if resp.status_code == 200:
+        return json.loads(resp.text)
+    else:
+        if resp.headers.get("Content-Type") == "text/plain":
+            err_msg = f"status code {resp.status_code} from {url}: {resp.text}"
+        else:
+            err_msg = f"status code {resp.status_code} from {url}"
+        logger.error(err_msg)
+        raise Exception(err_msg)
 
 class DataFetcher:
     def __init__(self, api_url: str, player_id: str):
@@ -31,7 +28,7 @@ class DataFetcher:
         self.last_fetch = 0
         self._cache = None
 
-    async def run(self) -> dict:
+    def run(self) -> dict:
         logger.debug("fetching latest block")
         block_data = await _get(f"{self.api_url}/get-block")
         block = Block.from_dict(block_data["block"])
@@ -47,7 +44,8 @@ class DataFetcher:
             _get(f"{self.api_url}/get-challenges?block_id={block.id}")
         ]
         
-        algorithms_data, benchmarks_data, challenges_data = await asyncio.gather(*tasks)
+        with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
+            algorithms_data, benchmarks_data, challenges_data = list(executor.map(_get, tasks))
 
         algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data["algorithms"]}
         wasms = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data["binarys"]}
@@ -58,14 +56,18 @@ class DataFetcher:
         frauds = {f["benchmark_id"]: Fraud.from_dict(f) for f in benchmarks_data["frauds"]}        
         challenges = {c["id"]: Challenge.from_dict(c) for c in challenges_data["challenges"]}
         
-        tasks = [
-            _get(f"{self.api_url}/get-difficulty-data?block_id={block.id}&challenge_id={c_id}")
+        # Fetch difficulty data for each challenge
+        difficulty_urls = [
+            f"{self.api_url}/get-difficulty-data?block_id={block.id}&challenge_id={c_id}"
             for c_id in challenges
         ]
-        difficulty_data = await asyncio.gather(*tasks)
+        
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            difficulty_responses = list(executor.map(_get, difficulty_urls))
+        
         difficulty_data = {
-            c_id: [DifficultyData.from_dict(x) for x in d["data"]]
-            for c_id, d in zip(challenges, difficulty_data)
+            c_id: [DifficultyData.from_dict(d) for d in resp.get("data", [])]
+            for c_id, resp in zip(challenges, difficulty_responses)
         }
 
         self._cache = {

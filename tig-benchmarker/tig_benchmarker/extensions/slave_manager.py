@@ -1,12 +1,12 @@
-import asyncio
 import os
 import json
 import logging
 import re
 import signal
-from quart import Quart, request, jsonify
-from hypercorn.config import Config
-from hypercorn.asyncio import serve
+import time
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+import uvicorn
 from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
@@ -49,15 +49,16 @@ class SlaveManager:
         self.jobs = jobs
 
     def start(self):
-        app = Quart(__name__)
+        app = FastAPI()
 
-        @app.route('/get-batches', methods=['GET'])
-        async def get_batches():
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                return "User-Agent header is required", 403
+        @app.get('/get-batches')
+        def get_batches(request: Request):
+            slave_name = request.headers.get('User-Agent')
+            if slave_name is None:
+                raise HTTPException(status_code=403, detail="User-Agent header is required")
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
-                return "Unregistered slave", 403
+                raise HTTPException(status_code=403, detail="Unregistered slave")
             
             slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
 
@@ -103,18 +104,19 @@ class SlaveManager:
 
             if len(batches) == 0:
                 logger.debug(f"{slave_name} get-batches: None available")
-                return "No batches available", 503
+                raise HTTPException(status_code=503, detail="No batches available")
             else:
                 logger.debug(f"{slave_name} get-batches: (challenge: {selected_challenge}, #batches: {len(batches)}, batch_ids: {[b.benchmark_id for b in batches]})")
-                return jsonify([b.to_dict() for b in batches])
+                return [b.to_dict() for b in batches]
 
-        @app.route('/get-batch', methods=['GET'])
-        def get_batch():
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                return "User-Agent header is required", 403
+        @app.get('/get-batch')
+        def get_batch(request: Request):
+            slave_name = request.headers.get('User-Agent')
+            if slave_name is None:
+                raise HTTPException(status_code=403, detail="User-Agent header is required")
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batches request")
-                return "Unregistered slave", 403
+                raise HTTPException(status_code=403, detail="Unregistered slave")
             
             slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
 
@@ -157,25 +159,26 @@ class SlaveManager:
 
             if batch is None:
                 logger.debug(f"{slave_name} get-batch: None available")
-                return "No batches available", 503
+                raise HTTPException(status_code=503, detail="No batches available")
             else:
                 logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
-                return jsonify([batch.to_dict()])
+                return [batch.to_dict()]
 
-        @app.route('/submit-batch-result/<batch_id>', methods=['POST'])
-        async def submit_batch_result(batch_id):
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                return "User-Agent header is required", 403
+        @app.post('/submit-batch-result/{batch_id}')
+        def submit_batch_result(request: Request, batch_id: str):
+            slave_name = request.headers.get('User-Agent')
+            if slave_name is None:
+                raise HTTPException(status_code=403, detail="User-Agent header is required")
             if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting submit-batch-result request")
             benchmark_id, start_nonce = batch_id.split("_")
             start_nonce = int(start_nonce)
-            result = BatchResult.from_dict(await request.json)
+            result = BatchResult.from_dict(request.json())
             job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
             logger.debug(f"{slave_name} submit-batch-result: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)}, #proofs: {len(result.merkle_proofs)})")
             if job is None:
                 logger.warning(f"{slave_name} submit-batch-result: no job found with benchmark_id {benchmark_id}")
-                return "Invalid benchmark_id", 400
+                raise HTTPException(status_code=400, detail="Invalid benchmark_id")
             batch_idx = start_nonce // job.batch_size
             job.batch_merkle_roots[batch_idx] = result.merkle_root
             job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
@@ -183,14 +186,7 @@ class SlaveManager:
                 x.leaf.nonce: x
                 for x in result.merkle_proofs
             })
-            return "OK"
+            return {"status": "OK"}
 
-        config = Config()
-        config.bind = [f"0.0.0.0:{self.config.port}"]
-
-        exit_event = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        loop.add_signal_handler(signal.SIGINT, exit_event.set)
-        loop.add_signal_handler(signal.SIGTERM, exit_event.set)
-        asyncio.create_task(serve(app, config, shutdown_trigger=exit_event.wait))
-        logger.info(f"webserver started on {config.bind[0]}")
+        uvicorn.run(app, host="0.0.0.0", port=self.config.port)
+        logger.info(f"webserver started on 0.0.0.0:{self.config.port}")

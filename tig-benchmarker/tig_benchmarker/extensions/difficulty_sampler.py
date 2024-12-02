@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import math
 import numpy as np
@@ -71,36 +70,36 @@ def calc_pareto_frontier(points: List[Point]) -> Tuple[Frontier, List[bool]]:
     if not points:
         return [], []
 
-    indices                     = list(range(len(points)))
+    indices = list(range(len(points)))
     indices.sort(key=lambda i: (points[i][1], points[i][0]))
     
-    on_front                    = [True] * len(points)
-    stack                       = []
+    on_front = [True] * len(points)
+    stack = []
     
     for curr_idx in indices:
         while stack and points[stack[-1]][0] > points[curr_idx][0]:
             stack.pop()
 
         if stack and points[stack[-1]][0] <= points[curr_idx][0]:
-            on_front[curr_idx]  = False
+            on_front[curr_idx] = False
             
         stack.append(curr_idx)
 
-    i                           = 0
+    i = 0
     while i < len(indices):
-        j                       = i + 1
+        j = i + 1
         while j < len(indices) and points[indices[j]][1] == points[indices[i]][1]:
-            j                   += 1
+            j += 1
 
         if j - i > 1:
-            min_x_idx           = min(indices[i:j], key=lambda k: points[k][0])
+            min_x_idx = min(indices[i:j], key=lambda k: points[k][0])
             for k in indices[i:j]:
                 if k != min_x_idx:
                     on_front[k] = False
                     
-        i                       = j
+        i = j
     
-    frontier                    = [points[i] for i in range(len(points)) if on_front[i]]
+    frontier = [points[i] for i in range(len(points)) if on_front[i]]
     
     return frontier, on_front
 
@@ -112,17 +111,17 @@ def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
     if not points:
         return []
     
-    frontiers                   = []
-    remaining_points            = None
+    frontiers = []
+    remaining_points = None
     
     while True:
-        points_                 = remaining_points if remaining_points is not None else points
-        frontier, on_front      = calc_pareto_frontier(points_)
+        points_ = remaining_points if remaining_points is not None else points
+        frontier, on_front = calc_pareto_frontier(points_)
 
         frontiers.append(frontier)
         
         # Get remaining points not on frontier
-        remaining_points        = [points_[i] for i in range(len(points_)) if not on_front[i]]
+        remaining_points = [points_[i] for i in range(len(points_)) if not on_front[i]]
         
         # Break if no more points to process
         if not remaining_points:
@@ -171,31 +170,31 @@ class DifficultySampler:
 
     def run(self) -> Dict[str, Point]:
         samples = {}
-        for c_name, frontiers in self.frontiers.items():
+        for c_name in challenges.values():
             found_valid = False
 
             if self.config.selected_difficulties[c_name] is not None:
-                valid_points = [p for frontier in frontiers for p in frontier]
-                min_x = min(p[0] for p in valid_points)
-                max_x = max(p[0] for p in valid_points)
-                min_y = min(p[1] for p in valid_points)
-                max_y = max(p[1] for p in valid_points)
+                min_x = min(p[0] for p in self.valid_difficulties[c_name])
+                max_x = max(p[0] for p in self.valid_difficulties[c_name])
+                min_y = min(p[1] for p in self.valid_difficulties[c_name])
+                max_y = max(p[1] for p in self.valid_difficulties[c_name])
 
-                difficulties = list(self.config.selected_difficulties[c_name])
-                random.shuffle(difficulties)
+                difficulties_ = list(self.config.selected_difficulties[c_name])
+                random.shuffle(difficulties_)
 
-                for selected_difficulty in difficulties:
+                for selected_difficulty in difficulties_:
                     if selected_difficulty[0] >= min_x and selected_difficulty[0] <= max_x and
-                       selected_difficulty[1] >= min_y and selected_difficulty[1] <= max_y:
+                    selected_difficulty[1] >= min_y and selected_difficulty[1] <= max_y:
                         samples[c_name] = selected_difficulty
                         logger.debug(f"Sampled difficulty {selected_difficulty} for challenge {c_name}")
                         found_valid = True
                         break
 
                 if not found_valid:
-                    logger.warning(f"No valid difficulties found for {c_name} - skipping")
-            
+                    logger.warning(f"No valid difficulties found for {c_name} - skipping selected difficulties")
+
             if not found_valid:
+                frontiers = self.frontiers[c_name]
                 difficulty_range = self.config.difficulty_ranges[c_name] # FIXME
                 idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
                 idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
