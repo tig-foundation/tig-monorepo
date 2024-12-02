@@ -1,5 +1,5 @@
-<div class="h-screen flex flex-column">
-  <div class="w-full p-4 m-2">
+<div class="h-screen flex flex-column align-items-center">
+  <div class="w-full m-2 mt-6 justify-content-center" style="max-height: 160px">
     <svg
       version="1.1"
       id="Capa_1"
@@ -153,9 +153,22 @@
       </g>
     </svg>
   </div>
-  <div class="w-full flex flex-column p-2">
-  
-    <p-button
+  <div class="w-full flex flex-column p-4">
+    <div
+      class="w-full flex align-items-center cursor-pointer"
+      (click)="router.navigate(['/'])"
+    >
+      <i class="pi pi-home" style="font-size: 1.5rem"></i>
+      <p class="ml-4">Home</p>
+    </div>
+    <div
+      class="w-full flex align-items-center cursor-pointer"
+      (click)="router.navigate(['/settings'])"
+    >
+      <i class="pi pi-cog" style="font-size: 1.5rem"></i>
+      <p class="ml-4">Settings</p>
+    </div>
+    <!-- <p-button
       label="Home"
       [style]="{
         width: '100%',
@@ -165,9 +178,9 @@
       [rounded]="true"
       [outlined]="true"
       (click)="router.navigate(['/'])"
-    />
+    /> -->
 
-    <p-button
+    <!-- <p-button
       label="Settings"
       [style]="{
         width: '100%',
@@ -177,14 +190,11 @@
       [rounded]="true"
       [outlined]="true"
       (click)="router.navigate(['/settings'])"
-    />
+    /> -->
   </div>
 
   <div class="w-full text-center" style="position: relative; bottom: 0">
-    <p
-      style="font-size: x-small; cursor: pointer"
-      (click)="tigService.init()"
-    >
+    <p style="font-size: x-small; cursor: pointer" (click)="tigService.init()">
       Data Refresh
     </p>
     <p-progressBar [value]="value" [style]="{ height: '6px' }" />

@@ -60,12 +60,25 @@ export class HomeComponent {
 
   expandAll() {
     this.expandedRows = this.benchmarks().reduce(
-      (acc:any, p:any) => (acc[p.benchmark_id] = true) && acc,
+      (acc: any, p: any) => (acc[p.benchmark_id] = true) && acc,
       {}
     );
   }
 
   collapseAll() {
     this.expandedRows = {};
+  }
+
+  copyToClipboard(value: any) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(value)
+        .then(() => {
+          console.log('Text copied to clipboard:', value);
+        })
+        .catch((err) => {
+          console.error('Failed to copy text to clipboard:', err);
+        });
+    }
   }
 }
