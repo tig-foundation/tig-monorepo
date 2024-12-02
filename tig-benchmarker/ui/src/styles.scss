@@ -67,3 +67,42 @@ body {
 .p-paginator {
   background: #ececee !important;
 }
+
+.text-hover-underline {
+  text-decoration: none; // Ensure no underline by default
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px; // Adjust thickness as needed
+    background-color: currentColor; // Use text color
+    transition: width 0.3s ease; // Smooth transition
+  }
+
+  &:hover::after {
+    width: 100%; // Full underline on hover
+  }
+}
+
+.p-datatable .p-datatable-tbody > tr > td {
+  border: 1px solid #b6b6b8 !important;
+  border-radius: 2px;
+}
+
+.p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
+  opacity: 0.8 !important;
+}
+
+.p-datatable .p-datatable-tbody > tr:nth-child(odd):hover {
+  opacity: 0.8 !important;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  border: 1px solid #b6b6b8 !important;
+  background-color: red !important;
+  border-radius: 2px;
+}

@@ -14,6 +14,7 @@ import { ChartModule } from 'primeng/chart';
 import { IBenchmark } from '../../interfaces/IBenchmark';
 import { TimeConverterPipe } from '../../pipes/time-converter.pipe';
 import { PanelModule } from 'primeng/panel';
+import { DividerModule } from 'primeng/divider';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -26,6 +27,7 @@ import { PanelModule } from 'primeng/panel';
     InputIconModule,
     PanelModule,
     ProgressSpinnerModule,
+    DividerModule,
     IconFieldModule,
     FormsModule,
     ReactiveFormsModule,
