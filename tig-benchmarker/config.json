@@ -1,7 +1,7 @@
 {
-    "player_id": "0x0000000000000000000000000000000000000000",
-    "api_key": "00000000000000000000000000000000",
-    "api_url": "https://mainnet-api.tig.foundation",
+    "player_id": "0xc30edf0147c46d0a5f79bfe9b15ce9de9b8879be",
+    "api_key": "3e823222a583e3f911c6c485893024a8",
+    "api_url": "https://testnet-api.tig.foundation",
     "difficulty_sampler_config": {
         "difficulty_ranges": {
             "satisfiability": [
@@ -20,6 +20,14 @@
                 0.0,
                 0.5
             ]
+        },
+        "selected_difficulties": {
+            "satisfiability": null,
+            "vehicle_routing": [
+                [1, 2], [4, 5]
+            ],
+            "knapsack": null,
+            "vector_search": null
         }
     },
     "job_manager_config": {
@@ -39,26 +47,26 @@
         "algo_selection": {
             "satisfiability": {
                 "algorithm": "sat_global_opt",
-                "num_nonces": 1000,
+                "num_nonces": 8,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "vehicle_routing": {
                 "algorithm": "advanced_routing",
-                "num_nonces": 1000,
+                "num_nonces": 8,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "knapsack": {
                 "algorithm": "classic_quadkp",
-                "num_nonces": 1000,
+                "num_nonces": 8,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "vector_search": {
                 "algorithm": "invector_hybrid",
-                "num_nonces": 1000,
-                "weight": 1.0,
+                "num_nonces": 8,
+                "weight": 0,
                 "base_fee_limit": "10000000000000000"
             }
         }
@@ -66,6 +74,7 @@
     "slave_manager_config": {
         "port": 5115,
         "time_before_batch_retry": 60000,
+        "num_nonces_to_sample": 0.5,
         "slaves": [
             {
                 "name_regex": ".*",

@@ -172,11 +172,36 @@ class DifficultySampler:
     def run(self) -> Dict[str, Point]:
         samples = {}
         for c_name, frontiers in self.frontiers.items():
-            difficulty_range = self.config.difficulty_ranges[c_name] # FIXME
-            idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
-            idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
-            difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
-            difficulty = random.choice(difficulties)
-            samples[c_name] = difficulty
-            logger.debug(f"Sampled difficulty {difficulty} for challenge {c_name}")
+            found_valid = False
+
+            if self.config.selected_difficulties[c_name] is not None:
+                valid_points = [p for frontier in frontiers for p in frontier]
+                min_x = min(p[0] for p in valid_points)
+                max_x = max(p[0] for p in valid_points)
+                min_y = min(p[1] for p in valid_points)
+                max_y = max(p[1] for p in valid_points)
+
+                difficulties = list(self.config.selected_difficulties[c_name])
+                random.shuffle(difficulties)
+
+                for selected_difficulty in difficulties:
+                    if selected_difficulty[0] >= min_x and selected_difficulty[0] <= max_x and
+                       selected_difficulty[1] >= min_y and selected_difficulty[1] <= max_y:
+                        samples[c_name] = selected_difficulty
+                        logger.debug(f"Sampled difficulty {selected_difficulty} for challenge {c_name}")
+                        found_valid = True
+                        break
+
+                if not found_valid:
+                    logger.warning(f"No valid difficulties found for {c_name} - skipping")
+            
+            if not found_valid:
+                difficulty_range = self.config.difficulty_ranges[c_name] # FIXME
+                idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
+                idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
+                difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
+                difficulty = random.choice(difficulties)
+                samples[c_name] = difficulty
+                logger.debug(f"Sampled difficulty {difficulty} for challenge {c_name}")
+                
         return samples
