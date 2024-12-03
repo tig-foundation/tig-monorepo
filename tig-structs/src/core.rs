@@ -365,7 +365,7 @@ serializable_struct_with_getters! {
     PlayerState {
         total_fees_paid: PreciseNumber,
         available_fee_balance: PreciseNumber,
-        delegatee: Option<PlayerValue<String>>,
+        delegatees: Option<PlayerValue<HashMap<String, f64>>>,
         votes: HashMap<String, PlayerValue<bool>>,
         reward_share: Option<PlayerValue<f64>>,
     }
@@ -380,7 +380,7 @@ pub enum RewardType {
 }
 serializable_struct_with_getters! {
     PlayerBlockData {
-        delegatee: Option<String>,
+        delegatees: HashMap<String, f64>,
         reward_by_type: HashMap<RewardType, PreciseNumber>,
         deposit_by_locked_period: Vec<PreciseNumber>,
         weighted_deposit: PreciseNumber,

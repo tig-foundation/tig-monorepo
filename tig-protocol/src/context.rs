@@ -40,13 +40,18 @@ pub trait Context {
     async fn get_config(&self) -> ProtocolConfig;
     async fn add_deposit_to_mempool(&self, details: DepositDetails) -> Result<String>;
     async fn add_fraud_to_mempool(&self, benchmark_id: String, allegation: String) -> Result<()>;
+    async fn get_player_details(&self, player_id: &String) -> Option<PlayerDetails>;
     async fn get_player_state(&self, player_id: &String) -> Option<PlayerState>;
     async fn get_player_block_data(
         &self,
         player_id: &String,
         block_id: &String,
     ) -> Option<PlayerBlockData>;
-    async fn set_player_delegatee(&self, player_id: String, delegatee: String) -> Result<()>;
+    async fn set_player_delegatees(
+        &self,
+        player_id: String,
+        delegatees: HashMap<String, f64>,
+    ) -> Result<()>;
     async fn set_player_reward_share(&self, player_id: String, reward_share: f64) -> Result<()>;
     async fn set_player_vote(
         &self,

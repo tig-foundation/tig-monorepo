@@ -259,23 +259,28 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
         if active_opow_ids.contains(player_id) {
-            player_data.delegatee = Some(player_id.clone());
-        } else if let Some(delegatee) = &player_state.delegatee {
-            if !active_opow_ids.contains(&delegatee.value)
-                // || self_deposit[player_id] < config.deposits.delegator_min_deposit
-                || self_deposit[&delegatee.value] < config.deposits.delegatee_min_deposit
-            {
-                continue;
-            }
-            player_data.delegatee = Some(delegatee.value.clone());
+            // benchmarkers self-delegate 100% to themselves
+            player_data.delegatees = HashMap::from([(player_id.clone(), 1.0)]);
+        } else if let Some(delegatees) = &player_state.delegatees {
+            player_data.delegatees = delegatees
+                .value
+                .iter()
+                .filter(|(delegatee, _)| {
+                    active_opow_ids.contains(delegatee.as_str())
+                        && self_deposit[delegatee.as_str()] >= config.deposits.delegatee_min_deposit
+                })
+                .map(|(delegatee, fraction)| (delegatee.clone(), *fraction))
+                .collect();
         } else {
             continue;
         }
-        let opow_data = active_opow_block_data
-            .get_mut(player_data.delegatee.as_ref().unwrap())
-            .unwrap();
-        opow_data.delegators.insert(player_id.clone());
-        opow_data.delegated_weighted_deposit += player_data.weighted_deposit;
+
+        for (delegatee, fraction) in player_data.delegatees.iter() {
+            let fraction = PreciseNumber::from_f64(*fraction);
+            let opow_data = active_opow_block_data.get_mut(delegatee).unwrap();
+            opow_data.delegators.insert(player_id.clone());
+            opow_data.delegated_weighted_deposit += player_data.weighted_deposit * fraction;
+        }
     }
     let total_deposit = active_opow_block_data
         .values()

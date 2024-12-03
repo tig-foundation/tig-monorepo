@@ -46,8 +46,9 @@ serializable_struct_with_getters! {
         max_reward_share: f64,
         default_reward_share: f64,
         reward_share_update_period: u32,
-        delegatee_update_period: u32,
+        delegatees_update_period: u32,
         delegatee_min_deposit: PreciseNumber,
+        max_delegations: usize,
     }
 }
 serializable_struct_with_getters! {

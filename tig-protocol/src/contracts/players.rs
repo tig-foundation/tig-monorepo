@@ -1,7 +1,10 @@
 use crate::context::*;
 use anyhow::{anyhow, Result};
 use logging_timer::time;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tig_structs::core::*;
 use tig_utils::*;
 
@@ -104,31 +107,48 @@ pub async fn submit_deposit<T: Context>(
 }
 
 #[time]
-pub async fn set_delegatee<T: Context>(
+pub async fn set_delegatees<T: Context>(
     ctx: &T,
     player_id: String,
-    delegatee: String,
+    delegatees: HashMap<String, f64>,
 ) -> Result<()> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if let Some(curr_delegatee) = &player_state.delegatee {
-        if curr_delegatee.value == delegatee {
-            return Err(anyhow!("Delegatee is already set to {}", delegatee));
-        }
-        if latest_block_details.height - curr_delegatee.block_set
-            < config.deposits.delegatee_update_period
+    if delegatees.len() > config.deposits.max_delegations as usize {
+        return Err(anyhow!(
+            "Cannot delegate to more than {} players",
+            config.deposits.max_delegations
+        ));
+    }
+    if let Some(curr_delegatees) = &player_state.delegatees {
+        if latest_block_details.height - curr_delegatees.block_set
+            < config.deposits.delegatees_update_period
         {
             return Err(anyhow!(
-                "Can only update delegatee every {} blocks",
-                config.deposits.delegatee_update_period
+                "Can only update delegatees every {} blocks",
+                config.deposits.delegatees_update_period
             ));
         }
     }
 
-    ctx.set_player_delegatee(player_id, delegatee).await?;
+    if delegatees.values().any(|&v| v < 0.0) {
+        return Err(anyhow!("Fraction to delegate cannot be negative"));
+    }
+
+    if delegatees.values().cloned().sum::<f64>() > 1.0 {
+        return Err(anyhow!("Total fraction to delegate cannot exceed 1.0"));
+    }
+
+    for delegatee in delegatees.keys() {
+        if ctx.get_player_details(delegatee).await.is_none() {
+            return Err(anyhow!("Invalid delegatee '{}'", delegatee));
+        }
+    }
+
+    ctx.set_player_delegatees(player_id, delegatees).await?;
     Ok(())
 }
 

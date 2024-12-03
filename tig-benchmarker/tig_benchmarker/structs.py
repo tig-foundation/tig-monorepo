@@ -221,13 +221,13 @@ class PlayerDetails(FromDict):
 class PlayerState(FromDict):
     total_fees_paid: PreciseNumber
     available_fee_balance: PreciseNumber
-    delegatee: Optional[dict]
+    delegatees: Optional[Dict[str, float]]
     votes: dict
     reward_share: Optional[dict]
 
 @dataclass
 class PlayerBlockData(FromDict):
-    delegatee: Optional[str]
+    delegatees: Dict[str, float]
     reward_by_type: Dict[str, PreciseNumber]
     deposit_by_locked_period: List[PreciseNumber]
     weighted_deposit: PreciseNumber
