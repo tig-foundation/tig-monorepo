@@ -61,7 +61,7 @@ pub async fn submit_breakthrough<T: Context>(
     player_id: String,
     breakthrough_name: String,
     challenge_id: String,
-    evidence: HashMap<String, String>,
+    evidence: String,
 ) -> Result<String> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;

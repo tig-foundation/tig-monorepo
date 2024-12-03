@@ -29,7 +29,7 @@ pub trait Context {
     async fn add_breakthrough_to_mempool(
         &self,
         details: BreakthroughDetails,
-        evidence: HashMap<String, String>,
+        evidence: String,
     ) -> Result<String>;
     async fn get_challenge_state(&self, challenge_id: &String) -> Option<ChallengeState>;
     async fn get_challenge_block_data(
