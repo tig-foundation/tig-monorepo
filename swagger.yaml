@@ -311,11 +311,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RequestApiKeyResponse'
-  /set-delegatee:
+  /set-delegatees:
     post:
       tags:
         - POST
-      summary: Sets your delegatee
+      summary: Sets your delegatees
       description: |-
         # Notes
         * Can only be updated once every `block.config.deposits.delegatee_update_period` blocks
@@ -323,11 +323,13 @@ paths:
         * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
           
           * If `<api_key>` is invalid, a `401` error will be returned
+
+        * `<delegatees>` is a map of `<player_id>` to `float`, where the floats must sum to at most `1.0`
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SetDelegateeRequest'
+              $ref: '#/components/schemas/SetDelegateesRequest'
       parameters:
         - in: header
           name: X-Api-Key
@@ -1418,11 +1420,13 @@ components:
           $ref: '#/components/schemas/MD5'
         name:
           type: string
-    SetDelegateeRequest:
+    SetDelegateesRequest:
       type: object
       properties:
-        delegatee:
-          $ref: '#/components/schemas/Address'
+        delegatees:
+          type: object
+          additionalProperties:
+            type: float
     SetDelegateeResponse:
       type: object
       properties:
