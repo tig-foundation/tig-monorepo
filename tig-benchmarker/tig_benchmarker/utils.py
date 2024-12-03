@@ -6,10 +6,7 @@ from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, 
 import json
 import time
 from tig_benchmarker.sql import PostgresDB
-
-db = PostgresDB(host="localhost", port=5432, dbname="postgres", user="postgres", password="mysecretpassword")
-print(db)
-
+    
 T = TypeVar('T', bound='DataclassBase')
 
 class FromStr(ABC):

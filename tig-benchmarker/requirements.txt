@@ -8,3 +8,4 @@ quart
 randomname
 fastapi
 uvicorn
+psycopg2

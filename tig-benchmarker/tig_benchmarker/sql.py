@@ -81,3 +81,8 @@ class PostgresDB:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.disconnect()
+
+
+db_conn = None
+if db_conn is None:
+    db_conn = PostgresDB(host="localhost", port=5432, dbname="postgres", user="postgres", password="mysecretpassword")

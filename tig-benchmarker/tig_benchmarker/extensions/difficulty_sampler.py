@@ -69,14 +69,11 @@ def calc_valid_difficulties(upper_frontier: List[Point], lower_frontier: List[Po
 def calc_pareto_frontier(points: List[Point]) -> Tuple[Frontier, List[bool]]:
     if not points:
         return [], []
-
-    indices = list(range(len(points)))
-    indices.sort(key=lambda i: (points[i][1], points[i][0]))
     
     on_front = [True] * len(points)
     stack = []
     
-    for curr_idx in indices:
+    for curr_idx in range(len(points)):
         while stack and points[stack[-1]][0] > points[curr_idx][0]:
             stack.pop()
 
@@ -86,14 +83,14 @@ def calc_pareto_frontier(points: List[Point]) -> Tuple[Frontier, List[bool]]:
         stack.append(curr_idx)
 
     i = 0
-    while i < len(indices):
+    while i < len(points):
         j = i + 1
-        while j < len(indices) and points[indices[j]][1] == points[indices[i]][1]:
+        while j < len(points) and points[j][1] == points[i][1]:
             j += 1
 
         if j - i > 1:
-            min_x_idx = min(indices[i:j], key=lambda k: points[k][0])
-            for k in indices[i:j]:
+            min_x_idx = min(range(i, j), key=lambda k: points[k][0])
+            for k in range(i, j):
                 if k != min_x_idx:
                     on_front[k] = False
                     
@@ -110,9 +107,12 @@ def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
     """
     if not points:
         return []
-    
+
     frontiers = []
-    remaining_points = None
+    remaining_points = list(set(tuple(p) for p in points))
+    remaining_points.sort(key=lambda p: (p[1], p[0]))
+
+    print("calc all frontiers for %d points"%len(remaining_points))
     
     while True:
         points_ = remaining_points if remaining_points is not None else points

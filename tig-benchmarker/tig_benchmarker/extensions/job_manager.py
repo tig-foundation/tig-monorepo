@@ -6,6 +6,7 @@ from tig_benchmarker.merkle_tree import MerkleHash, MerkleBranch, MerkleTree
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
+from tig_benchmarker.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -92,98 +93,165 @@ class JobManager:
                 continue
             logger.info(f"creating job from confirmed precommit {benchmark_id}")
             c_name = challenge_id_2_name[x.settings.challenge_id]
-            job = Job(
-                benchmark_id=benchmark_id,
-                settings=x.settings,
-                num_nonces=x.details.num_nonces,
-                rand_hash=x.details.rand_hash,
-                runtime_config=block.config["benchmarks"]["runtime_configs"]["wasm"],
-                batch_size=self.config.batch_sizes[c_name],
-                challenge=c_name,
-                download_url=next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
+            #job = Job(
+            #    benchmark_id=benchmark_id,
+            #    settings=x.settings,
+            #    num_nonces=x.details.num_nonces,
+            #    rand_hash=x.details.rand_hash,
+            #    runtime_config=block.config["benchmarks"]["runtime_configs"]["wasm"],
+            #    batch_size=self.config.batch_sizes[c_name],
+            #    challenge=c_name,
+            #    download_url=next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
+            #)
+            # job_idxs[benchmark_id] = len(self.jobs)
+            # self.jobs.append(job)
+
+            db_conn.execute(
+                """
+                INSERT INTO jobs (benchmark_id, settings, num_nonces, rand_hash, runtime_config, batch_size, challenge, download_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (benchmark_id) DO NOTHING;
+                """,
+                (
+                    benchmark_id,
+                    json.dumps(asdict(x.settings)),
+                    x.details.num_nonces,
+                    x.details.rand_hash,
+                    json.dumps(block.config["benchmarks"]["runtime_configs"]["wasm"]),
+                    self.config.batch_sizes[c_name],
+                    c_name,
+                    next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
+                )
             )
-            job_idxs[benchmark_id] = len(self.jobs)
-            self.jobs.append(job)
 
         # update jobs from confirmed benchmarks
         for benchmark_id, x in benchmarks.items():
             if benchmark_id in proofs:
                 continue
-            job = self.jobs[job_idxs[benchmark_id]]
-            if len(job.sampled_nonces) > 0:
-                continue
-            logger.info(f"updating job from confirmed benchmark {benchmark_id}")
-            job.sampled_nonces = x.details.sampled_nonces
-            for batch_idx in job.sampled_nonces_by_batch_idx:
-                job.last_batch_retry_time[batch_idx] = 0
 
-        # prune jobs from confirmed proofs
-        prune_idxs = [
-            job_idxs[benchmark_id]
-            for benchmark_id in proofs
-            if benchmark_id in job_idxs
-        ] + [
-            job_idxs[benchmark_id]
-            for benchmark_id in job_idxs
-            if benchmark_id not in precommits
-        ]
-        for idx in sorted(set(prune_idxs), reverse=True):
-            job = self.jobs.pop(idx)
-            logger.info(f"pruning job {job.benchmark_id}")
-            if os.path.exists(f"{self.config.backup_folder}/{job.benchmark_id}.json"):
-                os.remove(f"{self.config.backup_folder}/{job.benchmark_id}.json")
+            if benchmark_id not in job_idxs:
+                continue
+            
+            # Check if sampled_nonces in jobs table is > 0
+            result = db_conn.fetch_one(
+                """
+                SELECT COUNT(sampled_nonces) > 0 as has_sampled_nonces 
+                FROM jobs 
+                WHERE benchmark_id = %s
+                """,
+                (benchmark_id,)
+            )
+
+            if result and result['has_sampled_nonces']:
+                continue
+
+            logger.info(f"updating job from confirmed benchmark {benchmark_id}")
+            db_conn.execute(
+                """
+                UPDATE jobs 
+                SET sampled_nonces = %s
+                WHERE benchmark_id = %s
+                """,
+                (json.dumps(x.details.sampled_nonces), benchmark_id)
+            )
+
+            #for batch_idx in job.sampled_nonces_by_batch_idx:
+            #    job.last_batch_retry_time[batch_idx] = 0
                 
     def run(self):
         now = int(time.time() * 1000)
-        for job in self.jobs:
-            if job.merkle_root is not None:
-                continue
-            num_batches_ready = sum(x is not None for x in job.batch_merkle_roots)
-            logger.info(f"benchmark {job.benchmark_id}: (batches: {num_batches_ready} of {job.num_batches} ready, #solutions: {len(job.solution_nonces)})")
-            if num_batches_ready != job.num_batches:
-                continue
-            start_time = min(job.last_batch_retry_time)
-            logger.info(f"benchmark {job.benchmark_id}: ready, took {(now - start_time) / 1000} seconds")
+        #for job in self.jobs:
+        #    if job.merkle_root is not None:
+        #        continue
+        #    num_batches_ready = sum(x is not None for x in job.batch_merkle_roots)
+        #    logger.info(f"benchmark {job.benchmark_id}: (batches: {num_batches_ready} of {job.num_batches} ready, #solutions: {len(job.solution_nonces)})")
+        #    if num_batches_ready != job.num_batches:
+        #        continue
+        #    start_time = min(job.last_batch_retry_time)
+        #    logger.info(f"benchmark {job.benchmark_id}: ready, took {(now - start_time) / 1000} seconds")
+        #    tree = MerkleTree(
+        #        job.batch_merkle_roots,
+        #        1 << (job.num_batches - 1).bit_length()
+        #    )
+        #    job.merkle_root = tree.calc_merkle_root()
+
+        rows = db_conn.fetch_all("""
+            SELECT A.benchmark_id, JSONB_AGG(B.merkle_root) AS batch_merkle_roots
+            FROM jobs A
+            INNER JOIN batch B ON A.benchmark_id = B.benchmark_id 
+            GROUP BY A.benchmark_id
+            HAVING COUNT(*) = COUNT(B.merkle_proofs)
+        """)
+
+        # Calculate merkle roots for completed jobs
+        for row in rows:
+            benchmark_id = row['benchmark_id']
+            batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
+            num_batches = len(batch_merkle_roots)
+            
             tree = MerkleTree(
-                job.batch_merkle_roots,
-                1 << (job.num_batches - 1).bit_length()
+                batch_merkle_roots,
+                1 << (num_batches - 1).bit_length()
             )
-            job.merkle_root = tree.calc_merkle_root()
-        
-        for job in self.jobs:
+            merkle_root = tree.calc_merkle_root()
+
+            # Update the database with calculated merkle root
+            db_conn.execute("""
+                UPDATE jobs 
+                SET merkle_root = %s, datetime_finish = to_timestamp(%s/1000.0)
+                WHERE benchmark_id = %s
+            """, (merkle_root.to_str(), now, benchmark_id))
+            
+        rows = db_conn.fetch_all("""
+            SELECT A.benchmark_id, JSONB_AGG(B.merkle_proofs) AS batch_merkle_proofs,
+                   A.batch_size, A.num_batches, A.sampled_nonces,
+                   JSONB_AGG(B.merkle_root) AS batch_merkle_roots
+            FROM jobs A
+            INNER JOIN batch B ON A.benchmark_id = B.benchmark_id
+            GROUP BY A.benchmark_id
+            HAVING COUNT(*) = COUNT(B.merkle_proofs)
+        """)
+
+        for row in rows:
+            benchmark_id = row['benchmark_id']
+            batch_merkle_proofs = row['batch_merkle_proofs']
+            sampled_nonces = row['sampled_nonces']
+            batch_merkle_roots = row['batch_merkle_roots']
+            
+            logger.info(f"proof {benchmark_id}: (merkle_proof: {len(batch_merkle_proofs)} of {len(sampled_nonces)} ready)")
+            
             if (
-                len(job.sampled_nonces) == 0 or # benchmark not confirmed
-                len(job.merkle_proofs) == len(job.sampled_nonces) # already processed
+                len(batch_merkle_proofs) != len(sampled_nonces) or
+                any(x is None for x in batch_merkle_roots)
             ):
                 continue
-            logger.info(f"proof {job.benchmark_id}: (merkle_proof: {len(job.batch_merkle_proofs)} of {len(job.sampled_nonces)} ready)")
-            if (
-                len(job.batch_merkle_proofs) != len(job.sampled_nonces) or # not finished
-                any(x is None for x in job.batch_merkle_roots)
-            ):
-                continue
-            logger.info(f"proof {job.benchmark_id}: ready")
-            depth_offset = (job.batch_size - 1).bit_length()
+                
+            logger.info(f"proof {benchmark_id}: ready")
+            
+            depth_offset = (row['batch_size'] - 1).bit_length()
             tree = MerkleTree(
-                job.batch_merkle_roots, 
-                1 << (job.num_batches - 1).bit_length()
+                batch_merkle_roots,
+                1 << (row['num_batches'] - 1).bit_length()
             )
-            proofs = {}
-            sampled_nonces_by_batch_idx = job.sampled_nonces_by_batch_idx
+            
+            merkle_proofs = {}
+            sampled_nonces_by_batch_idx = row['sampled_nonces_by_batch_idx']
+            
             for batch_idx in sampled_nonces_by_batch_idx:
                 upper_stems = [
-                    (d + depth_offset, h) 
+                    (d + depth_offset, h)
                     for d, h in tree.calc_merkle_branch(batch_idx).stems
                 ]
                 for nonce in set(sampled_nonces_by_batch_idx[batch_idx]):
-                    proof = job.batch_merkle_proofs[nonce]
-                    job.merkle_proofs[nonce] = MerkleProof(
+                    proof = batch_merkle_proofs[nonce]
+                    merkle_proofs[nonce] = MerkleProof(
                         leaf=proof.leaf,
                         branch=MerkleBranch(proof.branch.stems + upper_stems)
                     )
-
-        for job in self.jobs:
-            file_path = f"{self.config.backup_folder}/{job.benchmark_id}.json"
-            logger.debug(f"backing up job to {file_path}")
-            with open(file_path, "w") as f:
-                json.dump(job.to_dict(), f)
+                    
+            # Update database with calculated merkle proofs
+            db_conn.execute("""
+                UPDATE job
+                SET merkle_proofs = %s
+                WHERE benchmark_id = %s
+            """, (json.dumps(merkle_proofs), benchmark_id))

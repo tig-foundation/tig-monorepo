@@ -14,6 +14,7 @@ from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
+from tig_benchmarker.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -70,66 +71,82 @@ class SlaveManager:
 
             slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
 
-            now = int(time.time() * 1000)
-            batch = None
-            
-            concurrent = self.concurrent.get(slave_name, {"count": 0, "challenge": None})
-            selected_challenge = concurrent["challenge"]
+            result = db_conn.fetch_one("""
+            SELECT COUNT(*) as count, j.challenge
+            FROM batch b
+            INNER JOIN jobs j 
+                ON j.benchmark_id = b.benchmark_id 
+            WHERE b.datetime_finish IS NULL
+                AND b.slave = %s
+            GROUP BY j.challenge
+            """, (slave_name,))
 
-            count = concurrent["count"]
+            count = result["count"] if result is not None else 0
+            selected_challenge = result["challenge"] if result is not None else None
+
             if selected_challenge is not None and count >= slave.max_concurrent_batches[selected_challenge]:
                 logger.debug(f"{slave_name} get-batch: max concurrent batches reached")
                 raise HTTPException(status_code=425, detail="Max concurrent batches reached")
 
-            for job in self.jobs:
-                if selected_challenge is not None and job.challenge != selected_challenge:
-                    continue
-                sampled_nonces_by_batch_idx = job.sampled_nonces_by_batch_idx
-                for batch_idx in range(job.num_batches):
-                    if not (
-                        now - job.last_batch_retry_time[batch_idx] > self.config.time_before_batch_retry and
-                        (
-                            job.batch_merkle_roots[batch_idx] is None or
-                            not set(sampled_nonces_by_batch_idx.get(batch_idx, [])).issubset(job.merkle_proofs)
-                        )
-                    ):
-                        continue
-                    job.last_batch_retry_time[batch_idx] = now
-                    selected_challenge = job.challenge
-                    start_nonce = batch_idx * job.batch_size
-                    batch = Batch(
-                        benchmark_id=job.benchmark_id,
-                        start_nonce=start_nonce,
-                        num_nonces=min(job.batch_size, job.num_nonces - start_nonce),
-                        settings=job.settings.to_dict(),
-                        sampled_nonces=sampled_nonces_by_batch_idx.get(batch_idx, []),
-                        runtime_config=job.runtime_config,
-                        download_url=job.download_url,
-                        rand_hash=job.rand_hash,
-                        batch_size=job.batch_size
+            if selected_challenge is None:
+                result = db_conn.fetch_one("""
+                    WITH selected AS (
+                        SELECT b.sampled_nonces AS batch_sampled_nonces, b.*, 
+                            j.challenge, j.num_nonces, j.batch_size, j.rand_hash, j.settings, j.runtime_config, j.download_url
+                        FROM batch b
+                        INNER JOIN jobs j ON j.benchmark_id = b.benchmark_id
+                        WHERE b.datetime_finish IS NULL 
+                        AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
+                        ORDER BY b.datetime_start ASC
+                        LIMIT 1
                     )
-                    break
-                if batch is not None:
-                    break
-
-            if batch is None:
-                logger.debug(f"{slave_name} get-batch: None available")
-                print('batch is none')
-
-                raise HTTPException(status_code=503, detail="No batches available")
+                    UPDATE batch b SET
+                        datetime_start = EXTRACT(EPOCH FROM NOW()),
+                        slave = %s
+                    FROM selected s
+                    WHERE b.benchmark_id = s.benchmark_id
+                    RETURNING s.*
+                """, (self.config.time_before_batch_retry, slave_name))
             else:
-                batch_id = f"{batch.benchmark_id}_{batch.start_nonce}"
-                if (old_slave_name := self.assigned.pop(batch_id, None)) is not None:
-                    logger.warning(f"{old_slave_name} was assigned batch {batch_id} but did not submit result")
-                    self.concurrent[old_slave_name]["count"] -= 1
-                self.assigned[batch_id] = slave_name
-                if slave_name not in self.concurrent:
-                    self.concurrent[slave_name] = {"challenge": selected_challenge, "count": 0}
+                result = db_conn.fetch_one("""
+                    WITH selected AS (
+                        SELECT b.sampled_nonces AS batch_sampled_nonces, b.*,
+                            j.challenge, j.num_nonces, j.batch_size, j.rand_hash, j.settings, j.runtime_config, j.download_url
+                        FROM batch b
+                        INNER JOIN jobs j ON j.benchmark_id = b.benchmark_id
+                        WHERE b.datetime_finish IS NULL 
+                        AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
+                        AND j.challenge = %s
+                        ORDER BY b.datetime_start ASC
+                        LIMIT 1
+                    )
+                    UPDATE batch b SET
+                        datetime_start = EXTRACT(EPOCH FROM NOW()),
+                        slave = %s
+                    FROM selected s
+                    WHERE b.benchmark_id = s.benchmark_id
+                    RETURNING s.*
+                """, (self.config.time_before_batch_retry, selected_challenge, slave_name))
 
-                self.concurrent[slave_name]["count"] += 1
-                self.assigned[batch_id] = slave_name
-                logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
-                return JSONResponse(content=jsonable_encoder(batch))
+            if result is None:
+                logger.debug(f"{slave_name} get-batch: None available")
+                raise HTTPException(status_code=503, detail="No batches available")
+
+            start_nonce = result["batch_idx"] * result["batch_size"]
+            batch = Batch(
+                benchmark_id=result["benchmark_id"],
+                start_nonce=start_nonce,
+                num_nonces=min(result["batch_size"], result["num_nonces"] - start_nonce),
+                settings=result["settings"],
+                sampled_nonces=result["batch_sampled_nonces"] if result["batch_sampled_nonces"] is not None else [],
+                runtime_config=result["runtime_config"],
+                download_url=result["download_url"],
+                rand_hash=result["rand_hash"],
+                batch_size=result["batch_size"]
+            )
+
+            logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
+            return JSONResponse(content=jsonable_encoder(batch))
 
         @app.post('/submit-batch-roots/{batch_id}')
         async def submit_batch_roots(batch_id: str, request: Request):
