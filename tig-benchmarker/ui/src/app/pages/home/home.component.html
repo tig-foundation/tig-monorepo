@@ -31,6 +31,26 @@
     <h2 class="banner-label"></h2>
   </div>
   @if(benchmarks()){
+  <div class="w-full flex justify-content-end">
+    <div class="w-2 flex flex-column justify-content-center align-items-center">
+      <p-button
+        icon="pi pi-refresh"
+        [rounded]="true"
+        [text]="true"
+        (click)="refreshTimer()"
+      />
+      <div class="w-full">
+        <p-progressBar
+          [value]="value"
+          [style]="{ height: '8px' }"
+          sev
+        />
+      </div>
+ 
+      <p class="text-xs tig-dark p-0 m-0 mt-1">Data Refresh</p>
+    </div>
+  </div>
+
   <p-table
     #benchmarksTable
     [value]="benchmarks()"
@@ -51,39 +71,39 @@
     [expandedRowKeys]="expandedRows"
   >
     <ng-template pTemplate="header">
-      <tr>
+      <tr class="tig-dark text-center tig-header">
         <th style="background-color: #ececee !important"></th>
         <th
           pSortableColumn="age"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Benchmark ID
         </th>
         <th
           pSortableColumn="challenge"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Challenge
         </th>
         <th
           pSortableColumn="algorithm"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Algorithm
         </th>
         <th
           pSortableColumn="difficulty "
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Difficulty
         </th>
         <th
           pSortableColumn="batch_size"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Batch Size
@@ -91,14 +111,14 @@
 
         <th
           pSortableColumn="nonces"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           # Nonces
         </th>
         <th
           pSortableColumn="solutions"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           # Solutions
@@ -106,14 +126,14 @@
 
         <th
           pSortableColumn="status"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Status
         </th>
         <th
           pSortableColumn="time_elapsed"
-          class="tig-dark underline text-center"
+          class="tig-dark text-center"
           style="background-color: #ececee !important"
         >
           Elapsed Time
@@ -190,7 +210,7 @@
           </div>
         </td>
 
-        <td class=" row-cell">
+        <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
             {{ benchmark.time_elapsed | timeConverter }}
           </div>
@@ -199,28 +219,28 @@
     </ng-template>
     <ng-template pTemplate="rowexpansion" let-benchmark>
       <tr>
-        <td colspan="10" class="p-0 underline">
+        <td colspan="10" class="p-0">
           <div class="p-3">
             <p-table [value]="benchmark.batches" dataKey="id">
               <ng-template pTemplate="header">
-                <tr class="">
+                <tr class="tig-dark text-center tig-header">
                   <th
                     pSortableColumn="id"
-                    class="tig-dark underline text-center"
+                    class="tig-dark text-center"
                     style="background-color: #ececee !important"
                   >
                     Batch No
                   </th>
                   <th
                     pSortableColumn="customer"
-                    class="tig-dark underline text-center"
+                    class="tig-dark text-center"
                     style="background-color: #ececee !important"
                   >
                     Slave
                   </th>
                   <th
                     pSortableColumn="date"
-                    class="tig-dark underline text-center"
+                    class="tig-dark text-center"
                     style="background-color: #ececee !important"
                   >
                     # Nonces
@@ -228,7 +248,7 @@
 
                   <th
                     pSortableColumn="amount"
-                    class="tig-dark underline text-center"
+                    class="tig-dark text-center"
                     style="background-color: #ececee !important"
                   >
                     # Solutions
@@ -236,13 +256,14 @@
                   <th
                     pSortableColumn="status"
                     class="tig-dark text-center"
+                    class="tig-dark text-center"
                     style="background-color: #ececee !important"
                   >
                     Status
                   </th>
                   <th
                     pSortableColumn="status"
-                    class="tig-dark underline text-center"
+                    class="tig-dark text-center"
                     style="background-color: #ececee !important"
                   >
                     Elapsed Time

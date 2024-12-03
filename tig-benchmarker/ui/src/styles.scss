@@ -3,8 +3,16 @@
 @import "primeng/resources/primeng.css";
 @import "primeicons/primeicons.css";
 
+
+@font-face {
+  font-family: 'Input-Font';
+  src: url('assets/fonts/InputSans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
-  --primary-font: Arial, Helvetica Neue, Helvetica, sans-serif;
+  --primary-font: Input-Font;
 }
 
 body {
@@ -103,6 +111,6 @@ body {
 
 .p-datatable .p-datatable-thead > tr > th {
   border: 1px solid #b6b6b8 !important;
-  background-color: red !important;
+  // background-color: red !important;
   border-radius: 2px;
 }

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, NgZone, signal } from '@angular/core';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { IconFieldModule } from 'primeng/iconfield';
@@ -15,6 +15,8 @@ import { IBenchmark } from '../../interfaces/IBenchmark';
 import { TimeConverterPipe } from '../../pipes/time-converter.pipe';
 import { PanelModule } from 'primeng/panel';
 import { DividerModule } from 'primeng/divider';
+import { MessageService } from 'primeng/api';
+import { ProgressBarModule } from 'primeng/progressbar';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -32,6 +34,7 @@ import { DividerModule } from 'primeng/divider';
     FormsModule,
     ReactiveFormsModule,
     TabViewModule,
+    ProgressBarModule,
     ChartModule,
     TimeConverterPipe,
   ],
@@ -45,7 +48,7 @@ export class HomeComponent {
   benchmarks: any = signal(null);
   expandedRows = {};
 
-  constructor() {
+  constructor(private messageService: MessageService, private ngZone: NgZone) {
     this.init();
   }
 
@@ -81,6 +84,43 @@ export class HomeComponent {
         .catch((err) => {
           console.error('Failed to copy text to clipboard:', err);
         });
+    }
+  }
+
+  value: number = 0;
+  timer: number = 0;
+  interval: any;
+  ngOnInit() {
+    this.ngZone.runOutsideAngular(() => {
+      this.interval = setInterval(() => {
+        this.ngZone.run(() => {
+          this.timer = this.timer + 1;
+          this.value = Math.round((this.timer / 60) * 100);
+          if (this.value >= 60) {
+            this.tigService.init();
+            this.timer = 0;
+            this.value = 0;
+            this.messageService.add({
+              severity: 'info',
+              summary: 'Data Refreshed',
+              detail: 'Process Completed',
+            });
+          } else {
+          }
+        });
+      }, 2000);
+    });
+  }
+
+  refreshTimer() {
+    this.tigService.init();
+    this.timer = 0;
+    this.value = 0;
+  }
+
+  ngOnDestroy() {
+    if (this.interval) {
+      clearInterval(this.interval);
     }
   }
 }

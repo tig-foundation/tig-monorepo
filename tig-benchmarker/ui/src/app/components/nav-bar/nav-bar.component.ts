@@ -8,11 +8,7 @@ import { ProgressBarModule } from 'primeng/progressbar';
 @Component({
   selector: 'app-nav-bar',
   standalone: true,
-  imports: [
-    ButtonModule,
-    DialogModule,
-    ProgressBarModule,
-  ],
+  imports: [ButtonModule, DialogModule, ProgressBarModule],
   templateUrl: './nav-bar.component.html',
   styleUrl: './nav-bar.component.scss',
   providers: [MessageService],
@@ -21,36 +17,9 @@ export class NavBarComponent {
   tigService = inject(TigApisService);
   router = inject(Router);
 
-  value: number = 0;
 
-  interval: any;
 
-  constructor(private messageService: MessageService, private ngZone: NgZone) {
-  }
+  constructor() {}
 
-  ngOnInit() {
-    this.ngZone.runOutsideAngular(() => {
-      this.interval = setInterval(() => {
-        this.ngZone.run(() => {
-          this.value = this.value + 1;
-          if (this.value >= 60) {
-            this.tigService.init();
-            this.value = 0;
-            this.messageService.add({
-              severity: 'info',
-              summary: 'Data Refreshed',
-              detail: 'Process Completed',
-            });
-          } else {
-          }
-        });
-      }, 2000);
-    });
-  }
 
-  ngOnDestroy() {
-    if (this.interval) {
-      clearInterval(this.interval);
-    }
-  }
 }
