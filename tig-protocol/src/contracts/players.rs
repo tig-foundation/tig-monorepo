@@ -1,7 +1,10 @@
 use crate::context::*;
 use anyhow::{anyhow, Result};
 use logging_timer::time;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tig_structs::core::*;
 use tig_utils::*;
 
@@ -104,31 +107,48 @@ pub async fn submit_deposit<T: Context>(
 }
 
 #[time]
-pub async fn set_delegatee<T: Context>(
+pub async fn set_delegatees<T: Context>(
     ctx: &T,
     player_id: String,
-    delegatee: String,
+    delegatees: HashMap<String, f64>,
 ) -> Result<()> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    if let Some(curr_delegatee) = &player_state.delegatee {
-        if curr_delegatee.value == delegatee {
-            return Err(anyhow!("Delegatee is already set to {}", delegatee));
-        }
-        if latest_block_details.height - curr_delegatee.block_set
-            < config.deposits.delegatee_update_period
+    if delegatees.len() > config.deposits.max_delegations as usize {
+        return Err(anyhow!(
+            "Cannot delegate to more than {} players",
+            config.deposits.max_delegations
+        ));
+    }
+    if let Some(curr_delegatees) = &player_state.delegatees {
+        if latest_block_details.height - curr_delegatees.block_set
+            < config.deposits.delegatees_update_period
         {
             return Err(anyhow!(
-                "Can only update delegatee every {} blocks",
-                config.deposits.delegatee_update_period
+                "Can only update delegatees every {} blocks",
+                config.deposits.delegatees_update_period
             ));
         }
     }
 
-    ctx.set_player_delegatee(player_id, delegatee).await?;
+    if delegatees.values().any(|&v| v < 0.0) {
+        return Err(anyhow!("Fraction to delegate cannot be negative"));
+    }
+
+    if delegatees.values().cloned().sum::<f64>() > 1.0 {
+        return Err(anyhow!("Total fraction to delegate cannot exceed 1.0"));
+    }
+
+    for delegatee in delegatees.keys() {
+        if ctx.get_player_details(delegatee).await.is_none() {
+            return Err(anyhow!("Invalid delegatee '{}'", delegatee));
+        }
+    }
+
+    ctx.set_player_delegatees(player_id, delegatees).await?;
     Ok(())
 }
 
@@ -169,6 +189,57 @@ pub async fn set_reward_share<T: Context>(
     }
 
     ctx.set_player_reward_share(player_id, reward_share).await?;
+    Ok(())
+}
+
+#[time]
+pub async fn set_vote<T: Context>(
+    ctx: &T,
+    player_id: String,
+    breakthrough_id: String,
+    yes: bool,
+) -> Result<()> {
+    let config = ctx.get_config().await;
+    let latest_block_id = ctx.get_latest_block_id().await;
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+    let player_state = ctx.get_player_state(&player_id).await.unwrap();
+
+    let breakthrough_state = ctx
+        .get_breakthrough_state(&breakthrough_id)
+        .await
+        .ok_or_else(|| anyhow!("Invalid breakthrough '{}'", breakthrough_id))?;
+    if breakthrough_state.round_pushed <= latest_block_details.round
+        && latest_block_details.round < breakthrough_state.round_vote_ends
+    {
+        return Err(anyhow!("Cannot vote on breakthrough '{}'", breakthrough_id));
+    }
+
+    if player_state.votes.contains_key(&breakthrough_id) {
+        return Err(anyhow!(
+            "You have already voted on breakthrough '{}'",
+            breakthrough_id
+        ));
+    }
+
+    let player_data = ctx
+        .get_player_block_data(&player_id, &latest_block_id)
+        .await;
+    let n = breakthrough_state.round_vote_ends - latest_block_details.round
+        + config.breakthroughs.min_lock_period_to_vote;
+    let zero = PreciseNumber::from(0);
+    if player_data.is_some_and(|d| {
+        d.deposit_by_locked_period
+            .iter()
+            .skip(n as usize)
+            .any(|x| *x > zero)
+    }) {
+        return Err(anyhow!(
+            "You must have deposit still locked {} rounds from now to vote",
+            n
+        ));
+    }
+
+    ctx.set_player_vote(player_id, breakthrough_id, yes).await?;
     Ok(())
 }
 

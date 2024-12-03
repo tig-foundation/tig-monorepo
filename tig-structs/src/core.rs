@@ -264,6 +264,7 @@ serializable_struct_with_getters! {
         name: String,
         player_id: String,
         challenge_id: String,
+        fee_paid: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
@@ -271,9 +272,11 @@ serializable_struct_with_getters! {
         block_confirmed: u32,
         round_submitted: u32,
         round_pushed: u32,
-        round_active: Option<u32>,
-        round_merged: Option<u32>,
+        round_vote_ends: u32,
         vote_tally: HashMap<bool, PreciseNumber>,
+        voted_breakthrough: Option<bool>,
+        round_merged: Option<u32>,
+        banned: bool,
     }
 }
 serializable_struct_with_getters! {
@@ -362,7 +365,7 @@ serializable_struct_with_getters! {
     PlayerState {
         total_fees_paid: PreciseNumber,
         available_fee_balance: PreciseNumber,
-        delegatee: Option<PlayerValue<String>>,
+        delegatees: Option<PlayerValue<HashMap<String, f64>>>,
         votes: HashMap<String, PlayerValue<bool>>,
         reward_share: Option<PlayerValue<f64>>,
     }
@@ -377,7 +380,7 @@ pub enum RewardType {
 }
 serializable_struct_with_getters! {
     PlayerBlockData {
-        delegatee: Option<String>,
+        delegatees: HashMap<String, f64>,
         reward_by_type: HashMap<RewardType, PreciseNumber>,
         deposit_by_locked_period: Vec<PreciseNumber>,
         weighted_deposit: PreciseNumber,
