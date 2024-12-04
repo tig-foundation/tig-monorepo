@@ -62,9 +62,18 @@ class SlaveManager:
     def start(self):
         app = FastAPI()
 
-        def get_pending_jobs_for_slave(slave_name: str):
-            return db_conn.fetch_all("""
-            SELECT COUNT(*) 
+        @app.route('/get-batch', methods=['GET'])
+        def get_batch(request: Request):
+            if (slave_name := request.headers.get('User-Agent', None)) is None:
+                return "User-Agent header is required", 403
+            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
+                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
+                return "Unregistered slave", 403
+
+            slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
+
+            result = db_conn.fetch_one("""
+            SELECT COUNT(*)
             FROM (
                 SELECT 1
                 FROM roots r
@@ -79,18 +88,8 @@ class SlaveManager:
             ) AS ongoing_batches
             """, (slave_name, slave_name))
             
-            return result[0][0] if result else 0
-
-        @app.route('/get-batch', methods=['GET'])
-        def get_batch(request: Request):
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                return "User-Agent header is required", 403
-            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
-                logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
-                return "Unregistered slave", 403
-
-            slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
-            if get_pending_jobs_for_slave(slave_name) >= slave.max_concurrent_batches:
+            concurrent = result["count"] if result else 0
+            if concurrent >= slave.max_concurrent_batches:
                 logger.debug(f"{slave_name} get-batch: Max concurrent batches reached")
                 raise HTTPException(status_code=503, detail="Max concurrent batches reached")
 
