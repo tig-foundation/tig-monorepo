@@ -227,7 +227,7 @@ pub async fn set_vote<T: Context>(
     let n = breakthrough_state.round_votes_tallied - latest_block_details.round
         + config.breakthroughs.min_lock_period_to_vote;
     let zero = PreciseNumber::from(0);
-    if player_data.is_some_and(|d| {
+    if !player_data.is_some_and(|d| {
         d.deposit_by_locked_period
             .iter()
             .skip(n as usize)
