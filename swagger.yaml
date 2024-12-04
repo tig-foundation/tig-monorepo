@@ -161,6 +161,8 @@ paths:
       description: |-
         # Notes
 
+        * Returns aggregated num_nonces, num_solutions, difficulty data from benchmarks in the last 120 blocks. 
+
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
 
         * Query parameter `<challenge_id>` must be a valid challenge id
@@ -174,7 +176,7 @@ paths:
           in: query
           required: true
           schema:
-            $ref: '#/components/schemas/MD5'
+            $ref: '#/components/schemas/ChallengeId'
       responses:
         '200':
           description: Success
