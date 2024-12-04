@@ -7,6 +7,7 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
 from tig_benchmarker.sql import db_conn
+import math
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -56,15 +57,15 @@ class JobManager:
     def __init__(self, config: JobManagerConfig, jobs: List[Job]):
         self.config = config
         self.jobs = jobs
-        os.makedirs(self.config.backup_folder, exist_ok=True)
-        for file in os.listdir(self.config.backup_folder):
-            if not file.endswith(".json"):
-                continue
-            file_path = f"{self.config.backup_folder}/{file}"
-            logger.info(f"restoring job from {file_path}")
-            with open(file_path) as f:
-                job = Job.from_dict(json.load(f))
-                self.jobs.append(job)
+        #os.makedirs(self.config.backup_folder, exist_ok=True)
+        #for file in os.listdir(self.config.backup_folder):
+        #    if not file.endswith(".json"):
+        #         continue
+        #    file_path = f"{self.config.backup_folder}/{file}"
+        #    logger.info(f"restoring job from {file_path}")
+        #    with open(file_path) as f:
+        #        job = Job.from_dict(json.load(f))
+        #        self.jobs.append(job)
 
     def on_new_block(
         self,
@@ -76,21 +77,28 @@ class JobManager:
         wasms: Dict[str, Binary],
         **kwargs
     ):
-        job_idxs = {
-            j.benchmark_id: idx 
-            for idx, j in enumerate(self.jobs)
-        }
         # create jobs from confirmed precommits
         challenge_id_2_name = {
             c.id: c.details.name
             for c in challenges.values()
         }
         for benchmark_id, x in precommits.items():
+            exists = db_conn.fetch_one(
+                """
+                SELECT benchmark_id FROM jobs 
+                WHERE benchmark_id = %s
+                """,
+                (benchmark_id,)
+            )
+            if exists:
+                continue
+
             if (
-                benchmark_id in job_idxs or
+                #benchmark_id in job_idxs or
                 benchmark_id in proofs
             ):
                 continue
+                
             logger.info(f"creating job from confirmed precommit {benchmark_id}")
             c_name = challenge_id_2_name[x.settings.challenge_id]
             #job = Job(
@@ -106,16 +114,18 @@ class JobManager:
             # job_idxs[benchmark_id] = len(self.jobs)
             # self.jobs.append(job)
 
+            num_batches = math.ceil(x.details.num_nonces / self.config.batch_sizes[c_name])
             db_conn.execute(
                 """
-                INSERT INTO jobs (benchmark_id, settings, num_nonces, rand_hash, runtime_config, batch_size, challenge, download_url)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO jobs (benchmark_id, settings, num_nonces, num_batches, rand_hash, runtime_config, batch_size, challenge, download_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (benchmark_id) DO NOTHING;
                 """,
                 (
                     benchmark_id,
                     json.dumps(asdict(x.settings)),
                     x.details.num_nonces,
+                    num_batches,
                     x.details.rand_hash,
                     json.dumps(block.config["benchmarks"]["runtime_configs"]["wasm"]),
                     self.config.batch_sizes[c_name],
@@ -124,25 +134,45 @@ class JobManager:
                 )
             )
 
+            for batch_idx in range(num_batches):
+                db_conn.execute(
+                    """
+                    INSERT INTO batch (benchmark_id, batch_idx)
+                    VALUES (%s, %s)
+                    """,
+                    (benchmark_id, batch_idx)
+                )
+
+            #create batches here
+
         # update jobs from confirmed benchmarks
         for benchmark_id, x in benchmarks.items():
             if benchmark_id in proofs:
                 continue
 
-            if benchmark_id not in job_idxs:
+            # Check if benchmark_id already exists in jobs table
+            exists = db_conn.fetch_one(
+                """
+                SELECT benchmark_id FROM jobs 
+                WHERE benchmark_id = %s
+                """,
+                (benchmark_id,)
+            )
+
+            if not exists:
                 continue
             
             # Check if sampled_nonces in jobs table is > 0
             result = db_conn.fetch_one(
                 """
-                SELECT COUNT(sampled_nonces) > 0 as has_sampled_nonces 
+                SELECT sampled_nonces
                 FROM jobs 
                 WHERE benchmark_id = %s
                 """,
                 (benchmark_id,)
             )
 
-            if result and result['has_sampled_nonces']:
+            if result and result['sampled_nonces'] and len(result['sampled_nonces']) > 0:
                 continue
 
             logger.info(f"updating job from confirmed benchmark {benchmark_id}")
@@ -198,7 +228,8 @@ class JobManager:
             # Update the database with calculated merkle root
             db_conn.execute("""
                 UPDATE jobs 
-                SET merkle_root = %s, datetime_finish = to_timestamp(%s/1000.0)
+                SET merkle_root = %s, 
+                    datetime_finish = %s
                 WHERE benchmark_id = %s
             """, (merkle_root.to_str(), now, benchmark_id))
             
@@ -234,10 +265,18 @@ class JobManager:
                 1 << (row['num_batches'] - 1).bit_length()
             )
             
-            merkle_proofs = {}
-            sampled_nonces_by_batch_idx = row['sampled_nonces_by_batch_idx']
-            
-            for batch_idx in sampled_nonces_by_batch_idx:
+            merkle_proofs = {}        
+            for batch_idx in range(row['num_batches']):
+                sampled_nonces_by_batch_idx = db_conn.fetch_one("""
+                    SELECT sampled_nonces
+                    FROM batch
+                    WHERE benchmark_id = %s 
+                        AND batch_idx = %s
+                """, (benchmark_id, batch_idx))
+                if not sampled_nonces_by_batch_idx:
+                    continue
+
+                sampled_nonces = sampled_nonces_by_batch_idx['sampled_nonces']
                 upper_stems = [
                     (d + depth_offset, h)
                     for d, h in tree.calc_merkle_branch(batch_idx).stems

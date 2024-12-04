@@ -57,7 +57,7 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
 def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
     batch_id = None
     try:
-        batch_id = f"{batch['benchmark_id']}_{batch['start_nonce']}"
+        batch_id = f"{batch['benchmark_id']}_{batch['batch_idx']}"
         logger.info(f"Processing batch {batch_id}: {batch}")
 
         # Step 2: Download WASM

@@ -29,6 +29,7 @@ class Batch(FromDict):
     download_url: str
     rand_hash: str
     batch_size: int
+    batch_idx: int
 
 @dataclass
 class BatchRoots(FromDict):
@@ -144,7 +145,8 @@ class SlaveManager:
                 runtime_config=result["runtime_config"],
                 download_url=result["download_url"],
                 rand_hash=result["rand_hash"],
-                batch_size=result["batch_size"]
+                batch_size=result["batch_size"],
+                batch_idx=result["batch_idx"]
             )
 
             logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
@@ -176,7 +178,7 @@ class SlaveManager:
                 UPDATE batch 
                 SET merkle_root = %s,
                     solution_nonces = %s,
-                    datetime_finish = EXTRACT(EPOCH FROM NOW())
+                    datetime_finish = EXTRACT(EPOCH FROM NOW()),
                     proof_request_time = EXTRACT(EPOCH FROM NOW())
                 WHERE benchmark_id = %s 
                 AND batch_idx = %s

@@ -7,6 +7,7 @@ from tig_benchmarker.extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Union
+from tig_benchmarker.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -68,33 +69,70 @@ class SubmissionsManager:
         else:
             self._post_thread("precommit", submit_precommit_req)
 
-        for job in self.jobs:
-            if (
-                job.merkle_root is not None and
-                len(job.sampled_nonces) == 0 and
-                now - job.last_benchmark_submit_time > self.config.time_between_retries
-            ):
-                job.last_benchmark_submit_time = now
-                self._post_thread("benchmark", SubmitBenchmarkRequest(
-                    benchmark_id=job.benchmark_id,
-                    merkle_root=job.merkle_root.to_str(),
-                    solution_nonces=job.solution_nonces
-                ))
-                break
+        benchmark_to_submit = db_conn.fetch_one(
+            """
+            SELECT benchmark_id, merkle_root, solution_nonces
+            FROM jobs
+            WHERE (EXTRACT(EPOCH FROM NOW()) - last_submit_time) > %s
+                AND merkle_root IS NOT NULL
+            ORDER BY block_started
+            LIMIT 1
+            """,
+            (self.config.time_between_retries,)
+        )
+
+        if benchmark_to_submit:
+            benchmark_id = benchmark_to_submit[0]
+            merkle_root = benchmark_to_submit[1] 
+            solution_nonces = benchmark_to_submit[2]
+
+            # Update last submit time in database
+            db_conn.execute(
+                """
+                UPDATE jobs 
+                    SET last_submit_time = EXTRACT(EPOCH FROM NOW())
+                WHERE benchmark_id = %s
+                """,
+                (benchmark_id,)
+            )
+
+            self._post_thread("benchmark", SubmitBenchmarkRequest(
+                benchmark_id=benchmark_id,
+                merkle_root=merkle_root,
+                solution_nonces=solution_nonces
+            ))
         else:
             logger.debug("no benchmark to submit")
 
-        for job in self.jobs:
-            if (
-                len(job.sampled_nonces) > 0 and
-                len(job.merkle_proofs) == len(job.sampled_nonces) and
-                now - job.last_proof_submit_time > self.config.time_between_retries
-            ):
-                job.last_proof_submit_time = now
-                self._post_thread("proof", SubmitProofRequest(
-                    benchmark_id=job.benchmark_id,
-                    merkle_proofs=list(job.merkle_proofs.values())
-                ))
-                break
+        proof_to_submit = db_conn.fetch_one(
+            """
+            SELECT benchmark_id, merkle_proofs
+            FROM jobs
+            WHERE (EXTRACT(EPOCH FROM NOW()) - last_proof_submit_time) > %s
+                AND merkle_proofs IS NOT NULL 
+            ORDER BY block_started
+            LIMIT 1
+            """,
+            (self.config.time_between_retries,)
+        )
+
+        if proof_to_submit:
+            benchmark_id = proof_to_submit[0]
+            merkle_proofs = proof_to_submit[1]
+
+            # Update last proof submit time in database
+            db_conn.execute(
+                """
+                UPDATE jobs 
+                SET last_proof_submit_time = EXTRACT(EPOCH FROM NOW())
+                WHERE benchmark_id = %s
+                """,
+                (benchmark_id,)
+            )
+
+            self._post_thread("proof", SubmitProofRequest(
+                benchmark_id=benchmark_id,
+                merkle_proofs=merkle_proofs
+            ))
         else:
             logger.debug("no proof to submit")
