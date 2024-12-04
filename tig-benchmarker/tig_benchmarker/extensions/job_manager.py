@@ -137,13 +137,12 @@ class JobManager:
             for batch_idx in range(num_batches):
                 db_conn.execute(
                     """
-                    INSERT INTO batch (benchmark_id, batch_idx)
-                    VALUES (%s, %s)
+                    INSERT INTO roots (benchmark_id, batch_idx) VALUES (%s, %s);
+                    INSERT INTO proofs (benchmark_id, batch_idx) VALUES (%s, %s);
                     """,
-                    (benchmark_id, batch_idx)
+                    (benchmark_id, batch_idx, benchmark_id, batch_idx)
                 )
 
-            #create batches here
 
         # update jobs from confirmed benchmarks
         for benchmark_id, x in benchmarks.items():
@@ -165,7 +164,7 @@ class JobManager:
             # Check if sampled_nonces in jobs table is > 0
             result = db_conn.fetch_one(
                 """
-                SELECT sampled_nonces
+                SELECT sampled_nonces, num_batches, batch_size
                 FROM jobs 
                 WHERE benchmark_id = %s
                 """,
@@ -185,8 +184,21 @@ class JobManager:
                 (json.dumps(x.details.sampled_nonces), benchmark_id)
             )
 
-            #for batch_idx in job.sampled_nonces_by_batch_idx:
-            #    job.last_batch_retry_time[batch_idx] = 0
+            batch_sampled_nonces = {}
+            for nonce in sampled_nonces:
+                batch_idx = nonce // batch_size
+                batch_sampled_nonces.setdefault(batch_idx, []).append(nonce)
+
+            for batch_idx, sampled_nonces in batch_sampled_nonces.items():
+                db_conn.execute(
+                    """
+                    UPDATE proofs
+                        SET sampled_nonces = %s
+                    WHERE benchmark_id = %s 
+                        AND batch_idx = %s
+                    """,
+                    (json.dumps(sampled_nonces), benchmark_id, batch_idx)
+                )
                 
     def run(self):
         now = int(time.time() * 1000)
@@ -206,11 +218,12 @@ class JobManager:
         #    job.merkle_root = tree.calc_merkle_root()
 
         rows = db_conn.fetch_all("""
-            SELECT A.benchmark_id, JSONB_AGG(B.merkle_root) AS batch_merkle_roots
+            SELECT A.benchmark_id, JSONB_AGG(R.root) AS batch_merkle_roots
             FROM jobs A
-            INNER JOIN batch B ON A.benchmark_id = B.benchmark_id 
+            INNER JOIN roots R ON A.benchmark_id = R.benchmark_id
+            INNER JOIN proofs P ON A.benchmark_id = P.benchmark_id AND R.batch_idx = P.batch_idx
             GROUP BY A.benchmark_id
-            HAVING COUNT(*) = COUNT(B.merkle_proofs)
+            HAVING COUNT(*) = COUNT(P.proofs)
         """)
 
         # Calculate merkle roots for completed jobs
@@ -228,19 +241,19 @@ class JobManager:
             # Update the database with calculated merkle root
             db_conn.execute("""
                 UPDATE jobs 
-                SET merkle_root = %s, 
-                    datetime_finish = %s
+                SET merkle_root = %s
                 WHERE benchmark_id = %s
-            """, (merkle_root.to_str(), now, benchmark_id))
+            """, (merkle_root.to_str(), benchmark_id))
             
         rows = db_conn.fetch_all("""
-            SELECT A.benchmark_id, JSONB_AGG(B.merkle_proofs) AS batch_merkle_proofs,
+            SELECT A.benchmark_id, JSONB_AGG(P.proofs) AS batch_merkle_proofs,
                    A.batch_size, A.num_batches, A.sampled_nonces,
-                   JSONB_AGG(B.merkle_root) AS batch_merkle_roots
+                   JSONB_AGG(R.root) AS batch_merkle_roots
             FROM jobs A
-            INNER JOIN batch B ON A.benchmark_id = B.benchmark_id
+            INNER JOIN roots R ON A.benchmark_id = R.benchmark_id
+            INNER JOIN proofs P ON A.benchmark_id = P.benchmark_id AND R.batch_idx = P.batch_idx
             GROUP BY A.benchmark_id
-            HAVING COUNT(*) = COUNT(B.merkle_proofs)
+            HAVING COUNT(*) = COUNT(P.proofs)
         """)
 
         for row in rows:
@@ -269,7 +282,7 @@ class JobManager:
             for batch_idx in range(row['num_batches']):
                 sampled_nonces_by_batch_idx = db_conn.fetch_one("""
                     SELECT sampled_nonces
-                    FROM batch
+                    FROM proofs
                     WHERE benchmark_id = %s 
                         AND batch_idx = %s
                 """, (benchmark_id, batch_idx))
@@ -288,7 +301,7 @@ class JobManager:
                         branch=MerkleBranch(proof.branch.stems + upper_stems)
                     )
                     
-            # Update database with calculated merkle proofs
+            # Update database with cxalculated merkle proofs
             db_conn.execute("""
                 UPDATE job
                 SET merkle_proofs = %s

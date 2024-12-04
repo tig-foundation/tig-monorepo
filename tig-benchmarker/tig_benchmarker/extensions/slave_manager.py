@@ -44,7 +44,7 @@ class BatchProof(FromDict):
 @dataclass
 class SlaveConfig(FromDict):
     name_regex: str
-    max_concurrent_batches: Dict[str, int]
+    max_concurrent_batches: int
 
 @dataclass
 class SlaveManagerConfig(FromDict):
@@ -62,6 +62,25 @@ class SlaveManager:
     def start(self):
         app = FastAPI()
 
+        def get_pending_jobs_for_slave(slave_name: str):
+            return db_conn.fetch_all("""
+            SELECT COUNT(*) 
+            FROM (
+                SELECT 1
+                FROM roots r
+                WHERE r.slave = %s 
+                    AND r.end_epoch IS NULL
+                UNION ALL
+                SELECT 1 
+                FROM proofs p
+                WHERE p.slave = %s
+                    AND p.end_epoch IS NULL
+                    AND p.start_epoch IS NOT NULL
+            ) AS ongoing_batches
+            """, (slave_name, slave_name))
+            
+            return result[0][0] if result else 0
+
         @app.route('/get-batch', methods=['GET'])
         def get_batch(request: Request):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
@@ -71,73 +90,105 @@ class SlaveManager:
                 return "Unregistered slave", 403
 
             slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
+            if get_pending_jobs_for_slave(slave_name) >= slave.max_concurrent_batches:
+                logger.debug(f"{slave_name} get-batch: Max concurrent batches reached")
+                raise HTTPException(status_code=503, detail="Max concurrent batches reached")
 
+            # pending proofs for this slave
             result = db_conn.fetch_one("""
-            SELECT COUNT(*) as count, j.challenge
-            FROM batch b
-            INNER JOIN jobs j 
-                ON j.benchmark_id = b.benchmark_id 
-            WHERE b.datetime_finish IS NULL
-                AND b.slave = %s
-            GROUP BY j.challenge
-            """, (slave_name,))
+            WITH selected AS (
+                SELECT p.sampled_nonces AS batch_sampled_nonces, r.*, p.*,
+                    j.benchmark_id as b_id, r.batch_idx as b_idx,
+                    j.settings, j.num_nonces, j.runtime_config, j.download_url, 
+                    j.rand_hash, j.batch_size, j.challenge
+                FROM roots r
+                INNER JOIN proofs p
+                    ON p.benchmark_id = r.benchmark_id AND p.batch_idx = r.batch_idx
+                INNER JOIN jobs j
+                    ON j.benchmark_id = r.benchmark_id
+                WHERE r.end_epoch IS NOT NULL
+                    AND p.start_epoch IS NULL
+                    AND p.end_epoch IS NULL
+                    AND r.slave = %s
+                ORDER BY j.block_started DESC
+                LIMIT 1
+            )
+            UPDATE proofs p SET
+                start_epoch = EXTRACT(EPOCH FROM NOW()),
+                slave = %s
+            FROM selected s
+            WHERE p.benchmark_id = s.b_id
+                AND p.batch_idx = s.b_idx
+            RETURNING s.*
+            """, (slave_name, slave_name))
 
-            count = result["count"] if result is not None else 0
-            selected_challenge = result["challenge"] if result is not None else None
-
-            if selected_challenge is not None and count >= slave.max_concurrent_batches[selected_challenge]:
-                logger.debug(f"{slave_name} get-batch: max concurrent batches reached")
-                raise HTTPException(status_code=425, detail="Max concurrent batches reached")
-
-            if selected_challenge is None:
+            if result is None:
+                # if we dont have a pending proof, we can try to get a new one
                 result = db_conn.fetch_one("""
-                    WITH selected AS (
-                        SELECT b.sampled_nonces AS batch_sampled_nonces, b.*, 
-                            j.challenge, j.num_nonces, j.batch_size, j.rand_hash, j.settings, j.runtime_config, j.download_url
-                        FROM batch b
-                        INNER JOIN jobs j ON j.benchmark_id = b.benchmark_id
-                        WHERE b.datetime_finish IS NULL 
-                            AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
-                        ORDER BY b.datetime_start ASC
-                        LIMIT 1
-                    )
-                    UPDATE batch b SET
-                        datetime_start = EXTRACT(EPOCH FROM NOW()),
-                        slave = %s
-                    FROM selected s
-                    WHERE b.benchmark_id = s.benchmark_id
-                        AND b.batch_idx = s.batch_idx
-                    RETURNING s.*
+                WITH selected AS (
+                    SELECT p.sampled_nonces AS batch_sampled_nonces, r.*, p.*, 
+                        j.benchmark_id as b_id, r.batch_idx as b_idx,
+                        j.settings, j.num_nonces, j.runtime_config, j.download_url, 
+                        j.rand_hash, j.batch_size, j.challenge
+                    FROM roots r
+                    INNER JOIN proofs p
+                        ON p.benchmark_id = r.benchmark_id AND p.batch_idx = r.batch_idx
+                    INNER JOIN jobs j
+                        ON j.benchmark_id = r.benchmark_id
+                    WHERE r.end_epoch IS NOT NULL
+                        AND p.end_epoch IS NULL
+                        AND (
+                            r.slave IS NULL
+                            OR (EXTRACT(EPOCH FROM NOW()) - p.start_epoch) > %s
+                        )
+                    ORDER BY j.block_started ASC
+                    LIMIT 1
+                )
+                UPDATE proofs p SET
+                    start_epoch = EXTRACT(EPOCH FROM NOW()),
+                    slave = %s
+                FROM selected s
+                WHERE p.benchmark_id = s.b_id
+                    AND p.batch_idx = s.b_idx
+                RETURNING s.*
                 """, (self.config.time_before_batch_retry, slave_name))
-            else:
-                result = db_conn.fetch_one("""
+
+                if result is None:
+                    result = db_conn.fetch_one("""
                     WITH selected AS (
-                        SELECT b.sampled_nonces AS batch_sampled_nonces, b.*,
-                            j.challenge, j.num_nonces, j.batch_size, j.rand_hash, j.settings, j.runtime_config, j.download_url
-                        FROM batch b
-                        INNER JOIN jobs j ON j.benchmark_id = b.benchmark_id
-                        WHERE b.datetime_finish IS NULL 
-                            AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
-                        AND j.challenge = %s
-                        ORDER BY b.datetime_start ASC
+                        SELECT NULL AS batch_sampled_nonces, r.*, 
+                            j.benchmark_id as b_id, r.batch_idx as b_idx,
+                            j.settings, j.num_nonces, j.runtime_config, j.download_url, 
+                            j.rand_hash, j.batch_size, j.challenge
+                        FROM roots r
+                        INNER JOIN jobs j
+                            ON j.benchmark_id = r.benchmark_id
+                        WHERE r.end_epoch IS NULL
+                            AND (
+                                r.start_epoch IS NULL
+                                OR (EXTRACT(EPOCH FROM NOW()) - r.start_epoch) > %s
+                            )
+                        ORDER BY j.block_started ASC
                         LIMIT 1
                     )
-                    UPDATE batch b SET
-                        datetime_start = EXTRACT(EPOCH FROM NOW()),
+                    UPDATE roots r SET
+                        start_epoch = EXTRACT(EPOCH FROM NOW()),
                         slave = %s
                     FROM selected s
-                    WHERE b.benchmark_id = s.benchmark_id
-                        AND b.batch_idx = s.batch_idx
+                    WHERE r.benchmark_id = s.b_id
+                        AND r.batch_idx = s.b_idx
                     RETURNING s.*
-                """, (self.config.time_before_batch_retry, selected_challenge, slave_name))
+                    """, (self.config.time_before_batch_retry, slave_name))
 
             if result is None:
                 logger.debug(f"{slave_name} get-batch: None available")
                 raise HTTPException(status_code=503, detail="No batches available")
+ 
+            selected_challenge = result["challenge"]
+            start_nonce = result["b_idx"] * result["batch_size"]
 
-            start_nonce = result["batch_idx"] * result["batch_size"]
             batch = Batch(
-                benchmark_id=result["benchmark_id"],
+                benchmark_id=result["b_id"],
                 start_nonce=start_nonce,
                 num_nonces=min(result["batch_size"], result["num_nonces"] - start_nonce),
                 settings=result["settings"],
@@ -146,7 +197,7 @@ class SlaveManager:
                 download_url=result["download_url"],
                 rand_hash=result["rand_hash"],
                 batch_size=result["batch_size"],
-                batch_idx=result["batch_idx"]
+                batch_idx=result["b_idx"]
             )
 
             logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
@@ -162,8 +213,8 @@ class SlaveManager:
 
             result = db_conn.fetch_one("""
                 SELECT slave 
-                FROM batch 
-                WHERE merkle_root IS NULL 
+                FROM roots 
+                WHERE root IS NULL 
                     AND benchmark_id = %s 
                     AND batch_idx = %s
             """, (benchmark_id, batch_idx))
@@ -173,13 +224,12 @@ class SlaveManager:
 
             roots = BatchRoots.from_dict(await request.json())
             
-            # Update batch with merkle root and solution nonces
+            # Update roots table with merkle root and solution nonces
             db_conn.execute("""
-                UPDATE batch 
-                SET merkle_root = %s,
+                UPDATE roots 
+                SET root = %s,
                     solution_nonces = %s,
-                    datetime_finish = EXTRACT(EPOCH FROM NOW()),
-                    proof_request_time = EXTRACT(EPOCH FROM NOW())
+                    end_epoch = EXTRACT(EPOCH FROM NOW())
                 WHERE benchmark_id = %s 
                 AND batch_idx = %s
             """, (roots.merkle_root.to_str(), json.dumps(roots.solution_nonces), benchmark_id, batch_idx))
@@ -188,7 +238,6 @@ class SlaveManager:
 
         @app.post('/submit-batch-proofs/{batch_id}')
         async def submit_batch_proofs(batch_id: str, request: Request):
-            # might want to introduce a lock here
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")
 
@@ -197,9 +246,8 @@ class SlaveManager:
 
             result = db_conn.fetch_one("""
                 SELECT slave 
-                    FROM batch 
-                WHERE merkle_proofs IS NULL
-                    AND merkle_root IS NOT NULL
+                FROM proofs 
+                WHERE proofs IS NULL
                     AND benchmark_id = %s 
                     AND batch_idx = %s
             """, (benchmark_id, batch_idx))
@@ -209,7 +257,7 @@ class SlaveManager:
 
             proofs = BatchProof.from_dict(await request.json())
             
-            # Get current merkle proofs and merge with new ones
+            #Get current merkle proofs and merge with new ones
             current_proofs = db_conn.fetch_one("""
                 SELECT merkle_proofs
                     FROM jobs
@@ -227,9 +275,9 @@ class SlaveManager:
                     SET merkle_proofs = %s
                 WHERE benchmark_id = %s;
 
-                UPDATE batch
-                SET merkle_proofs = %s,
-                    proofs_submitted = EXTRACT(EPOCH FROM NOW())
+                UPDATE proofs
+                SET proofs = %s,
+                    end_epoch = EXTRACT(EPOCH FROM NOW())
                 WHERE benchmark_id = %s
                     AND batch_idx = %s
             """, (json.dumps(merged_proofs), benchmark_id, json.dumps(proofs.merkle_proofs), benchmark_id, batch_idx))
