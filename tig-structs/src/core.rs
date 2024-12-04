@@ -272,9 +272,9 @@ serializable_struct_with_getters! {
         block_confirmed: u32,
         round_submitted: u32,
         round_pushed: u32,
-        round_vote_ends: u32,
-        vote_tally: HashMap<bool, PreciseNumber>,
-        voted_breakthrough: Option<bool>,
+        round_votes_tallied: u32,
+        votes_tally: HashMap<bool, PreciseNumber>,
+        round_active: Option<u32>,
         round_merged: Option<u32>,
         banned: bool,
     }

@@ -209,7 +209,7 @@ pub async fn set_vote<T: Context>(
         .await
         .ok_or_else(|| anyhow!("Invalid breakthrough '{}'", breakthrough_id))?;
     if breakthrough_state.round_pushed <= latest_block_details.round
-        && latest_block_details.round < breakthrough_state.round_vote_ends
+        && latest_block_details.round < breakthrough_state.round_votes_tallied
     {
         return Err(anyhow!("Cannot vote on breakthrough '{}'", breakthrough_id));
     }
@@ -224,7 +224,7 @@ pub async fn set_vote<T: Context>(
     let player_data = ctx
         .get_player_block_data(&player_id, &latest_block_id)
         .await;
-    let n = breakthrough_state.round_vote_ends - latest_block_details.round
+    let n = breakthrough_state.round_votes_tallied - latest_block_details.round
         + config.breakthroughs.min_lock_period_to_vote;
     let zero = PreciseNumber::from(0);
     if player_data.is_some_and(|d| {

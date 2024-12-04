@@ -151,7 +151,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update votes
     for breakthrough_state in voting_breakthroughs_state.values_mut() {
-        breakthrough_state.vote_tally = HashMap::from([
+        breakthrough_state.votes_tally = HashMap::from([
             (true, PreciseNumber::from(0)),
             (false, PreciseNumber::from(0)),
         ]);
@@ -161,13 +161,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         for (breakthrough_id, vote) in player_state.votes.iter() {
             let yes = vote.value;
             if let Some(breakthrough_state) = voting_breakthroughs_state.get_mut(breakthrough_id) {
-                let n = breakthrough_state.round_vote_ends - block_details.round;
+                let n = breakthrough_state.round_votes_tallied - block_details.round;
                 let votes: PreciseNumber = player_data
                     .deposit_by_locked_period
                     .iter()
                     .skip(n as usize)
                     .sum();
-                *breakthrough_state.vote_tally.get_mut(&yes).unwrap() += votes;
+                *breakthrough_state.votes_tally.get_mut(&yes).unwrap() += votes;
             }
         }
     }
@@ -287,12 +287,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let yes_threshold = PreciseNumber::from_f64(config.breakthroughs.min_percent_yes_votes);
         let zero = PreciseNumber::from(0);
         for breakthrough in voting_breakthroughs_state.values_mut() {
-            if breakthrough.round_vote_ends == block_details.round + 1 {
-                let yes = &breakthrough.vote_tally[&true];
-                let no = &breakthrough.vote_tally[&false];
+            if breakthrough.round_votes_tallied == block_details.round + 1 {
+                let yes = &breakthrough.votes_tally[&true];
+                let no = &breakthrough.votes_tally[&false];
                 let total = yes + no;
-                breakthrough.voted_breakthrough =
-                    Some(total != zero && yes / total >= yes_threshold);
+                if total != zero && yes / total >= yes_threshold {
+                    breakthrough.round_active = Some(block_details.round + 1);
+                }
             }
         }
     }
