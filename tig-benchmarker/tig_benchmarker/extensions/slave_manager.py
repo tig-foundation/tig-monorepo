@@ -96,7 +96,7 @@ class SlaveManager:
                         FROM batch b
                         INNER JOIN jobs j ON j.benchmark_id = b.benchmark_id
                         WHERE b.datetime_finish IS NULL 
-                        AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
+                            AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
                         ORDER BY b.datetime_start ASC
                         LIMIT 1
                     )
@@ -105,6 +105,7 @@ class SlaveManager:
                         slave = %s
                     FROM selected s
                     WHERE b.benchmark_id = s.benchmark_id
+                        AND b.batch_idx = s.batch_idx
                     RETURNING s.*
                 """, (self.config.time_before_batch_retry, slave_name))
             else:
@@ -115,7 +116,7 @@ class SlaveManager:
                         FROM batch b
                         INNER JOIN jobs j ON j.benchmark_id = b.benchmark_id
                         WHERE b.datetime_finish IS NULL 
-                        AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
+                            AND (b.datetime_start IS NULL OR (EXTRACT(EPOCH FROM NOW()) - b.datetime_start) > %s)
                         AND j.challenge = %s
                         ORDER BY b.datetime_start ASC
                         LIMIT 1
@@ -125,6 +126,7 @@ class SlaveManager:
                         slave = %s
                     FROM selected s
                     WHERE b.benchmark_id = s.benchmark_id
+                        AND b.batch_idx = s.batch_idx
                     RETURNING s.*
                 """, (self.config.time_before_batch_retry, selected_challenge, slave_name))
 
@@ -152,58 +154,83 @@ class SlaveManager:
         async def submit_batch_roots(batch_id: str, request: Request):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")
-            if slave_name != self.assigned.get(batch_id, None):
-                raise HTTPException(status_code=400, detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch.")
-            self.assigned.pop(batch_id)
-            self.concurrent[slave_name]["count"] -= 1
-            if self.concurrent[slave_name]["count"] == 0:
-                self.concurrent.pop(slave_name)
 
-            benchmark_id, start_nonce = batch_id.split("_")
-            start_nonce = int(start_nonce)
-            result = BatchRoots.from_dict(await request.json())
-            job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
-            logger.debug(f"{slave_name} submit-batch-roots: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #solutions: {len(result.solution_nonces)})")
-            if job is None:
-                logger.warning(f"{slave_name} submit-batch-roots: no job found with benchmark_id {benchmark_id}")
-                raise HTTPException(status_code=400, detail="Invalid benchmark_id")
-            batch_idx = start_nonce // job.batch_size
-            job.batch_merkle_roots[batch_idx] = result.merkle_root
-            job.solution_nonces = list(set(job.solution_nonces + result.solution_nonces))
-            #job.batch_merkle_proofs.update({
-            #    x.leaf.nonce: x
-            #     for x in result.merkle_proofs
-            #})
+            benchmark_id, batch_idx = batch_id.split("_")
+            batch_idx = int(batch_idx)
+
+            result = db_conn.fetch_one("""
+                SELECT slave 
+                FROM batch 
+                WHERE merkle_root IS NULL 
+                    AND benchmark_id = %s 
+                    AND batch_idx = %s
+            """, (benchmark_id, batch_idx))
+
+            if result is None or result['slave'] != slave_name:
+                raise HTTPException(status_code=400, detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch.")
+
+            roots = BatchRoots.from_dict(await request.json())
+            
+            # Update batch with merkle root and solution nonces
+            db_conn.execute("""
+                UPDATE batch 
+                SET merkle_root = %s,
+                    solution_nonces = %s,
+                    datetime_finish = EXTRACT(EPOCH FROM NOW())
+                    proof_request_time = EXTRACT(EPOCH FROM NOW())
+                WHERE benchmark_id = %s 
+                AND batch_idx = %s
+            """, (roots.merkle_root.to_str(), json.dumps(roots.solution_nonces), benchmark_id, batch_idx))
+
             return {"status": "OK"}
 
         @app.post('/submit-batch-proofs/{batch_id}')
         async def submit_batch_proofs(batch_id: str, request: Request):
+            # might want to introduce a lock here
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")
-           
-            if slave_name != self.assigned.get(batch_id, None):
-                raise HTTPException(status_code=400, detail=f"Slave submitted proofs for {batch_id}, but either took too long, or was not assigned this batch.")
 
-            self.assigned.pop(batch_id)
-            self.concurrent[slave_name]["count"] -= 1
-            if self.concurrent[slave_name]["count"] == 0:
-                self.concurrent.pop(slave_name)
+            benchmark_id, batch_idx = batch_id.split("_")
+            batch_idx = int(batch_idx)
 
-            benchmark_id, start_nonce = batch_id.split("_")
-            start_nonce = int(start_nonce)
+            result = db_conn.fetch_one("""
+                SELECT slave 
+                    FROM batch 
+                WHERE merkle_proofs IS NULL
+                    AND merkle_root IS NOT NULL
+                    AND benchmark_id = %s 
+                    AND batch_idx = %s
+            """, (benchmark_id, batch_idx))
 
-            result = BatchProof.from_dict(await request.json())
-            logger.debug(f"{slave_name} submit-batch-proofs: (benchmark_id: {benchmark_id}, start_nonce: {start_nonce}, #proofs: {len(result.merkle_proofs)})")
+            if result is None or result["slave"] != slave_name:
+                raise HTTPException(status_code=400, detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch.")
 
-            job = next((job for job in self.jobs if job.benchmark_id == benchmark_id), None)
-            if job is None:
-                logger.warning(f"{slave_name} submit-batch-proofs: no job found with benchmark_id {benchmark_id}")
-                raise HTTPException(status_code=400, detail="Invalid benchmark_id")
+            proofs = BatchProof.from_dict(await request.json())
+            
+            # Get current merkle proofs and merge with new ones
+            current_proofs = db_conn.fetch_one("""
+                SELECT merkle_proofs
+                    FROM jobs
+                WHERE benchmark_id = %s
+            """, (benchmark_id,))
 
-            job.batch_merkle_proofs.update({
-                x.leaf.nonce: x
-                for x in result.merkle_proofs
-            })
+            merged_proofs = {}
+            if current_proofs and current_proofs["merkle_proofs"]:
+                merged_proofs.update(current_proofs["merkle_proofs"])
+            merged_proofs.update(proofs.merkle_proofs)
+
+            # Update job with merged merkle proofs
+            db_conn.execute("""
+                UPDATE jobs 
+                    SET merkle_proofs = %s
+                WHERE benchmark_id = %s;
+
+                UPDATE batch
+                SET merkle_proofs = %s,
+                    proofs_submitted = EXTRACT(EPOCH FROM NOW())
+                WHERE benchmark_id = %s
+                    AND batch_idx = %s
+            """, (json.dumps(merged_proofs), benchmark_id, json.dumps(proofs.merkle_proofs), benchmark_id, batch_idx))
 
             return {"status": "OK"}
             
