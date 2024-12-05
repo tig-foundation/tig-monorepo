@@ -10,11 +10,11 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 import uvicorn
-from tig_benchmarker.extensions.job_manager import Job
+from extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
-from tig_benchmarker.sql import db_conn
+from extensions.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -202,7 +202,7 @@ class SlaveManager:
             logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, #batches: 1, batch_ids: [{batch.benchmark_id}])")
             return JSONResponse(content=jsonable_encoder(batch))
 
-        @app.post('/submit-batch-roots/{batch_id}')
+        @app.post('/submit-batch-root/{batch_id}')
         async def submit_batch_roots(batch_id: str, request: Request):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")

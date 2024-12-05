@@ -4,12 +4,12 @@ import logging
 import os
 import threading
 import time
-from tig_benchmarker.extensions.data_fetcher import *
-from tig_benchmarker.extensions.difficulty_sampler import *
-from tig_benchmarker.extensions.job_manager import *
-from tig_benchmarker.extensions.precommit_manager import *
-from tig_benchmarker.extensions.slave_manager import *
-from tig_benchmarker.extensions.submissions_manager import *
+from extensions.data_fetcher import *
+from extensions.difficulty_sampler import *
+from extensions.job_manager import *
+from extensions.precommit_manager import *
+from extensions.slave_manager import *
+from extensions.submissions_manager import *
 from tig_benchmarker.utils import FromDict
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])

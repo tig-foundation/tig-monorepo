@@ -3,11 +3,11 @@ import threading
 import logging
 import json
 import os
-from tig_benchmarker.extensions.job_manager import Job
+from extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Union
-from tig_benchmarker.sql import db_conn
+from extensions.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 

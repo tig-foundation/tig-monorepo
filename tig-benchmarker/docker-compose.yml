@@ -1,0 +1,80 @@
+services:
+  db:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    container_name: db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+    networks:
+      - tig-benchmarker
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4_container
+    restart: always
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    networks:
+      - tig-benchmarker
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+  tig_benchmarker:
+    build:
+      context: ./tig_benchmarker
+      dockerfile: Dockerfile
+    image: tig-benchmarker:latest
+
+  master:
+    build:
+      context: ./master
+      dockerfile: Dockerfile
+    container_name: master
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+    networks:
+      - tig-benchmarker
+    ports:
+      - 5115:5115
+      - 3336:3336
+    depends_on:
+      db:
+        condition: service_healthy
+      tig_benchmarker:
+        condition: service_completed_successfully
+
+  slave:
+    build:
+      context: ../
+      dockerfile: tig-benchmarker/slave/Dockerfile
+    container_name: slave
+    networks:
+      - tig-benchmarker
+    depends_on:
+      - master
+      - tig_benchmarker
+
+networks:
+  tig-benchmarker:
+
+volumes:
+  pgadmin-data:

@@ -1,6 +1,6 @@
 {
-    "player_id": "0xc30edf0147c46d0a5f79bfe9b15ce9de9b8879be",
-    "api_key": "3e823222a583e3f911c6c485893024a8",
+    "player_id": "0x0000000000000000000000000000000000000000",
+    "api_key": "0",
     "api_url": "https://testnet-api.tig.foundation",
     "difficulty_sampler_config": {
         "difficulty_ranges": {
@@ -22,21 +22,18 @@
             ]
         },
         "selected_difficulties": {
-            "satisfiability": null,
             "vehicle_routing": [
                 [1, 2], [4, 5]
-            ],
-            "knapsack": null,
-            "vector_search": null
+            ]
         }
     },
     "job_manager_config": {
         "backup_folder": "jobs",
         "batch_sizes": {
-            "satisfiability": 1024,
-            "vehicle_routing": 1024,
-            "knapsack": 1024,
-            "vector_search": 1024
+            "satisfiability": 8,
+            "vehicle_routing": 8,
+            "knapsack": 8,
+            "vector_search": 8
         }
     },
     "submissions_manager_config": {
@@ -47,25 +44,25 @@
         "algo_selection": {
             "satisfiability": {
                 "algorithm": "sat_global_opt",
-                "num_nonces": 8,
+                "num_nonces": 40,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "vehicle_routing": {
                 "algorithm": "advanced_routing",
-                "num_nonces": 8,
+                "num_nonces": 40,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "knapsack": {
                 "algorithm": "classic_quadkp",
-                "num_nonces": 8,
+                "num_nonces": 40,
                 "weight": 1.0,
                 "base_fee_limit": "10000000000000000"
             },
             "vector_search": {
                 "algorithm": "invector_hybrid",
-                "num_nonces": 8,
+                "num_nonces": 40,
                 "weight": 0,
                 "base_fee_limit": "10000000000000000"
             }
@@ -78,12 +75,7 @@
         "slaves": [
             {
                 "name_regex": ".*",
-                "max_concurrent_batches": {
-                    "satisfiability": 1,
-                    "vehicle_routing": 1,
-                    "knapsack": 1,
-                    "vector_search": 1
-                }
+                "max_concurrent_batches": 4
             }
         ]
     }

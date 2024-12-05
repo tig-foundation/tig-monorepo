@@ -2,12 +2,12 @@ import os
 import logging
 import random
 from dataclasses import dataclass
-from tig_benchmarker.extensions.job_manager import Job
-from tig_benchmarker.extensions.submissions_manager import SubmitPrecommitRequest
+from extensions.job_manager import Job
+from extensions.submissions_manager import SubmitPrecommitRequest
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
-from tig_benchmarker.sql import db_conn
+from extensions.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 

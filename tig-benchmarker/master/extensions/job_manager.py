@@ -6,7 +6,7 @@ from tig_benchmarker.merkle_tree import MerkleHash, MerkleBranch, MerkleTree
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
-from tig_benchmarker.sql import db_conn
+from extensions.sql import db_conn
 import math
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])

@@ -9,3 +9,4 @@ randomname
 fastapi
 uvicorn
 psycopg2
+requests
