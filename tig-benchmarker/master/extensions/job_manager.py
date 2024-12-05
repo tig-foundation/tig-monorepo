@@ -7,6 +7,7 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
 from extensions.sql import db_conn
+from extensions.client_manager import get_config
 import math
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -54,18 +55,8 @@ class JobManagerConfig(FromDict):
     batch_sizes: Dict[str, int]
 
 class JobManager:
-    def __init__(self, config: JobManagerConfig, jobs: List[Job]):
-        self.config = config
+    def __init__(self, jobs: List[Job]):
         self.jobs = jobs
-        #os.makedirs(self.config.backup_folder, exist_ok=True)
-        #for file in os.listdir(self.config.backup_folder):
-        #    if not file.endswith(".json"):
-        #         continue
-        #    file_path = f"{self.config.backup_folder}/{file}"
-        #    logger.info(f"restoring job from {file_path}")
-        #    with open(file_path) as f:
-        #        job = Job.from_dict(json.load(f))
-        #        self.jobs.append(job)
 
     def on_new_block(
         self,
@@ -101,20 +92,10 @@ class JobManager:
                 
             logger.info(f"creating job from confirmed precommit {benchmark_id}")
             c_name = challenge_id_2_name[x.settings.challenge_id]
-            #job = Job(
-            #    benchmark_id=benchmark_id,
-            #    settings=x.settings,
-            #    num_nonces=x.details.num_nonces,
-            #    rand_hash=x.details.rand_hash,
-            #    runtime_config=block.config["benchmarks"]["runtime_configs"]["wasm"],
-            #    batch_size=self.config.batch_sizes[c_name],
-            #    challenge=c_name,
-            #    download_url=next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
-            #)
-            # job_idxs[benchmark_id] = len(self.jobs)
-            # self.jobs.append(job)
 
-            num_batches = math.ceil(x.details.num_nonces / self.config.batch_sizes[c_name])
+            config = get_config()["job_manager_config"]
+
+            num_batches = math.ceil(x.details.num_nonces / config["batch_sizes"][c_name])
             db_conn.execute(
                 """
                 INSERT INTO jobs (benchmark_id, settings, num_nonces, num_batches, rand_hash, runtime_config, batch_size, challenge, download_url)
@@ -128,7 +109,7 @@ class JobManager:
                     num_batches,
                     x.details.rand_hash,
                     json.dumps(block.config["benchmarks"]["runtime_configs"]["wasm"]),
-                    self.config.batch_sizes[c_name],
+                    config["batch_sizes"][c_name],
                     c_name,
                     next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
                 )

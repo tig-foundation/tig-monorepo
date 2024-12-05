@@ -15,6 +15,7 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
 from extensions.sql import db_conn
+from extensions.client_manager import get_config
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -53,8 +54,7 @@ class SlaveManagerConfig(FromDict):
     slaves: List[SlaveConfig]
 
 class SlaveManager:
-    def __init__(self, config: SlaveManagerConfig, jobs: List[Job]):
-        self.config = config
+    def __init__(self, jobs: List[Job]):
         self.jobs = jobs
         self.assigned = {}
         self.concurrent = {}
@@ -64,13 +64,15 @@ class SlaveManager:
 
         @app.route('/get-batch', methods=['GET'])
         def get_batch(request: Request):
+            config = get_config()["slave_manager_config"]
+
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
-            if not any(re.match(slave.name_regex, slave_name) for slave in self.config.slaves):
+            if not any(re.match(slave.name_regex, slave_name) for slave in config["slaves"]):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
                 return "Unregistered slave", 403
 
-            slave = next((slave for slave in self.config.slaves if re.match(slave.name_regex, slave_name)), None)
+            slave = next((slave for slave in config["slaves"] if re.match(slave["name_regex"], slave_name)), None)
 
             result = db_conn.fetch_one("""
             SELECT COUNT(*)
@@ -150,7 +152,7 @@ class SlaveManager:
                 WHERE p.benchmark_id = s.b_id
                     AND p.batch_idx = s.b_idx
                 RETURNING s.*
-                """, (self.config.time_before_batch_retry, slave_name))
+                """, (config["time_before_batch_retry"], slave_name))
 
                 if result is None:
                     result = db_conn.fetch_one("""
@@ -177,7 +179,7 @@ class SlaveManager:
                     WHERE r.benchmark_id = s.b_id
                         AND r.batch_idx = s.b_idx
                     RETURNING s.*
-                    """, (self.config.time_before_batch_retry, slave_name))
+                    """, (config["time_before_batch_retry"], slave_name))
 
             if result is None:
                 logger.debug(f"{slave_name} get-batch: None available")
@@ -267,8 +269,8 @@ class SlaveManager:
 
             return {"status": "OK"}
             
-        thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=self.config.port))
+        thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=get_config()["slave_manager_config"].port))
         thread.daemon = True
         thread.start()
 
-        logger.info(f"webserver started on 0.0.0.0:{self.config.port}")
+        logger.info(f"webserver started on 0.0.0.0:{get_config()["slave_manager_config"].port}")

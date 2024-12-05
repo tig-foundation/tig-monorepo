@@ -8,6 +8,7 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
 from extensions.sql import db_conn
+from extensions.client_manager import get_config
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -24,8 +25,7 @@ class PrecommitManagerConfig(FromDict):
     algo_selection: Dict[str, AlgorithmSelectionConfig]
 
 class PrecommitManager:
-    def __init__(self, config: PrecommitManagerConfig, player_id: str, jobs: List[Job]):
-        self.config = config
+    def __init__(self, player_id: str, jobs: List[Job]):
         self.player_id = player_id
         #self.jobs = jobs
         self.last_block_id = None
@@ -104,12 +104,14 @@ class PrecommitManager:
             """
         )["count"]
 
+        config = get_config()["precommit_manager_config"]
+
         num_pending_benchmarks = num_pending_jobs + self.num_precommits_submitted
-        if  num_pending_benchmarks >= self.config.max_pending_benchmarks:
-            logger.debug(f"number of pending benchmarks has reached max of {self.config.max_pending_benchmarks}")
+        if  num_pending_benchmarks >= config["max_pending_benchmarks"]:
+            logger.debug(f"number of pending benchmarks has reached max of {config['max_pending_benchmarks']}")
             return
         selections = [
-            (c_name, x) for c_name, x in self.config.algo_selection.items()
+            (c_name, x) for c_name, x in config["algo_selection"].items()
             #if self.curr_base_fees[c_name] <= x.base_fee_limit
         ]
         if len(selections) == 0:

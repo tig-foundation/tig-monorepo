@@ -8,7 +8,7 @@ import { MessageService } from 'primeng/api';
   providedIn: 'root',
 })
 export class TigApisService {
-  base_url = 'http://localhost:5115';
+  base_url = 'http://localhost:3336';
 
   // Services
   router = inject(Router);

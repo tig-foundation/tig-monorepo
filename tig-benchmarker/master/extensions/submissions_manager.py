@@ -8,6 +8,7 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Union
 from extensions.sql import db_conn
+from extensions.client_manager import get_config
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -32,8 +33,7 @@ class SubmissionsManagerConfig(FromDict):
     time_between_retries: int
 
 class SubmissionsManager:
-    def __init__(self, config: SubmissionsManagerConfig, api_url: str, api_key: str, jobs: List[Job]):
-        self.config = config
+    def __init__(self, api_url: str, api_key: str, jobs: List[Job]):
         self.jobs = jobs
         self.api_url = api_url
         self.api_key = api_key
@@ -69,6 +69,7 @@ class SubmissionsManager:
         else:
             self._post_thread("precommit", submit_precommit_req)
 
+        config = get_config()["submissions_manager_config"]
         benchmark_to_submit = db_conn.fetch_one(
             """
             WITH updated AS (
@@ -88,7 +89,7 @@ class SubmissionsManager:
             )
             SELECT benchmark_id, merkle_root, solution_nonces FROM updated
             """,
-            (self.config.time_between_retries,)
+            (config["time_between_retries"],)
         )
 
         if benchmark_to_submit:
@@ -123,7 +124,7 @@ class SubmissionsManager:
             )
             SELECT benchmark_id, merkle_proofs FROM updated
             """,
-            (self.config.time_between_retries,)
+            (config["time_between_retries"],)
         )
 
         if proof_to_submit:

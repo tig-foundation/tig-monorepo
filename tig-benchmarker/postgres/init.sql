@@ -37,4 +37,8 @@ CREATE TABLE IF NOT EXISTS proofs (
     end_epoch BIGINT,
     sampled_nonces JSONB,
     PRIMARY KEY (benchmark_id, batch_idx)
-)
+);
+
+CREATE TABLE IF NOT EXISTS config (
+    config JSONB
+);

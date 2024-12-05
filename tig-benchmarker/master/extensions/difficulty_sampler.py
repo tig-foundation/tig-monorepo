@@ -5,6 +5,7 @@ import os
 import random
 from tig_benchmarker.structs import *
 from typing import List, Tuple, Dict
+from extensions.client_manager import get_config
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -151,8 +152,7 @@ class DifficultySamplerConfig(FromDict):
                     self.selected_difficulties[c_name].append((x, y))
 
 class DifficultySampler:
-    def __init__(self, config: DifficultySamplerConfig):
-        self.config = config
+    def __init__(self):
         self.valid_difficulties = {}
         self.frontiers = {}
         self.challenges = {}
@@ -173,16 +173,18 @@ class DifficultySampler:
 
     def run(self) -> Dict[str, Point]:
         samples = {}
+        config = get_config()["difficulty_sampler_config"]
+
         for c_name in self.challenges:
             found_valid = False
 
-            if self.config.selected_difficulties.get(c_name) is not None:
+            if config["selected_difficulties"].get(c_name) is not None:
                 min_x = min(p[0] for p in self.valid_difficulties[c_name])
                 max_x = max(p[0] for p in self.valid_difficulties[c_name])
                 min_y = min(p[1] for p in self.valid_difficulties[c_name])
                 max_y = max(p[1] for p in self.valid_difficulties[c_name])
 
-                difficulties_ = list(self.config.selected_difficulties[c_name])
+                difficulties_ = list(config["selected_difficulties"][c_name])
                 random.shuffle(difficulties_)
 
                 for selected_difficulty in difficulties_:
@@ -198,7 +200,7 @@ class DifficultySampler:
 
             if not found_valid:
                 frontiers = self.frontiers[c_name]
-                difficulty_range = self.config.difficulty_ranges[c_name] # FIXME
+                difficulty_range = config["difficulty_ranges"][c_name] # FIXME
                 idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
                 idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
                 difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]

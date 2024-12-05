@@ -10,34 +10,28 @@ from extensions.job_manager import *
 from extensions.precommit_manager import *
 from extensions.slave_manager import *
 from extensions.submissions_manager import *
+from extensions.client_manager import *
 from tig_benchmarker.utils import FromDict
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-@dataclass
-class Config(FromDict):
-    player_id: str
-    api_key: str
-    api_url: str
-    difficulty_sampler_config: DifficultySamplerConfig
-    job_manager_config: JobManagerConfig
-    precommit_manager_config: PrecommitManagerConfig
-    slave_manager_config: SlaveManagerConfig
-    submissions_manager_config: SubmissionsManagerConfig
-
-def main(config: Config):
+def main():
     last_block_id = None
     jobs = []
 
-    config.player_id = config.player_id.lower()
-    config.api_url = config.api_url.rstrip("/")
+    client_manager = ClientManager()
+    client_manager.start()
 
-    data_fetcher = DataFetcher(config.api_url, config.player_id)
-    difficulty_sampler = DifficultySampler(config.difficulty_sampler_config)
-    job_manager = JobManager(config.job_manager_config, jobs)
-    precommit_manager = PrecommitManager(config.precommit_manager_config, config.player_id, jobs)
-    submissions_manager = SubmissionsManager(config.submissions_manager_config, config.api_url, config.api_key, jobs)
-    slave_manager = SlaveManager(config.slave_manager_config, jobs)
+    config = get_config()
+    print(config)
+
+    data_fetcher = DataFetcher(config["api_url"], config["player_id"])
+    difficulty_sampler = DifficultySampler()
+    job_manager = JobManager(jobs)
+    precommit_manager = PrecommitManager(config["player_id"], jobs)
+    submissions_manager = SubmissionsManager(config["api_url"], config["api_key"], jobs)
+    
+    slave_manager = SlaveManager(jobs)
     slave_manager.start()
 
     while True:
@@ -71,10 +65,12 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO
     )
 
-    if not os.path.exists(args.config_path):
-        logger.error(f"config file not found at path: {args.config_path}")
-        sys.exit(1)
-    with open(args.config_path, "r") as f:
-        config = json.load(f)
-        config = Config.from_dict(config)
-    main(config)
+    
+    #if not os.path.exists(args.config_path):
+    #    logger.error(f"config file not found at path: {args.config_path}")
+    #    sys.exit(1)
+    #with open(args.config_path, "r") as f:
+    #    config = json.load(f)
+    #    config = Config.from_dict(config)
+    
+    main()
