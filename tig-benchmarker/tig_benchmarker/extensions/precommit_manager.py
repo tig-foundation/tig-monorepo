@@ -7,6 +7,7 @@ from tig_benchmarker.extensions.submissions_manager import SubmitPrecommitReques
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
 from typing import Dict, List, Optional, Set
+from tig_benchmarker.sql import db_conn
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -26,7 +27,7 @@ class PrecommitManager:
     def __init__(self, config: PrecommitManagerConfig, player_id: str, jobs: List[Job]):
         self.config = config
         self.player_id = player_id
-        self.jobs = jobs
+        #self.jobs = jobs
         self.last_block_id = None
         self.num_precommits_submitted = 0
         self.algorithm_name_2_id = {}
@@ -95,7 +96,15 @@ class PrecommitManager:
             logger.info(f"global qualifier difficulty stats for {challenges[c_id].details.name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
 
     def run(self, difficulty_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
-        num_pending_benchmarks = sum(1 for job in self.jobs if job.merkle_root is None) + self.num_precommits_submitted
+        num_pending_jobs = db_conn.fetch_one(
+            """
+            SELECT COUNT(*) 
+            FROM jobs 
+            WHERE merkle_proofs IS NULL
+            """
+        )["count"]
+
+        num_pending_benchmarks = num_pending_jobs + self.num_precommits_submitted
         if  num_pending_benchmarks >= self.config.max_pending_benchmarks:
             logger.debug(f"number of pending benchmarks has reached max of {self.config.max_pending_benchmarks}")
             return
