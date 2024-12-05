@@ -7,6 +7,8 @@ import requests
 import subprocess
 import time
 import threading
+from tig_benchmarker.structs import OutputData, MerkleProof
+from tig_benchmarker.merkle_tree import MerkleTree
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -38,7 +40,7 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
         "--mem", str(batch["runtime_config"]["max_memory"]),
         "--fuel", str(batch["runtime_config"]["max_fuel"]),
         "--workers", str(num_workers),
-        "--output", f"{output_path}/{batch['benchmark_id']}_{batch['start_nonce']}_{batch['batch_size']}",
+        "--output", f"{output_path}/{batch['benchmark_id']}_{batch['batch_idx']}",
     ]
     #if batch["sampled_nonces"]:
     #    cmd += ["--sampled", *map(str, batch["sampled_nonces"])]
@@ -56,26 +58,57 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
 
 def process_batch(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, batch, headers, output_path):
     batch_id = None
+    result = None
     try:
         batch_id = f"{batch['benchmark_id']}_{batch['batch_idx']}"
         logger.info(f"Processing batch {batch_id}: {batch}")
 
-        # Step 2: Download WASM
-        wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
-        download_wasm(session, batch['download_url'], wasm_path)
+        # Step 3: Run tig-worker only if output folder does not exist
+        output_folder = f"{output_path}/{batch['benchmark_id']}_{batch['batch_idx']}"
+        if not os.path.exists(output_folder):
+            wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
+            download_wasm(session, batch['download_url'], wasm_path)
 
-        # Step 3: Run tig-worker
-        result = run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path)
+            result = run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path)
+        else:
+            logger.info(f"Output folder {output_folder} already exists, skipping tig-worker") 
 
-        # Step 4: Submit results
-        start = now()
-        submit_url = f"http://{master_ip}:{master_port}/submit-batch-roots/{batch_id}"
-        logger.info(f"posting results to {submit_url}")
-        resp = session.post(submit_url, json=result, headers=headers)
-        if resp.status_code != 200:
-            raise Exception(f"status {resp.status_code} when posting roots to master: {resp.text}")
-        logger.debug(f"posting roots took {now() - start} ms")
+        if len(batch["sampled_nonces"]) > 0:
+            leafs = {}
+            for nonce in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
+                with open(f"{output_folder}/{nonce}.json") as f:
+                    leafs[nonce] = OutputData.from_dict(json.load(f))
+                
+            merkle_tree = MerkleTree(
+                [x.to_merkle_hash() for x in leafs.values()],
+                batch["batch_size"]
+            )
 
+            proofs_to_submit = [
+                MerkleProof(
+                    leaf=leafs[n],
+                    branch=merkle_tree.calc_merkle_branch(branch_idx=n - batch["start_nonce"])
+                ).to_dict()
+                for n in batch["sampled_nonces"]
+            ]
+            # send proofs
+            start = now()
+            submit_url = f"http://{master_ip}:{master_port}/submit-batch-proofs/{batch_id}"
+            logger.info(f"posting results to {submit_url}")
+            resp = session.post(submit_url, json={"merkle_proofs": proofs_to_submit}, headers=headers)
+            if resp.status_code != 200:
+                raise Exception(f"status {resp.status_code} when posting proofs to master: {resp.text}")
+            logger.debug(f"posting proofs took {now() - start} ms")
+        else:
+            # send root
+            start = now()
+            submit_url = f"http://{master_ip}:{master_port}/submit-batch-roots/{batch_id}"
+            logger.info(f"posting results to {submit_url}")
+            resp = session.post(submit_url, json=result, headers=headers)
+            if resp.status_code != 200:
+                raise Exception(f"status {resp.status_code} when posting roots to master: {resp.text}")
+            logger.debug(f"posting roots took {now() - start} ms")
+            
     except Exception as e:
         logger.error(f"Error processing batch {batch_id}: {e}")
 

@@ -71,30 +71,30 @@ class SubmissionsManager:
 
         benchmark_to_submit = db_conn.fetch_one(
             """
-            SELECT benchmark_id, merkle_root, solution_nonces
-            FROM jobs
-            WHERE (EXTRACT(EPOCH FROM NOW()) - last_submit_time) > %s
-                AND merkle_root IS NOT NULL
-            ORDER BY block_started
-            LIMIT 1
+            WITH updated AS (
+                UPDATE jobs
+                SET last_submit_time = EXTRACT(EPOCH FROM NOW())
+                WHERE benchmark_id IN (
+                    SELECT benchmark_id 
+                    FROM jobs
+                    WHERE (
+                        last_submit_time IS NULL 
+                        OR (EXTRACT(EPOCH FROM NOW()) - last_submit_time) > %s
+                    ) AND merkle_root IS NOT NULL
+                    ORDER BY block_started
+                    LIMIT 1
+                )
+                RETURNING benchmark_id, merkle_root, solution_nonces
+            )
+            SELECT benchmark_id, merkle_root, solution_nonces FROM updated
             """,
             (self.config.time_between_retries,)
         )
 
         if benchmark_to_submit:
-            benchmark_id = benchmark_to_submit[0]
-            merkle_root = benchmark_to_submit[1] 
-            solution_nonces = benchmark_to_submit[2]
-
-            # Update last submit time in database
-            db_conn.execute(
-                """
-                UPDATE jobs 
-                    SET last_submit_time = EXTRACT(EPOCH FROM NOW())
-                WHERE benchmark_id = %s
-                """,
-                (benchmark_id,)
-            )
+            benchmark_id = benchmark_to_submit["benchmark_id"]
+            merkle_root = benchmark_to_submit["merkle_root"] 
+            solution_nonces = benchmark_to_submit["solution_nonces"]
 
             self._post_thread("benchmark", SubmitBenchmarkRequest(
                 benchmark_id=benchmark_id,
@@ -106,29 +106,29 @@ class SubmissionsManager:
 
         proof_to_submit = db_conn.fetch_one(
             """
-            SELECT benchmark_id, merkle_proofs
-            FROM jobs
-            WHERE (EXTRACT(EPOCH FROM NOW()) - last_proof_submit_time) > %s
-                AND merkle_proofs IS NOT NULL 
-            ORDER BY block_started
-            LIMIT 1
+            WITH updated AS (
+                UPDATE jobs
+                SET last_proof_submit_time = EXTRACT(EPOCH FROM NOW())
+                WHERE benchmark_id IN (
+                    SELECT benchmark_id 
+                    FROM jobs
+                    WHERE (
+                        last_proof_submit_time IS NULL 
+                        OR (EXTRACT(EPOCH FROM NOW()) - last_proof_submit_time) > %s
+                    ) AND merkle_proofs IS NOT NULL
+                    ORDER BY block_started
+                    LIMIT 1
+                )
+                RETURNING benchmark_id, merkle_proofs
+            )
+            SELECT benchmark_id, merkle_proofs FROM updated
             """,
             (self.config.time_between_retries,)
         )
 
         if proof_to_submit:
-            benchmark_id = proof_to_submit[0]
-            merkle_proofs = proof_to_submit[1]
-
-            # Update last proof submit time in database
-            db_conn.execute(
-                """
-                UPDATE jobs 
-                SET last_proof_submit_time = EXTRACT(EPOCH FROM NOW())
-                WHERE benchmark_id = %s
-                """,
-                (benchmark_id,)
-            )
+            benchmark_id = proof_to_submit["benchmark_id"]
+            merkle_proofs = proof_to_submit["merkle_proofs"]
 
             self._post_thread("proof", SubmitProofRequest(
                 benchmark_id=benchmark_id,

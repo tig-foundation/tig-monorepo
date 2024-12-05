@@ -137,10 +137,9 @@ class JobManager:
             for batch_idx in range(num_batches):
                 db_conn.execute(
                     """
-                    INSERT INTO roots (benchmark_id, batch_idx) VALUES (%s, %s);
-                    INSERT INTO proofs (benchmark_id, batch_idx) VALUES (%s, %s);
+                    INSERT INTO roots (benchmark_id, batch_idx) VALUES (%s, %s)
                     """,
-                    (benchmark_id, batch_idx, benchmark_id, batch_idx)
+                    (benchmark_id, batch_idx)
                 )
 
 
@@ -166,12 +165,12 @@ class JobManager:
                 """
                 SELECT sampled_nonces, num_batches, batch_size
                 FROM jobs 
-                WHERE benchmark_id = %s
+                WHERE benchmark_id  = %s
                 """,
                 (benchmark_id,)
             )
 
-            if result and result['sampled_nonces'] and len(result['sampled_nonces']) > 0:
+            if result is None or result["sampled_nonces"] is not None:
                 continue
 
             logger.info(f"updating job from confirmed benchmark {benchmark_id}")
@@ -185,49 +184,35 @@ class JobManager:
             )
 
             batch_sampled_nonces = {}
-            for nonce in sampled_nonces:
-                batch_idx = nonce // batch_size
+            for nonce in x.details.sampled_nonces:
+                batch_idx = nonce // result["batch_size"]
                 batch_sampled_nonces.setdefault(batch_idx, []).append(nonce)
 
             for batch_idx, sampled_nonces in batch_sampled_nonces.items():
                 db_conn.execute(
                     """
-                    UPDATE proofs
-                        SET sampled_nonces = %s
-                    WHERE benchmark_id = %s 
-                        AND batch_idx = %s
+                    INSERT INTO proofs (sampled_nonces, benchmark_id, batch_idx)
+                    VALUES (%s, %s, %s)
                     """,
                     (json.dumps(sampled_nonces), benchmark_id, batch_idx)
                 )
                 
     def run(self):
         now = int(time.time() * 1000)
-        #for job in self.jobs:
-        #    if job.merkle_root is not None:
-        #        continue
-        #    num_batches_ready = sum(x is not None for x in job.batch_merkle_roots)
-        #    logger.info(f"benchmark {job.benchmark_id}: (batches: {num_batches_ready} of {job.num_batches} ready, #solutions: {len(job.solution_nonces)})")
-        #    if num_batches_ready != job.num_batches:
-        #        continue
-        #    start_time = min(job.last_batch_retry_time)
-        #    logger.info(f"benchmark {job.benchmark_id}: ready, took {(now - start_time) / 1000} seconds")
-        #    tree = MerkleTree(
-        #        job.batch_merkle_roots,
-        #        1 << (job.num_batches - 1).bit_length()
-        #    )
-        #    job.merkle_root = tree.calc_merkle_root()
 
         rows = db_conn.fetch_all("""
-            SELECT A.benchmark_id, JSONB_AGG(R.root) AS batch_merkle_roots
+            SELECT A.benchmark_id, JSONB_AGG(R.root ORDER BY R.batch_idx) AS batch_merkle_roots,
+                JSONB_AGG(r.solution_nonces) AS solution_nonces
             FROM jobs A
             INNER JOIN roots R ON A.benchmark_id = R.benchmark_id
-            INNER JOIN proofs P ON A.benchmark_id = P.benchmark_id AND R.batch_idx = P.batch_idx
             GROUP BY A.benchmark_id
-            HAVING COUNT(*) = COUNT(P.proofs)
+            HAVING COUNT(*) = COUNT(R.root)
         """)
 
         # Calculate merkle roots for completed jobs
         for row in rows:
+            solution_nonces = [x for y in row['solution_nonces'] for x in y]
+
             benchmark_id = row['benchmark_id']
             batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
             num_batches = len(batch_merkle_roots)
@@ -241,69 +226,58 @@ class JobManager:
             # Update the database with calculated merkle root
             db_conn.execute("""
                 UPDATE jobs 
-                SET merkle_root = %s
+                SET merkle_root = %s,
+                    solution_nonces = %s
                 WHERE benchmark_id = %s
-            """, (merkle_root.to_str(), benchmark_id))
+            """, (merkle_root.to_str(), json.dumps(solution_nonces), benchmark_id))
             
         rows = db_conn.fetch_all("""
-            SELECT A.benchmark_id, JSONB_AGG(P.proofs) AS batch_merkle_proofs,
-                   A.batch_size, A.num_batches, A.sampled_nonces,
-                   JSONB_AGG(R.root) AS batch_merkle_roots
+            SELECT A.benchmark_id, JSONB_AGG(P.proofs ORDER BY P.batch_idx) AS batch_merkle_proofs,
+                A.batch_size, A.num_batches
             FROM jobs A
-            INNER JOIN roots R ON A.benchmark_id = R.benchmark_id
-            INNER JOIN proofs P ON A.benchmark_id = P.benchmark_id AND R.batch_idx = P.batch_idx
-            GROUP BY A.benchmark_id
+            INNER JOIN proofs P ON A.benchmark_id = P.benchmark_id
+            GROUP BY A.benchmark_id, A.batch_size, A.num_batches
             HAVING COUNT(*) = COUNT(P.proofs)
         """)
 
         for row in rows:
-            benchmark_id = row['benchmark_id']
-            batch_merkle_proofs = row['batch_merkle_proofs']
-            sampled_nonces = row['sampled_nonces']
-            batch_merkle_roots = row['batch_merkle_roots']
+            benchmark_id = row["benchmark_id"]
+            batch_merkle_proofs = [MerkleProof.from_dict(x) for y in row["batch_merkle_proofs"] for x in y]
+
+            batch_merkle_roots = db_conn.fetch_one("""
+                SELECT JSONB_AGG(root ORDER BY batch_idx) as batch_merkle_roots
+                FROM roots
+                WHERE benchmark_id = %s
+            """, (benchmark_id,))
+
+            batch_merkle_roots = batch_merkle_roots["batch_merkle_roots"]
             
-            logger.info(f"proof {benchmark_id}: (merkle_proof: {len(batch_merkle_proofs)} of {len(sampled_nonces)} ready)")
+            #logger.info(f"proof {benchmark_id}: (merkle_proof: {len(batch_merkle_proofs)} ready)")
             
-            if (
-                len(batch_merkle_proofs) != len(sampled_nonces) or
-                any(x is None for x in batch_merkle_roots)
-            ):
-                continue
-                
-            logger.info(f"proof {benchmark_id}: ready")
-            
-            depth_offset = (row['batch_size'] - 1).bit_length()
+            depth_offset = (row["batch_size"] - 1).bit_length()
             tree = MerkleTree(
-                batch_merkle_roots,
-                1 << (row['num_batches'] - 1).bit_length()
+                [MerkleHash.from_str(root) for root in batch_merkle_roots],
+                1 << (row["num_batches"] - 1).bit_length()
             )
             
-            merkle_proofs = {}        
-            for batch_idx in range(row['num_batches']):
-                sampled_nonces_by_batch_idx = db_conn.fetch_one("""
-                    SELECT sampled_nonces
-                    FROM proofs
-                    WHERE benchmark_id = %s 
-                        AND batch_idx = %s
-                """, (benchmark_id, batch_idx))
-                if not sampled_nonces_by_batch_idx:
-                    continue
-
-                sampled_nonces = sampled_nonces_by_batch_idx['sampled_nonces']
+            merkle_proofs = []       
+            for proof in batch_merkle_proofs:
+                batch_idx = proof.leaf.nonce // row["batch_size"]
                 upper_stems = [
                     (d + depth_offset, h)
                     for d, h in tree.calc_merkle_branch(batch_idx).stems
                 ]
-                for nonce in set(sampled_nonces_by_batch_idx[batch_idx]):
-                    proof = batch_merkle_proofs[nonce]
-                    merkle_proofs[nonce] = MerkleProof(
+                
+                merkle_proofs.append(
+                    MerkleProof(
                         leaf=proof.leaf,
                         branch=MerkleBranch(proof.branch.stems + upper_stems)
                     )
+                )
                     
             # Update database with cxalculated merkle proofs
             db_conn.execute("""
-                UPDATE job
+                UPDATE jobs
                 SET merkle_proofs = %s
                 WHERE benchmark_id = %s
-            """, (json.dumps(merkle_proofs), benchmark_id))
+            """, (json.dumps([x.to_dict() for x in merkle_proofs]), benchmark_id))

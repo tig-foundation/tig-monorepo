@@ -246,40 +246,24 @@ class SlaveManager:
             result = db_conn.fetch_one("""
                 SELECT slave 
                 FROM proofs 
-                WHERE proofs IS NULL
+                WHERE proofs IS NULL 
                     AND benchmark_id = %s 
                     AND batch_idx = %s
             """, (benchmark_id, batch_idx))
 
-            if result is None or result["slave"] != slave_name:
-                raise HTTPException(status_code=400, detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch.")
+            if result is None or result['slave'] != slave_name:
+                raise HTTPException(status_code=400, detail=f"Slave submitted proofs for {batch_id}, but either took too long, or was not assigned this batch.")
 
-            proofs = BatchProof.from_dict(await request.json())
+            proofs = await request.json()
             
-            #Get current merkle proofs and merge with new ones
-            current_proofs = db_conn.fetch_one("""
-                SELECT merkle_proofs
-                    FROM jobs
-                WHERE benchmark_id = %s
-            """, (benchmark_id,))
-
-            merged_proofs = {}
-            if current_proofs and current_proofs["merkle_proofs"]:
-                merged_proofs.update(current_proofs["merkle_proofs"])
-            merged_proofs.update(proofs.merkle_proofs)
-
-            # Update job with merged merkle proofs
+            # Update proofs table with merkle proofs
             db_conn.execute("""
-                UPDATE jobs 
-                    SET merkle_proofs = %s
-                WHERE benchmark_id = %s;
-
-                UPDATE proofs
+                UPDATE proofs 
                 SET proofs = %s,
                     end_epoch = EXTRACT(EPOCH FROM NOW())
-                WHERE benchmark_id = %s
-                    AND batch_idx = %s
-            """, (json.dumps(merged_proofs), benchmark_id, json.dumps(proofs.merkle_proofs), benchmark_id, batch_idx))
+                WHERE benchmark_id = %s 
+                AND batch_idx = %s
+            """, (json.dumps(proofs["merkle_proofs"]), benchmark_id, batch_idx))
 
             return {"status": "OK"}
             

@@ -101,7 +101,7 @@ class PrecommitManager:
             return
         selections = [
             (c_name, x) for c_name, x in self.config.algo_selection.items()
-            if self.curr_base_fees[c_name] <= x.base_fee_limit
+            #if self.curr_base_fees[c_name] <= x.base_fee_limit
         ]
         if len(selections) == 0:
             logger.warning("No challenges under base fee limit")
