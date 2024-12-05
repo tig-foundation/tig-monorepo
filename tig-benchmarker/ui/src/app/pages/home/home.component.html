@@ -1,0 +1,263 @@
+@if(tigService.ready()){
+<div class="flex flex-column justify-content-end p-2 mt-4">
+  <p-card header="Latest Jobs">
+    @if(benchmarks()){
+    <p-table
+      #benchmarksTable
+      [value]="benchmarks()"
+      [tableStyle]="{ 'min-width': '50rem' }"
+      styleClass="p-datatable-striped"
+      [paginator]="true"
+      [rows]="5"
+      [rowsPerPageOptions]="[5, 10, 20]"
+      [globalFilterFields]="[
+        'benchmark_id',
+        'challenge',
+        'algorithm',
+        'status',
+        'difficulty',
+        'batch_size'
+      ]"
+      dataKey="benchmark_id"
+      [expandedRowKeys]="expandedRows"
+    >
+      <ng-template pTemplate="caption">
+        <div class="flex">
+          <p-iconField iconPosition="left" class="ml-auto">
+            <p-inputIcon>
+              <i class="pi pi-search"></i>
+            </p-inputIcon>
+            <input
+              pInputText
+              type="text"
+              (input)="
+                benchmarksTable.filterGlobal(
+                  $any($event.target).value || '',
+                  'contains'
+                )
+              "
+              placeholder="Search keyword"
+            />
+          </p-iconField>
+        </div>
+      </ng-template>
+      <ng-template pTemplate="header">
+        <tr>
+          <th></th>
+          <th pSortableColumn="age">
+            Benchmark ID <p-sortIcon field="benchmark_id" />
+          </th>
+          <th pSortableColumn="challenge">
+            Challenge <p-sortIcon field="challenge" />
+          </th>
+          <th pSortableColumn="algorithm">
+            Algorithm <p-sortIcon field="algorithm" />
+          </th>
+          <th pSortableColumn="difficulty">
+            Difficulty <p-sortIcon field="difficulty" />
+          </th>
+          <th pSortableColumn="batch_size">
+            Batch Size <p-sortIcon field="batch_size" />
+          </th>
+
+          <th pSortableColumn="nonces">
+            # Nonces <p-sortIcon field="nonces" />
+          </th>
+          <th pSortableColumn="solutions">
+            # Solutions <p-sortIcon field="solutions" />
+          </th>
+
+          <th pSortableColumn="status">Status <p-sortIcon field="status" /></th>
+          <th pSortableColumn="time_elapsed">
+            Elapsed Time <p-sortIcon field="time_elapsed" />
+          </th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-benchmark let-expanded="expanded">
+        <tr>
+          <td>
+            <p-button
+              type="button"
+              pRipple
+              [pRowToggler]="benchmark"
+              [text]="true"
+              [rounded]="true"
+              [plain]="true"
+              [icon]="benchmark ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+            />
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center text-xs">
+              {{ benchmark.benchmark_id }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.challenge }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.settings?.algorithm_id }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              [{{ benchmark.settings?.difficulty }}]
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.batch_size }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.num_nonces }}
+            </div>
+          </td>
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.num_solutions }}
+            </div>
+          </td>
+
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              <p-tag
+                [severity]="
+                  benchmark.status == 'SUBMITTED'
+                    ? 'success'
+                    : benchmark.status == 'PENDING PROOF'
+                    ? 'info'
+                    : 'warning'
+                "
+                [rounded]="true"
+                [value]="benchmark.status"
+              />
+            </div>
+          </td>
+
+          <td>
+            <div class="flex justify-content-center align-items-center">
+              {{ benchmark.time_elapsed | timeConverter }}
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="rowexpansion" let-benchmark>
+        <tr>
+          <td colspan="10">
+            <div class="p-3">
+              <p-table [value]="benchmark.batches" dataKey="id">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th pSortableColumn="id">
+                      Batch No <p-sortIcon field="batch_number" />
+                    </th>
+                    <th pSortableColumn="customer">
+                      Slave <p-sortIcon field="slave_id" />
+                    </th>
+                    <th pSortableColumn="date">
+                      # Nonces <p-sortIcon field="num_nonces" />
+                    </th>
+                    <th pSortableColumn="amount">
+                      # Solutions <p-sortIcon field="num_solutions" />
+                    </th>
+                    <th pSortableColumn="status">
+                      Status <p-sortIcon field="status" />
+                    </th>
+                    <th pSortableColumn="status">
+                      Elapsed Time <p-sortIcon field="elapsed_time" />
+                    </th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-batch>
+                  <tr>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.batch_number }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.slave_id }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.num_nonces }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.num_solutions }}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        <p-tag
+                          [severity]="
+                            batch.status == 'COMPLETED'
+                              ? 'success'
+                              : 'warning'
+                          "
+                          [rounded]="true"
+                          [value]="batch.status"
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        class="flex justify-content-center align-items-center"
+                      >
+                        {{ batch.time_elapsed | timeConverter }}
+                      </div>
+                    </td>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                  <tr>
+                    <td colspan="6">
+                      There are no batches for this Benchmark yet.
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+    } @else {
+    <div class="flex w-full justify-content-center align-items-center">
+      <p-progressSpinner
+        styleClass="w-4rem h-4rem"
+        strokeWidth="8"
+        fill="var(--surface-ground)"
+        animationDuration="1.5s"
+      />
+    </div>
+    }
+  </p-card>
+</div>
+} @else {
+<div class="flex w-full justify-content-center align-items-center">
+  <p-progressSpinner
+    styleClass="w-4rem h-4rem"
+    strokeWidth="8"
+    fill="var(--surface-ground)"
+    animationDuration="1.5s"
+  />
+</div>
+}

@@ -1,0 +1,23 @@
+<div class="flex flex-column justify-content-end p-2 mt-4">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="flex justify-content-between p-3 align-items-center">
+        <h2>Benchmarker Settings</h2>
+        <p-button
+          label="Success"
+          [disabled]="error()"
+          [rounded]="true"
+          severity="success"
+          (click)="save()"
+        />
+      </div>
+    </ng-template>
+    <ngs-code-editor
+      [theme]="theme"
+      [codeModel]="model"
+      [options]="options"
+      style="height: 75vh; width: 100%"
+      (valueChanged)="onCodeChanged($event)"
+    ></ngs-code-editor>
+  </p-card>
+</div>

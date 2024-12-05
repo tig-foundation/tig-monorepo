@@ -62,16 +62,29 @@ services:
       tig_benchmarker:
         condition: service_completed_successfully
 
-  slave:
-    build:
-      context: ../
-      dockerfile: tig-benchmarker/slave/Dockerfile
-    container_name: slave
+  # slave:
+  #  build:
+  #    context: ../
+  #     dockerfile: tig-benchmarker/slave/Dockerfile
+  #   container_name: slave
+  #   networks:
+  #     - tig-benchmarker
+  #   depends_on:
+  #     - master
+  #     - tig_benchmarker
+
+  ui:
+    container_name: ui
+    build: 
+      context: ./ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
     networks:
       - tig-benchmarker
+    ports:
+      - 8083:80
     depends_on:
       - master
-      - tig_benchmarker
 
 networks:
   tig-benchmarker:
