@@ -91,7 +91,7 @@ class SlaveManager:
             """, (slave_name, slave_name))
             
             concurrent = result["count"] if result else 0
-            if concurrent >= slave.max_concurrent_batches:
+            if concurrent >= slave["max_concurrent_batches"]:
                 logger.debug(f"{slave_name} get-batch: Max concurrent batches reached")
                 raise HTTPException(status_code=503, detail="Max concurrent batches reached")
 

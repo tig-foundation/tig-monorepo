@@ -30,15 +30,6 @@ class ClientManager:
     def __init__(self):
         logger.info("ClientManager initialized and connected to the database.")
 
-        self.app = FastAPI()
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-
         # Fetch initial config from database
         result = db_conn.fetch_one(
             """
@@ -51,14 +42,12 @@ class ClientManager:
             set_config(result["config"])
         else:
             init_config()
-
-        self.setup_routes()
         
     def verify_api_key(self, x_api_key: str = Header(...)):
         if x_api_key != get_config()["api_key"]:
             raise HTTPException(status_code=403, detail="Could not validate credentials")
 
-    async def setup_routes(self):
+    def setup_routes(self):
         @self.app.post("/register-player")
         async def register_player(request: Request):
             try:
@@ -84,8 +73,8 @@ class ClientManager:
                 logger.error(f"Unexpected error on /update-config: {e}")
                 raise HTTPException(status_code=400, detail="Invalid configuration data")
 
-        @self.app.route('/get-config', methods=['GET'])
-        async def get_config():
+        @self.app.get('/get-config')
+        def get_config_endpoint():
             try:
                 return JSONResponse(content=get_config(), status_code=200)
             except Exception as e:
@@ -135,6 +124,17 @@ class ClientManager:
 
     def start(self, host="0.0.0.0", port=3336):
         def run():
+            self.app = FastAPI()
+            self.app.add_middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
+
+            self.setup_routes()
+
             uvicorn.run(self.app, host=host, port=port)
         
         server_thread = threading.Thread(target=run, daemon=True)
