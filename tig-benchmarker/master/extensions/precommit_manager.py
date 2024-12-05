@@ -117,10 +117,10 @@ class PrecommitManager:
         if len(selections) == 0:
             logger.warning("No challenges under base fee limit")
             return None
-        logger.debug(f"Selecting challenge from: {[(c_name, x.weight) for c_name, x in selections]}")
-        selection = random.choices(selections, weights=[x.weight for _, x in selections])[0]
+        logger.debug(f"Selecting challenge from: {[(c_name, x['weight']) for c_name, x in selections]}")
+        selection = random.choices(selections, weights=[x["weight"] for _, x in selections])[0]
         c_id = self.challenge_name_2_id[selection[0]]
-        a_id = self.algorithm_name_2_id[f"{selection[0]}_{selection[1].algorithm}"]
+        a_id = self.algorithm_name_2_id[f"{selection[0]}_{selection[1]['algorithm']}"]
         self.num_precommits_submitted += 1
         req = SubmitPrecommitRequest(
             settings=BenchmarkSettings(
@@ -130,7 +130,7 @@ class PrecommitManager:
                 block_id=self.last_block_id,
                 difficulty=difficulty_samples[selection[0]]
             ),
-            num_nonces=selection[1].num_nonces
+            num_nonces=selection[1]["num_nonces"]
         )
-        logger.info(f"Created precommit (challenge: {selection[0]}, algorithm: {selection[1].algorithm}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
+        logger.info(f"Created precommit (challenge: {selection[0]}, algorithm: {selection[1]['algorithm']}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
         return req

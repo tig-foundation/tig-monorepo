@@ -5,7 +5,6 @@ from dataclasses import dataclass, fields, is_dataclass, asdict
 from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, get_args
 import json
 import time
-from tig_benchmarker.sql import PostgresDB
     
 T = TypeVar('T', bound='DataclassBase')
 

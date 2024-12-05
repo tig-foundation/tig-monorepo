@@ -68,7 +68,7 @@ class SlaveManager:
 
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
-            if not any(re.match(slave.name_regex, slave_name) for slave in config["slaves"]):
+            if not any(re.match(slave["name_regex"], slave_name) for slave in config["slaves"]):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
                 return "Unregistered slave", 403
 
@@ -269,8 +269,8 @@ class SlaveManager:
 
             return {"status": "OK"}
             
-        thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=get_config()["slave_manager_config"].port))
+        thread = threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=get_config()["slave_manager_config"]["port"]))
         thread.daemon = True
         thread.start()
 
-        logger.info(f"webserver started on 0.0.0.0:{get_config()["slave_manager_config"].port}")
+        logger.info(f"webserver started on 0.0.0.0:{get_config()['slave_manager_config']['port']}")

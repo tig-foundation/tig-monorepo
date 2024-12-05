@@ -84,7 +84,7 @@ class ClientManager:
                 logger.error(f"Unexpected error on /update-config: {e}")
                 raise HTTPException(status_code=400, detail="Invalid configuration data")
 
-        @self.app.get("/get-config")
+        @self.app.route('/get-config', methods=['GET'])
         async def get_config():
             try:
                 return JSONResponse(content=get_config(), status_code=200)
