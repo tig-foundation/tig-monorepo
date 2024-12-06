@@ -17,21 +17,17 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 def main():
     last_block_id = None
-    jobs = []
 
     client_manager = ClientManager()
     client_manager.start()
 
-    config = get_config()
-    print(config)
-
-    data_fetcher = DataFetcher(config["api_url"], config["player_id"])
+    data_fetcher = DataFetcher()
     difficulty_sampler = DifficultySampler()
-    job_manager = JobManager(jobs)
-    precommit_manager = PrecommitManager(config["player_id"], jobs)
-    submissions_manager = SubmissionsManager(config["api_url"], config["api_key"], jobs)
+    job_manager = JobManager()
+    precommit_manager = PrecommitManager()
+    submissions_manager = SubmissionsManager()
     
-    slave_manager = SlaveManager(jobs)
+    slave_manager = SlaveManager()
     slave_manager.start()
 
     while True:

@@ -130,27 +130,6 @@ def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
             
     return frontiers
 
-@dataclass
-class DifficultySamplerConfig(FromDict):
-    difficulty_ranges: Dict[str, Tuple[float, float]]
-    selected_difficulties: Dict[str, List[Tuple[int, int]]] = field(default_factory=dict)
-
-    def __post_init__(self):
-        for c_name, (start, end) in self.difficulty_ranges.items():
-            if start < 0 or start > 1 or end < 0 or end > 1 or start > end:
-                raise ValueError(f"Invalid difficulty range for challenge {c_name}. Must be (start, end) where '0 <= start <= end <= 1'")
-
-        for c_name, difficulties in self.selected_difficulties.items():
-            if difficulties is None:
-                self.selected_difficulties[c_name] = None
-            else:
-                self.selected_difficulties[c_name] = []
-                for (x, y) in difficulties:
-                    if x < 0 or y < 0:
-                        raise ValueError(f"Invalid difficulty for challenge {c_name}. Must be (x, y) where 'x >= 0 and y >= 0', got ({x}, {y})")
-
-                    self.selected_difficulties[c_name].append((x, y))
-
 class DifficultySampler:
     def __init__(self):
         self.valid_difficulties = {}

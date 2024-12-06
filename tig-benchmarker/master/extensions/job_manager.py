@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-from dataclasses import dataclass
 from tig_benchmarker.merkle_tree import MerkleHash, MerkleBranch, MerkleTree
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
@@ -12,51 +11,9 @@ import math
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-@dataclass
-class Job(FromDict):
-    benchmark_id: str
-    settings: BenchmarkSettings
-    num_nonces: int
-    rand_hash: str
-    runtime_config: Dict[str, int]
-    download_url: str
-    batch_size: int
-    challenge: str
-    sampled_nonces: Optional[List[int]] = field(default_factory=list)
-    merkle_root: Optional[MerkleHash] = None
-    solution_nonces: List[int] = field(default_factory=list)
-    merkle_proofs: Dict[int, MerkleProof] = field(default_factory=dict)
-    solution_nonces: List[int] = field(default_factory=list)
-    batch_merkle_proofs: Dict[int, MerkleProof] = field(default_factory=dict)
-    batch_merkle_roots: List[Optional[MerkleHash]] = None
-    last_benchmark_submit_time: int = 0
-    last_proof_submit_time: int = 0
-    last_batch_retry_time: List[int] = None
-
-    def __post_init__(self):
-        self.batch_merkle_roots = [None] * self.num_batches
-        self.last_batch_retry_time = [0] * self.num_batches
-
-    @property
-    def num_batches(self) -> int:
-        return (self.num_nonces + self.batch_size - 1) // self.batch_size
-
-    @property
-    def sampled_nonces_by_batch_idx(self) -> Dict[int, List[int]]:
-        ret = {}
-        for nonce in self.sampled_nonces:
-            batch_idx = nonce // self.batch_size
-            ret.setdefault(batch_idx, []).append(nonce)
-        return ret
-
-@dataclass
-class JobManagerConfig(FromDict):
-    backup_folder: str
-    batch_sizes: Dict[str, int]
-
 class JobManager:
-    def __init__(self, jobs: List[Job]):
-        self.jobs = jobs
+    def __init__(self):
+        return
 
     def on_new_block(
         self,
@@ -98,8 +55,8 @@ class JobManager:
             num_batches = math.ceil(x.details.num_nonces / config["batch_sizes"][c_name])
             db_conn.execute(
                 """
-                INSERT INTO jobs (benchmark_id, settings, num_nonces, num_batches, rand_hash, runtime_config, batch_size, challenge, download_url)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO jobs (benchmark_id, settings, num_nonces, num_batches, rand_hash, runtime_config, batch_size, challenge, download_url, creation_timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (benchmark_id) DO NOTHING;
                 """,
                 (
@@ -111,7 +68,8 @@ class JobManager:
                     json.dumps(block.config["benchmarks"]["runtime_configs"]["wasm"]),
                     config["batch_sizes"][c_name],
                     c_name,
-                    next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None)
+                    next((w.details.download_url for w in wasms.values() if w.algorithm_id == x.settings.algorithm_id), None),
+                    int(time.time())
                 )
             )
 

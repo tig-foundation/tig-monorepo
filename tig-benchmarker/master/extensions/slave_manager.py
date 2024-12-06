@@ -6,16 +6,17 @@ import signal
 import time
 import random
 import threading
+from dataclasses import dataclass
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 import uvicorn
-from extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, List, Optional, Set
 from extensions.sql import db_conn
 from extensions.client_manager import get_config
+
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -32,30 +33,8 @@ class Batch(FromDict):
     batch_size: int
     batch_idx: int
 
-@dataclass
-class BatchRoots(FromDict):
-    merkle_root: MerkleHash
-    solution_nonces: List[int]
-    #merkle_proofs: List[MerkleProof]
-
-@dataclass
-class BatchProof(FromDict):
-    merkle_proofs: List[MerkleProof]
-
-@dataclass
-class SlaveConfig(FromDict):
-    name_regex: str
-    max_concurrent_batches: int
-
-@dataclass
-class SlaveManagerConfig(FromDict):
-    port: int
-    time_before_batch_retry: int
-    slaves: List[SlaveConfig]
-
 class SlaveManager:
-    def __init__(self, jobs: List[Job]):
-        self.jobs = jobs
+    def __init__(self):
         self.assigned = {}
         self.concurrent = {}
 

@@ -2,7 +2,6 @@ import os
 import logging
 import random
 from dataclasses import dataclass
-from extensions.job_manager import Job
 from extensions.submissions_manager import SubmitPrecommitRequest
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import FromDict
@@ -25,9 +24,7 @@ class PrecommitManagerConfig(FromDict):
     algo_selection: Dict[str, AlgorithmSelectionConfig]
 
 class PrecommitManager:
-    def __init__(self, player_id: str, jobs: List[Job]):
-        self.player_id = player_id
-        #self.jobs = jobs
+    def __init__(self):
         self.last_block_id = None
         self.num_precommits_submitted = 0
         self.algorithm_name_2_id = {}
@@ -126,7 +123,7 @@ class PrecommitManager:
             settings=BenchmarkSettings(
                 challenge_id=c_id,
                 algorithm_id=a_id,
-                player_id=self.player_id,
+                player_id=get_config()["player_id"],
                 block_id=self.last_block_id,
                 difficulty=difficulty_samples[selection[0]]
             ),

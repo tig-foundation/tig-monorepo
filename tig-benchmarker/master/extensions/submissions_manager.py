@@ -3,7 +3,6 @@ import threading
 import logging
 import json
 import os
-from extensions.job_manager import Job
 from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Union
@@ -28,19 +27,17 @@ class SubmitProofRequest(FromDict):
     benchmark_id: str
     merkle_proofs: List[MerkleProof]
 
-@dataclass
-class SubmissionsManagerConfig(FromDict):
-    time_between_retries: int
-
 class SubmissionsManager:
-    def __init__(self, api_url: str, api_key: str, jobs: List[Job]):
-        self.jobs = jobs
-        self.api_url = api_url
-        self.api_key = api_key
+    def __init__(self):
+        return
         
     def _post(self, submission_type: str, req: Union[SubmitPrecommitRequest, SubmitBenchmarkRequest, SubmitProofRequest]):
+        config = get_config()
+        api_key = config["api_key"]
+        api_url = config["api_url"]
+
         headers = {
-            "X-Api-Key": self.api_key,
+            "X-Api-Key": api_key,
             "Content-Type": "application/json",
             "User-Agent": "tig-benchmarker-py/v0.2"
         }
@@ -50,7 +47,7 @@ class SubmissionsManager:
             logger.info(f"submitting {submission_type} '{req.benchmark_id}'")
         logger.debug(f"{req}")
         
-        resp = requests.post(f"{self.api_url}/submit-{submission_type}", json=req.to_dict(), headers=headers)
+        resp = requests.post(f"{api_url}/submit-{submission_type}", json=req.to_dict(), headers=headers)
         if resp.status_code == 200:
             logger.info(f"submitted {submission_type} successfully")
         elif resp.headers.get("Content-Type") == "text/plain":

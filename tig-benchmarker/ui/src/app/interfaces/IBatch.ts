@@ -4,4 +4,9 @@ export interface IBatch {
   difficulty: string;
   qualifiers: number;
   imbalance: number;
+  num_solutions: number;
+  num_nonces: number;
+  slave_id: string;
+  elapsed_time: number;
+  status: string;
 }

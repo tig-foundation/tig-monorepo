@@ -4,6 +4,7 @@ import signal
 import threading
 import uvicorn
 import json
+from datetime import datetime
 from fastapi import FastAPI, Query, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -110,16 +111,58 @@ class ClientManager:
         
         @self.app.get("/get-jobs")
         async def get_jobs():
-            #jobs = self.db_session.query(JobModel).all()
-            #jobs_data = [
-            #    {
-            #        **job.to_dataclass().to_dict(),
-            #        "batches": [ batch.to_dict() for batch in job.batches ],
-            #        "created_at": str(job.created_at)
-            #    } for job in jobs
-            #]
+            result = db_conn.fetch_all("""
+                SELECT j.num_batches as batches, 
+                    j.creation_timestamp as created_at, 
+                    j.*
+                FROM jobs j
+                ORDER BY j.block_started DESC
+            """)
 
             jobs_data = []
+            if result:
+                for row in result:
+                    job_dict = dict(row)
+                    job_dict["created_at"] = datetime.fromtimestamp(job_dict["created_at"]).strftime("%Y-%m-%d %H:%M:%S")
+                    job_dict["updated_at"] = "0"
+
+                    batches = db_conn.fetch_all("""
+                        SELECT 
+                            r.batch_idx as batch_number,
+                            r.slave as slave_id,
+                            r.solution_nonces as solutions,
+                            CASE 
+                                WHEN p.proofs IS NOT NULL THEN 'COMPLETED'
+                                WHEN r.root IS NOT NULL THEN 'PENDING PROOF'
+                                WHEN r.slave IS NULL THEN 'PENDING SLAVE'
+                                ELSE 'PENDING ROOT'
+                            END as status,
+                            CASE
+                                WHEN p.end_epoch IS NOT NULL THEN (p.end_epoch - r.start_epoch)
+                                WHEN r.end_epoch IS NOT NULL THEN (r.end_epoch - r.start_epoch)
+                                WHEN r.start_epoch IS NOT NULL THEN (EXTRACT(EPOCH FROM NOW()) - r.start_epoch)
+                                ELSE 0
+                            END as elapsed_time
+                        FROM jobs j
+                        LEFT JOIN roots r ON j.benchmark_id = r.benchmark_id 
+                        LEFT JOIN proofs p ON r.benchmark_id = p.benchmark_id AND r.batch_idx = p.batch_idx
+                        WHERE j.benchmark_id = %s
+                        ORDER BY r.batch_idx ASC
+                    """, (job_dict["benchmark_id"],))
+                    job_dict["batches"] = [dict(batch) for batch in batches] if batches else []
+                    for batch in job_dict["batches"]:
+                        batch["num_solutions"] = len(batch["solutions"]) if batch["solutions"] else 0
+                        batch["slave_id"] = batch["slave_id"] if batch["slave_id"] else "Not yet assigned"
+                        batch["elapsed_time"] = int(batch["elapsed_time"]) * 1000 if batch["elapsed_time"] else 0
+
+                        batch["start_nonce"] = batch["batch_number"] * job_dict["batch_size"]
+                        batch["num_nonces"] = min(
+                            job_dict["batch_size"],
+                            job_dict["num_nonces"] - batch["start_nonce"]
+                        )
+
+                    jobs_data.append(job_dict)
+
             return JSONResponse(content=jobs_data, status_code=200)
 
     def start(self, host="0.0.0.0", port=3336):

@@ -6,6 +6,8 @@ from tig_benchmarker.structs import *
 from tig_benchmarker.utils import *
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
+from extensions.client_manager import get_config
+
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 def _get(url: str) -> Dict[str, Any]:
@@ -22,15 +24,14 @@ def _get(url: str) -> Dict[str, Any]:
         raise Exception(err_msg)
 
 class DataFetcher:
-    def __init__(self, api_url: str, player_id: str):
-        self.api_url = api_url
-        self.player_id = player_id
+    def __init__(self):
         self.last_fetch = 0
         self._cache = None
 
     def run(self) -> dict:
+        config = get_config()
         logger.debug("fetching latest block")
-        block_data = _get(f"{self.api_url}/get-block")
+        block_data = _get(f"{config["api_url"]}/get-block")
         block = Block.from_dict(block_data["block"])
 
         if self._cache is not None and block.id == self._cache["block"].id:
@@ -39,9 +40,9 @@ class DataFetcher:
 
         logger.info(f"new block @ height {block.details.height}, fetching data")
         tasks = [
-            f"{self.api_url}/get-algorithms?block_id={block.id}",
-            f"{self.api_url}/get-benchmarks?player_id={self.player_id}&block_id={block.id}",
-            f"{self.api_url}/get-challenges?block_id={block.id}"
+            f"{config["api_url"]}/get-algorithms?block_id={block.id}",
+            f"{config["api_url"]}/get-benchmarks?player_id={config["player_id"]}&block_id={block.id}",
+            f"{config["api_url"]}/get-challenges?block_id={block.id}"
         ]
         
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
@@ -58,7 +59,7 @@ class DataFetcher:
         
         # Fetch difficulty data for each challenge
         difficulty_urls = [
-            f"{self.api_url}/get-difficulty-data?block_id={block.id}&challenge_id={c_id}"
+            f"{config["api_url"]}/get-difficulty-data?block_id={block.id}&challenge_id={c_id}"
             for c_id in challenges
         ]
         

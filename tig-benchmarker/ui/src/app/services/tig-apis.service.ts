@@ -82,6 +82,8 @@ export class TigApisService {
           }
           const num_solutions = b.solutions ? b.solutions.length : 0;
 
+          console.log(b);
+
           let time_elapsed = 0;
           if (!b.last_proof_submit_time) {
             const start_timestamp = b.created_at;
@@ -106,33 +108,11 @@ export class TigApisService {
           }
 
           const batches = b.batches.map((batch: any) => {
-            const batch_number =
-              Math.floor(batch.start_nonce / b.num_nonces) + 1;
-            const num_solutions = batch.solutions ? batch.solutions.length : 0;
-            const status = batch.created_at != batch.updated_at ? 'COMPLETED' : 'PENDING';
-            let time_elapsed = 0;
-            if (batch.created_at != batch.updated_at) {
-              const start_timestamp = batch.created_at;
-              const start_normalizedTimestamp = start_timestamp.split('.')[0];
-              const start_date = new Date(start_normalizedTimestamp);
-              const seconds = Math.floor(start_date.getTime());
+            const batch_number = batch.batch_number + 1;
+            const num_solutions = batch.num_solutions;
+            const status = batch.status;
+            let time_elapsed = batch.elapsed_time;
 
-              const utcDate1 = new Date(Date.now());
-              const utcDate2 = new Date(utcDate1.toUTCString());
-              const now = utcDate2.getTime();
-              time_elapsed = now - seconds;
-            } else {
-              const start_timestamp = batch.created_at;
-              const start_normalizedTimestamp = start_timestamp.split('.')[0];
-              const start_date = new Date(start_normalizedTimestamp);
-              const seconds = Math.floor(start_date.getTime());
-
-              const end_timestamp = batch.updated_at;
-              const end_normalizedTimestamp = end_timestamp.split('.')[0];
-              const end_date = new Date(end_normalizedTimestamp);
-              const end_seconds = Math.floor(end_date.getTime());
-              time_elapsed = end_seconds - seconds;
-            }
             return {
               ...batch,
               batch_number,

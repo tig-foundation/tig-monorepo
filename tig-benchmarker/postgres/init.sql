@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     download_url TEXT,
     last_submit_time BIGINT,
     last_proof_submit_time BIGINT,
+    creation_timestamp BIGINT,
     block_started INTEGER,
     merkle_proofs JSONB,
     merkle_root TEXT
