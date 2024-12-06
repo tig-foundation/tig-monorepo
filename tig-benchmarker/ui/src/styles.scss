@@ -1,0 +1,126 @@
+/* You can add global styles to this file, and also import other style files */
+@import "primeng/resources/themes/lara-light-blue/theme.css";
+@import "primeng/resources/primeng.css";
+@import "primeicons/primeicons.css";
+
+@font-face {
+  font-family: "Input-Font";
+  src: url("assets/fonts/InputSans-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --primary-font: Input-Font;
+}
+
+body {
+  font-family: var(--primary-font);
+  background-color: #ececee;
+}
+
+.banner {
+  grid-column-gap: 1.5rem;
+  grid-row-gap: 0.5rem;
+  border-radius: 0;
+  flex-flow: column;
+  justify-content: center;
+  align-items: center;
+  height: auto;
+  padding: 1rem 1.5rem;
+  display: flex;
+  position: relative;
+}
+
+.banner-video {
+  z-index: -10;
+  object-position: 50% 100%;
+  border-radius: 10px;
+  width: 100%;
+  position: absolute;
+  inset: 0%;
+  overflow: hidden;
+}
+.banner-label {
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  padding-left: 0.5rem;
+  display: flex;
+  position: relative;
+  color: #ececee;
+}
+
+.p-datatable .p-datatable-header {
+  background: #000128 !important;
+  text-transform: capitalize !important;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  background: #000128 !important;
+  color: #ececee !important;
+  text-transform: capitalize !important;
+}
+
+.tig-white {
+  color: #ececee;
+}
+
+.tig-dark {
+  color: #000128;
+}
+
+.p-datatable .p-datatable-tbody > tr {
+  background: #ececee !important;
+}
+
+.p-paginator {
+  background: #ececee !important;
+}
+
+.text-hover-underline {
+  text-decoration: none; // Ensure no underline by default
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px; // Adjust thickness as needed
+    background-color: currentColor; // Use text color
+    transition: width 0.3s ease; // Smooth transition
+  }
+
+  &:hover::after {
+    width: 100%; // Full underline on hover
+  }
+}
+
+.p-datatable .p-datatable-tbody > tr > td {
+  border: 1px solid #b6b6b8 !important;
+  border-radius: 2px;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  border: 1px solid #b6b6b8 !important;
+  border-radius: 2px;
+}
+
+.p-datatable .p-datatable-tbody > tr:nth-child(even):hover {
+  background-color: #c8c8cf !important;
+}
+
+.p-datatable .p-datatable-tbody > tr:nth-child(odd):hover {
+  background-color: #c8c8cf !important;
+}
+
+.p-datatable-wrapper {
+  border: 1px solid #b6b6b8 !important;
+  border-radius: 20px 20px 0px 0px;
+}
+
+.p-tag-value{
+  text-align: center !important;
+}

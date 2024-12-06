@@ -3,8 +3,8 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use futures::stream::{self, StreamExt};
 use serde_json::json;
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
-use tig_structs::core::{BenchmarkSettings, MerkleProof};
+use std::{fs, path::PathBuf, sync::Arc};
+use tig_structs::core::BenchmarkSettings;
 use tig_utils::{dejsonify, jsonify, MerkleHash, MerkleTree};
 use tokio::runtime::Runtime;
 
@@ -90,14 +90,13 @@ fn cli() -> Command {
                         .value_parser(clap::value_parser!(u64)),
                 )
                 .arg(
-                    arg!(--sampled [SAMPLED_NONCES] "Sampled nonces for which to generate proofs")
-                        .num_args(1..)
-                        .value_parser(clap::value_parser!(u64)),
-                )
-                .arg(
                     arg!(--workers [WORKERS] "Number of worker threads")
                         .default_value("1")
                         .value_parser(clap::value_parser!(usize)),
+                )
+                .arg(
+                    arg!(--output [OUTPUT_FOLDER] "If set, the data for nonce will be saved as '<nonce>.json' in this folder")
+                        .value_parser(clap::value_parser!(PathBuf)),
                 ),
         )
 }
@@ -120,7 +119,6 @@ fn main() {
             *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<String>("SOLUTION").unwrap().clone(),
         ),
-
         Some(("compute_batch", sub_m)) => compute_batch(
             sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
             sub_m.get_one::<String>("RAND_HASH").unwrap().clone(),
@@ -130,11 +128,8 @@ fn main() {
             sub_m.get_one::<PathBuf>("WASM").unwrap().clone(),
             *sub_m.get_one::<u64>("mem").unwrap(),
             *sub_m.get_one::<u64>("fuel").unwrap(),
-            sub_m
-                .get_many::<u64>("sampled")
-                .map(|values| values.cloned().collect())
-                .unwrap_or_default(),
             *sub_m.get_one::<usize>("workers").unwrap(),
+            sub_m.get_one::<PathBuf>("output").cloned(),
         ),
         _ => Err(anyhow!("Invalid subcommand")),
     } {
@@ -199,27 +194,20 @@ fn compute_batch(
     wasm_path: PathBuf,
     max_memory: u64,
     max_fuel: u64,
-    sampled_nonces: Vec<u64>,
     num_workers: usize,
+    output_folder: Option<PathBuf>,
 ) -> Result<()> {
     if num_nonces == 0 || batch_size < num_nonces {
         return Err(anyhow!(
             "Invalid number of nonces. Must be non-zero and less than batch size"
         ));
     }
-    let end_nonce = start_nonce + num_nonces;
-    for &nonce in &sampled_nonces {
-        if nonce < start_nonce || nonce >= end_nonce {
-            return Err(anyhow!(
-                "Sampled nonce {} is out of range [{}, {})",
-                nonce,
-                start_nonce,
-                end_nonce
-            ));
-        }
-    }
     if batch_size == 0 || (batch_size & (batch_size - 1)) != 0 {
         return Err(anyhow!("Batch size must be a power of 2"));
+    }
+
+    if let Some(path) = &output_folder {
+        fs::create_dir_all(path)?;
     }
 
     let settings = Arc::new(load_settings(&settings));
@@ -228,17 +216,17 @@ fn compute_batch(
     let runtime = Runtime::new()?;
 
     runtime.block_on(async {
-        let mut output_data_map = HashMap::new();
         let mut hashes = vec![MerkleHash::null(); num_nonces as usize];
         let mut solution_nonces = Vec::new();
 
         // Create a stream of nonces and process them concurrently
-        let results = stream::iter(start_nonce..end_nonce)
+        let results = stream::iter(start_nonce..(start_nonce + num_nonces))
             .map(|nonce| {
                 let settings = Arc::clone(&settings);
                 let wasm = Arc::clone(&wasm);
                 let rand_hash = rand_hash.clone();
-                let sampled_nonces = sampled_nonces.clone();
+                let output_folder = output_folder.clone();
+
                 tokio::spawn(async move {
                     let (output_data, err_msg) = worker::compute_solution(
                         &settings,
@@ -258,17 +246,11 @@ fn compute_batch(
                         .is_ok();
                     let hash = MerkleHash::from(output_data.clone());
                     // only keep the data if required
-                    let output_data = if sampled_nonces.contains(&nonce) {
-                        Some(output_data)
-                    } else {
-                        None
-                    };
-                    Ok::<(u64, Option<worker::OutputData>, MerkleHash, bool), anyhow::Error>((
-                        nonce,
-                        output_data,
-                        hash,
-                        is_solution,
-                    ))
+                    if let Some(path) = output_folder {
+                        let file_path = path.join(format!("{}.json", nonce));
+                        fs::write(&file_path, jsonify(&output_data))?;
+                    }
+                    Ok::<(u64, MerkleHash, bool), anyhow::Error>((nonce, hash, is_solution))
                 })
             })
             .buffer_unordered(num_workers)
@@ -276,10 +258,7 @@ fn compute_batch(
             .await;
 
         for result in results {
-            let (nonce, output_data, hash, is_solution) = result??;
-            if let Some(output_data) = output_data {
-                output_data_map.insert(nonce, output_data);
-            }
+            let (nonce, hash, is_solution) = result??;
             if is_solution {
                 solution_nonces.push(nonce);
             }
@@ -289,17 +268,8 @@ fn compute_batch(
         let tree = MerkleTree::new(hashes, batch_size as usize)?;
         let merkle_root = tree.calc_merkle_root();
 
-        let mut merkle_proofs = Vec::new();
-        for (nonce, output_data) in output_data_map {
-            merkle_proofs.push(MerkleProof {
-                leaf: output_data,
-                branch: tree.calc_merkle_branch((nonce - start_nonce) as usize)?,
-            });
-        }
-
         let result = json!({
             "merkle_root": merkle_root,
-            "merkle_proofs": merkle_proofs,
             "solution_nonces": solution_nonces,
         });
 

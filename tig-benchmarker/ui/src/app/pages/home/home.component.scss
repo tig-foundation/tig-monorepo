@@ -1,0 +1,80 @@
+/* app.component.css */
+.custom-panel {
+  border-radius: 10px;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.cutoff-section {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.cutoff-label {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.cutoff-value {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 5px;
+}
+
+.cutoff-equation {
+  font-style: italic;
+}
+
+.solutions-section {
+  border-left: 2px solid #000;
+  border-right: 2px solid #000;
+  border-radius: 25px;
+  padding: 10px;
+}
+
+.active-solutions-title {
+  font-weight: bold;
+  font-size: 12px;
+  text-align: right;
+  margin-bottom: 10px;
+}
+
+.solution-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.highlighted {
+  background-color: #f8d7da; /* Light red background */
+  padding: 3px 5px;
+  border-radius: 5px;
+}
+
+.row-cell-dark {
+  color: #ececee !important;
+  background-color: #000128 !important;
+  padding: 0.5rem;
+  text-transform: capitalize !important;
+}
+
+.customProgress .ui-progressbar .ui-progressbar-label {
+  color: yellow !important;
+}
+
+.customProgress .ui-progressbar .ui-progressbar-value {
+  background-color: #000128 !important;
+} 
+
+.row-cell-light {
+  color: #000128 !important;
+  background-color: #ececee;
+}
+
+.tig-header {
+  text-transform: uppercase;
+}

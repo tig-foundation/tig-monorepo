@@ -1,0 +1,11 @@
+blake3
+dataclasses
+hypercorn
+numpy
+quart
+randomname
+uvicorn
+fastapi
+sqlalchemy
+psycopg2-binary
+requests

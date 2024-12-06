@@ -4,9 +4,9 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from tig_benchmarker.utils import u64s_from_str, u8s_from_str, jsonify
-from tig_benchmarker.merkle_tree import MerkleHash
-from tig_benchmarker.data import BenchmarkSettings, OutputData
+from common.utils import u64s_from_str, u8s_from_str, jsonify
+from common.merkle_tree import MerkleHash
+from common.structs import BenchmarkSettings, OutputData
 
 class TestData(unittest.TestCase):
     def test_calc_solution_signature(self):
