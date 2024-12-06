@@ -1,0 +1,335 @@
+@if(tigService.ready()){
+<div class="flex flex-column justify-content-end p-2 mt-4 h-10">
+  <div class="w-full border-round-lg banner">
+    <div class="border-round-lg banner-video">
+      <div class="border-round-lg">
+        <video
+          autoplay=""
+          loop=""
+          muted=""
+          playsinline=""
+          width="100%"
+          height="100%"
+          class="border-round-lg"
+        >
+          <source
+            src="https://files.tig.foundation/banner.mp4"
+            type="video/mp4"
+          />
+        </video>
+
+        <style>
+          video {
+            object-fit: cover !important;
+            background-size: cover !important;
+            background-repeat: no-repeat !important;
+          }
+        </style>
+      </div>
+    </div>
+    <h2 class="banner-label">Latest Jobs</h2>
+  </div>
+  @if(benchmarks()){
+  <div class="w-full flex justify-content-end">
+    <div class="w-2 flex flex-column justify-content-center align-items-center">
+      <p-button
+        icon="pi pi-refresh"
+        [rounded]="true"
+        [text]="true"
+        (click)="refreshTimer()"
+      />
+      <div class="w-full">
+        <p-progressBar [value]="value">
+          <ng-template pTemplate="content" let-value>
+            <span>{{ 10 - value / 10 }}s</span>
+          </ng-template>
+        </p-progressBar>
+      </div>
+
+      <p class="text-xs tig-dark p-0 m-0 mt-1">Data Refresh</p>
+    </div>
+  </div>
+
+  <p-table
+    #benchmarksTable
+    [value]="benchmarks()"
+    [tableStyle]="{
+      'min-width': '50rem',
+      'border-radius': '20px 20px 0px 0px'
+    }"
+    styleClass=" mt-2 p-datatable-gridlines"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [globalFilterFields]="[
+      'benchmark_id',
+      'challenge',
+      'algorithm',
+      'status',
+      'difficulty',
+      'batch_size'
+    ]"
+    dataKey="benchmark_id"
+    [expandedRowKeys]="expandedRows"
+  >
+    <ng-template pTemplate="header">
+      <tr class="text-center row-cell-dark">
+        <th></th>
+        <th
+          pSortableColumn="age"
+          class="text-center row-cell-dark"
+          style="text-transform: capitalize !important"
+        >
+          BENCHMARK ID
+        </th>
+        <th pSortableColumn="challenge" class="tig-dark text-center">
+          CHALLENGE
+        </th>
+        <th pSortableColumn="algorithm" class="tig-dark text-center">
+          ALGORITHM
+        </th>
+        <th pSortableColumn="difficulty " class="tig-dark text-center">
+          DIFFICULTY
+        </th>
+        <th pSortableColumn="batch_size" class="tig-dark text-center">
+          BATCH SIZE
+        </th>
+
+        <th pSortableColumn="nonces" class="tig-dark text-center">#NONCES</th>
+        <th pSortableColumn="solutions" class="tig-dark text-center">
+          #SOLUTIONS
+        </th>
+
+        <th pSortableColumn="status" class="tig-dark text-center">STATUS</th>
+        <th pSortableColumn="time_elapsed" class="tig-dark text-center">
+          ELAPSED
+        </th>
+        <th pSortableColumn="time_elapsed" class="tig-dark text-center"></th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-benchmark let-expanded="expanded">
+      <tr class="tig-dark">
+        <td class="row-cell">
+          <p-button
+            type="button"
+            pRipple
+            [pRowToggler]="benchmark"
+            [text]="true"
+            [rounded]="true"
+            [plain]="true"
+            [icon]="benchmark ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+          />
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.benchmark_id_display }}
+            <i
+              class="pi pi-copy ml-1 cursor-pointer"
+              style="font-size: 1rem"
+              (click)="copyToClipboard(benchmark.benchmark_id)"
+            ></i>
+          </div>
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.challenge }}
+          </div>
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.algorithm }}
+          </div>
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            [{{ benchmark.difficulty }}]
+          </div>
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.batch_size }}
+          </div>
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.num_nonces }}
+          </div>
+        </td>
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.num_solutions }}
+          </div>
+        </td>
+
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            <p-tag
+              [severity]="
+                benchmark.status == 'COMPLETED'
+                  ? 'success'
+                  : benchmark.status == 'STOPPED'
+                  ? 'danger'
+                  : benchmark.status.includes('SUBMITTING')
+                  ? 'secondary'
+                  : benchmark.status.includes('COMPUTING')
+                  ? 'info'
+                  : 'info'
+              "
+              [rounded]="true"
+              [value]="benchmark.status"
+            />
+          </div>
+        </td>
+
+        <td class="row-cell">
+          <div class="flex justify-content-center align-items-center">
+            {{ benchmark.time_elapsed | timeConverter }}
+          </div>
+        </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            <p-button
+              label="STOP"
+              [rounded]="true"
+              severity="danger"
+              [disabled]="!benchmark.can_stop"
+              (click)="tigService.stopBenchmark(benchmark)"
+            />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="rowexpansion" let-benchmark>
+      <tr>
+        <td colspan="11" class="p-0">
+          <div class="p-3">
+            <p-table [value]="benchmark.batches" dataKey="id">
+              <ng-template pTemplate="header">
+                <tr class="tig-dark text-center tig-header">
+                  <th pSortableColumn="id" class="tig-dark text-center">
+                    BATCH NO
+                  </th>
+                  <th pSortableColumn="customer" class="tig-dark text-center">
+                    SLAVE
+                  </th>
+                  <th pSortableColumn="date" class="tig-dark text-center">
+                    #NONCES
+                  </th>
+
+                  <th pSortableColumn="amount" class="tig-dark text-center">
+                    #SOLUTIONS
+                  </th>
+                  <th pSortableColumn="status" class="tig-dark text-center">
+                    STATUS
+                  </th>
+                  <th pSortableColumn="status" class="tig-dark text-center">
+                    ELAPSED
+                  </th>
+                  <th class="tig-dark text-center"></th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-batch>
+                <tr>
+                  <td>
+                    <div
+                      class="flex justify-content-center align-items-center tig-dark"
+                    >
+                      {{ batch.batch_idx + 1 }}
+                    </div>
+                  </td>
+                  <td>
+                    <div
+                      class="flex justify-content-center align-items-center tig-dark"
+                    >
+                      {{ batch.slave }}
+                    </div>
+                  </td>
+                  <td>
+                    <div
+                      class="flex justify-content-center align-items-center tig-dark"
+                    >
+                      {{ batch.num_nonces }}
+                    </div>
+                  </td>
+                  <td>
+                    <div
+                      class="flex justify-content-center align-items-center tig-dark"
+                    >
+                      {{ batch.end_time ? batch.num_solutions : "" }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="flex justify-content-center align-items-center">
+                      <p-tag
+                        [severity]="
+                          batch.status == 'STOPPED'
+                            ? 'danger'
+                            : batch.status.includes('READY')
+                            ? 'success'
+                            : batch.status.includes('COMPUTING')
+                            ? 'info'
+                            : 'secondary'
+                        "
+                        [rounded]="true"
+                        [value]="batch.status"
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <div
+                      class="flex justify-content-center align-items-center tig-dark"
+                    >
+                    {{
+                      batch.time_elapsed != null ? batch.time_elapsed + "ms" : ""
+                    }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="flex justify-content-center align-items-center">
+                      <p-button
+                        label="VERIFY"
+                        [rounded]="true"
+                        severity="success"
+                        [disabled]="!batch.verifiable"
+                        (click)="tigService.verifyBatch(batch)"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="6" class="tig-dark">
+                    There are no batches for this Benchmark yet.
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+        </td>
+      </tr>
+      <p-divider />
+    </ng-template>
+  </p-table>
+  } @else {
+  <div class="flex w-full justify-content-center align-items-center">
+    <p-progressSpinner
+      styleClass="w-4rem h-4rem"
+      strokeWidth="8"
+      fill="var(--surface-ground)"
+      animationDuration="1.5s"
+    />
+  </div>
+  }
+  <!-- </p-card> -->
+</div>
+} @else {
+<div class="flex w-full justify-content-center align-items-center">
+  <p-progressSpinner
+    styleClass="w-4rem h-4rem"
+    strokeWidth="8"
+    fill="var(--surface-ground)"
+    animationDuration="1.5s"
+  />
+</div>
+}

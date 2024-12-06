@@ -6,7 +6,7 @@ from typing import List
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from tig_benchmarker.merkle_tree import MerkleHash, MerkleTree, MerkleBranch
+from common.merkle_tree import MerkleHash, MerkleTree, MerkleBranch
 
 def create_test_hashes() -> List[MerkleHash]:
     return [MerkleHash(blake3(i.to_bytes(4, 'big')).digest()) for i in range(9)]

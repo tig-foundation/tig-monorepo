@@ -1,0 +1,47 @@
+<div class="flex flex-column justify-content-end p-2 mt-4">
+  <div class="w-full border-round-lg banner">
+    <div class="border-round-lg banner-video">
+      <div class="border-round-lg">
+        <video
+          autoplay=""
+          loop=""
+          muted=""
+          playsinline=""
+          width="100%"
+          height="100%"
+          class="border-round-lg"
+        >
+          <source
+            src="https://files.tig.foundation/banner.mp4"
+            type="video/mp4"
+          />
+        </video>
+
+        <style>
+          video {
+            object-fit: cover !important;
+            background-size: cover !important;
+            background-repeat: no-repeat !important;
+          }
+        </style>
+      </div>
+    </div>
+    <h2 class="banner-label">Benchmarker Config</h2>
+  </div>
+    <div class="flex justify-content-end p-3 align-items-center w-full" >
+      <p-button
+        label="Save"
+        [disabled]="error()"
+        [rounded]="true"
+        severity="success"
+        (click)="save()"
+      />
+    </div>
+  <ngs-code-editor
+    [theme]="theme"
+    [codeModel]="model"
+    [options]="options"
+    style="height: 65vh; width: 100%; border-radius: 5px;"
+    (valueChanged)="onCodeChanged($event)"
+  ></ngs-code-editor>
+</div>

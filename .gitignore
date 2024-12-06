@@ -16,3 +16,7 @@ Cargo.lock
 .vscode/
 
 __pycache__/
+
+# Ignore these. 
+.env
+db_data/

@@ -1,5 +1,5 @@
-// optimized pareto impl
-use std::cmp::min;
+use std::{cmp::min, collections::HashMap};
+
 pub type Point = Vec<i32>;
 pub type Frontier = Vec<Point>;
 
@@ -70,11 +70,7 @@ fn is_pareto_front_2d(costs: &Vec<Vec<i32>>) -> Vec<bool> {
     return on_front;
 }
 
-pub fn is_pareto_front(
-    costs: &Vec<Vec<i32>>,
-    assume_unique_lexsorted: bool,
-    pre_sorted_along_x: Option<bool>,
-) -> Vec<bool> {
+pub fn is_pareto_front(costs: &Vec<Vec<i32>>, assume_unique_lexsorted: bool) -> Vec<bool> {
     let apply_unique = !assume_unique_lexsorted;
     let (unique_costs, order_inv) = if apply_unique {
         let (unique, indices) = unique_with_indices(costs);
@@ -98,14 +94,13 @@ pub fn is_pareto_front(
 }
 
 // will be about 1.3x faster if we use this and cache it somehow instead of calling it repeatedely on the same points
-use std::collections::HashMap;
 pub fn unique_with_indices(arr: &Vec<Vec<i32>>) -> (Vec<Vec<i32>>, Vec<usize>) {
     let n = arr.len();
     let mut unique = Vec::with_capacity(n);
     let mut indices = Vec::with_capacity(n);
     let mut seen = HashMap::with_capacity(n);
 
-    for (i, point) in arr.iter().enumerate() {
+    for point in arr.iter() {
         if let Some(&idx) = seen.get(point) {
             indices.push(idx);
         } else {
@@ -224,12 +219,10 @@ pub fn pareto_algorithm(points: &Vec<Vec<i32>>, only_one: bool) -> Vec<Vec<Point
         .collect::<Vec<Point>>();
 
     let mut frontiers = Vec::new();
-    let (mut remaining_points, indices) = unique_with_indices(&points_inverted);
+    let (mut remaining_points, _) = unique_with_indices(&points_inverted);
 
-    //remaining_points.sort_by(|a, b| a[0].cmp(&b[0]));
-
-    while true {
-        let on_front = is_pareto_front(&remaining_points, true, Some(true));
+    loop {
+        let on_front = is_pareto_front(&remaining_points, true);
 
         // Extract frontier points
         let frontier: Vec<_> = remaining_points
