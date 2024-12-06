@@ -40,13 +40,9 @@
         (click)="refreshTimer()"
       />
       <div class="w-full">
-        <p-progressBar
-          [value]="value"
-          [style]="{ height: '8px' }"
-          sev
-        />
+        <p-progressBar [value]="value" [style]="{ height: '8px' }" sev />
       </div>
- 
+
       <p class="text-xs tig-dark p-0 m-0 mt-1">Data Refresh</p>
     </div>
   </div>
@@ -138,6 +134,11 @@
         >
           Elapsed Time
         </th>
+        <th
+          pSortableColumn="time_elapsed"
+          class="tig-dark text-center"
+          style="background-color: #ececee !important"
+        ></th>
       </tr>
     </ng-template>
     <ng-template pTemplate="body" let-benchmark let-expanded="expanded">
@@ -215,6 +216,17 @@
             {{ benchmark.time_elapsed | timeConverter }}
           </div>
         </td>
+        <td>
+          <div class="flex justify-content-center align-items-center">
+            <p-button
+              label="STOP"
+              [rounded]="true"
+              severity="warning"
+              [disabled]="!benchmark.stoppable"
+              (click)="tigService.stopBenchmark(benchmark);"
+            />
+          </div>
+        </td>
       </tr>
     </ng-template>
     <ng-template pTemplate="rowexpansion" let-benchmark>
@@ -268,6 +280,10 @@
                   >
                     Elapsed Time
                   </th>
+                  <th
+                    class="tig-dark text-center"
+                    style="background-color: #ececee !important"
+                  ></th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-batch>
@@ -316,6 +332,17 @@
                       class="flex justify-content-center align-items-center tig-dark"
                     >
                       {{ batch.time_elapsed | timeConverter }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="flex justify-content-center align-items-center">
+                      <p-button
+                        label="VERIFY"
+                        [rounded]="true"
+                        severity="success"
+                        [disabled]="!batch.verifiable"
+                        (click)="tigService.verifyBatch(batch);"
+                      />
                     </div>
                   </td>
                 </tr>

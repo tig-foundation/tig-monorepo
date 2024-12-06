@@ -109,7 +109,8 @@ export class TigApisService {
             const batch_number =
               Math.floor(batch.start_nonce / b.num_nonces) + 1;
             const num_solutions = batch.solutions ? batch.solutions.length : 0;
-            const status = batch.created_at != batch.updated_at ? 'COMPLETED' : 'PENDING';
+            const status =
+              batch.created_at != batch.updated_at ? 'COMPLETED' : 'PENDING';
             let time_elapsed = 0;
             if (batch.created_at != batch.updated_at) {
               const start_timestamp = batch.created_at;
@@ -152,5 +153,20 @@ export class TigApisService {
         })
       );
     }
+  }
+
+  verifyBatch(batch: any) {
+    console.log('verifyBatch', batch);
+    const url = `${this.base_url}/verify-batch/${batch.benchmark_id}_${batch.batch_number}`;
+    axios.get(url).then(() => {
+      this.getBenchmarks();
+    });
+  }
+  stopBenchmark(benchmark: any) {
+    console.log('benchmark', benchmark);
+    const url = `${this.base_url}/stop/${benchmark.benchmark_id}`;
+    axios.get(url).then(() => {
+      this.getBenchmarks();
+    });
   }
 }
