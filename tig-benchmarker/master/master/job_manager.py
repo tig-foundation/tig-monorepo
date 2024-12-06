@@ -162,8 +162,8 @@ class JobManager:
                 atomic_update += [
                     (
                         """
-                        INSERT INTO proofs_batch (sampled_nonces, benchmark_id, batch_idx, slave)
-                        SELECT %s, A.benchmark_id, A.batch_idx, A.slave
+                        INSERT INTO proofs_batch (sampled_nonces, benchmark_id, batch_idx, slave, start_time)
+                        SELECT %s, A.benchmark_id, A.batch_idx, A.slave, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
                         FROM root_batch A
                         WHERE A.benchmark_id = %s AND A.batch_idx = %s
                         """,
@@ -184,6 +184,19 @@ class JobManager:
                 """,
                 (tuple(proofs),)
             )
+
+        # stop any expired jobs
+        db_conn.execute(
+            """
+            UPDATE job
+            SET stopped = true
+            WHERE end_time IS NULL
+                AND stopped IS NULL
+                AND %s >= block_started + 120
+            """,
+            (block.details.height,)
+        )
+        
                 
     def run(self):
         now = int(time.time() * 1000)

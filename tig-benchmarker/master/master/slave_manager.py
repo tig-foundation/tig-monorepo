@@ -56,18 +56,49 @@ class SlaveManager:
             # check how many batches are currently assigned for this slave
             result = db_conn.fetch_all(
                 """
-                SELECT benchmark_id || '_' || batch_idx AS id
-                FROM root_batch
-                WHERE slave = %s 
-                    AND end_time IS NULL
+                SELECT 
+                    JSONB_BUILD_OBJECT(
+                        'id', A.benchmark_id || '_' || A.batch_idx,
+                        'benchmark_id', A.benchmark_id,
+                        'start_nonce', A.batch_idx * B.batch_size,
+                        'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
+                        'settings', B.settings,
+                        'sampled_nonces', NULL,
+                        'runtime_config', B.runtime_config,
+                        'download_url', B.download_url,
+                        'rand_hash', B.rand_hash,
+                        'batch_size', B.batch_size,
+                        'batch_idx', A.batch_idx
+                    ) AS batch
+                FROM root_batch A
+                INNER JOIN job B
+                    ON A.slave = %s
+                    AND A.ready IS NULL
+                    AND B.stopped IS NULL
+                    AND A.benchmark_id = B.benchmark_id
                 
                 UNION ALL
                 
-                SELECT benchmark_id || '_' || batch_idx AS id
-                FROM proofs_batch
-                WHERE slave = %s
-                    AND end_time IS NULL
-                    AND start_time IS NOT NULL
+                SELECT 
+                    JSONB_BUILD_OBJECT(
+                        'id', A.benchmark_id || '_' || A.batch_idx,
+                        'benchmark_id', A.benchmark_id,
+                        'start_nonce', A.batch_idx * B.batch_size,
+                        'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
+                        'settings', B.settings,
+                        'sampled_nonces', A.sampled_nonces,
+                        'runtime_config', B.runtime_config,
+                        'download_url', B.download_url,
+                        'rand_hash', B.rand_hash,
+                        'batch_size', B.batch_size,
+                        'batch_idx', A.batch_idx
+                    ) AS batch
+                FROM proofs_batch A
+                INNER JOIN job B
+                    ON A.slave = %s
+                    AND A.ready IS NULL
+                    AND B.stopped IS NULL
+                    AND A.benchmark_id = B.benchmark_id
                 """, 
                 (
                     slave_name, 
@@ -77,25 +108,30 @@ class SlaveManager:
             concurrent = len(result) if result else 0
             if concurrent >= slave["max_concurrent_batches"]:
                 logger.debug(f"{slave_name} get-batch: Max concurrent batches reached")
-                batch_ids = [r["id"] for r in result]
-                return JSONResponse(content=jsonable_encoder(batch_ids), status_code=425)
+                return JSONResponse(content=jsonable_encoder([r["batch"] for r in result]), status_code=425)
 
             # find pendings proof where the slave computed the root recently
             result = db_conn.fetch_one(
                 """
                 WITH selected AS (
                     SELECT
-                        A.benchmark_id || '_' || A.batch_idx AS id,
-                        A.sampled_nonces, 
-                        A.benchmark_id, 
+                        A.benchmark_id,
                         A.batch_idx,
-                        C.settings, 
-                        C.num_nonces, 
-                        C.runtime_config, 
-                        C.download_url, 
-                        C.rand_hash, 
-                        C.batch_size,
-                        C.challenge
+                        C.challenge,
+                        C.algorithm,
+                        JSONB_BUILD_OBJECT(
+                            'id', A.benchmark_id || '_' || A.batch_idx,
+                            'benchmark_id', A.benchmark_id,
+                            'start_nonce', A.batch_idx * C.batch_size,
+                            'num_nonces', LEAST(C.batch_size, C.num_nonces - A.batch_idx * C.batch_size),
+                            'settings', C.settings,
+                            'sampled_nonces', A.sampled_nonces,
+                            'runtime_config', C.runtime_config,
+                            'download_url', C.download_url,
+                            'rand_hash', C.rand_hash,
+                            'batch_size', C.batch_size,
+                            'batch_idx', A.batch_idx
+                        ) AS batch
                     FROM proofs_batch A
                     INNER JOIN root_batch B
                         ON A.slave = %s
@@ -131,17 +167,23 @@ class SlaveManager:
                     """
                     WITH selected AS (
                         SELECT 
-                            A.benchmark_id || '_' || A.batch_idx AS id,
-                            A.sampled_nonces, 
-                            A.benchmark_id, 
+                            A.benchmark_id,
                             A.batch_idx,
-                            C.settings, 
-                            C.num_nonces, 
-                            C.runtime_config,
-                            C.download_url, 
-                            C.rand_hash,
-                            C.batch_size,
-                            C.challenge
+                            C.challenge,
+                            C.algorithm,
+                            JSONB_BUILD_OBJECT(
+                                'id', A.benchmark_id || '_' || A.batch_idx,
+                                'benchmark_id', A.benchmark_id,
+                                'start_nonce', A.batch_idx * C.batch_size,
+                                'num_nonces', LEAST(C.batch_size, C.num_nonces - A.batch_idx * C.batch_size),
+                                'settings', C.settings,
+                                'sampled_nonces', A.sampled_nonces,
+                                'runtime_config', C.runtime_config,
+                                'download_url', C.download_url,
+                                'rand_hash', C.rand_hash,
+                                'batch_size', C.batch_size,
+                                'batch_idx', A.batch_idx
+                            ) AS batch
                         FROM proofs_batch A
                         INNER JOIN root_batch B
                             ON A.ready IS NULL
@@ -180,17 +222,24 @@ class SlaveManager:
                 result = db_conn.fetch_one(
                     """
                     WITH selected AS (
-                        SELECT 
-                            A.benchmark_id || '_' || A.batch_idx AS id,
+                        SELECT
                             A.benchmark_id,
                             A.batch_idx,
-                            B.settings,
-                            B.num_nonces,
-                            B.runtime_config,
-                            B.download_url, 
-                            B.rand_hash,
-                            B.batch_size,
-                            B.challenge
+                            B.challenge,
+                            B.algorithm,
+                            JSONB_BUILD_OBJECT(
+                                'id', A.benchmark_id || '_' || A.batch_idx,
+                                'benchmark_id', A.benchmark_id,
+                                'start_nonce', A.batch_idx * B.batch_size,
+                                'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
+                                'settings', B.settings,
+                                'sampled_nonces', NULL,
+                                'runtime_config', B.runtime_config,
+                                'download_url', B.download_url,
+                                'rand_hash', B.rand_hash,
+                                'batch_size', B.batch_size,
+                                'batch_idx', A.batch_idx
+                            ) AS batch
                         FROM root_batch A
                         INNER JOIN job B
                             ON A.ready IS NULL
@@ -223,26 +272,9 @@ class SlaveManager:
             if result is None:
                 logger.debug(f"{slave_name} get-batch: None available")
                 raise HTTPException(status_code=503, detail="No batches available")
- 
-            selected_challenge = result["challenge"]
-            start_nonce = result["batch_idx"] * result["batch_size"]
 
-            batch = Batch(
-                id=result["id"],
-                benchmark_id=result["benchmark_id"],
-                start_nonce=start_nonce,
-                num_nonces=min(result["batch_size"], result["num_nonces"] - start_nonce),
-                settings=result["settings"],
-                sampled_nonces=result.get("sampled_nonces"),
-                runtime_config=result["runtime_config"],
-                download_url=result["download_url"],
-                rand_hash=result["rand_hash"],
-                batch_size=result["batch_size"],
-                batch_idx=result["batch_idx"]
-            )
-
-            logger.debug(f"{slave_name} get-batch: (challenge: {selected_challenge}, benchmark_id: {batch.benchmark_id})")
-            return JSONResponse(content=jsonable_encoder(batch))
+            logger.debug(f"{slave_name} get-batch: (challenge: {result['challenge']}, algorithm: {result['algorithm']} benchmark_id: {result['benchmark_id']})")
+            return JSONResponse(content=jsonable_encoder(result['batch']))
 
         @app.post('/submit-batch-root/{batch_id}')
         async def submit_batch_root(batch_id: str, request: Request):
