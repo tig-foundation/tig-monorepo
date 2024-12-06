@@ -295,3 +295,39 @@ class Deposit(FromDict):
     id: str
     details: DepositDetails
     state: DepositState
+
+@dataclass
+class Job(FromDict):
+    benchmark_id: str
+    settings: BenchmarkSettings
+    num_nonces: int
+    rand_hash: str
+    runtime_config: Dict[str, int]
+    download_url: str
+    batch_size: int
+    challenge: str
+    sampled_nonces: Optional[List[int]] = field(default_factory=list)
+    merkle_root: Optional[MerkleHash] = None
+    solution_nonces: List[int] = field(default_factory=list)  # Removed duplicate
+    merkle_proofs: Dict[int, MerkleProof] = field(default_factory=dict)
+    batch_merkle_proofs: Dict[int, MerkleProof] = field(default_factory=dict)
+    batch_merkle_roots: List[Optional[MerkleHash]] = field(default_factory=list)
+    last_benchmark_submit_time: int = 0
+    last_proof_submit_time: int = 0
+    last_batch_retry_time: List[int] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.batch_merkle_roots = [None] * self.num_batches
+        self.last_batch_retry_time = [0] * self.num_batches
+
+    @property
+    def num_batches(self) -> int:
+        return (self.num_nonces + self.batch_size - 1) // self.batch_size
+
+    @property
+    def sampled_nonces_by_batch_idx(self) -> Dict[int, List[int]]:
+        ret = {}
+        for nonce in self.sampled_nonces:
+            batch_idx = nonce // self.batch_size
+            ret.setdefault(batch_idx, []).append(nonce)
+        return ret

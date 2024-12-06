@@ -5,7 +5,8 @@ from dataclasses import dataclass, fields, is_dataclass, asdict
 from typing import TypeVar, Type, Dict, Any, List, Union, Optional, get_origin, get_args
 import json
 import time
-    
+from decimal import Decimal  # Added import
+
 T = TypeVar('T', bound='DataclassBase')
 
 class FromStr(ABC):
@@ -99,15 +100,18 @@ class FromDict:
 class PreciseNumber(FromStr):
     PRECISION = 10**18  # 18 decimal places of precision
 
-    def __init__(self, value: Union[int, float, str, PreciseNumber]):
+    def __init__(self, value: Union[int, float, str, 'PreciseNumber', Decimal]):
         if isinstance(value, PreciseNumber):
             self._value = value._value
         elif isinstance(value, int):
             self._value = value * self.PRECISION
         elif isinstance(value, float):
             self._value = int(value * self.PRECISION)
+        elif isinstance(value, Decimal):
+            self._value = int(value * Decimal(self.PRECISION))
         elif isinstance(value, str):
-            self._value = int(value)
+            value = Decimal(value)
+            self._value = int(value * Decimal(self.PRECISION))
         else:
             raise TypeError(f"Unsupported type for PreciseNumber: {type(value)}")
 
@@ -124,73 +128,73 @@ class PreciseNumber(FromStr):
     def to_float(self) -> float:
         return self._value / self.PRECISION
 
-    def __add__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
-        if isinstance(other, (int, float)):
+    def __add__(self, other: Union['PreciseNumber', int, float, Decimal]) -> 'PreciseNumber':
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return PreciseNumber(self._value + other._value)
 
-    def __sub__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
-        if isinstance(other, (int, float)):
+    def __sub__(self, other: Union['PreciseNumber', int, float, Decimal]) -> 'PreciseNumber':
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return PreciseNumber(self._value - other._value)
 
-    def __mul__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
-        if isinstance(other, (int, float)):
+    def __mul__(self, other: Union['PreciseNumber', int, float, Decimal]) -> 'PreciseNumber':
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return PreciseNumber((self._value * other._value) // self.PRECISION)
 
-    def __truediv__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
-        if isinstance(other, (int, float)):
+    def __truediv__(self, other: Union['PreciseNumber', int, float, Decimal]) -> 'PreciseNumber':
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         if other._value == 0:
             raise ZeroDivisionError
         return PreciseNumber((self._value * self.PRECISION) // other._value)
 
-    def __floordiv__(self, other: Union[PreciseNumber, int, float]) -> PreciseNumber:
-        if isinstance(other, (int, float)):
+    def __floordiv__(self, other: Union['PreciseNumber', int, float, Decimal]) -> 'PreciseNumber':
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         if other._value == 0:
             raise ZeroDivisionError
-        return PreciseNumber((self._value * self.PRECISION // other._value))
+        return PreciseNumber((self._value * self.PRECISION) // other._value)
 
-    def __eq__(self, other: Union[PreciseNumber, int, float]) -> bool:
-        if isinstance(other, (int, float)):
+    def __eq__(self, other: Union['PreciseNumber', int, float, Decimal]) -> bool:
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return self._value == other._value
 
-    def __lt__(self, other: Union[PreciseNumber, int, float]) -> bool:
-        if isinstance(other, (int, float)):
+    def __lt__(self, other: Union['PreciseNumber', int, float, Decimal]) -> bool:
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return self._value < other._value
 
-    def __le__(self, other: Union[PreciseNumber, int, float]) -> bool:
-        if isinstance(other, (int, float)):
+    def __le__(self, other: Union['PreciseNumber', int, float, Decimal]) -> bool:
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return self._value <= other._value
 
-    def __gt__(self, other: Union[PreciseNumber, int, float]) -> bool:
-        if isinstance(other, (int, float)):
+    def __gt__(self, other: Union['PreciseNumber', int, float, Decimal]) -> bool:
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return self._value > other._value
 
-    def __ge__(self, other: Union[PreciseNumber, int, float]) -> bool:
-        if isinstance(other, (int, float)):
+    def __ge__(self, other: Union['PreciseNumber', int, float, Decimal]) -> bool:
+        if isinstance(other, (int, float, Decimal)):
             other = PreciseNumber(other)
         return self._value >= other._value
 
-    def __radd__(self, other: Union[int, float]) -> PreciseNumber:
+    def __radd__(self, other: Union[int, float, Decimal]) -> 'PreciseNumber':
         return self + other
 
-    def __rsub__(self, other: Union[int, float]) -> PreciseNumber:
+    def __rsub__(self, other: Union[int, float, Decimal]) -> 'PreciseNumber':
         return PreciseNumber(other) - self
 
-    def __rmul__(self, other: Union[int, float]) -> PreciseNumber:
+    def __rmul__(self, other: Union[int, float, Decimal]) -> 'PreciseNumber':
         return self * other
 
-    def __rtruediv__(self, other: Union[int, float]) -> PreciseNumber:
+    def __rtruediv__(self, other: Union[int, float, Decimal]) -> 'PreciseNumber':
         return PreciseNumber(other) / self
 
-    def __rfloordiv__(self, other: Union[int, float]) -> PreciseNumber:
+    def __rfloordiv__(self, other: Union[int, float, Decimal]) -> 'PreciseNumber':
         return PreciseNumber(other) // self
 
 def jsonify(obj: Any) -> str:
@@ -214,4 +218,3 @@ def u64s_from_str(input: str) -> List[int]:
 
 def now():
     return int(time.time() * 1000)
-

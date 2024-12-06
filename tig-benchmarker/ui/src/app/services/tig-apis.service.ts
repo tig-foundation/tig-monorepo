@@ -82,8 +82,6 @@ export class TigApisService {
           }
           const num_solutions = b.solutions ? b.solutions.length : 0;
 
-          console.log(b);
-
           let time_elapsed = 0;
           if (!b.last_proof_submit_time) {
             const start_timestamp = b.created_at;

@@ -558,6 +558,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubmitTopupResponse'
+  /submit-deposit:
+    post:
+      tags:
+        - POST
+      summary: Submit a deposit
+      description: |-
+        # Notes
+        
+        * This endpoint can only be invoked once every few seconds
+
+        * `<tx_hash>`
+        * `<log_idx>`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitDepositRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitDepositResponse'
 components:
   schemas:
     Address:
@@ -1154,6 +1184,14 @@ components:
           $ref: '#/components/schemas/Address'
         is_multisig:
           type: boolean
+    PlayerValueDelegatee:
+      type: object
+      properties:
+        value:
+          $ref: '#/components/schemas/Address'
+        block_set:
+          type: integer
+          format: uint32
     PlayerState:
       type: object
       properties:
@@ -1199,7 +1237,40 @@ components:
           $ref: '#/components/schemas/BenchmarkSettings'
         state:
           $ref: '#/components/schemas/PrecommitState'
-    PrecommitDetails:
+    DepositDetails:
+      type: object
+      properties:
+        player_id:
+          $ref: '#/components/schemas/Address'
+        tx_hash:
+          $ref: '#/components/schemas/TxHash'
+        log_idx:
+          type: integer
+          format: uint64
+        amount:
+          $ref: '#/components/schemas/PreciseNumber'
+        start_timestamp:
+          type: integer
+          format: uint64
+        end_timestamp:
+          type: integer
+          format: uint64
+    DepositState:
+      type: object
+      properties:
+        block_confirmed:
+          type: integer
+          format: uint32
+    Deposit:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/MD5'
+        details:
+          $ref: '#/components/schemas/DepositDetails'
+        state:
+          $ref: '#/components/schemas/DepositState'
+    DepositDetails:
       type: object
       properties:
         block_started:
