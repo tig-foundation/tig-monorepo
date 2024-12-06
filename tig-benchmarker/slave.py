@@ -206,11 +206,19 @@ def poll_batch(session, master_ip, master_port, output_path):
         time.sleep(0.2)
 
     elif resp.status_code == 425: # too early
-        batch_ids = resp.json()
+        batches = resp.json()
+        batch_ids = [batch['id'] for batch in batches]
         logger.info(f"max concurrent batches reached: {batch_ids}")
+        for batch in batches:
+            output_folder = f"{output_path}/{batch['id']}"
+            if os.path.exists(output_folder):
+                continue
+            os.makedirs(output_folder, exist_ok=True)
+            with open(f"{output_folder}/batch.json", "w") as f:
+                json.dump(batch, f)
         PENDING_BATCH_IDS.clear()
         PENDING_BATCH_IDS.update(batch_ids)
-        time.sleep(2)
+        time.sleep(5)
 
     else:
         logger.error(f"status {resp.status_code} when fetching batch: {resp.text}")
