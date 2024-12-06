@@ -46,6 +46,8 @@ class JobManager:
                 for c in challenges.values()
             }
 
+            print(precommits)
+
             # Create jobs from confirmed precommits
             for benchmark_id, precommit in precommits.items():
                 if benchmark_id in job_map or benchmark_id in proofs:

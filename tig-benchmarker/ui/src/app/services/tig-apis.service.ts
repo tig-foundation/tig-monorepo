@@ -131,4 +131,19 @@ export class TigApisService {
       );
     }
   }
+
+  verifyBatch(batch: any) {
+    console.log('verifyBatch', batch);
+    const url = `${this.base_url}/verify-batch/${batch.benchmark_id}_${batch.batch_number}`;
+    axios.get(url).then(() => {
+      this.getBenchmarks();
+    });
+  }
+  stopBenchmark(benchmark: any) {
+    console.log('benchmark', benchmark);
+    const url = `${this.base_url}/stop/${benchmark.benchmark_id}`;
+    axios.get(url).then(() => {
+      this.getBenchmarks();
+    });
+  }
 }
