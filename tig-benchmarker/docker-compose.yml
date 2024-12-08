@@ -57,7 +57,7 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     ports:
-      - "{UI_PORT}:80"
+      - "${UI_PORT}:80"
     networks:
       - tig-benchmarker
     depends_on:
