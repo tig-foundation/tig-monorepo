@@ -15,7 +15,7 @@ export UI_PORT=80
 export DB_PORT=5432
 export MASTER_PORT=5115
 
-docker-compose up
+docker-compose up --build
 ```
 
 See last section on how to find your player_id & api_key.
@@ -30,6 +30,12 @@ See last section on how to find your player_id & api_key.
 * You can view the logs of each service individually: `docker-compose logs -f <service>`
     * There are 4 services: `db`, `master`, `ui`, `nginx`
 * To query the database, recommend to use [pgAdmin](https://www.pgadmin.org/)
+
+## Hard Resetting Your Master
+
+1. Kill the services: `docker-compose down`
+2. Delete the database: `rm -rf db_data`
+3. Start your master
 
 # Connecting Slaves
 
@@ -48,6 +54,12 @@ See last section on how to find your player_id & api_key.
 * To set the number of workers (threads), use the option `--workers <NUM_WORKERS>`
 * To use a different port, use the option `--port <MASTER_PORT>`
 * To see all options, use `--help` 
+
+## Hard Resetting Your Slave
+
+1. Stop your slave
+2. Remove the output folder (defaults to results): `rm -rf results`
+3. Start your slave
 
 # Optimising your Config
 
