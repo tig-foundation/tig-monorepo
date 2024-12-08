@@ -154,7 +154,7 @@ SELECT '
       "vector_search": {
         "algorithm": "invector_hybrid",
         "num_nonces": 40,
-        "weight": 0,
+        "weight": 1,
         "base_fee_limit": "10000000000000000"
       }
     }

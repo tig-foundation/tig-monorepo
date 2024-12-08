@@ -9,6 +9,7 @@ from master.sql import db_conn
 from fastapi import FastAPI, Query, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi import Request
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -179,7 +180,11 @@ class ClientManager:
                 """
             )
 
-            return JSONResponse(content=[dict(row) for row in result], status_code=200)
+            return JSONResponse(
+                content=[dict(row) for row in result], 
+                status_code=200,
+                headers = {"Accept-Encoding": "gzip"}
+            )
 
     def start(self):
         def run():
@@ -190,6 +195,11 @@ class ClientManager:
                 allow_credentials=True,
                 allow_methods=["*"],
                 allow_headers=["*"],
+            )
+            self.app.add_middleware(
+                GZipMiddleware,
+                minimum_size=1000,
+                compresslevel=5,
             )
 
             self.setup_routes()
