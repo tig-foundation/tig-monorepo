@@ -82,6 +82,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
                 .min()
                 .unwrap();
+            // should we uncomment this again?
             // let phase_in_cutoff = cutoff_cap.min(
             //     (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
             // );
@@ -118,6 +119,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         if !solutions_by_challenge.contains_key(challenge_id) {
             continue;
         }
+        // is cutoff already applied at this stage?
         let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
         let points = solutions
             .iter()
@@ -275,6 +277,18 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             continue;
         }
 
+        let total_delegated_weighted_deposit = player_data
+            .delegatees
+            .iter()
+            .map(|(_, fraction)| fraction)
+            .sum::<f64>();
+
+        if total_delegated_weighted_deposit != 1.0 {
+            continue;
+        }
+
+        // we should probably consider using fixed-point instead of floats
+        // for these things.
         for (delegatee, fraction) in player_data.delegatees.iter() {
             let fraction = PreciseNumber::from_f64(*fraction);
             let opow_data = active_opow_block_data.get_mut(delegatee).unwrap();

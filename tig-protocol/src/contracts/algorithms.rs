@@ -162,12 +162,21 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let yes = vote.value;
             if let Some(breakthrough_state) = voting_breakthroughs_state.get_mut(breakthrough_id) {
                 let n = breakthrough_state.round_votes_tallied - block_details.round;
-                let votes: PreciseNumber = player_data
-                    .deposit_by_locked_period
-                    .iter()
-                    .skip(n as usize)
-                    .sum();
-                *breakthrough_state.votes_tally.get_mut(&yes).unwrap() += votes;
+                if n > 0 && n <= player_data.deposit_by_locked_period.len() as u32 {
+                    let votes: PreciseNumber = player_data
+                        .deposit_by_locked_period
+                        .iter()
+                        .skip(n as usize)
+                        .sum();
+
+                    *breakthrough_state.votes_tally.get_mut(&yes).unwrap() += votes;
+                } else {
+                    /*log::error!(
+                        "n < 0 || n > {} [{}]",
+                        player_data.deposit_by_locked_period.len() as u32,
+                        n
+                    );*/
+                }
             }
         }
     }
@@ -197,10 +206,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             {
                 let num_qualifiers = PreciseNumber::from(num_qualifiers);
                 let opow_data = &active_opow_block_data[player_id];
-                let player_num_qualifiers =
-                    PreciseNumber::from(opow_data.num_qualifiers_by_challenge[challenge_id]);
-
-                weight = weight + opow_data.influence * num_qualifiers / player_num_qualifiers;
+                let player_num_qualifiers = opow_data.num_qualifiers_by_challenge[challenge_id];
+                
+                // possible div by 0
+                if player_num_qualifiers > 0 {
+                    // should we use averages for influence?
+                    weight = weight + opow_data.influence * num_qualifiers / PreciseNumber::from(player_num_qualifiers);
+                }
             }
             weights.push(weight);
         }
@@ -251,11 +263,18 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     // update merges at last block of the round
     if (block_details.height + 1) % config.rounds.blocks_per_round == 0 {
         for algorithm_ids in algorithms_by_challenge.values() {
+            if algorithm_ids.len() == 0 {
+                continue;
+            }
+
             let algorithm_id = algorithm_ids
                 .iter()
                 .max_by_key(|&id| active_algorithms_block_data[id].merge_points)
                 .unwrap();
 
+            // what do if tie? (multiple algorithms with same merge points)
+            // could potentially be used to craft
+            // specific algorithm ids and then block other merges?
             if active_algorithms_block_data[algorithm_id].merge_points
                 < config.algorithms.merge_points_threshold
             {
@@ -291,6 +310,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 let yes = &breakthrough.votes_tally[&true];
                 let no = &breakthrough.votes_tally[&false];
                 let total = yes + no;
+                // should there a min % for participation before a breakthrough is active
+                // e.g. 10% of users with deposit must have voted
                 if total != zero && yes / total >= yes_threshold {
                     breakthrough.round_active = Some(block_details.round + 1);
                 }

@@ -254,12 +254,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     } = cache;
 
     let seconds_till_round_end = (block_details.round * config.rounds.blocks_per_round
-        - block_details.height)
-        * config.rounds.seconds_between_blocks;
+        - block_details.height) as u64
+        * config.rounds.seconds_between_blocks as u64;
     let seconds_per_round = config.rounds.seconds_between_blocks * config.rounds.blocks_per_round;
     let mut round_timestamps = vec![
         block_details.timestamp,
-        block_details.timestamp + seconds_till_round_end as u64,
+        block_details.timestamp + seconds_till_round_end,
     ];
     let lock_period_cap = config.deposits.lock_period_cap as usize;
     for _ in 2..=lock_period_cap {
@@ -267,7 +267,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     for deposit in active_deposit_details.values() {
-        let total_time = PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp);
+        // prevent div by 0
+        let total_time = if PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp) == PreciseNumber::from(0) {
+            PreciseNumber::from(1)
+        } else {
+            PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp)
+        };
+
         for i in 0..lock_period_cap {
             if round_timestamps[i + 1] <= deposit.start_timestamp {
                 continue;
