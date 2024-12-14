@@ -115,7 +115,7 @@ To further assist you in exercising your vote in an informed way, we have set ou
 
   You should endeavour to avoid affirming eligibility for potential Breakthrough Rewards for algorithmic methods that are not, novel and inventive because this can have serious consequences by prejudicing and stifling innovation that does satisfy those criteria.
 
-  An algorithmic method that is incorrectly made eligible for potential Breakthrough Rewards may, if sufficiently adopted by benchmarkers, either; **(i)** deprive an innovator of their continuing Breakthrough Rewards thus disincentivising future innovation from that innovator and other observers; or **(ii)** deprive the TIG Treasury of bootstrap rewards (see below). Bootstrap rewards would be used as bounties, in situations where there is no incumbent algorithmic method that is eligible for Breakthrough Rewards to encourage the submission of innovative algorithmic methods that are closer to state of the art solvers in terms of performance.
+  An algorithmic method that is incorrectly made eligible for potential Breakthrough Rewards may, if sufficiently adopted by benchmarkers, either; **(i)** deprive an innovator of their continuing Breakthrough Rewards thus disincentivising future innovation from that innovator and other observers; or **(ii)** deprive the TIG Treasury of bootstrap rewards (see below). Bootstrap Rewards should be used to fund/incentivise research towards an algorithmic breakthrough corresponding to challenges featured in TIG.
 
 ### Bootstrap Rewards
 

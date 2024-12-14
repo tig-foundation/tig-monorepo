@@ -20,7 +20,8 @@ Each submissions is committed to their own branch with the naming pattern:
 4. Email your invention assignment to contact@tig.foundation with subject "Invention Assignment"
 
 5. Submit your evidence via https://play.tig.foundation/innovator
-    * You will need to burn 250 TIG to make a submission
+    * 250 TIG will be deducted from your Available Fee Balance to make a submission
+    * You can topup via the [Benchmarker page](https://play.tig.foundation/benchmarker)
 
 ## Method Submission Flow
 
