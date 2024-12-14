@@ -20,10 +20,11 @@ WASM blobs for an algorithm are stored in the `wasm` subfolder and can be downlo
 
 1. New submissions get their branch pushed to a private version of this repository
 2. CI will compile submissions into WASM
-3. A new submission made during round `X` will have its branch pushed to the public version of this repository at the start of round `X + 3`
-4. Once public, benchmarkers can use the algorithm for benchmarking
-5. Every block, algorithms with at least 25% adoption earn a merge point
-6. At the end of a round, a the algorithm from each challenge with the most merge points, meeting the minimum threshold of 5040, gets merged to the `main` branch
+3. A new submission made during round `X` will have its branch pushed to the public version of this repository at the start of round `X + 2`
+4. At the start of round `X + 4`, the submission becomes active, where benchmarkers can use the algorithm for benchmarking
+5. Every block, algorithms with at least 25% adoption earn rewards and a merge point
+6. At the end of a round, a algorithm from each challenge with the most merge points, meeting the minimum threshold of 5040, gets merged to the `main` branch
+    * Merged algorithms receive rewards every block where their adoption is greater than 0%
 
 # License
 

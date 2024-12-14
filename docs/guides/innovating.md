@@ -69,9 +69,13 @@ git pull public <branch>
 2. Make a copy of `tig-algorithms/<challenge_name>/template.rs` or an existing algorithm (see notes)
 3. Make sure your file has the following notice in its header if you intend to submit it to TIG:
 ```
-Copyright [yyyy] [name of copyright owner]
+Copyright [year copyright work created] [name of copyright owner]
 
-Licensed under the TIG Inbound Game License v1.0 or (at your option) any later
+Identity of Submitter [name of person or entity that submits the Work to TIG]
+
+UAI [UAI (if applicable)]
+
+Licensed under the TIG Inbound Game License v2.0 or (at your option) any later
 version (the "License"); you may not use this file except in compliance with the
 License. You may obtain a copy of the License at
 
@@ -82,6 +86,10 @@ under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
 language governing permissions and limitations under the License.
 ```
+  * If your implementation is based on an algorithmic method submitted to TIG, you must attribute your implementation to it (example UAI: `c001_b001`)
+    * UAI of a method is detailed inside `tig-breakthroughs/<challenge_name>/<method_name>.md`
+    * Methods have branch name `<challenge_name>/method/<method_name>`
+  * If your implementation is based on an algorithmic method outside of TIG, set UAI to `null`
 4. Rename the file with your own `<algorithm_name>`
 5. Edit `tig-algorithms/<challenge_name>/mod.rs` to export your algorithm and test it:
     ```
@@ -141,95 +149,8 @@ language governing permissions and limitations under the License.
 * If you are copying and modifying an algorithm that has been submitted to TIG, make sure to use the `innovator_outbound` version
 * Do not include tests in your algorithm file. TIG will reject your algorithm submission.
 * Only your algorithm's rust code gets submitted. You should not be modifying `Cargo.toml` in `tig-algorithms`. Any extra dependencies you add will not be available when TIG compiles your algorithm
-* If you need to use random number generation be sure to use `let mut rng = StdRng::seed_from_u64(challenge.seed as u64)` to ensure your algorithm is deterministic.
-* To test cuda, edit the following test, and use the command `cargo test -p tig-algorithms --features cuda -- --nocapture`:
-```
-#[cfg(feature = "cuda")]
-#[cfg(test)]
-mod cuda_tests {
-    use std::collections::HashMap;
-
-    use super::*;
-    use cudarc::driver::*;
-    use cudarc::nvrtc::compile_ptx;
-    use std::{sync::Arc, collections::HashMap};
-    use tig_challenges::{<challenge_name>::*, *};
-
-    fn load_cuda_functions(
-        dev: &Arc<CudaDevice>,
-        kernel: &CudaKernel,
-        key: &str,
-    ) -> HashMap<&'static str, CudaFunction> {
-        let start = std::time::Instant::now();
-        println!("Compiling CUDA kernels for {}", key);
-        let ptx = compile_ptx(kernel.src).expect("Cuda Kernel failed to compile");
-        dev.load_ptx(ptx, key, &kernel.funcs)
-            .expect("Failed to load CUDA functions");
-        let funcs = kernel
-            .funcs
-            .iter()
-            .map(|&name| (name, dev.get_func(key, name).unwrap()))
-            .collect();
-        println!(
-            "CUDA kernels for '{}' compiled in {}ms",
-            key,
-            start.elapsed().as_millis()
-        );
-        funcs
-    }
-
-    #[test]
-    fn test_cuda_<algorithm_name>() {
-        let dev = CudaDevice::new(0).expect("Failed to create CudaDevice");
-        let challenge_cuda_funcs = match &<challenge_name>::KERNEL {
-            Some(kernel) => load_cuda_functions(&dev, &kernel, "challenge"),
-            None => {
-                println!("No CUDA kernel for challenge");
-                HashMap::new()
-            }
-        };
-        let algorithm_cuda_funcs = match &<algorithm_name>::KERNEL {
-            Some(kernel) => load_cuda_functions(&dev, &kernel, "algorithm"),
-            None => {
-                println!("No CUDA kernel for algorithm");
-                HashMap::new()
-            }
-        };
-
-        let difficulty = Difficulty {
-            // Uncomment the relevant fields.
-            // Modify the values for different difficulties
-
-            // -- satisfiability --
-            // num_variables: 50,
-            // clauses_to_variables_percent: 300,
-            // -- vehicle_routing --
-            // num_nodes: 40,
-            // better_than_baseline: 250,
-
-            // -- knapsack --
-            // num_items: 50,
-            // better_than_baseline: 10,
-
-            // -- vector_search --
-            // num_queries: 10,
-            // better_than_baseline: 350,
-        };
-        let seed = [0u8; 32]; // change this to generate different instances
-        let challenge =
-            Challenge::cuda_generate_instance(seed, &difficulty, &dev, challenge_cuda_funcs)
-                .unwrap();
-        match <algorithm_name>::cuda_solve_challenge(&challenge, &dev, algorithm_cuda_funcs) {
-            Ok(Some(solution)) => match challenge.verify_solution(&solution) {
-                Ok(_) => println!("Valid solution"),
-                Err(e) => println!("Invalid solution: {}", e),
-            },
-            Ok(None) => println!("No solution"),
-            Err(e) => println!("Algorithm error: {}", e),
-        };
-    }
-}
-```
+* If you need to use random number generation,  ensure that it is seeded so that your algorithm is deterministic.
+    * Suggest to use `let mut rng = SmallRng::from_seed(StdRng::from_seed(challenge.seed).gen())`
 
 ## Locally Compiling Your Algorithm into WASM 
 
@@ -251,7 +172,7 @@ git push origin <challenge_name>/<algorithm_name>
 
 ## Making Your Submission
 
-You will need to burn 0.001 ETH to make a submission. Visit https://play.tig.foundation/innovator and follow the instructions.
+You will need to burn 10 TIG to make a submission. Visit https://play.tig.foundation/innovator and follow the instructions.
 
 **IMPORTANT:** 
 * Submissions are final and cannot be modified after they are made

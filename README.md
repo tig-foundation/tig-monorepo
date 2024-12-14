@@ -4,16 +4,19 @@ This repository contains the implementation of The Innovation Game (TIG).
 
 ## Important Links
 
+* [TIG Documentation](https://docs.tig.foundation/)
 * [TIG Whitepaper](docs/whitepaper.pdf)
 * [TIG Tech Explainer](docs/tech/1_basics.md)
 * [TIG Licensing Explainer](docs/guides/anatomy.md)
 * [Getting Started with Innovating](docs/guides/innovating.md)
-* [Challenge Descriptions](docs/challenges/satisfiability.md)
+* [Implementations vs Breakthroughs](docs/guides/breakthroughs.md)
+* [Voting Guidelines for Token Holders](docs/guides/voting.md)
 
 ## Repo Contents
 
 * [tig-algorithms](./tig-algorithms/README.md) - A Rust crate that hosts algorithm submissions made by Innovators in TIG
 * [tig-benchmarker](./tig-benchmarker/README.md) - Python scripts for running TIG's benchmarker in master/slave configuration
+* [tig-breakthroughs](./tig-breakthroughs/README.md) - A folder that hosts submissions of algorithmic methods made by Innovators in TIG.
 * [tig-challenges](./tig-challenges/README.md) - A Rust crate that contains the implementation of TIG's challenges (computational problems adapted for proof-of-work)
 * [tig-protocol](./tig-protocol/README.md) - A Rust crate that contains the implementation of TIG's core protocol logic.
 * [tig-structs](./tig-structs/README.md) - A Rust crate that contains the definitions of structs used throughout TIG
