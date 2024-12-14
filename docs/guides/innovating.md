@@ -172,7 +172,8 @@ git push origin <challenge_name>/<algorithm_name>
 
 ## Making Your Submission
 
-You will need to burn 10 TIG to make a submission. Visit https://play.tig.foundation/innovator and follow the instructions.
+
+10 TIG will be deducted from your Available Fee Balance to make a submission. You can topup via the [Benchmarker page](https://play.tig.foundation/benchmarker)
 
 **IMPORTANT:** 
 * Submissions are final and cannot be modified after they are made

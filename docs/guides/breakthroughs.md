@@ -338,6 +338,4 @@ Contributor (referred to as "Submitter" in the TIG Inbound Game License)
 of the Contribution and the Game Rules will be amended such that any
 code based on the work submitted by that Contributor is required to
 attribute the Contributor thus creating an indication of the heritage of
-the code back to the original Contributor. We will also amend the Game
-Rules so that it is not permitted to use the name of the Contributor
-without their consent.
+the code back to the original Contributor.
