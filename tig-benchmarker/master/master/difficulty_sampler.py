@@ -67,65 +67,47 @@ def calc_valid_difficulties(upper_frontier: List[Point], lower_frontier: List[Po
     valid_difficulties = np.stack(np.where(weights), axis=1) + min_difficulty
     return valid_difficulties.tolist()
 
-def calc_pareto_frontier(points: List[Point]) -> Tuple[Frontier, List[bool]]:
-    if not points:
-        return [], []
-    
-    on_front = [True] * len(points)
-    stack = []
-    
-    for curr_idx in range(len(points)):
-        while stack and points[stack[-1]][0] > points[curr_idx][0]:
-            stack.pop()
-
-        if stack and points[stack[-1]][0] <= points[curr_idx][0]:
-            on_front[curr_idx] = False
-            
-        stack.append(curr_idx)
-
-    i = 0
-    while i < len(points):
-        j = i + 1
-        while j < len(points) and points[j][1] == points[i][1]:
-            j += 1
-
-        if j - i > 1:
-            min_x_idx = min(range(i, j), key=lambda k: points[k][0])
-            for k in range(i, j):
-                if k != min_x_idx:
-                    on_front[k] = False
-                    
-        i = j
-    
-    frontier = [points[i] for i in range(len(points)) if on_front[i]]
-    
-    return frontier, on_front
-
+def calc_pareto_frontier(points: List[Point]) -> Frontier:
+    """
+    Calculates a single Pareto frontier from a list of points
+    Adapted from https://stackoverflow.com/questions/32791911/fast-calculation-of-pareto-front-in-python
+    """
+    points_ = points
+    points = np.array(points)
+    frontier_idxs = np.arange(points.shape[0])
+    n_points = points.shape[0]
+    next_point_index = 0  # Next index in the frontier_idxs array to search for
+    while next_point_index < len(points):
+        nondominated_point_mask = np.any(points < points[next_point_index], axis=1)
+        nondominated_point_mask[np.all(points == points[next_point_index], axis=1)] = True
+        frontier_idxs = frontier_idxs[nondominated_point_mask]  # Remove dominated points
+        points = points[nondominated_point_mask]
+        next_point_index = np.sum(nondominated_point_mask[:next_point_index]) + 1
+    return [points_[idx] for idx in frontier_idxs]
 
 def calc_all_frontiers(points: List[Point]) -> List[Frontier]:
     """
     Calculates a list of Pareto frontiers from a list of points
     """
-    if not points:
-        return []
-
+    buckets = {}
+    r = np.max(points, axis=0) - np.min(points, axis=0) 
+    dim1, dim2 = (1, 0) if r[0] > r[1] else (0, 1)
+    for p in points:
+        if p[dim1] not in buckets:
+            buckets[p[dim1]] = []
+        buckets[p[dim1]].append(p)
+    for bucket in buckets.values():
+        bucket.sort(reverse=True, key=lambda x: x[dim2])
     frontiers = []
-    remaining_points = list(set(tuple(p) for p in points))
-    remaining_points.sort(key=lambda p: (p[1], p[0]))
-    
-    while True:
-        points_ = remaining_points if remaining_points is not None else points
-        frontier, on_front = calc_pareto_frontier(points_)
-
+    while len(buckets) > 0:
+        points = [bucket[-1] for bucket in buckets.values()]
+        frontier = calc_pareto_frontier(points)
+        for p in frontier:
+            x = p[dim1]
+            buckets[x].pop()
+            if len(buckets[x]) == 0:
+                buckets.pop(x)
         frontiers.append(frontier)
-        
-        # Get remaining points not on frontier
-        remaining_points = [points_[i] for i in range(len(points_)) if not on_front[i]]
-        
-        # Break if no more points to process
-        if not remaining_points:
-            break
-            
     return frontiers
 
 class DifficultySampler:
@@ -138,12 +120,14 @@ class DifficultySampler:
         for c in challenges.values():
             if c.block_data is None:
                 continue
+            print(c.details.name)
             logger.debug(f"Calculating valid difficulties and frontiers for challenge {c.details.name}")
             if c.block_data.scaling_factor >= 1:
                 upper_frontier, lower_frontier = c.block_data.scaled_frontier, c.block_data.base_frontier
             else:
                 upper_frontier, lower_frontier = c.block_data.base_frontier, c.block_data.scaled_frontier
             self.valid_difficulties[c.details.name] = calc_valid_difficulties(list(upper_frontier), list(lower_frontier))
+            print("DONE")
             self.frontiers[c.details.name] = calc_all_frontiers(self.valid_difficulties[c.details.name])
 
         self.challenges = [c.details.name for c in challenges.values()]
@@ -176,12 +160,12 @@ class DifficultySampler:
                     logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
 
             if not found_valid:
-                frontiers = self.frontiers[c_name]
-                difficulty_range = config["difficulty_ranges"][c_name] # FIXME
-                idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
-                idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
-                difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
-                difficulty = random.choice(difficulties)
+                # frontiers = self.frontiers[c_name]
+                # difficulty_range = config["difficulty_ranges"][c_name] # FIXME
+                # idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
+                # idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
+                # difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
+                difficulty = random.choice(self.valid_difficulties)
                 samples[c_name] = difficulty
                 logger.debug(f"Sampled difficulty {difficulty} for challenge {c_name}")
                 
