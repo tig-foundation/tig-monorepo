@@ -137,25 +137,19 @@ class DifficultySampler:
         for c_name in self.challenges:
             found_valid = False
 
-            if config["selected_difficulties"].get(c_name) is not None:
-                min_x = min(p[0] for p in self.valid_difficulties[c_name])
-                max_x = max(p[0] for p in self.valid_difficulties[c_name])
-                min_y = min(p[1] for p in self.valid_difficulties[c_name])
-                max_y = max(p[1] for p in self.valid_difficulties[c_name])
-
-                difficulties_ = list(config["selected_difficulties"][c_name])
-                random.shuffle(difficulties_)
-
-                for selected_difficulty in difficulties_:
-                    if selected_difficulty[0] >= min_x and selected_difficulty[0] <= max_x and \
-                    selected_difficulty[1] >= min_y and selected_difficulty[1] <= max_y:
-                        samples[c_name] = selected_difficulty
-                        logger.debug(f"Sampled difficulty {selected_difficulty} for challenge {c_name}")
-                        found_valid = True
-                        break
-
-                if not found_valid:
-                    logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
+            if len(selected_difficulties := config["selected_difficulties"].get(c_name, [])) > 0:
+                selected_difficulties = [tuple(d) for d in selected_difficulties]
+                selected_difficulties = [
+                    d for d in selected_difficulties if d in self.valid_difficulties[c_name]
+                ]
+            
+            if len(selected_difficulties) > 0:
+                random.shuffle(selected_difficulties)
+                samples[c_name] = selected_difficulties[0]
+                logger.debug(f"Sampled difficulty {selected_difficulty} for challenge {c_name}")
+                found_valid = True
+            else:
+                logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
 
             if not found_valid:
                 frontiers = self.frontiers[c_name]
