@@ -13,7 +13,7 @@ Each submissions is committed to their own branch with the naming pattern:
 
     * [Voting Guidelines for Token Holders](../docs/guides/voting.md)
 
-2. Copy `template.md` from the relevant challenges folder, and fill in the details with evidence of your breakthrough
+2. Copy `template.md` from the relevant challenges folder (e.g. [`knapsack/tempate.md`](./knapsack/template.md)), and fill in the details with evidence of your breakthrough
 
 3. Copy [invention_assignment.doc](../docs/agreements/invention_assignment.doc), fill in the details, and sign
 
