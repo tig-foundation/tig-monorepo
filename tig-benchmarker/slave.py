@@ -118,7 +118,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             logger.info(f"successfully posted root for batch {batch_id}")
         elif resp.status_code == 408: # took too long 
             FINISHED_BATCH_IDS[batch_id] = 0
-            logger.error(f"status {resp.status_code} when posting proofs for batch {batch_id} to master: {resp.text}")
+            logger.error(f"status {resp.status_code} when posting root for batch {batch_id} to master: {resp.text}")
         else:
             logger.error(f"status {resp.status_code} when posting root for batch {batch_id} to master: {resp.text}")
             READY_BATCH_IDS.add(batch_id) # requeue
@@ -211,8 +211,6 @@ def poll_batch(session, master_ip, master_port, output_path):
         logger.info(f"max concurrent batches reached: {batch_ids}")
         for batch in batches:
             output_folder = f"{output_path}/{batch['id']}"
-            if os.path.exists(output_folder):
-                continue
             os.makedirs(output_folder, exist_ok=True)
             with open(f"{output_folder}/batch.json", "w") as f:
                 json.dump(batch, f)
