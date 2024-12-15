@@ -165,7 +165,7 @@ SELECT '
     "slaves": [
       {
         "name_regex": ".*",
-        "max_concurrent_batches": 4,
+        "max_concurrent_batches": 1,
         "selected_challenges": [
           "satisfiability",
           "vehicle_routing",
