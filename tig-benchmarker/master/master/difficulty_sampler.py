@@ -120,14 +120,12 @@ class DifficultySampler:
         for c in challenges.values():
             if c.block_data is None:
                 continue
-            print(c.details.name)
             logger.debug(f"Calculating valid difficulties and frontiers for challenge {c.details.name}")
             if c.block_data.scaling_factor >= 1:
                 upper_frontier, lower_frontier = c.block_data.scaled_frontier, c.block_data.base_frontier
             else:
                 upper_frontier, lower_frontier = c.block_data.base_frontier, c.block_data.scaled_frontier
             self.valid_difficulties[c.details.name] = calc_valid_difficulties(list(upper_frontier), list(lower_frontier))
-            print("DONE")
             self.frontiers[c.details.name] = calc_all_frontiers(self.valid_difficulties[c.details.name])
 
         self.challenges = [c.details.name for c in challenges.values()]
@@ -160,12 +158,12 @@ class DifficultySampler:
                     logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
 
             if not found_valid:
-                # frontiers = self.frontiers[c_name]
-                # difficulty_range = config["difficulty_ranges"][c_name] # FIXME
-                # idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
-                # idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
-                # difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
-                difficulty = random.choice(self.valid_difficulties)
+                frontiers = self.frontiers[c_name]
+                difficulty_range = config["difficulty_ranges"][c_name]
+                idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
+                idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
+                difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
+                difficulty = random.choice(difficulties)
                 samples[c_name] = difficulty
                 logger.debug(f"Sampled difficulty {difficulty} for challenge {c_name}")
                 
