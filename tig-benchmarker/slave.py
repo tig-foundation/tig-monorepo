@@ -65,19 +65,21 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
     READY_BATCH_IDS.add(batch["id"])
     
 
-def purge_folders(output_path):
+def purge_folders(output_path, ttl):
     n = now()
     purge_batch_ids = [
         batch_id
         for batch_id, finish_time in FINISHED_BATCH_IDS.items()
-        if n >= finish_time + 300000
+        if n >= finish_time + (ttl * 1000)
     ]
     if len(purge_batch_ids) == 0:
         time.sleep(5)
         return
 
     for batch_id in purge_batch_ids:
-        shutil.rmtree(f"{output_path}/{batch_id}")
+        if os.path.exists(f"{output_path}/{batch_id}"):
+            logger.info(f"purging batch {batch_id}")
+            shutil.rmtree(f"{output_path}/{batch_id}")
         FINISHED_BATCH_IDS.pop(batch_id)
 
 
@@ -241,6 +243,7 @@ def main(
     slave_name: str,
     master_port: int,
     output_path: str,
+    ttl: int,
 ):
     print(f"Starting slave {slave_name}")
 
@@ -265,7 +268,7 @@ def main(
 
     Thread(
         target=wrap_thread,
-        args=(purge_folders, output_path)
+        args=(purge_folders, output_path, ttl)
     ).start()
 
     wrap_thread(poll_batch, session, master_ip, master_port, output_path)
@@ -281,6 +284,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=5115, help="Port for master (default: 5115)")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     parser.add_argument("--output", type=str, default="results", help="Folder to output results to (default: results)")
+    parser.add_argument("--ttl", type=int, default=300, help="(Time To Live) Seconds to retain results (default: 300)")
     
     args = parser.parse_args()
     
@@ -289,4 +293,4 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO
     )
 
-    main(args.master, args.tig_worker_path, args.download, args.workers, args.name, args.port, args.output)
+    main(args.master, args.tig_worker_path, args.download, args.workers, args.name, args.port, args.output, args.ttl)
