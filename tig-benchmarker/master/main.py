@@ -43,6 +43,7 @@ def main():
             samples = difficulty_sampler.run()
             submit_precommit_req = precommit_manager.run(samples)
             submissions_manager.run(submit_precommit_req)
+            slave_manager.run()
         except Exception as e:
             import traceback
             traceback.print_exc()
