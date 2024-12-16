@@ -3,6 +3,7 @@ import requests
 import json
 import random
 
+print("THIS IS AN EXAMPLE SCRIPT TO UPDATE YOUR MASTER CONFIG")
 MASTER_IP = input("Enter Master IP: ")
 MASTER_PORT = input("Enter Master Port: ")
 
@@ -48,7 +49,7 @@ print("cutoff: ", cutoff)
 
 # Calculate challenge weights
 if cutoff == 0:
-    weights = {c_name: 1.0 for c_name in challenges}
+    weights = {c_name: 1.0 for c_name in challenge_id_2_name.values()}
 elif cutoff < max(potential_qualifiers.values()):
     print("Adjusting weights to increase cutoff")
     m = max(potential_qualifiers.values())
