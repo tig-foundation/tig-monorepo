@@ -35,6 +35,7 @@ def main():
             data = data_fetcher.run()
             if data["block"].id != last_block_id:
                 last_block_id = data["block"].id
+                client_manager.on_new_block(**data)
                 difficulty_sampler.on_new_block(**data)
                 job_manager.on_new_block(**data)
                 submissions_manager.on_new_block(**data)

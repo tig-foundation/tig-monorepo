@@ -28,15 +28,26 @@ class ClientManager:
             """
         )
         CONFIG.update(result["config"])
+        self.latest_data = {}
+
+    def on_new_block(self, **kwargs):
+        def convert(d):
+            if isinstance(d, dict):
+                return {k: convert(v) for k, v in d.items()}
+            elif hasattr(d, "to_dict"):
+                return d.to_dict()
+            else:
+                return d
+        self.latest_data = convert(kwargs)
 
     def setup_routes(self):
+        @self.app.get('/get-latest-data')
+        async def get_latest_data():
+            return JSONResponse(content=self.latest_data)
+
         @self.app.get('/get-config')
         async def get_config_endpoint():
-            try:
-                return JSONResponse(content=CONFIG, status_code=200)
-            except Exception as e:
-                logger.error(f"Database error on /get-config: {e}")
-                raise HTTPException(status_code=500, detail="Internal Server Error")
+            return JSONResponse(content=CONFIG)
         
         @self.app.get('/stop/{benchmark_id}')
         async def stop_benchmark(benchmark_id: str):
@@ -49,7 +60,7 @@ class ClientManager:
                     """,
                     (benchmark_id,)
                 )
-                return JSONResponse(content={"message": "Benchmark stopped successfully."}, status_code=200)
+                return JSONResponse(content={"message": "Benchmark stopped successfully."})
             except Exception as e:
                 logger.error(f"Unexpected error on /stop/{benchmark_id}: {e}")
                 raise HTTPException(status_code=500, detail="Internal Server Error")
@@ -75,7 +86,7 @@ class ClientManager:
 
                 CONFIG.update(new_config)
 
-                return JSONResponse(content={"message": "Config updated successfully."}, status_code=200)
+                return JSONResponse(content={"message": "Config updated successfully."})
             except Exception as e:
                 logger.error(f"Unexpected error on /update-config: {e}")
                 raise HTTPException(status_code=400, detail="Invalid configuration data")
