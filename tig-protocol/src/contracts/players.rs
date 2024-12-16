@@ -128,8 +128,10 @@ pub async fn set_delegatees<T: Context>(
             < config.deposits.delegatees_update_period
         {
             return Err(anyhow!(
-                "Can only update delegatees every {} blocks",
+                "Can only update delegatees every {} blocks. Please wait {} blocks",
+                config.deposits.delegatees_update_period,
                 config.deposits.delegatees_update_period
+                    - (latest_block_details.height - curr_delegatees.block_set)
             ));
         }
     }
@@ -171,8 +173,10 @@ pub async fn set_reward_share<T: Context>(
             < config.deposits.reward_share_update_period
         {
             return Err(anyhow!(
-                "Can only update reward share every {} blocks",
+                "Can only update reward share every {} blocks. Please wait {} blocks",
+                config.deposits.reward_share_update_period,
                 config.deposits.reward_share_update_period
+                    - (latest_block_details.height - curr_reward_share.block_set)
             ));
         }
     }

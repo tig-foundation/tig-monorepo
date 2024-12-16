@@ -54,6 +54,7 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
     )
     stdout, stderr = process.communicate()
     if process.returncode != 0:
+        PROCESSING_BATCH_IDS.remove(batch["id"])
         raise Exception(f"tig-worker failed: {stderr.decode()}")
     result = json.loads(stdout.decode())
     logger.info(f"computing batch took {now() - start}ms")
@@ -178,6 +179,7 @@ def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, 
         logger.info(f"Batch {batch_id} already processed")
         READY_BATCH_IDS.add(batch_id)
         return
+    PROCESSING_BATCH_IDS.add(batch_id)
 
     with open(f"{output_path}/{batch_id}/batch.json") as f:
         batch = json.load(f)
@@ -185,39 +187,30 @@ def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, 
     wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
     download_wasm(session, batch['download_url'], wasm_path)
     
-    PROCESSING_BATCH_IDS.add(batch_id)
     Thread(
         target=run_tig_worker,
         args=(tig_worker_path, batch, wasm_path, num_workers, output_path)
     ).start()
 
 
-def poll_batch(session, master_ip, master_port, output_path):    
-    get_batch_url = f"http://{master_ip}:{master_port}/get-batch"
-    logger.info(f"fetching job from {get_batch_url}")
-    resp = session.get(get_batch_url)
+def poll_batches(session, master_ip, master_port, output_path):    
+    get_batches_url = f"http://{master_ip}:{master_port}/get-batches"
+    logger.info(f"fetching batches from {get_batches_url}")
+    resp = session.get(get_batches_url)
 
     if resp.status_code == 200:
-        batch = resp.json()
-        logger.info(f"fetched batch: {batch}")
-        output_folder = f"{output_path}/{batch['id']}"
-        os.makedirs(output_folder, exist_ok=True)
-        with open(f"{output_folder}/batch.json", "w") as f:
-            json.dump(batch, f)
-        PENDING_BATCH_IDS.add(batch['id'])
-        time.sleep(0.2)
-
-    elif resp.status_code == 425: # too early
         batches = resp.json()
-        batch_ids = [batch['id'] for batch in batches]
-        logger.info(f"max concurrent batches reached: {batch_ids}")
+        root_batch_ids = [batch['id'] for batch in batches if batch['sampled_nonces'] is None]
+        proofs_batch_ids = [batch['id'] for batch in batches if batch['sampled_nonces'] is not None]
+        logger.info(f"root batches: {root_batch_ids}")
+        logger.info(f"proofs batches: {proofs_batch_ids}")
         for batch in batches:
             output_folder = f"{output_path}/{batch['id']}"
             os.makedirs(output_folder, exist_ok=True)
             with open(f"{output_folder}/batch.json", "w") as f:
                 json.dump(batch, f)
         PENDING_BATCH_IDS.clear()
-        PENDING_BATCH_IDS.update(batch_ids)
+        PENDING_BATCH_IDS.update(root_batch_ids + proofs_batch_ids)
         time.sleep(5)
 
     else:
@@ -271,7 +264,7 @@ def main(
         args=(purge_folders, output_path, ttl)
     ).start()
 
-    wrap_thread(poll_batch, session, master_ip, master_port, output_path)
+    wrap_thread(poll_batches, session, master_ip, master_port, output_path)
 
 
 if __name__ == "__main__":

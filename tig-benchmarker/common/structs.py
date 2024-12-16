@@ -44,7 +44,7 @@ class BenchmarkSettings(FromDict):
     block_id: str
     challenge_id: str
     algorithm_id: str
-    difficulty: List[int]
+    difficulty: Point
 
     def calc_seed(self, rand_hash: str, nonce: int) -> bytes:
         return u8s_from_str(f"{jsonify(self)}_{rand_hash}_{nonce}")
