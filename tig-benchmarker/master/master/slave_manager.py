@@ -85,7 +85,7 @@ class SlaveManager:
     def start(self):
         app = FastAPI()
 
-        @app.route('/get-batch', methods=['GET'])
+        @app.route('/get-batches', methods=['GET'])
         def get_batch(request: Request):
             config = CONFIG["slave_manager_config"]
 
