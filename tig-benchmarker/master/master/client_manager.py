@@ -34,6 +34,8 @@ class ClientManager:
         def convert(d):
             if isinstance(d, dict):
                 return {k: convert(v) for k, v in d.items()}
+            elif isinstance(d, list):
+                return [convert(v) for v in d]
             elif hasattr(d, "to_dict"):
                 return d.to_dict()
             else:
