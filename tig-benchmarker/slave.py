@@ -54,6 +54,7 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
     )
     stdout, stderr = process.communicate()
     if process.returncode != 0:
+        PROCESSING_BATCH_IDS.remove(batch["id"])
         raise Exception(f"tig-worker failed: {stderr.decode()}")
     result = json.loads(stdout.decode())
     logger.info(f"computing batch took {now() - start}ms")
@@ -178,6 +179,7 @@ def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, 
         logger.info(f"Batch {batch_id} already processed")
         READY_BATCH_IDS.add(batch_id)
         return
+    PROCESSING_BATCH_IDS.add(batch_id)
 
     with open(f"{output_path}/{batch_id}/batch.json") as f:
         batch = json.load(f)
@@ -185,7 +187,6 @@ def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, 
     wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
     download_wasm(session, batch['download_url'], wasm_path)
     
-    PROCESSING_BATCH_IDS.add(batch_id)
     Thread(
         target=run_tig_worker,
         args=(tig_worker_path, batch, wasm_path, num_workers, output_path)

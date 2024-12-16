@@ -29,55 +29,61 @@ class SlaveManager:
         with self.lock:
             self.batches = db_conn.fetch_all(
                 """
-                SELECT
-                    A.slave,
-                    A.start_time,
-                    A.end_time,
-                    B.challenge,
-                    JSONB_BUILD_OBJECT(
-                        'id', A.benchmark_id || '_' || A.batch_idx,
-                        'benchmark_id', A.benchmark_id,
-                        'start_nonce', A.batch_idx * B.batch_size,
-                        'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
-                        'settings', B.settings,
-                        'sampled_nonces', A.sampled_nonces,
-                        'runtime_config', B.runtime_config,
-                        'download_url', B.download_url,
-                        'rand_hash', B.rand_hash,
-                        'batch_size', B.batch_size,
-                        'batch_idx', A.batch_idx
-                    ) AS batch
-                FROM proofs_batch A
-                INNER JOIN job B
-                    ON A.ready IS NULL
-                    AND B.stopped IS NULL
-                    AND A.benchmark_id = B.benchmark_id
+                SELECT * FROM (
+                    SELECT
+                        A.slave,
+                        A.start_time,
+                        A.end_time,
+                        B.challenge,
+                        JSONB_BUILD_OBJECT(
+                            'id', A.benchmark_id || '_' || A.batch_idx,
+                            'benchmark_id', A.benchmark_id,
+                            'start_nonce', A.batch_idx * B.batch_size,
+                            'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
+                            'settings', B.settings,
+                            'sampled_nonces', A.sampled_nonces,
+                            'runtime_config', B.runtime_config,
+                            'download_url', B.download_url,
+                            'rand_hash', B.rand_hash,
+                            'batch_size', B.batch_size,
+                            'batch_idx', A.batch_idx
+                        ) AS batch
+                    FROM proofs_batch A
+                    INNER JOIN job B
+                        ON A.ready IS NULL
+                        AND B.stopped IS NULL
+                        AND A.benchmark_id = B.benchmark_id
+                    ORDER BY B.block_started, A.benchmark_id, A.batch_idx
+                )
                 
                 UNION ALL
                 
-                SELECT
-                    A.slave,
-                    A.start_time,
-                    A.end_time,
-                    B.challenge,
-                    JSONB_BUILD_OBJECT(
-                        'id', A.benchmark_id || '_' || A.batch_idx,
-                        'benchmark_id', A.benchmark_id,
-                        'start_nonce', A.batch_idx * B.batch_size,
-                        'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
-                        'settings', B.settings,
-                        'sampled_nonces', NULL,
-                        'runtime_config', B.runtime_config,
-                        'download_url', B.download_url,
-                        'rand_hash', B.rand_hash,
-                        'batch_size', B.batch_size,
-                        'batch_idx', A.batch_idx
-                    ) AS batch
-                FROM root_batch A
-                INNER JOIN job B
-                    ON A.ready IS NULL
-                    AND B.stopped IS NULL
-                    AND A.benchmark_id = B.benchmark_id
+                SELECT * FROM (
+                    SELECT
+                        A.slave,
+                        A.start_time,
+                        A.end_time,
+                        B.challenge,
+                        JSONB_BUILD_OBJECT(
+                            'id', A.benchmark_id || '_' || A.batch_idx,
+                            'benchmark_id', A.benchmark_id,
+                            'start_nonce', A.batch_idx * B.batch_size,
+                            'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
+                            'settings', B.settings,
+                            'sampled_nonces', NULL,
+                            'runtime_config', B.runtime_config,
+                            'download_url', B.download_url,
+                            'rand_hash', B.rand_hash,
+                            'batch_size', B.batch_size,
+                            'batch_idx', A.batch_idx
+                        ) AS batch
+                    FROM root_batch A
+                    INNER JOIN job B
+                        ON A.ready IS NULL
+                        AND B.stopped IS NULL
+                        AND A.benchmark_id = B.benchmark_id
+                    ORDER BY B.block_started, A.benchmark_id, A.batch_idx
+                )
                 """
             )
             logger.debug(f"Refreshed pending batches. Got {len(self.batches)}")
