@@ -165,7 +165,7 @@ class SlaveManager:
 
             logger.debug((await request.body()).decode())
             result = await request.json()
-            logger.debug(f"slave {slave_name} submitted root for {benchmark_id} batch {batch_idx}")
+            logger.debug(f"slave {slave_name} submitted root for {batch_id}")
             
             # Update roots table with merkle root and solution nonces
             benchmark_id, batch_idx = batch_id.split("_")
@@ -225,7 +225,7 @@ class SlaveManager:
                 b["end_time"] = time.time() * 1000
 
             result = await request.json()
-            logger.debug(f"slave {slave_name} submitted proofs for {benchmark_id} batch {batch_idx}")
+            logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
 
             # Update proofs table with merkle proofs
             benchmark_id, batch_idx = batch_id.split("_")
