@@ -82,8 +82,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .sum();
             for algorithm_id in algorithm_ids.iter() {
                 let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
-                algorithm_data.reward =
-                    reward_pool_per_challenge * algorithm_data.adoption / total_adoption;
+                algorithm_data.reward = if total_adoption == zero
+                    { zero }
+                else
+                    { reward_pool_per_challenge * algorithm_data.adoption / total_adoption };
 
                 let algorithm_details = &active_algorithms_details[algorithm_id];
                 *active_players_block_data
