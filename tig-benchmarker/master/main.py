@@ -54,13 +54,12 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Benchmarker")
-    parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
 
     logging.basicConfig(
         format='%(levelname)s - [%(name)s] - %(message)s',
-        level=logging.DEBUG if args.verbose else logging.INFO
+        level=logging.DEBUG if os.environ.get("VERBOSE") else logging.INFO
     )
     
     main()
