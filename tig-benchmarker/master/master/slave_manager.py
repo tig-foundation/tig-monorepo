@@ -108,29 +108,28 @@ class SlaveManager:
             now = time.time() * 1000
             selected_challenges = set(slave["selected_challenges"])
             with self.lock:
+                concurrent = [
+                    b["batch"] for b in self.batches
+                    if b["slave"] == slave_name
+                ]
                 for b in self.batches:
                     batch = b["batch"]
-                    is_root_batch = batch["sampled_nonces"] is None
-                    if (
-                        len(concurrent) >= slave["max_concurrent_batches"] and 
-                        is_root_batch
-                    ):
+                    if len(concurrent) >= slave["max_concurrent_batches"]:
                         break
                     if (
+                        b["slave"] == slave_name or
                         b["challenge"] not in selected_challenges or
                         b["end_time"] is not None
                     ):
                         continue
-                    if b["slave"] == slave_name:
-                        concurrent.append(batch)
-                    elif (
+                    if (
                         b["slave"] is None or
                         b["start_time"] is None or
                         (now - b["start_time"]) > config["time_before_batch_retry"]
                     ):
                         b["slave"] = slave_name
                         b["start_time"] = now
-                        table = "root_batch" if is_root_batch else "proofs_batch"
+                        table = "root_batch" if batch["sampled_nonces"] is None else "proofs_batch"
                         updates.append((
                             f"""
                             UPDATE {table}
