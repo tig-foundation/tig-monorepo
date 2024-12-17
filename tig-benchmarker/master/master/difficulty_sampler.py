@@ -138,15 +138,16 @@ class DifficultySampler:
             found_valid = False
 
             if len(selected_difficulties := config["selected_difficulties"].get(c_name, [])) > 0:
+                valid_difficulties = set(tuple(d) for d in self.valid_difficulties[c_name])
                 selected_difficulties = [tuple(d) for d in selected_difficulties]
                 selected_difficulties = [
-                    d for d in selected_difficulties if d in self.valid_difficulties[c_name]
+                    d for d in selected_difficulties if d in valid_difficulties
                 ]
             
             if len(selected_difficulties) > 0:
                 random.shuffle(selected_difficulties)
                 samples[c_name] = selected_difficulties[0]
-                logger.debug(f"Sampled difficulty {selected_difficulty} for challenge {c_name}")
+                logger.debug(f"Selected difficulty {samples[c_name]} for challenge {c_name}")
                 found_valid = True
             else:
                 logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
