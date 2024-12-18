@@ -6,6 +6,7 @@ use serde_json::json;
 use std::{fs, path::PathBuf, sync::Arc};
 use tig_structs::core::BenchmarkSettings;
 use tig_utils::{dejsonify, jsonify, MerkleHash, MerkleTree};
+use tig_worker::OutputData;
 use tokio::runtime::Runtime;
 
 fn cli() -> Command {
@@ -245,24 +246,34 @@ fn compute_batch(
                         )
                         .is_ok();
                     let hash = MerkleHash::from(output_data.clone());
-                    // only keep the data if required
-                    if let Some(path) = output_folder {
-                        let file_path = path.join(format!("{}.json", nonce));
-                        fs::write(&file_path, jsonify(&output_data))?;
-                    }
-                    Ok::<(u64, MerkleHash, bool), anyhow::Error>((nonce, hash, is_solution))
+
+                    Ok::<(u64, MerkleHash, bool, Option<OutputData>), anyhow::Error>((
+                        nonce,
+                        hash,
+                        is_solution,
+                        output_folder.is_some().then(|| output_data),
+                    ))
                 })
             })
             .buffer_unordered(num_workers)
             .collect::<Vec<_>>()
             .await;
 
+        let mut dump = Vec::new();
         for result in results {
-            let (nonce, hash, is_solution) = result??;
+            let (nonce, hash, is_solution, output_data) = result??;
             if is_solution {
                 solution_nonces.push(nonce);
             }
+            if let Some(output_data) = output_data {
+                dump.push(output_data);
+            }
             *hashes.get_mut((nonce - start_nonce) as usize).unwrap() = hash;
+        }
+        if let Some(path) = output_folder {
+            dump.sort_by_key(|data| data.nonce);
+            let file_path = path.join("data.json");
+            fs::write(&file_path, jsonify(&dump))?;
         }
 
         let tree = MerkleTree::new(hashes, batch_size as usize)?;
