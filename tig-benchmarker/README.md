@@ -7,14 +7,14 @@ Benchmarker for TIG. Expected setup is a single master and multiple slaves on di
 Simply run:
 
 ```
-export POSTGRES_USER=postgres
-export POSTGRES_PASSWORD=mysecretpassword
-export POSTGRES_DB=postgres
-
-export UI_PORT=80
-export DB_PORT=5432
-export MASTER_PORT=5115
-
+POSTGRES_USER=postgres \
+POSTGRES_PASSWORD=mysecretpassword \
+POSTGRES_DB=postgres \
+UI_PORT=80 \
+DB_PORT=5432 \
+MASTER_PORT=5115 \
+# set VERBOSE=1 for debug master logs
+VERBOSE= \
 docker-compose up --build
 ```
 
