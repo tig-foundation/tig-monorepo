@@ -7,6 +7,7 @@ import requests
 import shutil
 import subprocess
 import time
+import zlib
 from threading import Thread
 from common.structs import OutputData, MerkleProof
 from common.merkle_tree import MerkleTree
@@ -98,10 +99,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
 
     if (
         not os.path.exists(f"{output_folder}/result.json")
-        or not all(
-            os.path.exists(f"{output_folder}/{nonce}.json") 
-            for nonce in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"])
-        )
+        or not os.path.exists(f"{output_folder}/data.zlib")
     ):
         if os.path.exists(f"{output_folder}/result.json"):
             os.remove(f"{output_folder}/result.json")
@@ -128,8 +126,11 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             time.sleep(2)
 
     else:
-        with open(f"{output_folder}/data.json") as f:
-            leafs = [OutputData.from_dict(x) for x in json.load(f)]
+        with open(f"{output_folder}/data.zlib", "rb") as f:
+            leafs = [
+                OutputData.from_dict(x) 
+                for x in json.loads(zlib.decompress(f.read()).decode())
+            ]
             
         merkle_tree = MerkleTree(
             [x.to_merkle_hash() for x in leafs],
