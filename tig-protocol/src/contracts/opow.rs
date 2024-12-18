@@ -74,19 +74,16 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .unwrap();
         let mut cutoff = cutoff_cap
             .min((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32);
-        // if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
-        if phase_in_end > block_details.height {
+        if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
             let phase_in_min_num_solutions = active_challenge_ids
                 .iter()
                 .filter(|&id| !phase_in_challenge_ids.contains(id))
                 .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
                 .min()
                 .unwrap();
-            // let phase_in_cutoff = cutoff_cap.min(
-            //     (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
-            // );
-            let phase_in_cutoff =
-                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32;
+            let phase_in_cutoff = cutoff_cap.min(
+                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
+            );
             let phase_in_weight =
                 (phase_in_end - block_details.height) as f64 / phase_in_period as f64;
             cutoff = (phase_in_cutoff as f64 * phase_in_weight
