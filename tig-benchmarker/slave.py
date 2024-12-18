@@ -120,7 +120,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted root for batch {batch_id}")
         elif resp.status_code == 408: # took too long 
-            FINISHED_BATCH_IDS[batch_id] = 0
+            FINISHED_BATCH_IDS[batch_id] = now()
             logger.error(f"status {resp.status_code} when posting root for batch {batch_id} to master: {resp.text}")
         else:
             logger.error(f"status {resp.status_code} when posting root for batch {batch_id} to master: {resp.text}")
@@ -128,19 +128,17 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             time.sleep(2)
 
     else:
-        leafs = {}
-        for nonce in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
-            with open(f"{output_folder}/{nonce}.json") as f:
-                leafs[nonce] = OutputData.from_dict(json.load(f))
+        with open(f"{output_folder}/data.json") as f:
+            leafs = [OutputData.from_dict(x) for x in json.load(f)]
             
         merkle_tree = MerkleTree(
-            [x.to_merkle_hash() for x in leafs.values()],
+            [x.to_merkle_hash() for x in leafs],
             batch["batch_size"]
         )
 
         proofs_to_submit = [
             MerkleProof(
-                leaf=leafs[n],
+                leaf=leafs[n - batch["start_nonce"]],
                 branch=merkle_tree.calc_merkle_branch(branch_idx=n - batch["start_nonce"])
             ).to_dict()
             for n in batch["sampled_nonces"]
@@ -153,7 +151,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted proofs for batch {batch_id}")
         elif resp.status_code == 408: # took too long 
-            FINISHED_BATCH_IDS[batch_id] = 0
+            FINISHED_BATCH_IDS[batch_id] = now()
             logger.error(f"status {resp.status_code} when posting proofs for batch {batch_id} to master: {resp.text}")
         else:
             logger.error(f"status {resp.status_code} when posting proofs for batch {batch_id} to master: {resp.text}")
