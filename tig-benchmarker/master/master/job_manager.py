@@ -272,7 +272,8 @@ class JobManager:
                 SELECT A.benchmark_id
                 FROM proofs_batch A
                 INNER JOIN job B
-                    ON B.merkle_proofs_ready IS NULL
+                    ON B.merkle_root_ready
+                    AND B.merkle_proofs_ready IS NULL
                     AND A.benchmark_id = B.benchmark_id
                 GROUP BY A.benchmark_id
                 HAVING COUNT(*) = COUNT(A.ready)

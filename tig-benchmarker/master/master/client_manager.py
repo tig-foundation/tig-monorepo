@@ -176,7 +176,7 @@ class ClientManager:
                         WHEN B.end_time IS NOT NULL THEN 'COMPLETED'
                         WHEN B.stopped IS NOT NULL THEN 'STOPPED'
                         WHEN B.merkle_proofs_ready = true THEN 'SUBMITTING PROOF'
-                        WHEN B.sampled_nonces IS NOT NULL THEN 'COMPUTING PROOF'
+                        WHEN B.sampled_nonces IS NOT NULL AND B.merkle_root_ready THEN 'COMPUTING PROOF'
                         WHEN B.sampled_nonces IS NULL AND B.merkle_root_ready THEN 'SUBMITTING ROOT'
                         ELSE 'COMPUTING ROOT'
                     END AS status,

@@ -51,6 +51,7 @@ class SlaveManager:
                     FROM proofs_batch A
                     INNER JOIN job B
                         ON A.ready IS NULL
+                        AND B.merkle_root_ready
                         AND B.stopped IS NULL
                         AND A.benchmark_id = B.benchmark_id
                     ORDER BY B.block_started, A.benchmark_id, A.batch_idx
@@ -168,9 +169,15 @@ class SlaveManager:
                     )
                 b["end_time"] = time.time() * 1000
 
-            logger.debug((await request.body()).decode())
-            result = await request.json()
-            logger.debug(f"slave {slave_name} submitted root for {batch_id}")
+            try:
+                result = await request.json()
+                merkle_root = MerkleHash.from_str(result["merkle_root"])
+                solution_nonces = result["solution_nonces"]
+                assert isinstance(solution_nonces, list) and all(isinstance(x, int) for x in solution_nonces)
+                logger.debug(f"slave {slave_name} submitted root for {batch_id}")
+            except Exception as e:
+                logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
+                raise HTTPException(status_code=400, detail="INVALID root")
             
             # Update roots table with merkle root and solution nonces
             benchmark_id, batch_idx = batch_id.split("_")
@@ -198,8 +205,8 @@ class SlaveManager:
                         AND batch_idx = %s                    
                     """,
                     (
-                        result["merkle_root"],
-                        json.dumps(result["solution_nonces"]),
+                        merkle_root.to_str(),
+                        json.dumps(solution_nonces),
                         benchmark_id,
                         batch_idx
                     )
@@ -229,8 +236,13 @@ class SlaveManager:
                     )
                 b["end_time"] = time.time() * 1000
 
-            result = await request.json()
-            logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
+            try:
+                result = await request.json()
+                merkle_proofs = [MerkleProof.from_dict(x) for x in result["merkle_proofs"]]
+                logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
+            except Exception as e:
+                logger.error(f"slave {slave_name} submitted INVALID proofs for {batch_id}: {e}")
+                raise HTTPException(status_code=400, detail="INVALID proofs")
 
             # Update proofs table with merkle proofs
             benchmark_id, batch_idx = batch_id.split("_")
@@ -254,7 +266,7 @@ class SlaveManager:
                         AND batch_idx = %s
                     """, 
                     (
-                        json.dumps(result["merkle_proofs"]), 
+                        json.dumps([x.to_dict() for x in merkle_proofs]), 
                         benchmark_id, 
                         batch_idx
                     )
