@@ -120,7 +120,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted root for batch {batch_id}")
         elif resp.status_code == 408: # took too long 
-            FINISHED_BATCH_IDS[batch_id] = 0
+            FINISHED_BATCH_IDS[batch_id] = now()
             logger.error(f"status {resp.status_code} when posting root for batch {batch_id} to master: {resp.text}")
         else:
             logger.error(f"status {resp.status_code} when posting root for batch {batch_id} to master: {resp.text}")
@@ -153,7 +153,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted proofs for batch {batch_id}")
         elif resp.status_code == 408: # took too long 
-            FINISHED_BATCH_IDS[batch_id] = 0
+            FINISHED_BATCH_IDS[batch_id] = now()
             logger.error(f"status {resp.status_code} when posting proofs for batch {batch_id} to master: {resp.text}")
         else:
             logger.error(f"status {resp.status_code} when posting proofs for batch {batch_id} to master: {resp.text}")
