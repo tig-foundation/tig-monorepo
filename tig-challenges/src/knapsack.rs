@@ -112,9 +112,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .collect();
 
         // Sort the list of tuples by value-to-weight ratio in descending order
-        value_weight_ratios.sort_unstable_by(|&(_, ratio_a, _), &(_, ratio_b, _)| {
-            ratio_b.partial_cmp(&ratio_a).unwrap()
-        });
+        value_weight_ratios
+            .sort_by(|&(_, ratio_a, _), &(_, ratio_b, _)| ratio_b.partial_cmp(&ratio_a).unwrap());
 
         let mut total_weight = 0;
         let mut selected_indices = Vec::new();
@@ -124,7 +123,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
                 total_weight += weight;
             }
         }
-        selected_indices.sort_unstable();
+        selected_indices.sort();
 
         let mut min_value = calculate_total_value(&selected_indices, &values, &interaction_values);
         min_value = (min_value as f32 * (1.0 + difficulty.better_than_baseline as f32 / 1000.0))
@@ -187,7 +186,7 @@ pub fn calculate_total_value(
     interaction_values: &Vec<Vec<i32>>,
 ) -> u32 {
     let mut indices = indices.clone();
-    indices.sort_unstable();
+    indices.sort();
 
     let mut total_value = 0i32;
 
