@@ -5,7 +5,7 @@ use futures::stream::{self, StreamExt};
 use serde_json::json;
 use std::{fs, path::PathBuf, sync::Arc};
 use tig_structs::core::BenchmarkSettings;
-use tig_utils::{dejsonify, jsonify, MerkleHash, MerkleTree};
+use tig_utils::{compress_obj, dejsonify, jsonify, MerkleHash, MerkleTree};
 use tig_worker::OutputData;
 use tokio::runtime::Runtime;
 
@@ -272,8 +272,8 @@ fn compute_batch(
         }
         if let Some(path) = output_folder {
             dump.sort_by_key(|data| data.nonce);
-            let file_path = path.join("data.json");
-            fs::write(&file_path, jsonify(&dump))?;
+            let file_path = path.join("data.zlib");
+            fs::write(&file_path, compress_obj(&dump))?;
         }
 
         let tree = MerkleTree::new(hashes, batch_size as usize)?;
