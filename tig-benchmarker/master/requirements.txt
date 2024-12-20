@@ -1,4 +1,5 @@
 blake3
+brotli
 dataclasses
 hypercorn
 numpy
