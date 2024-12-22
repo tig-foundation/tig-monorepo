@@ -1,3 +1,4 @@
+import brotli
 import requests
 import threading
 import logging
@@ -46,7 +47,14 @@ class SubmissionsManager:
             logger.info(f"submitting {submission_type} '{req.benchmark_id}'")
         logger.debug(f"{req}")
         
-        resp = requests.post(f"{api_url}/submit-{submission_type}", json=req.to_dict(), headers=headers)
+        data = jsonify(req)
+        if len(data) > 10 * 1024:
+            headers.update({
+                'Content-Encoding': 'br',
+                'Accept-Encoding': 'br',
+            })
+            data = brotli.compress(data)
+        resp = requests.post(f"{api_url}/submit-{submission_type}", data=data, headers=headers)
         if resp.status_code == 200:
             logger.info(f"submitted {submission_type} successfully")
         elif resp.headers.get("Content-Type") == "text/plain":

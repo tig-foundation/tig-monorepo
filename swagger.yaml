@@ -1428,7 +1428,7 @@ components:
         delegatees:
           type: object
           additionalProperties:
-            type: float
+            type: number
     SetDelegateeResponse:
       type: object
       properties:
