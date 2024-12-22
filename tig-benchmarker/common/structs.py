@@ -161,8 +161,8 @@ class BlockDetails(FromDict):
 
 @dataclass
 class BlockData(FromDict):
-    confirmed_ids: Dict[str, Set[int]]
-    active_ids: Dict[str, Set[int]]
+    confirmed_ids: Dict[str, Set[str]]
+    active_ids: Dict[str, Set[str]]
 
 @dataclass
 class Block(FromDict):
