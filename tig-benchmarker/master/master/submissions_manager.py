@@ -53,7 +53,7 @@ class SubmissionsManager:
                 'Content-Encoding': 'br',
                 'Accept-Encoding': 'br',
             })
-            data = brotli.compress(data)
+            data = brotli.compress(data.encode())
         resp = requests.post(f"{api_url}/submit-{submission_type}", data=data, headers=headers)
         if resp.status_code == 200:
             logger.info(f"submitted {submission_type} successfully")
