@@ -10,7 +10,7 @@ import time
 import zlib
 from threading import Thread
 from common.structs import OutputData, MerkleProof
-from common.merkle_tree import MerkleTree
+from common.merkle_tree import MerkleTree, MerkleHash
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 PENDING_BATCH_IDS = set()
@@ -126,22 +126,21 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             time.sleep(2)
 
     else:
+        with open(f"{output_folder}/hashes.zlib", "rb") as f:
+            hashes = json.loads(zlib.decompress(f.read()).decode())
         with open(f"{output_folder}/data.zlib", "rb") as f:
-            leafs = [
-                OutputData.from_dict(x) 
-                for x in json.loads(zlib.decompress(f.read()).decode())
-            ]
-            
+            leafs = json.loads(zlib.decompress(f.read()).decode())
+        
         merkle_tree = MerkleTree(
-            [x.to_merkle_hash() for x in leafs],
+            [MerkleHash.from_str(x) for x in hashes],
             batch["batch_size"]
         )
 
         proofs_to_submit = [
-            MerkleProof(
+            dict(
                 leaf=leafs[n - batch["start_nonce"]],
-                branch=merkle_tree.calc_merkle_branch(branch_idx=n - batch["start_nonce"])
-            ).to_dict()
+                branch=merkle_tree.calc_merkle_branch(branch_idx=n - batch["start_nonce"]).to_str()
+            )
             for n in batch["sampled_nonces"]
         ]
         
