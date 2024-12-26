@@ -89,8 +89,12 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
     try:
         batch_id = READY_BATCH_IDS.pop()
     except KeyError:
-        logger.debug("No pending batches")
+        logger.debug("No batches to send")
         time.sleep(1)
+        return
+
+    if now() - FINISHED_BATCH_IDS.get(batch_id, 0) < 10000:
+        logger.debug(f"Batch {batch_id} submitted recently")
         return
     
     output_folder = f"{output_path}/{batch_id}"
