@@ -104,6 +104,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
     if (
         not os.path.exists(f"{output_folder}/result.json")
         or not os.path.exists(f"{output_folder}/data.zlib")
+        or not os.path.exists(f"{output_folder}/hashes.zlib")
     ):
         if os.path.exists(f"{output_folder}/result.json"):
             os.remove(f"{output_folder}/result.json")
