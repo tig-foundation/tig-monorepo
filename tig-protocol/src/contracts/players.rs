@@ -136,8 +136,8 @@ pub async fn set_delegatees<T: Context>(
         }
     }
 
-    if delegatees.values().any(|&v| v < 0.0) {
-        return Err(anyhow!("Fraction to delegate cannot be negative"));
+    if delegatees.values().any(|&v| v <= 0.0) {
+        return Err(anyhow!("Fraction to delegate cannot be zero or negative"));
     }
 
     if delegatees.values().cloned().sum::<f64>() > 1.0 {

@@ -159,10 +159,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
         for delegator in opow_data.delegators.iter() {
             let player_data = active_players_block_data.get_mut(delegator).unwrap();
-            player_data.reward_by_type.insert(
-                RewardType::Delegator,
-                shared_amount * player_data.weighted_deposit / opow_data.delegated_weighted_deposit,
-            );
+            let fraction = PreciseNumber::from_f64(*player_data.delegatees.get(delegatee).unwrap());
+            *player_data
+                .reward_by_type
+                .entry(RewardType::Delegator)
+                .or_insert(zero.clone()) += shared_amount * fraction * player_data.weighted_deposit
+                / opow_data.delegated_weighted_deposit;
         }
     }
 }

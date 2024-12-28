@@ -4,7 +4,7 @@ use clap::{arg, Command};
 use futures::stream::{self, StreamExt};
 use serde_json::json;
 use std::{fs, path::PathBuf, sync::Arc};
-use tig_structs::core::BenchmarkSettings;
+use tig_structs::core::*;
 use tig_utils::{compress_obj, dejsonify, jsonify, MerkleHash, MerkleTree};
 use tig_worker::OutputData;
 use tokio::runtime::Runtime;
@@ -272,8 +272,8 @@ fn compute_batch(
         }
         if let Some(path) = output_folder {
             dump.sort_by_key(|data| data.nonce);
-            let file_path = path.join("data.zlib");
-            fs::write(&file_path, compress_obj(&dump))?;
+            fs::write(&path.join("data.zlib"), compress_obj(&dump))?;
+            fs::write(&path.join("hashes.zlib"), compress_obj(&hashes))?;
         }
 
         let tree = MerkleTree::new(hashes, batch_size as usize)?;
