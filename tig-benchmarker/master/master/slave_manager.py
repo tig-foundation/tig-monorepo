@@ -276,8 +276,8 @@ class SlaveManager:
             return {"status": "OK"}
             
         config = CONFIG["slave_manager_config"]
-        thread = Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=config["port"]))
+        thread = Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=5115))
         thread.daemon = True
         thread.start()
 
-        logger.info(f"webserver started on 0.0.0.0:{config['port']}")
+        logger.info(f"webserver started on 0.0.0.0:5115")
