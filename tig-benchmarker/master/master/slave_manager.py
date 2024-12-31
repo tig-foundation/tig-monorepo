@@ -13,7 +13,7 @@ import uvicorn
 from common.structs import *
 from common.utils import *
 from typing import Dict, List, Optional, Set
-from master.sql import db_conn
+from master.sql import get_db_conn
 from master.client_manager import CONFIG
 
 
@@ -27,7 +27,7 @@ class SlaveManager:
 
     def run(self):
         with self.lock:
-            self.batches = db_conn.fetch_all(
+            self.batches = get_db_conn().fetch_all(
                 """
                 SELECT * FROM (
                     SELECT
@@ -145,7 +145,7 @@ class SlaveManager:
             if len(concurrent) == 0:
                 logger.debug(f"no batches available for {slave_name}")
             if len(updates) > 0:
-                db_conn.execute_many(*updates)
+                get_db_conn().execute_many(*updates)
             return JSONResponse(content=jsonable_encoder(concurrent))
 
         @app.post('/submit-batch-root/{batch_id}')
@@ -182,7 +182,7 @@ class SlaveManager:
             # Update roots table with merkle root and solution nonces
             benchmark_id, batch_idx = batch_id.split("_")
             batch_idx = int(batch_idx)
-            db_conn.execute_many(*[
+            get_db_conn().execute_many(*[
                 (
                     """
                     UPDATE root_batch
@@ -247,7 +247,7 @@ class SlaveManager:
             # Update proofs table with merkle proofs
             benchmark_id, batch_idx = batch_id.split("_")
             batch_idx = int(batch_idx)
-            db_conn.execute_many(*[
+            get_db_conn().execute_many(*[
                 (
                     """
                     UPDATE proofs_batch

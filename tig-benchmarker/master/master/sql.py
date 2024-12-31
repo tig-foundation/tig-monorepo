@@ -100,11 +100,15 @@ class PostgresDB:
 
 
 db_conn = None
-if db_conn is None:
-    db_conn = PostgresDB(
-        host=os.environ["POSTGRES_HOST"],
-        port=5432,
-        dbname=os.environ["POSTGRES_DB"],
-        user=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"]
-    )
+
+def get_db_conn():
+    global db_conn
+    if db_conn is None or db_conn.closed:
+        db_conn = PostgresDB(
+            host=os.environ["POSTGRES_HOST"],
+            port=5432,
+            dbname=os.environ["POSTGRES_DB"],
+            user=os.environ["POSTGRES_USER"],
+            password=os.environ["POSTGRES_PASSWORD"]
+        )
+    return db_conn

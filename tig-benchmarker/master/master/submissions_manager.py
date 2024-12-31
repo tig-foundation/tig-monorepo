@@ -7,7 +7,7 @@ import os
 from common.structs import *
 from common.utils import *
 from typing import Union, Set, List, Dict
-from master.sql import db_conn
+from master.sql import get_db_conn
 from master.client_manager import CONFIG
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -72,7 +72,7 @@ class SubmissionsManager:
         **kwargs
     ):
         if len(benchmarks) > 0:
-            db_conn.execute(
+            get_db_conn().execute(
                 """
                 UPDATE job
                 SET benchmark_submitted = true
@@ -82,7 +82,7 @@ class SubmissionsManager:
             )
         
         if len(proofs) > 0:
-            db_conn.execute(
+            get_db_conn().execute(
                 """
                 UPDATE job
                 SET proof_submitted = true
@@ -100,7 +100,7 @@ class SubmissionsManager:
         else:
             self._post_thread("precommit", submit_precommit_req)
 
-        benchmark_to_submit = db_conn.fetch_one(
+        benchmark_to_submit = get_db_conn().fetch_one(
             """
             WITH updated AS (
                 UPDATE job
@@ -144,7 +144,7 @@ class SubmissionsManager:
         else:
             logger.debug("no benchmark to submit")
 
-        proof_to_submit = db_conn.fetch_one(
+        proof_to_submit = get_db_conn().fetch_one(
             """
             WITH updated AS (
                 UPDATE job

@@ -6,7 +6,7 @@ from master.submissions_manager import SubmitPrecommitRequest
 from common.structs import *
 from common.utils import FromDict
 from typing import Dict, List, Optional, Set
-from master.sql import db_conn
+from master.sql import get_db_conn
 from master.client_manager import CONFIG
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -93,7 +93,7 @@ class PrecommitManager:
             logger.info(f"global qualifier difficulty stats for {challenges[c_id].details.name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
 
     def run(self, difficulty_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
-        num_pending_jobs = db_conn.fetch_one(
+        num_pending_jobs = get_db_conn().fetch_one(
             """
             SELECT COUNT(*) 
             FROM job
