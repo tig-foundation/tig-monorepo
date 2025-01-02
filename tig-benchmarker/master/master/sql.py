@@ -17,10 +17,15 @@ class PostgresDB:
         }
         self._conn = None
 
+    @property
+    def closed(self) -> bool:
+        return self._conn is None or self._conn.closed
+
     def connect(self) -> None:
         """Establish connection to PostgreSQL database"""
         try:
             self._conn = psycopg2.connect(**self.conn_params)
+            self._conn.autocommit = False
             logger.info(f"Connected to PostgreSQL database at {self.conn_params['host']}:{self.conn_params['port']}")
         except Exception as e:
             logger.error(f"Error connecting to PostgreSQL: {str(e)}")
@@ -40,7 +45,6 @@ class PostgresDB:
 
         try:
             with self._conn.cursor() as cur:
-                cur.execute("BEGIN")
                 for query in args:
                     cur.execute(*query)
             self._conn.commit()
@@ -100,11 +104,15 @@ class PostgresDB:
 
 
 db_conn = None
-if db_conn is None:
-    db_conn = PostgresDB(
-        host=os.environ["POSTGRES_HOST"],
-        port=5432,
-        dbname=os.environ["POSTGRES_DB"],
-        user=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"]
-    )
+
+def get_db_conn():
+    global db_conn
+    if db_conn is None or db_conn.closed:
+        db_conn = PostgresDB(
+            host=os.environ["POSTGRES_HOST"],
+            port=5432,
+            dbname=os.environ["POSTGRES_DB"],
+            user=os.environ["POSTGRES_USER"],
+            password=os.environ["POSTGRES_PASSWORD"]
+        )
+    return db_conn

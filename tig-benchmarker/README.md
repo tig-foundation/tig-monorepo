@@ -7,15 +7,19 @@ Benchmarker for TIG. Expected setup is a single master and multiple slaves on di
 Simply run:
 
 ```
-POSTGRES_USER=postgres \
-POSTGRES_PASSWORD=mysecretpassword \
-POSTGRES_DB=postgres \
-UI_PORT=80 \
-DB_PORT=5432 \
-MASTER_PORT=5115 \
-# set VERBOSE=1 for debug master logs
-VERBOSE= \
 docker-compose up --build
+```
+
+This uses the `.env` file:
+
+```
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=mysecretpassword
+POSTGRES_DB=postgres
+UI_PORT=80
+DB_PORT=5432
+MASTER_PORT=5115
+VERBOSE=
 ```
 
 See last section on how to find your player_id & api_key.

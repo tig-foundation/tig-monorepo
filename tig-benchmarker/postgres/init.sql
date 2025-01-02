@@ -160,7 +160,6 @@ SELECT '
     }
   },
   "slave_manager_config": {
-    "port": 5115,
     "time_before_batch_retry": 60000,
     "slaves": [
       {
