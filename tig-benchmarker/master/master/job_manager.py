@@ -5,7 +5,7 @@ from common.merkle_tree import MerkleHash, MerkleBranch, MerkleTree
 from common.structs import *
 from common.utils import *
 from typing import Dict, List, Optional, Set
-from master.sql import db_conn
+from master.sql import get_db_conn
 from master.client_manager import CONFIG
 import math
 
@@ -39,7 +39,7 @@ class JobManager:
         for benchmark_id, x in precommits.items():
             if (
                 benchmark_id in proofs or
-                db_conn.fetch_one( # check if job is already created
+                get_db_conn().fetch_one( # check if job is already created
                     """
                     SELECT 1 
                     FROM job
@@ -122,14 +122,14 @@ class JobManager:
                     )
                 ]
             
-            db_conn.execute_many(*atomic_inserts)
+            get_db_conn().execute_many(*atomic_inserts)
 
 
         # update jobs from confirmed benchmarks
         for benchmark_id, x in benchmarks.items():
             if (
                 benchmark_id in proofs or
-                (result := db_conn.fetch_one(
+                (result := get_db_conn().fetch_one(
                     """
                     SELECT num_batches, batch_size
                     FROM job
@@ -171,11 +171,11 @@ class JobManager:
                     )
                 ]
             
-            db_conn.execute_many(*atomic_update)
+            get_db_conn().execute_many(*atomic_update)
 
         # update jobs from confirmed proofs
         if len(proofs) > 0:
-            db_conn.execute(
+            get_db_conn().execute(
                 """
                 UPDATE job
                 SET end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
@@ -186,7 +186,7 @@ class JobManager:
             )
 
         # stop any expired jobs
-        db_conn.execute(
+        get_db_conn().execute(
             """
             UPDATE job
             SET stopped = true
@@ -202,7 +202,7 @@ class JobManager:
         now = int(time.time() * 1000)
 
         # Find jobs where all root_batchs are ready
-        rows = db_conn.fetch_all(
+        rows = get_db_conn().fetch_all(
             """
             WITH ready AS (
                 SELECT A.benchmark_id
@@ -241,7 +241,7 @@ class JobManager:
             merkle_root = tree.calc_merkle_root()
 
             # Update the database with calculated merkle root
-            db_conn.execute_many(*[
+            get_db_conn().execute_many(*[
                 (
                     """
                     UPDATE job_data
@@ -266,7 +266,7 @@ class JobManager:
             ])
             
         # Find jobs where all proofs_batchs are ready
-        rows = db_conn.fetch_all(
+        rows = get_db_conn().fetch_all(
             """
             WITH ready AS (
                 SELECT A.benchmark_id
@@ -306,7 +306,7 @@ class JobManager:
                 for x in y
             ]
 
-            batch_merkle_roots = db_conn.fetch_one(
+            batch_merkle_roots = get_db_conn().fetch_one(
                 """
                 SELECT JSONB_AGG(merkle_root ORDER BY batch_idx) as batch_merkle_roots
                 FROM batch_data
@@ -341,7 +341,7 @@ class JobManager:
                 )
                     
             # Update database with calculated merkle proofs
-            db_conn.execute_many(*[
+            get_db_conn().execute_many(*[
                 (
                     """
                     UPDATE job_data

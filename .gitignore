@@ -18,5 +18,4 @@ Cargo.lock
 __pycache__/
 
 # Ignore these. 
-.env
 db_data/

@@ -53,18 +53,30 @@ def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    stdout, stderr = process.communicate()
-    if process.returncode != 0:
-        PROCESSING_BATCH_IDS.remove(batch["id"])
-        raise Exception(f"tig-worker failed: {stderr.decode()}")
-    result = json.loads(stdout.decode())
-    logger.info(f"computing batch took {now() - start}ms")
-    logger.debug(f"batch result: {result}")
-    with open(f"{output_path}/{batch['id']}/result.json", "w") as f:
-        json.dump(result, f)
-    
-    PROCESSING_BATCH_IDS.remove(batch["id"])
-    READY_BATCH_IDS.add(batch["id"])
+    while True:
+        ret = process.poll()
+        if ret is not None:
+            if ret != 0:
+                PROCESSING_BATCH_IDS.remove(batch["id"])
+                raise Exception(f"tig-worker failed with return code {ret}")
+            
+            stdout, stderr = process.communicate()
+            result = json.loads(stdout.decode())
+            logger.info(f"computing batch {batch['id']} took {now() - start}ms")
+            logger.debug(f"batch {batch['id']} result: {result}")
+            with open(f"{output_path}/{batch['id']}/result.json", "w") as f:
+                json.dump(result, f)
+            
+            PROCESSING_BATCH_IDS.remove(batch["id"])
+            READY_BATCH_IDS.add(batch["id"])
+            break
+
+        elif batch["id"] not in PROCESSING_BATCH_IDS:
+            process.kill()
+            logger.info(f"batch {batch['id']} stopped")
+            break
+        
+        time.sleep(0.1)
     
 
 def purge_folders(output_path, ttl):
@@ -214,6 +226,9 @@ def poll_batches(session, master_ip, master_port, output_path):
                 json.dump(batch, f)
         PENDING_BATCH_IDS.clear()
         PENDING_BATCH_IDS.update(root_batch_ids + proofs_batch_ids)
+        for batch_id in PROCESSING_BATCH_IDS - set(root_batch_ids + proofs_batch_ids):
+            logger.info(f"stopping batch {batch_id}")
+            PROCESSING_BATCH_IDS.remove(batch_id)
         time.sleep(5)
 
     else:
