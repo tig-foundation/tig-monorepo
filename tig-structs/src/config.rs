@@ -23,6 +23,7 @@ serializable_struct_with_getters! {
     BreakthroughsConfig {
         bootstrap_address: String,
         min_percent_yes_votes: f64,
+        vote_start_delay: u32,
         vote_period: u32,
         min_lock_period_to_vote: u32,
         submission_fee: PreciseNumber,
