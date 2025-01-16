@@ -28,7 +28,8 @@
 
 // c003_a015
 
-// c003_a016
+pub mod better_knapm;
+pub use better_knapm as c003_a016;
 
 // c003_a017
 
