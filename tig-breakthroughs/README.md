@@ -4,7 +4,7 @@ A folder that hosts submissions of algorithmic methods made by Innovators in TIG
 
 Each submissions is committed to their own branch with the naming pattern:
 
-`<challenge_name>\method\<method_name>` 
+`<challenge_name>\breakthrough\<method_name>` 
 
 ## Making a Submission
 
