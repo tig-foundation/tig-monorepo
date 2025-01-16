@@ -76,7 +76,8 @@
 
 // c001_a039
 
-// c001_a040
+pub mod best_sat;
+pub use best_sat as c001_a040;
 
 // c001_a041
 
