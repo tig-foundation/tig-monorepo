@@ -56,7 +56,8 @@
 
 // c001_a029
 
-// c001_a030
+pub mod sat_opaafast;
+pub use sat_opaafast as c001_a030;
 
 // c001_a031
 
