@@ -149,12 +149,17 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 |x| x.value.clone(),
             );
 
+        if opow_data.reward == zero {
+            continue;
+        }
+
         let shared_amount = if opow_data.delegated_weighted_deposit == zero {
             zero.clone()
         } else {
             opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share)
         };
         let coinbase_amount = opow_data.reward - shared_amount;
+
         for (output, fraction) in opow_data.coinbase.iter() {
             let player_data = active_players_block_data.get_mut(output).unwrap();
             let fraction = PreciseNumber::from_f64(*fraction);

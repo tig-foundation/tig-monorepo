@@ -34,8 +34,10 @@ pub async fn set_coinbase<T: Context>(
         }
     }
 
-    if coinbase.values().any(|&v| v <= 0.0) {
-        return Err(anyhow!("Fraction cannot be zero or negative"));
+    if coinbase.values().any(|&v| v <= 0.0 || v > 1.0) {
+        return Err(anyhow!(
+            "Fraction must be greater than 0.0 and less than or equal to 1.0"
+        ));
     }
 
     if coinbase.values().cloned().sum::<f64>() > 1.0 {
@@ -82,12 +84,14 @@ pub async fn set_delegatees<T: Context>(
         }
     }
 
-    if delegatees.values().any(|&v| v <= 0.0) {
-        return Err(anyhow!("Fraction to delegate cannot be zero or negative"));
+    if delegatees.values().any(|&v| v <= 0.0 || v > 1.0) {
+        return Err(anyhow!(
+            "Fraction must be greater than 0.0 and less than or equal to 1.0"
+        ));
     }
 
     if delegatees.values().cloned().sum::<f64>() > 1.0 {
-        return Err(anyhow!("Total fraction to delegate cannot exceed 1.0"));
+        return Err(anyhow!("Total fraction cannot exceed 1.0"));
     }
 
     for delegatee in delegatees.keys() {
