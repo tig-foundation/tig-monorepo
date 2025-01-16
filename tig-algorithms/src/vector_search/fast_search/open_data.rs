@@ -1,9 +1,9 @@
 /*!
-Copyright [yyyy] [name of copyright owner]
+Copyright 2024 Chibs
 
-Licensed under the TIG Inbound Game License v1.0 or (at your option) any later
-version (the "License"); you may not use this file except in compliance with the
-License. You may obtain a copy of the License at
+Licensed under the TIG Open Data License v1.0 or (at your option) any later version 
+(the "License"); you may not use this file except in compliance with the License. 
+You may obtain a copy of the License at
 
 https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
 
@@ -14,15 +14,45 @@ language governing permissions and limitations under the License.
 */
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use tig_challenges::vector_search::{Challenge, Solution};
 
-pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
-    // return Err(<msg>) if your algorithm encounters an error
-    // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(Solution { .. }) if your algorithm finds a solution
-    Err(anyhow!("Not implemented"))
+fn squared_distance(v1: &[f32], v2: &[f32]) -> f32 {
+    v1.iter()
+        .zip(v2.iter())
+        .map(|(a, b)| (a - b) * (a - b))
+        .sum()
 }
+
+pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
+    let max_distance_sq = challenge.max_distance * challenge.max_distance;
+
+    let indexes: Vec<usize> = challenge
+        .query_vectors
+        .iter()
+        .filter_map(|query| {
+            challenge
+                .vector_database
+                .iter()
+                .enumerate()
+                .find_map(|(i, vector)| {
+                    if squared_distance(query, vector) <= max_distance_sq {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+        })
+        .collect();
+
+    if indexes.len() == challenge.query_vectors.len() {
+        Ok(Some(Solution { indexes }))
+    } else {
+        Ok(None)
+    }
+}
+
+// Important! Do not include any tests in this file, it will result in your submission being rejected
 
 #[cfg(feature = "cuda")]
 mod gpu_optimisation {
@@ -45,5 +75,3 @@ mod gpu_optimisation {
 }
 #[cfg(feature = "cuda")]
 pub use gpu_optimisation::{cuda_solve_challenge, KERNEL};
-
-// Important! Do not include any tests in this file, it will result in your submission being rejected
