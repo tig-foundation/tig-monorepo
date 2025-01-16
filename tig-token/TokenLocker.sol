@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 
@@ -15,6 +14,7 @@ interface ITokenLocker {
     event TokensRewarded(address indexed user, uint256 amount, uint256 locked);
 
     function getNumPendingWithdrawals(address account) external view returns (uint256);
+    function getTimeUntilWithdrawable(address account, uint256 index) external view returns (uint256);
     function lock(uint256 amount) external;
     function unlock(uint256 amount) external;
     function withdraw(uint256 index) external;
@@ -45,6 +45,18 @@ contract TokenLocker is ITokenLocker, ReentrancyGuard, Ownable {
 
     function getNumPendingWithdrawals(address account) external view override returns (uint256) {
         return pendingWithdrawals[account].length;
+    }
+
+    function getTimeUntilWithdrawable(address account, uint256 index) external view returns (uint256) {
+        require(index < pendingWithdrawals[account].length, "Invalid withdrawal index");
+        
+        uint256 withdrawableTime = pendingWithdrawals[account][index].timeWithdrawable;
+        
+        if (block.timestamp >= withdrawableTime) {
+            return 0;
+        }
+        
+        return withdrawableTime.sub(block.timestamp);
     }
 
     function lock(uint256 amount) external override nonReentrant {
