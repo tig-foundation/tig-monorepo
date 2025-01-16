@@ -354,6 +354,7 @@ serializable_struct_with_getters! {
         delegated_weighted_deposit: PreciseNumber,
         delegators: HashSet<String>,
         reward_share: f64,
+        coinbase: HashMap<String, f64>,
         imbalance: PreciseNumber,
         influence: PreciseNumber,
         reward: PreciseNumber,
@@ -379,6 +380,7 @@ serializable_struct_with_getters! {
         delegatees: Option<PlayerValue<HashMap<String, f64>>>,
         votes: HashMap<String, PlayerValue<bool>>,
         reward_share: Option<PlayerValue<f64>>,
+        coinbase: Option<PlayerValue<HashMap<String, f64>>>,
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]

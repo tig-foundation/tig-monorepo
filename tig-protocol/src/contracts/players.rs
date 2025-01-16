@@ -5,6 +5,54 @@ use std::collections::HashMap;
 use tig_structs::core::*;
 
 #[time]
+pub async fn set_coinbase<T: Context>(
+    ctx: &T,
+    player_id: String,
+    coinbase: HashMap<String, f64>,
+) -> Result<()> {
+    let config = ctx.get_config().await;
+    let latest_block_id = ctx.get_latest_block_id().await;
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+    let player_state = ctx.get_player_state(&player_id).await.unwrap();
+
+    if coinbase.len() > config.opow.max_coinbase_outputs {
+        return Err(anyhow!(
+            "Cannot split coinbase to more than {} players",
+            config.opow.max_coinbase_outputs
+        ));
+    }
+    if let Some(curr_coinbase) = &player_state.coinbase {
+        if latest_block_details.height - curr_coinbase.block_set
+            < config.opow.coinbase_update_period
+        {
+            return Err(anyhow!(
+                "Can only update coinbase every {} blocks. Please wait {} blocks",
+                config.opow.coinbase_update_period,
+                config.opow.coinbase_update_period
+                    - (latest_block_details.height - curr_coinbase.block_set)
+            ));
+        }
+    }
+
+    if coinbase.values().any(|&v| v <= 0.0) {
+        return Err(anyhow!("Fraction cannot be zero or negative"));
+    }
+
+    if coinbase.values().cloned().sum::<f64>() > 1.0 {
+        return Err(anyhow!("Total fraction cannot exceed 1.0"));
+    }
+
+    for output in coinbase.keys() {
+        if ctx.get_player_details(output).await.is_none() {
+            return Err(anyhow!("Player '{}' is invalid or not registered", output));
+        }
+    }
+
+    ctx.set_player_coinbase(player_id, coinbase).await?;
+    Ok(())
+}
+
+#[time]
 pub async fn set_delegatees<T: Context>(
     ctx: &T,
     player_id: String,

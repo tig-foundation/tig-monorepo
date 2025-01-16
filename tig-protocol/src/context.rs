@@ -53,6 +53,11 @@ pub trait Context {
         delegatees: HashMap<String, f64>,
     ) -> Result<()>;
     async fn set_player_reward_share(&self, player_id: String, reward_share: f64) -> Result<()>;
+    async fn set_player_coinbase(
+        &self,
+        player_id: String,
+        coinbase: HashMap<String, f64>,
+    ) -> Result<()>;
     async fn set_player_vote(
         &self,
         player_id: String,

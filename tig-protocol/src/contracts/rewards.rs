@@ -141,17 +141,28 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .as_ref()
             .map_or(config.deposits.default_reward_share, |x| x.value)
             .clone();
+        opow_data.coinbase = active_players_state[delegatee]
+            .coinbase
+            .as_ref()
+            .map_or_else(
+                || HashMap::from([(delegatee.clone(), 1.0)]),
+                |x| x.value.clone(),
+            );
 
         let shared_amount = if opow_data.delegated_weighted_deposit == zero {
             zero.clone()
         } else {
             opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share)
         };
-        active_players_block_data
-            .get_mut(delegatee)
-            .unwrap()
-            .reward_by_type
-            .insert(RewardType::Benchmarker, opow_data.reward - shared_amount);
+        let coinbase_amount = opow_data.reward - shared_amount;
+        for (output, fraction) in opow_data.coinbase.iter() {
+            let player_data = active_players_block_data.get_mut(output).unwrap();
+            let fraction = PreciseNumber::from_f64(*fraction);
+            *player_data
+                .reward_by_type
+                .entry(RewardType::Delegator)
+                .or_insert(zero.clone()) += coinbase_amount * fraction;
+        }
 
         if shared_amount == zero {
             continue;
