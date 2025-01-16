@@ -165,7 +165,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let fraction = PreciseNumber::from_f64(*fraction);
             *player_data
                 .reward_by_type
-                .entry(RewardType::Delegator)
+                .entry(RewardType::Benchmarker)
                 .or_insert(zero.clone()) += coinbase_amount * fraction;
         }
 
