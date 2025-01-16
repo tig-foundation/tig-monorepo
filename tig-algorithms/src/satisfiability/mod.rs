@@ -16,7 +16,8 @@
 
 // c001_a009
 
-// c001_a010
+pub mod walk_sat_adapt_tabu;
+pub use walk_sat_adapt_tabu as c001_a010;
 
 // c001_a011
 
