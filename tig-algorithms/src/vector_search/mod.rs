@@ -76,7 +76,8 @@
 
 // c004_a039
 
-// c004_a040
+pub mod neighbor_kd;
+pub use neighbor_kd as c004_a040;
 
 // c004_a041
 
