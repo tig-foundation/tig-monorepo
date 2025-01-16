@@ -18,7 +18,8 @@
 
 // c001_a010
 
-// c001_a011
+pub mod fast_walk_sat;
+pub use fast_walk_sat as c001_a011;
 
 // c001_a012
 
