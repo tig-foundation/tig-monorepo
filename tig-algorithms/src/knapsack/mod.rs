@@ -58,7 +58,8 @@
 
 // c003_a030
 
-// c003_a031
+pub mod knap_suck;
+pub use knap_suck as c003_a031;
 
 // c003_a032
 
