@@ -1,5 +1,5 @@
 /*!
-Copyright [yyyy] [name of copyright owner]
+Copyright 2024 Clarence Callahan
 
 Licensed under the TIG Inbound Game License v1.0 or (at your option) any later
 version (the "License"); you may not use this file except in compliance with the
@@ -13,15 +13,39 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the speci
 language governing permissions and limitations under the License.
 */
 
-// TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
-use anyhow::{anyhow, Result};
-use tig_challenges::satisfiability::{Challenge, Solution};
+use std::collections::{HashMap, HashSet};
+use tig_challenges::satisfiability::*;
 
-pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
-    // return Err(<msg>) if your algorithm encounters an error
-    // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(Solution { .. }) if your algorithm finds a solution
-    Err(anyhow!("Not implemented"))
+pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
+    let mut solution = Solution {
+        variables: vec![false; challenge.difficulty.num_variables],
+    };
+    let mut vars_map = HashMap::<i32, HashSet<usize>>::new();
+    for (idx, clause) in challenge.clauses.iter().enumerate() {
+        for v in clause.iter() {
+            vars_map.entry(*v).or_insert(HashSet::new()).insert(idx);
+        }
+    }
+    while !vars_map.is_empty() {
+        let mut lens = vars_map
+            .iter()
+            .map(|v| (v.0.clone(), v.1.len()))
+            .collect::<Vec<_>>();
+        lens.sort_by(|a, b| b.1.cmp(&a.1));
+        let s = &lens[0];
+        if s.1 == 0 {
+            break;
+        }
+        solution.variables[(s.0.abs() - 1) as usize] = s.0 > 0;
+        let c = vars_map.remove(&s.0).unwrap();
+        vars_map.remove(&-s.0);
+        vars_map.retain(|_, v| {
+            *v = v.difference(&c).cloned().collect();
+            !v.is_empty()
+        });
+    }
+
+    Ok(Some(solution))
 }
 
 #[cfg(feature = "cuda")]
@@ -45,5 +69,3 @@ mod gpu_optimisation {
 }
 #[cfg(feature = "cuda")]
 pub use gpu_optimisation::{cuda_solve_challenge, KERNEL};
-
-// Important! Do not include any tests in this file, it will result in your submission being rejected
