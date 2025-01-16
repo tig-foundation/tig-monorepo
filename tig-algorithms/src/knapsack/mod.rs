@@ -92,7 +92,8 @@
 
 // c003_a047
 
-// c003_a048
+pub mod quadratic_greedy;
+pub use quadratic_greedy as c003_a048;
 
 // c003_a049
 
