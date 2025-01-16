@@ -74,7 +74,8 @@
 
 // c003_a038
 
-// c003_a039
+pub mod greedy_backtrack;
+pub use greedy_backtrack as c003_a039;
 
 // c003_a040
 
