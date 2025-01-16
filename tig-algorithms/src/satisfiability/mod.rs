@@ -12,7 +12,8 @@
 
 // c001_a007
 
-// c001_a008
+pub mod i_cant_get_no;
+pub use i_cant_get_no as c001_a008;
 
 // c001_a009
 
