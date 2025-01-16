@@ -1,5 +1,5 @@
 /*!
-Copyright [yyyy] [name of copyright owner]
+Copyright 2024 Chad Blanchard
 
 Licensed under the TIG Inbound Game License v1.0 or (at your option) any later
 version (the "License"); you may not use this file except in compliance with the
@@ -14,14 +14,43 @@ language governing permissions and limitations under the License.
 */
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
-use anyhow::{anyhow, Result};
-use tig_challenges::satisfiability::{Challenge, Solution};
+use rand::prelude::*;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use tig_challenges::satisfiability::*;
 
-pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
-    // return Err(<msg>) if your algorithm encounters an error
-    // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(Solution { .. }) if your algorithm finds a solution
-    Err(anyhow!("Not implemented"))
+pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
+    let mut rng = StdRng::seed_from_u64(u64::from_le_bytes(challenge.seed[..8].try_into().unwrap()) as u64);
+    let num_variables = challenge.difficulty.num_variables;
+    let max_flips = 1000;
+
+    let mut variables: Vec<bool> = (0..num_variables).map(|_| rng.gen::<bool>()).collect();
+
+    for _ in 0..max_flips {
+        let mut unsatisfied_clauses: Vec<&Vec<i32>> = challenge
+            .clauses
+            .iter()
+            .filter(|clause| !clause_satisfied(clause, &variables))
+            .collect();
+
+        if unsatisfied_clauses.is_empty() {
+            return Ok(Some(Solution { variables }));
+        }
+
+        let clause = unsatisfied_clauses.choose(&mut rng).unwrap();
+        let literal = clause.choose(&mut rng).unwrap();
+        let var_idx = literal.abs() as usize - 1;
+        variables[var_idx] = !variables[var_idx];
+    }
+
+    Ok(None)
+}
+
+fn clause_satisfied(clause: &Vec<i32>, variables: &[bool]) -> bool {
+    clause.iter().any(|&literal| {
+        let var_idx = literal.abs() as usize - 1;
+        (literal > 0 && variables[var_idx]) || (literal < 0 && !variables[var_idx])
+    })
 }
 
 #[cfg(feature = "cuda")]
@@ -45,5 +74,3 @@ mod gpu_optimisation {
 }
 #[cfg(feature = "cuda")]
 pub use gpu_optimisation::{cuda_solve_challenge, KERNEL};
-
-// Important! Do not include any tests in this file, it will result in your submission being rejected

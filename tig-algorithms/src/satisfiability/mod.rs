@@ -6,7 +6,8 @@
 
 // c001_a004
 
-// c001_a005
+pub mod walk_sat;
+pub use walk_sat as c001_a005;
 
 // c001_a006
 
