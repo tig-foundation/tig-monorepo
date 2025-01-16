@@ -10,7 +10,8 @@
 
 // c001_a006
 
-// c001_a007
+pub mod satisfiapilled;
+pub use satisfiapilled as c001_a007;
 
 // c001_a008
 
