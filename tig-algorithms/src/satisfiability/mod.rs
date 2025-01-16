@@ -50,7 +50,8 @@
 
 // c001_a026
 
-// c001_a027
+pub mod ultra_sat_allocd;
+pub use ultra_sat_allocd as c001_a027;
 
 // c001_a028
 
