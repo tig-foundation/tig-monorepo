@@ -80,7 +80,8 @@
 
 // c004_a041
 
-// c004_a042
+pub mod invector_hybrid;
+pub use invector_hybrid as c004_a042;
 
 // c004_a043
 
