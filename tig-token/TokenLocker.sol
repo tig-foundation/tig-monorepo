@@ -6,13 +6,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-
 interface ITokenLocker {
     event TokensLocked(address indexed user, uint256 amount, uint256 locked);
     event TokensUnlocked(address indexed user, uint256 amount, uint256 locked, uint256 withdrawableTime);
     event TokensWithdrawn(address indexed user, uint256 amount);
-    event TokensRewarded(address indexed user, uint256 amount, uint256 locked);
+    event TokensRewarded(address indexed user, uint256 amount, uint256 claimable);
     event TokensRelocked(address indexed user, uint256 amount, uint256 locked);
+    event TokensClaimed(address indexed user, uint256 amount, uint256 locked);
 
     function getNumPendingWithdrawals(address account) external view returns (uint256);
     function getTimeUntilWithdrawable(address account, uint256 index) external view returns (uint256);
@@ -21,6 +21,7 @@ interface ITokenLocker {
     function withdraw(uint256 index) external;
     function relock(uint256 index) external;
     function rewardTokens(address account, uint256 amount) external;
+    function claim(uint256 amount) external;
 }
 
 contract TokenLocker is ITokenLocker, ReentrancyGuard, Ownable {
@@ -36,8 +37,10 @@ contract TokenLocker is ITokenLocker, ReentrancyGuard, Ownable {
     
     uint256 public totalLocked;
     uint256 public totalPendingWithdrawal;
+    uint256 public totalClaimable;
     
     mapping(address => uint256) public locked;
+    mapping(address => uint256) public claimable;
     mapping(address => PendingWithdrawal[]) public pendingWithdrawals;
     
     constructor(address tokenAddress, uint256 _pendingPeriod) public Ownable(msg.sender) {
@@ -134,9 +137,22 @@ contract TokenLocker is ITokenLocker, ReentrancyGuard, Ownable {
         
         require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
         
-        locked[account] = locked[account].add(amount);
+        claimable[account] = claimable[account].add(amount);
+        totalClaimable = totalClaimable.add(amount);
+        
+        emit TokensRewarded(account, amount, claimable[account]);
+    }
+
+    function claim(uint256 amount) external override nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(claimable[msg.sender] >= amount, "Insufficient claimable balance");
+        
+        claimable[msg.sender] = claimable[msg.sender].sub(amount);
+        totalClaimable = totalClaimable.sub(amount);
+        
+        locked[msg.sender] = locked[msg.sender].add(amount);
         totalLocked = totalLocked.add(amount);
         
-        emit TokensRewarded(account, amount, locked[account]);
+        emit TokensClaimed(msg.sender, amount, locked[msg.sender]);
     }
 }
