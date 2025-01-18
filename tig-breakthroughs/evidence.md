@@ -33,7 +33,7 @@ IT IS IMPORTANT THAT THIS SECTION IS COMPLETED IN SUFFICIENT DETAIL TO FULLY DES
 
 PLEASE IDENTIFY WHICH TIG CHALLENGE THE ALGORITHMIC METHOD ADDRESSES.
 
-> knapsack
+> YOUR RESPONSE HERE (options are satisfiability, vehicle_routing, knapsack, or vector_search)
 
 PLEASE DESCRIBE THE ALGORITHMIC METHOD AND THE PROBLEM THAT IT SOLVES.
 
@@ -50,18 +50,6 @@ TO THE EXTENT THAT YOU HAVE IMPLEMENTED THE ALGORITHMIC METHOD IN CODE YOU SHOUL
 > YOUR RESPONSE HERE
 
 ## SECTION 3
-
-### ATTRIBUTION
-
-PLEASE PROVIDE THE IDENTITY OF THE CREATOR OF THE ALGORITHMIC METHOD (this should be a natural person or legal entity. If an artificial intelligence has been used to assist in the creation of the algorithmic method then the creator is the operator of the artificial intelligence)
-
-> YOUR RESPONSE HERE
-
-PLEASE PROVIDE EVIDENCE OF AUTHORSHIP WHERE IT IS AVAILABLE.
-
-> YOUR RESPONSE HERE
-
-## SECTION 4
 
 ### NOVELTY AND INVENTIVENESS
 
@@ -132,7 +120,7 @@ To support your claim that an algorithmic method is novel and inventive, you sho
 
   > YOUR RESPONSE HERE
 
-## SECTION 5
+## SECTION 4
 
 ### EVIDENCE TO SUPPORT PATENTABILITY
 
@@ -140,7 +128,7 @@ To support your claim that an algorithmic method is novel and inventive, you sho
 
   > YOUR RESPONSE HERE
 
-## SECTION 6
+## SECTION 5
 
 ### SUGGESTED APPLICATIONS
 
@@ -148,7 +136,7 @@ To support your claim that an algorithmic method is novel and inventive, you sho
 
   > YOUR RESPONSE HERE
 
-## SECTION 7
+## SECTION 6
 
 ### ANY OTHER INFORMATION
 
