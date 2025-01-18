@@ -14,7 +14,7 @@ Each submissions is committed to their own branch with the naming pattern:
     * [Voting Guidelines for Token Holders](../docs/guides/voting.md)
 
 2. Email the following to `breakthroughs@tig.foundation` with subject "Breakthrough Submission (`<breakthrough_name>`)":
-    * **Evidence form**: copy & fill in `evidence.md` from the relevant challenges folder (e.g. [`knapsack/evidence.md`](./knapsack/evidence.md)). Of particular importance is Section 1 which describes your breakthrough
+    * **Evidence form**: copy & fill in [`evidence.md`](./evidence.md). Of particular importance is Section 1 which describes your breakthrough
 
     * **Invention assignment**: copy & replace [invention_assignment.doc](../docs/agreements/invention_assignment.doc) the highlighted parts. Inventor and witness must sign.
 
