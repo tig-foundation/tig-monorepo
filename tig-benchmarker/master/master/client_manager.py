@@ -211,7 +211,7 @@ class ClientManager:
                         'start_nonce', A.batch_idx * B.batch_size,
                         'num_nonces', LEAST(B.batch_size, B.num_nonces - A.batch_idx * B.batch_size),
                         'settings', B.settings,
-                        'sampled_nonces', NULL,
+                        'sampled_nonces', D.sampled_nonces,
                         'runtime_config', B.runtime_config,
                         'download_url', B.download_url,
                         'rand_hash', B.rand_hash,
@@ -229,6 +229,9 @@ class ClientManager:
                 INNER JOIN batch_data C
                 ON A.benchmark_id = C.benchmark_id
                 AND A.batch_idx = C.batch_idx
+                LEFT JOIN proofs_batch D
+                ON A.benchmark_id = D.benchmark_id
+                AND A.batch_idx = D.batch_idx
                 """
             )
 
