@@ -129,7 +129,6 @@ pub fn compute_solution(
         }
     }
 
-    // Get runtime signature
     let runtime_signature = store.get_runtime_signature();
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
     let solution_data = OutputData {

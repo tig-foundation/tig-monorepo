@@ -1,5 +1,5 @@
 #!/bin/bash
-REPO_DIR=$(dirname $(dirname "$(realpath "$0")"))
+REPO_DIR=$(dirname $(dirname "$(realpath -- "$0")"))
 TIG_WORKER_PATH="$REPO_DIR/target/release/tig-worker"
 
 if [ ! -f $TIG_WORKER_PATH ]; then
@@ -8,17 +8,25 @@ if [ ! -f $TIG_WORKER_PATH ]; then
     exit 1
 fi
 
-
 options=()
 index=0
-echo "Available WASMs:"
+echo "Available algorithms:"
 for w in $(find $REPO_DIR/tig-algorithms/wasm -name '*.wasm'); do
     a_name=$(basename $w .wasm)
     c_name=$(basename $(dirname $w))
-    echo "$index) $c_name/$a_name"
-    options+=("$c_name/$a_name")
+    echo "$index) $c_name/$a_name (WASM)"
+    options+=("wasm $c_name/$a_name")
     index=$((index + 1))
 done
+
+for n in $(find $REPO_DIR/tig-algorithms/native -name '*.native'); do
+    a_name=$(basename $n .native)
+    c_name=$(basename $(dirname $n))
+    echo "$index) $c_name/$a_name (Native)"
+    options+=("native $c_name/$a_name")
+    index=$((index + 1))
+done
+
 echo "Don't see the algorithm you're looking for? Can run: git pull origin <challenge_name>/<algorithm_name> --no-edit"
 read -p "Enter the index of the algorithm to test: " selected_index
 if [[ $selected_index =~ ^[0-9]+$ ]] && [ "$selected_index" -ge 0 ] && [ "$selected_index" -lt "$index" ]; then
@@ -29,8 +37,9 @@ else
     exit 1
 fi
 
-CHALLENGE=$(dirname $selected_option)
-ALGORITHM=$(basename $selected_option)
+BINARY_TYPE=$(echo $selected_option | cut -d' ' -f1)
+CHALLENGE=$(echo $selected_option | cut -d' ' -f2 | cut -d'/' -f1)
+ALGORITHM=$(echo $selected_option | cut -d' ' -f2 | cut -d'/' -f2)
 
 case $CHALLENGE in
     satisfiability)
@@ -92,7 +101,6 @@ get_closest_power_of_2() {
     echo $p
 }
 
-
 SETTINGS="{\"challenge_id\":\"$CHALLENGE_ID\",\"difficulty\":$difficulty,\"algorithm_id\":\"\",\"player_id\":\"\",\"block_id\":\"\"}"
 num_solutions=0
 num_invalid=0
@@ -117,7 +125,16 @@ while [ $remaining_nonces -gt 0 ]; do
     start_time=$(date +%s%3N)
     stdout=$(mktemp)
     stderr=$(mktemp)
-    ./target/release/tig-worker compute_batch "$SETTINGS" "random_string" $current_nonce $nonces_to_compute $power_of_2_nonces $REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm --workers $nonces_to_compute >"$stdout" 2>"$stderr"
+
+    if [ "$BINARY_TYPE" = "wasm" ]; then
+        BINARY_PATH="$REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm"
+        BINARY_ARG="--wasm"
+    else
+        BINARY_PATH="$REPO_DIR/tig-algorithms/native/$CHALLENGE/$ALGORITHM.native"
+        BINARY_ARG="--native"
+    fi
+
+    ./target/release/tig-worker compute_batch "$SETTINGS" "random_string" $current_nonce $nonces_to_compute $power_of_2_nonces $BINARY_ARG $BINARY_PATH --workers $nonces_to_compute >"$stdout" 2>"$stderr"
     exit_code=$?
     output_stdout=$(cat "$stdout")
     output_stderr=$(cat "$stderr")

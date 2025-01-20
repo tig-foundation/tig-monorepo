@@ -1,0 +1,20 @@
+[package]
+name = "tig-native"
+version = "0.1.0"
+readme = "README.md"
+license = "https://github.com/tig-foundation/tig-monorepo/tree/main/docs/agreements/end_user_license_agreement.pdf"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+tig-challenges  = { path = "../tig-challenges" }
+
+[workspace]
+
+[features]
+knapsack = []
+vector_search = []
+satisfiability = []
+vehicle_routing = []
+entry_point = []

@@ -48,7 +48,7 @@ impl TryFrom<Map<String, Value>> for Solution {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
