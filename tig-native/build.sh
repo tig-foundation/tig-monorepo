@@ -1,13 +1,22 @@
 #!/bin/bash
 
-if ! command -v curl >/dev/null 2>&1
+if command -v apt-get >/dev/null 2>&1
 then
-    echo "Installing curl..."
-    sudo apt-get update && sudo apt-get install -y curl
-
-    if [ $? -ne 0 ]
+    if ! command -v curl >/dev/null 2>&1
     then
-        echo "Error: Failed to install curl"
+        echo "Installing curl..."
+        sudo apt-get update && sudo apt-get install -y curl
+
+        if [ $? -ne 0 ]
+        then
+            echo "Error: Failed to install curl"
+            exit 1
+        fi
+    fi
+else
+    if ! command -v curl >/dev/null 2>&1
+    then
+        echo "Error: curl is not installed and apt-get is not available"
         exit 1
     fi
 fi
@@ -26,14 +35,23 @@ then
     source "$HOME/.cargo/env"
 fi
 
-if ! command -v cc >/dev/null 2>&1
+if command -v apt-get >/dev/null 2>&1
 then
-    echo "Installing build-essential..."
-    sudo apt-get update && sudo apt-get install -y build-essential
-
-    if [ $? -ne 0 ]
+    if ! command -v cc >/dev/null 2>&1
     then
-        echo "Error: Failed to install build-essential"
+        echo "Installing build-essential..."
+        sudo apt-get update && sudo apt-get install -y build-essential
+
+        if [ $? -ne 0 ]
+        then
+            echo "Error: Failed to install build-essential"
+            exit 1
+        fi
+    fi
+else
+    if ! command -v cc >/dev/null 2>&1
+    then
+        echo "Error: C compiler is not installed and apt-get is not available"
         exit 1
     fi
 fi
@@ -41,7 +59,11 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LLVM_RELEASES=(
-    "https://nightly.link/tig-foundation/llvm/actions/runs/12875091437/llvm.zip" # TESTING ONLY
+    "https://nightly.link/tig-foundation/llvm/actions/runs/12877227458/llvm-f247539ca9413c3fc42f20e3c838219587bb799f.zip" # TESTING ONLY
+)
+
+LLVM_CHECKSUMS=(
+    "386da121337f96b4ffe9f11217ae81ee7b9d7344da6925a203a914fa14d68979"
 )
 
 LLVM_RELEASE_IDX=${LLVM_RELEASE:-${#LLVM_RELEASES[@]}-1}
@@ -49,6 +71,7 @@ CURRENT_RELEASE="${LLVM_RELEASES[$LLVM_RELEASE_IDX]}"
 ARTIFACT_ID=$(echo "$CURRENT_RELEASE" | grep -o 'runs/[0-9]*' | cut -d'/' -f2)
 LLVM_ARCHIVE="llvm-${ARTIFACT_ID}.tar.zst"
 LLVM_DIR="llvm-${ARTIFACT_ID}"
+LLVM_CHECKSUM="${LLVM_CHECKSUMS[$LLVM_RELEASE_IDX]}"
 if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
     rustup install nightly-2024-12-17 &&
     rustup +nightly-2024-12-17 component add rust-src &&
@@ -67,27 +90,55 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
             echo "Error: Failed to download LLVM release"
             exit 1
         fi
-    fi
 
-    mkdir -p "$SCRIPT_DIR/$LLVM_DIR"
-
-    if ! command -v unzip >/dev/null 2>&1; then
-        echo "Installing unzip..."
-        sudo apt-get update && sudo apt-get install -y unzip
-        if [ $? -ne 0 ]
+        echo "Verifying SHA256 checksum..."
+        COMPUTED_CHECKSUM=$(sha256sum "$SCRIPT_DIR/$LLVM_ARCHIVE.zip" | cut -d' ' -f1)
+        
+        if [ "$COMPUTED_CHECKSUM" != "$LLVM_CHECKSUM" ]
         then
-            echo "Error: Failed to install unzip"
+            rm -f "$SCRIPT_DIR/$LLVM_ARCHIVE.zip"
+            echo "Error: SHA256 checksum verification failed"
+            echo "Expected: $LLVM_CHECKSUM"
+            echo "Got: $COMPUTED_CHECKSUM"
             exit 1
         fi
     fi
 
-    if ! command -v zstd >/dev/null 2>&1
+    mkdir -p "$SCRIPT_DIR/$LLVM_DIR"
+
+    if command -v apt-get >/dev/null 2>&1
     then
-        echo "Installing zstd..."
-        sudo apt-get update && sudo apt-get install -y zstd
-        if [ $? -ne 0 ]
+        if ! command -v unzip >/dev/null 2>&1
         then
-            echo "Error: Failed to install zstd"
+            echo "Installing unzip..."
+            sudo apt-get update && sudo apt-get install -y unzip
+            if [ $? -ne 0 ]
+            then
+                echo "Error: Failed to install unzip"
+                exit 1
+            fi
+        fi
+
+        if ! command -v zstd >/dev/null 2>&1
+        then
+            echo "Installing zstd..."
+            sudo apt-get update && sudo apt-get install -y zstd
+            if [ $? -ne 0 ]
+            then
+                echo "Error: Failed to install zstd"
+                exit 1
+            fi
+        fi
+    else
+        if ! command -v unzip >/dev/null 2>&1
+        then
+            echo "Error: unzip is not installed and apt-get is not available"
+            exit 1
+        fi
+
+        if ! command -v zstd >/dev/null 2>&1
+        then
+            echo "Error: zstd is not installed and apt-get is not available"
             exit 1
         fi
     fi
@@ -165,4 +216,3 @@ if [ $? -ne 0 ]
 then
     exit 1
 fi
-
