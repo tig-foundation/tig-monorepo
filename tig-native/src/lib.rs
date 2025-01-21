@@ -2,33 +2,30 @@ extern crate tig_challenges;
 mod solve;
 
 use {
-    tig_challenges::knapsack::{Challenge as KnapsackChallenge, Solution as KnapsackSolution},
-    tig_challenges::vector_search::{Challenge as VectorSearchChallenge, Solution as VectorSearchSolution},
-    tig_challenges::satisfiability::{Challenge as SatisfiabilityChallenge, Solution as SatisfiabilitySolution},
-    tig_challenges::vehicle_routing::{Challenge as VehicleRoutingChallenge, Solution as VehicleRoutingSolution},
+    tig_challenges::{
+        knapsack, vector_search, satisfiability, vehicle_routing,
+    },
     std::panic::catch_unwind,
     solve::solve
 };
 
-#[cfg(feature = "knapsack")]
-pub type Challenge = KnapsackChallenge;
-#[cfg(feature = "knapsack")]
-pub type Solution = KnapsackSolution;
+macro_rules! define_challenge_types {
+    ($(($feature:literal, $challenge:path, $solution:path)),*) => {
+        $(
+            #[cfg(feature = $feature)]
+            pub type Challenge = $challenge;
+            #[cfg(feature = $feature)]
+            pub type Solution = $solution;
+        )*
+    };
+}
 
-#[cfg(feature = "vector_search")]
-pub type Challenge = VectorSearchChallenge;
-#[cfg(feature = "vector_search")]
-pub type Solution = VectorSearchSolution;
-
-#[cfg(feature = "satisfiability")]
-pub type Challenge = SatisfiabilityChallenge;
-#[cfg(feature = "satisfiability")]
-pub type Solution = SatisfiabilitySolution;
-
-#[cfg(feature = "vehicle_routing")]
-pub type Challenge = VehicleRoutingChallenge;
-#[cfg(feature = "vehicle_routing")]
-pub type Solution = VehicleRoutingSolution;
+define_challenge_types!(
+    ("knapsack", knapsack::Challenge, knapsack::Solution),
+    ("vector_search", vector_search::Challenge, vector_search::Solution),
+    ("satisfiability", satisfiability::Challenge, satisfiability::Solution),
+    ("vehicle_routing", vehicle_routing::Challenge, vehicle_routing::Solution)
+);
 
 #[cfg(feature = "entry_point")]
 #[unsafe(no_mangle)]
