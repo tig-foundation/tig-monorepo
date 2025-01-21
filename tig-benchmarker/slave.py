@@ -21,11 +21,11 @@ FINISHED_BATCH_IDS = {}
 def now():
     return int(time.time() * 1000)
 
-def download_wasm(session, download_url, wasm_path):
+def download_wasm(download_url, wasm_path):
     if not os.path.exists(wasm_path):
         start = now()
         logger.info(f"downloading WASM from {download_url}")
-        resp = session.get(download_url)
+        resp = requests.get(download_url)
         if resp.status_code != 200:
             raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
         with open(wasm_path, 'wb') as f:
@@ -93,11 +93,11 @@ def purge_folders(output_path, ttl):
     for batch_id in purge_batch_ids:
         if os.path.exists(f"{output_path}/{batch_id}"):
             logger.info(f"purging batch {batch_id}")
-            shutil.rmtree(f"{output_path}/{batch_id}")
+            shutil.rmtree(f"{output_path}/{batch_id}", ignore_errors=True)
         FINISHED_BATCH_IDS.pop(batch_id)
 
 
-def send_results(session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, output_path):
+def send_results(headers, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, output_path):
     try:
         batch_id = READY_BATCH_IDS.pop()
     except KeyError:
@@ -130,7 +130,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
 
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
         logger.info(f"posting root to {submit_url}")
-        resp = session.post(submit_url, json=result)
+        resp = requests.post(submit_url, headers=headers, json=result)
         if resp.status_code == 200:
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted root for batch {batch_id}")
@@ -163,7 +163,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
         
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-proofs/{batch_id}"
         logger.info(f"posting proofs to {submit_url}")
-        resp = session.post(submit_url, json={"merkle_proofs": proofs_to_submit})
+        resp = requests.post(submit_url, headers=headers, json={"merkle_proofs": proofs_to_submit})
         if resp.status_code == 200:
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted proofs for batch {batch_id}")
@@ -176,7 +176,7 @@ def send_results(session, master_ip, master_port, tig_worker_path, download_wasm
             time.sleep(2)
 
 
-def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, output_path):
+def process_batch(tig_worker_path, download_wasms_folder, num_workers, output_path):
     try:
         batch_id = PENDING_BATCH_IDS.pop()
     except KeyError:
@@ -200,7 +200,7 @@ def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, 
         batch = json.load(f)
 
     wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
-    download_wasm(session, batch['download_url'], wasm_path)
+    download_wasm(batch['download_url'], wasm_path)
     
     Thread(
         target=run_tig_worker,
@@ -208,10 +208,10 @@ def process_batch(session, tig_worker_path, download_wasms_folder, num_workers, 
     ).start()
 
 
-def poll_batches(session, master_ip, master_port, output_path):    
+def poll_batches(headers, master_ip, master_port, output_path):    
     get_batches_url = f"http://{master_ip}:{master_port}/get-batches"
     logger.info(f"fetching batches from {get_batches_url}")
-    resp = session.get(get_batches_url)
+    resp = requests.get(get_batches_url, headers=headers)
 
     if resp.status_code == 200:
         batches = resp.json()
@@ -262,19 +262,18 @@ def main(
         raise FileNotFoundError(f"tig-worker not found at path: {tig_worker_path}")
     os.makedirs(download_wasms_folder, exist_ok=True)
 
-    session = requests.Session()
-    session.headers.update({
+    headers = {
         "User-Agent": slave_name
-    })
+    }
 
     Thread(
         target=wrap_thread,
-        args=(process_batch, session, tig_worker_path, download_wasms_folder, num_workers, output_path)
+        args=(process_batch, tig_worker_path, download_wasms_folder, num_workers, output_path)
     ).start()
 
     Thread(
         target=wrap_thread,
-        args=(send_results, session, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, output_path)
+        args=(send_results, headers, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, output_path)
     ).start()
 
     Thread(
@@ -282,7 +281,7 @@ def main(
         args=(purge_folders, output_path, ttl)
     ).start()
 
-    wrap_thread(poll_batches, session, master_ip, master_port, output_path)
+    wrap_thread(poll_batches, headers, master_ip, master_port, output_path)
 
 
 if __name__ == "__main__":

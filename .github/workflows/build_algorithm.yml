@@ -38,7 +38,7 @@ jobs:
           echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
           echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
           echo "WASM_PATH=$ALGORITHM" >> $GITHUB_ENV
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.82.0
         with:
           targets: wasm32-wasi
       # - name: Install CUDA
