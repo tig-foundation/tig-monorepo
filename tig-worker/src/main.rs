@@ -197,10 +197,10 @@ fn compute_solution(
         println!("{}", jsonify(&output_data));
         if let Some(err_msg) = err_msg {
             return Err(anyhow!("Runtime error: {}", err_msg));
-        } else if output_data.solution.len() == 0 {
+        } else if output_data.solution.as_ref().unwrap().len() == 0 {
             return Err(anyhow!("No solution found"));
         }
-        return worker::verify_solution(&settings, &rand_hash, nonce, &output_data.solution)
+        return worker::verify_solution(&settings, &rand_hash, nonce, &output_data.solution.as_ref().unwrap())
             .map_err(|e| anyhow!("Invalid solution: {}", e))
     }
 
@@ -258,7 +258,7 @@ fn compute_solution(
 
                 let output_data = OutputData {
                     nonce,
-                    solution: serde_json::Map::new(),
+                    solution: None,
                     fuel_consumed: max_fuel,
                     runtime_signature: rt_sig,
                 };
@@ -275,7 +275,7 @@ fn compute_solution(
         let output_data: OutputData = dejsonify(&output_str)?;
         println!("{}", jsonify(&output_data));
 
-        return worker::verify_solution(&settings, &rand_hash, nonce, &output_data.solution)
+        return worker::verify_solution(&settings, &rand_hash, nonce, &output_data.solution.as_ref().unwrap())
             .map_err(|e| anyhow!("Invalid solution: {}", e));
     }
 
@@ -361,7 +361,7 @@ fn compute_batch(
                                 &settings,
                                 &rand_hash,
                                 nonce,
-                                &output_data.solution,
+                                &output_data.solution.as_ref().unwrap(),
                             )
                             .is_ok();
                         let hash = MerkleHash::from(output_data.clone());
@@ -467,7 +467,7 @@ fn compute_batch(
 
                     let output_data = OutputData {
                         nonce,
-                        solution: serde_json::Map::new(),
+                        solution: None,
                         fuel_consumed: max_fuel,
                         runtime_signature: rt_sig,
                     };
@@ -502,7 +502,7 @@ fn compute_batch(
                 &settings,
                 &rand_hash,
                 nonce,
-                &output_data.solution,
+                &output_data.solution.as_ref().unwrap(),
             ).is_ok();
 
             if is_solution {

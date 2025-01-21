@@ -421,7 +421,7 @@ serializable_struct_with_getters! {
         nonce: u64,
         runtime_signature: u64,
         fuel_consumed: u64,
-        solution: Solution,
+        solution: Option<Solution>,
     }
 }
 impl OutputData {

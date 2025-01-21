@@ -135,7 +135,7 @@ pub fn compute_solution(
         nonce,
         runtime_signature,
         fuel_consumed,
-        solution,
+        solution: Some(solution),
     };
     Ok((solution_data, err_msg))
 }
