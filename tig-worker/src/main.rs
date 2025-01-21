@@ -498,15 +498,17 @@ fn compute_batch(
 
             output_data.nonce = nonce;
 
-            let is_solution = worker::verify_solution(
-                &settings,
-                &rand_hash,
-                nonce,
-                &output_data.solution.as_ref().unwrap(),
-            ).is_ok();
-
-            if is_solution {
-                solution_nonces.push(nonce);
+            if output_data.solution.is_some() {
+                let is_solution = worker::verify_solution(
+                    &settings,
+                    &rand_hash,
+                    nonce,
+                    &output_data.solution.as_ref().unwrap(),
+                ).is_ok();
+    
+                if is_solution {
+                    solution_nonces.push(nonce);
+                }
             }
 
             let hash = MerkleHash::from(output_data.clone());
