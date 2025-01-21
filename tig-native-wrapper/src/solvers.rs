@@ -16,7 +16,7 @@ macro_rules! generate_solvers {
                 library_path: String,
                 challenge: $challenge,
                 fuel: Option<u64>
-            ) -> Result<($solution, u64, i64), String>
+            ) -> Result<(Option<$solution>, u64, i64), String>
             {
                 let library = load_module(&PathBuf::from(library_path))?;
                 let solve_fn = unsafe { library.get::<fn($challenge, Option<u64>) -> Option<$solution>>(b"entry_point").map_err(|e| e.to_string())? };
@@ -27,7 +27,7 @@ macro_rules! generate_solvers {
                     unsafe { *fuel_remaining_ptr = fuel.unwrap() as i64 };
                 }
 
-                let solution = solve_fn(challenge, fuel).ok_or_else(|| "Solver returned None".to_string())?;
+                let solution = solve_fn(challenge, fuel);
 
                 let fuel_remaining_ptr = unsafe { *library.get::<*const i64>(b"__fuel_remaining").map_err(|e| e.to_string())? };
                 let runtime_signature_ptr = unsafe { *library.get::<*const u64>(b"__runtime_signature").map_err(|e| e.to_string())? };
