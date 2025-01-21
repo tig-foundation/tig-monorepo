@@ -33,7 +33,7 @@ impl crate::DifficultyTrait<2> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Solution {
     pub items: Vec<usize>,
 }
