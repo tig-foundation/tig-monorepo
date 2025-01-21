@@ -1,43 +1,40 @@
 extern crate tig_challenges;
+mod solve;
 
 use {
     tig_challenges::knapsack::{Challenge as KnapsackChallenge, Solution as KnapsackSolution},
     tig_challenges::vector_search::{Challenge as VectorSearchChallenge, Solution as VectorSearchSolution},
     tig_challenges::satisfiability::{Challenge as SatisfiabilityChallenge, Solution as SatisfiabilitySolution},
     tig_challenges::vehicle_routing::{Challenge as VehicleRoutingChallenge, Solution as VehicleRoutingSolution},
+    std::panic::catch_unwind,
+    solve::solve
 };
 
 #[cfg(feature = "knapsack")]
-type Challenge = KnapsackChallenge;
+pub type Challenge = KnapsackChallenge;
 #[cfg(feature = "knapsack")]
-type Solution = KnapsackSolution;
+pub type Solution = KnapsackSolution;
 
 #[cfg(feature = "vector_search")]
-type Challenge = VectorSearchChallenge;
+pub type Challenge = VectorSearchChallenge;
 #[cfg(feature = "vector_search")]
-type Solution = VectorSearchSolution;
+pub type Solution = VectorSearchSolution;
 
 #[cfg(feature = "satisfiability")]
-type Challenge = SatisfiabilityChallenge;
+pub type Challenge = SatisfiabilityChallenge;
 #[cfg(feature = "satisfiability")]
-type Solution = SatisfiabilitySolution;
+pub type Solution = SatisfiabilitySolution;
 
 #[cfg(feature = "vehicle_routing")]
-type Challenge = VehicleRoutingChallenge;
+pub type Challenge = VehicleRoutingChallenge;
 #[cfg(feature = "vehicle_routing")]
-type Solution = VehicleRoutingSolution;
-
-#[cfg(feature = "entry_point")]
-fn solve(challenge: Challenge) -> Option<Solution>
-{
-    return Some(Solution { 
-        items: vec![0, 1, 2] 
-    });
-}
+pub type Solution = VehicleRoutingSolution;
 
 #[cfg(feature = "entry_point")]
 #[unsafe(no_mangle)]
 pub extern "C" fn entry_point(challenge: Challenge) -> Option<Solution>
 {
-    return solve(challenge);
+    return catch_unwind(|| {
+        return solve(challenge);
+    }).unwrap_or(None);
 }
