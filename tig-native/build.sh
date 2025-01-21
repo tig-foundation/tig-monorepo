@@ -5,7 +5,12 @@ then
     if ! command -v curl >/dev/null 2>&1
     then
         echo "Installing curl..."
-        sudo apt-get update && sudo apt-get install -y curl
+        if command -v sudo >/dev/null 2>&1
+        then
+            sudo apt-get update && sudo apt-get install -y curl
+        else
+            apt-get update && apt-get install -y curl
+        fi
 
         if [ $? -ne 0 ]
         then
@@ -40,7 +45,12 @@ then
     if ! command -v cc >/dev/null 2>&1
     then
         echo "Installing build-essential..."
-        sudo apt-get update && sudo apt-get install -y build-essential
+        if command -v sudo >/dev/null 2>&1
+        then
+            sudo apt-get update && sudo apt-get install -y build-essential
+        else
+            apt-get update && apt-get install -y build-essential
+        fi
 
         if [ $? -ne 0 ]
         then
@@ -111,7 +121,12 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
         if ! command -v unzip >/dev/null 2>&1
         then
             echo "Installing unzip..."
-            sudo apt-get update && sudo apt-get install -y unzip
+            if command -v sudo >/dev/null 2>&1
+            then
+                sudo apt-get update && sudo apt-get install -y unzip
+            else
+                apt-get update && apt-get install -y unzip
+            fi
             if [ $? -ne 0 ]
             then
                 echo "Error: Failed to install unzip"
@@ -122,7 +137,12 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
         if ! command -v zstd >/dev/null 2>&1
         then
             echo "Installing zstd..."
-            sudo apt-get update && sudo apt-get install -y zstd
+            if command -v sudo >/dev/null 2>&1
+            then
+                sudo apt-get update && sudo apt-get install -y zstd
+            else
+                apt-get update && apt-get install -y zstd
+            fi
             if [ $? -ne 0 ]
             then
                 echo "Error: Failed to install zstd"
