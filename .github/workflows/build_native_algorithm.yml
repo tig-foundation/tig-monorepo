@@ -1,0 +1,40 @@
+name: Build tig-native
+
+on:
+  workflow_dispatch:
+    inputs:
+      challenge_type:
+        description: 'Challenge type to build'
+        required: true
+        type: choice
+        options:
+          - knapsack
+          - satisfiability
+          - vector-search
+          - vehicle-routing
+      llvm_release:
+        description: 'LLVM release index (defaults to latest)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tig-native
+        env:
+          LLVM_RELEASE: ${{ inputs.llvm_release }}
+        run: |
+          chmod +x tig-native/build.sh
+          cd tig-native
+          ./build.sh --${{ inputs.challenge_type }} .
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtsig-blob-${{ inputs.challenge_type }}-${{ github.sha }}
+          path: tig-native/rtsig_blob.dylib
