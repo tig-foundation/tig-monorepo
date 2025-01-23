@@ -19,3 +19,7 @@ __pycache__/
 
 # Ignore these. 
 db_data/
+
+tig-native/target/
+tig-native/Cargo.lock
+tig-native/rtsig_blob.dylib
