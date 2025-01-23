@@ -23,3 +23,5 @@ db_data/
 tig-native/target/
 tig-native/Cargo.lock
 tig-native/rtsig_blob.dylib
+tig-native/llvm-*.zip
+tig-native/llvm-*/
