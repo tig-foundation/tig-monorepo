@@ -142,7 +142,7 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
         fi
     fi
 
-    tar -xf "$SCRIPT_DIR/$LLVM_DIR/llvm.tar.zst" -C "$SCRIPT_DIR/$LLVM_DIR"
+    tar -xf "$SCRIPT_DIR/$LLVM_ARCHIVE" -C "$SCRIPT_DIR/$LLVM_DIR"
 
     if [ $? -ne 0 ]; then
         rm -rf "$SCRIPT_DIR/$LLVM_DIR"
