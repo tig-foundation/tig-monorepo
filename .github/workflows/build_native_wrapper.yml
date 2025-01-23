@@ -9,8 +9,8 @@ on:
         type: choice
         options:
           - nightly-2024-12-17
-          - nightly-2025-01-23
-        default: nightly-2025-01-23
+          - nightly-2025-01-16
+        default: nightly-2025-01-16
       release_tag:
         description: 'Release tag (defaults to build-{sha})'
         required: false

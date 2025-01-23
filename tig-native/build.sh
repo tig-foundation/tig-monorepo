@@ -76,7 +76,7 @@ LLVM_CHECKSUMS=(
     "db302cce4320024258f3e9bd7839b418e5e683214eafbfc3833dfd0e2a63b244"
 )
 
-TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2025-01-23}"
+TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2025-01-16}" # default to latest nightly using llvm 19.1.6
 LLVM_RELEASE_IDX=${LLVM_RELEASE:-${#LLVM_RELEASES[@]}-1}
 CURRENT_RELEASE="${LLVM_RELEASES[$LLVM_RELEASE_IDX]}"
 ARTIFACT_ID=$(echo "$CURRENT_RELEASE" | sed -E 's|.*/([^/]+)/llvm.tar.zst|\1|')
