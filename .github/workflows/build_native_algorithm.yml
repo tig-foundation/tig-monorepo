@@ -55,6 +55,12 @@ jobs:
           rm -f tig-algorithms/native/${CHALLENGE_DIR}/${{ inputs.algorithm_name }}.native
           cp tig-native/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ inputs.algorithm_name }}.native
 
+      - name: Copy to algorithms directory
+        run: |
+          CHALLENGE_DIR=$(echo "${{ inputs.challenge_type }}" | tr '-' '_')
+          mkdir -p tig-algorithms/native/${CHALLENGE_DIR}
+          cp tig-native/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ inputs.algorithm_name }}.native
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
