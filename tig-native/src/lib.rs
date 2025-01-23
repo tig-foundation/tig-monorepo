@@ -33,6 +33,6 @@ define_challenge_types!(
 pub extern "C" fn entry_point(challenge: Challenge) -> Option<Solution>
 {
     return catch_unwind(|| {
-        solve::solve(challenge);
+        solve::solve(challenge)
     }).unwrap_or(None);
 }
