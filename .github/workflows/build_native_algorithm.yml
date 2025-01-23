@@ -50,7 +50,7 @@ jobs:
 
       - name: Build tig-native
         env:
-          LLVM_RELEASE: ${{ inputs.llvm_release %% ' -'* }}
+          LLVM_RELEASE: ${{ split(inputs.llvm_release, ' -')[0] }}
           RUST_TOOLCHAIN: ${{ inputs.rust_toolchain }}
         run: |
           chmod +x tig-native/build.sh
