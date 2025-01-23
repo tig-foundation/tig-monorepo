@@ -1,12 +1,13 @@
 extern crate tig_challenges;
+
+#[cfg(feature = "entry_point")]
 mod solve;
 
 use {
     tig_challenges::{
         knapsack, vector_search, satisfiability, vehicle_routing,
     },
-    std::panic::catch_unwind,
-    solve::solve
+    std::panic::catch_unwind
 };
 
 macro_rules! define_challenge_types {
@@ -32,6 +33,6 @@ define_challenge_types!(
 pub extern "C" fn entry_point(challenge: Challenge) -> Option<Solution>
 {
     return catch_unwind(|| {
-        return solve(challenge);
+        solve::solve(challenge);
     }).unwrap_or(None);
 }
