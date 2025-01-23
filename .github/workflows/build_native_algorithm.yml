@@ -22,6 +22,7 @@ on:
         type: choice
         options:
           - nightly-2024-12-17
+          - nightly-2025-01-23
       llvm_release:
         description: 'LLVM release index (defaults to latest)'
         required: false
