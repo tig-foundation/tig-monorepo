@@ -53,7 +53,7 @@ jobs:
           LLVM_INDEX=$(echo "${{ inputs.llvm_release }}" | cut -d' ' -f1)
           chmod +x tig-native/build.sh
           cd tig-native
-          LLVM_RELEASE=${LLVM_INDEX} RUST_TOOLCHAIN=${{ inputs.rust_toolchain }} ./build.sh
+          LLVM_RELEASE=${LLVM_INDEX} RUST_TOOLCHAIN=${{ inputs.rust_toolchain }} ./build.sh --${{ inputs.challenge_type }} .
           cd ..
           git config --global --add safe.directory "$(realpath .)"
 
