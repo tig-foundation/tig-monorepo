@@ -69,16 +69,16 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LLVM_RELEASES=(
-    "https://nightly.link/tig-foundation/llvm/actions/runs/12877227458/llvm-f247539ca9413c3fc42f20e3c838219587bb799f.zip" # TESTING ONLY
+    "https://github.com/tig-foundation/llvm/releases/download/build-0971e080be6c87bf551a9f41897bda4aebad32b1/llvm.tar.zst"
 )
 
 LLVM_CHECKSUMS=(
-    "386da121337f96b4ffe9f11217ae81ee7b9d7344da6925a203a914fa14d68979"
+    "db302cce4320024258f3e9bd7839b418e5e683214eafbfc3833dfd0e2a63b244"
 )
 
 LLVM_RELEASE_IDX=${LLVM_RELEASE:-${#LLVM_RELEASES[@]}-1}
 CURRENT_RELEASE="${LLVM_RELEASES[$LLVM_RELEASE_IDX]}"
-ARTIFACT_ID=$(echo "$CURRENT_RELEASE" | grep -o 'runs/[0-9]*' | cut -d'/' -f2)
+ARTIFACT_ID=$(echo "$CURRENT_RELEASE" | sed -E 's|.*/([^/]+)/llvm.tar.zst|\1|')
 LLVM_ARCHIVE="llvm-${ARTIFACT_ID}.tar.zst"
 LLVM_DIR="llvm-${ARTIFACT_ID}"
 LLVM_CHECKSUM="${LLVM_CHECKSUMS[$LLVM_RELEASE_IDX]}"
