@@ -36,10 +36,10 @@ jobs:
       contents: write
       statuses: write
     steps:
-      - name: Install git
+      - name: Install dependencies
         run: |
           apt-get update -y
-          apt-get install -y git curl gh
+          apt-get install -y git curl gh build-essential
 
       - uses: actions/checkout@v4
 
