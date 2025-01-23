@@ -68,7 +68,7 @@ jobs:
           if [ -z "$RELEASE_TITLE" ]; then
             RELEASE_TITLE="$RELEASE_TAG"
           fi
-          RELEASE_NOTES="tig-native-wrapper build (commit: ${{ github.sha }})"
+          RELEASE_NOTES="tig-native-wrapper build (commit: ${{ github.sha }}) toolchain: ${{ inputs.rust_toolchain }}"
           if [ -n "${{ inputs.release_notes }}" ]; then
             RELEASE_NOTES="$RELEASE_NOTES\n\n${{ inputs.release_notes }}"
           fi
