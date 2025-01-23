@@ -49,13 +49,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build tig-native
-        env:
-          LLVM_RELEASE: ${{ split(inputs.llvm_release, ' -')[0] }}
-          RUST_TOOLCHAIN: ${{ inputs.rust_toolchain }}
         run: |
+          LLVM_INDEX=$(echo "${{ inputs.llvm_release }}" | cut -d' ' -f1)
           chmod +x tig-native/build.sh
           cd tig-native
-          ./build.sh --${{ inputs.challenge_type }} .
+          LLVM_RELEASE=${LLVM_INDEX} RUST_TOOLCHAIN=${{ inputs.rust_toolchain }} ./build.sh
           cd ..
           git config --global --add safe.directory "$(realpath .)"
 
