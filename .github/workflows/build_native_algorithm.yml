@@ -27,7 +27,15 @@ jobs:
     runs-on: ubuntu-22.04-arm
     container:
       image: debian:12
+    permissions:
+      contents: write
+      statuses: write
     steps:
+      - name: Install git
+        run: |
+          apt-get update -y
+          apt-get install git -y
+          
       - uses: actions/checkout@v4
 
       - name: Build tig-native
@@ -38,6 +46,7 @@ jobs:
           cd tig-native
           ./build.sh --${{ inputs.challenge_type }} .
           cd ..
+          git config --global --add safe.directory "$(realpath .)"
 
       - name: Copy to algorithms directory
         run: |
