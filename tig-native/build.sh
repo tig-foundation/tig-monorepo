@@ -69,7 +69,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LLVM_RELEASES=(
-    "https://github.com/tig-foundation/llvm/releases/download/build-0971e080be6c87bf551a9f41897bda4aebad32b1/llvm.tar.zst"
+    "https://github.com/tig-foundation/llvm/releases/download/build-0971e080be6c87bf551a9f41897bda4aebad32b1/llvm.tar.zst" #TESTING ONLY
 )
 
 LLVM_CHECKSUMS=(
@@ -93,21 +93,21 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
         exit 1
     fi
 
-    if [ ! -f "$SCRIPT_DIR/$LLVM_ARCHIVE.zip" ]; then
+    if [ ! -f "$SCRIPT_DIR/$LLVM_ARCHIVE" ]; then
         echo "Using LLVM release: $CURRENT_RELEASE"
         echo "Downloading $LLVM_ARCHIVE..."
-        curl -L "$CURRENT_RELEASE" -o "$SCRIPT_DIR/$LLVM_ARCHIVE.zip"
+        curl -L "$CURRENT_RELEASE" -o "$SCRIPT_DIR/$LLVM_ARCHIVE"
         if [ $? -ne 0 ]; then
             echo "Error: Failed to download LLVM release"
             exit 1
         fi
 
         echo "Verifying SHA256 checksum..."
-        COMPUTED_CHECKSUM=$(sha256sum "$SCRIPT_DIR/$LLVM_ARCHIVE.zip" | cut -d' ' -f1)
+        COMPUTED_CHECKSUM=$(sha256sum "$SCRIPT_DIR/$LLVM_ARCHIVE" | cut -d' ' -f1)
         
         if [ "$COMPUTED_CHECKSUM" != "$LLVM_CHECKSUM" ]
         then
-            rm -f "$SCRIPT_DIR/$LLVM_ARCHIVE.zip"
+            rm -f "$SCRIPT_DIR/$LLVM_ARCHIVE"
             echo "Error: SHA256 checksum verification failed"
             echo "Expected: $LLVM_CHECKSUM"
             echo "Got: $COMPUTED_CHECKSUM"
@@ -119,22 +119,6 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
 
     if command -v apt-get >/dev/null 2>&1
     then
-        if ! command -v unzip >/dev/null 2>&1
-        then
-            echo "Installing unzip..."
-            if command -v sudo >/dev/null 2>&1
-            then
-                sudo apt-get update && sudo apt-get install -y unzip
-            else
-                apt-get update && apt-get install -y unzip
-            fi
-            if [ $? -ne 0 ]
-            then
-                echo "Error: Failed to install unzip"
-                exit 1
-            fi
-        fi
-
         if ! command -v zstd >/dev/null 2>&1
         then
             echo "Installing zstd..."
@@ -151,12 +135,6 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
             fi
         fi
     else
-        if ! command -v unzip >/dev/null 2>&1
-        then
-            echo "Error: unzip is not installed and apt-get is not available"
-            exit 1
-        fi
-
         if ! command -v zstd >/dev/null 2>&1
         then
             echo "Error: zstd is not installed and apt-get is not available"
@@ -164,12 +142,6 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
         fi
     fi
 
-    unzip "$SCRIPT_DIR/$LLVM_ARCHIVE.zip" -d "$SCRIPT_DIR/$LLVM_DIR"
-    if [ $? -ne 0 ]
-    then
-        echo "Error: Failed to unzip LLVM release"
-        exit 1
-    fi
     tar -xf "$SCRIPT_DIR/$LLVM_DIR/llvm.tar.zst" -C "$SCRIPT_DIR/$LLVM_DIR"
 
     if [ $? -ne 0 ]; then
@@ -182,8 +154,6 @@ if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
         mv "$SCRIPT_DIR/$LLVM_DIR/llvm/build"/* "$SCRIPT_DIR/$LLVM_DIR/"
         rm -rf "$SCRIPT_DIR/$LLVM_DIR/llvm"
     fi
-
-    rm -rf "$SCRIPT_DIR/$LLVM_DIR/llvm.tar.zst"
 fi
 
 PATH_TO_LLVM="$SCRIPT_DIR/$LLVM_DIR"
