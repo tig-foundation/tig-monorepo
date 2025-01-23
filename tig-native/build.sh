@@ -76,7 +76,7 @@ LLVM_CHECKSUMS=(
     "db302cce4320024258f3e9bd7839b418e5e683214eafbfc3833dfd0e2a63b244"
 )
 
-TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2024-12-17}"
+TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2025-01-23}"
 LLVM_RELEASE_IDX=${LLVM_RELEASE:-${#LLVM_RELEASES[@]}-1}
 CURRENT_RELEASE="${LLVM_RELEASES[$LLVM_RELEASE_IDX]}"
 ARTIFACT_ID=$(echo "$CURRENT_RELEASE" | sed -E 's|.*/([^/]+)/llvm.tar.zst|\1|')
@@ -198,7 +198,8 @@ PROJECT_BASE_DIR=$(dirname "$PROJECT_FOLDER")
 rm -rf "$PROJECT_FOLDER/target"
 
 pushd "$SCRIPT_DIR/$LLVM_DIR"
-TOOLCHAIN="$TOOLCHAIN" "$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES"
+export TOOLCHAIN
+"$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES"
 popd
 
 echo "$PROJECT_FOLDER/rtsig_blob.dylib"
