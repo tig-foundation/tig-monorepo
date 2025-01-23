@@ -1,4 +1,4 @@
-name: Build tig-native
+name: Build tig-native algorithm
 
 on:
   workflow_dispatch:
@@ -12,6 +12,10 @@ on:
           - satisfiability
           - vector-search
           - vehicle-routing
+      algorithm_name:
+        description: 'Algorithm name'
+        required: true
+        type: string
       llvm_release:
         description: 'LLVM release index (defaults to latest)'
         required: false
@@ -20,8 +24,18 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: debian:12
+    permissions:
+      contents: write
+      statuses: write
     steps:
+      - name: Install git
+        run: |
+          apt-get update -y
+          apt-get install git -y
+          
       - uses: actions/checkout@v4
 
       - name: Build tig-native
@@ -33,8 +47,33 @@ jobs:
           ./build.sh --${{ inputs.challenge_type }} .
           cd ..
 
+      - name: Copy to algorithms directory
+        run: |
+          CHALLENGE_DIR=$(echo "${{ inputs.challenge_type }}" | tr '-' '_')
+          mkdir -p tig-algorithms/native/${CHALLENGE_DIR}
+          cp tig-native/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ inputs.algorithm_name }}.native
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rtsig-blob-${{ inputs.challenge_type }}-${{ github.sha }}
           path: tig-native/rtsig_blob.dylib
+
+      - name: Auto commit
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Compiled native algorithm ${{ inputs.algorithm_name }} for ${{ inputs.challenge_type }}
+  
+      - name: Update Commit Status (Success)
+        if: success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
+      - name: Update Commit Status (Failure)
+        if: failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'
