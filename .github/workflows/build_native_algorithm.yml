@@ -12,6 +12,10 @@ on:
           - satisfiability
           - vector-search
           - vehicle-routing
+      algorithm_name:
+        description: 'Algorithm name'
+        required: true
+        type: string
       llvm_release:
         description: 'LLVM release index (defaults to latest)'
         required: false
@@ -35,8 +39,33 @@ jobs:
           ./build.sh --${{ inputs.challenge_type }} .
           cd ..
 
+      - name: Copy to algorithms directory
+        run: |
+          CHALLENGE_DIR=$(echo "${{ inputs.challenge_type }}" | tr '-' '_')
+          mkdir -p tig-algorithms/native/${CHALLENGE_DIR}
+          cp tig-native/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ inputs.algorithm_name }}.native
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rtsig-blob-${{ inputs.challenge_type }}-${{ github.sha }}
           path: tig-native/rtsig_blob.dylib
+
+      - name: Auto commit
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Compiled native algorithm ${{ inputs.algorithm_name }} for ${{ inputs.challenge_type }}
+  
+      - name: Update Commit Status (Success)
+        if: success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
+      - name: Update Commit Status (Failure)
+        if: failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'
