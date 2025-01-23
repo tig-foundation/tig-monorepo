@@ -23,11 +23,14 @@ on:
         options:
           - nightly-2024-12-17
           - nightly-2025-01-23
+        default: nightly-2025-01-23
       llvm_release:
-        description: 'LLVM release index (defaults to latest)'
-        required: false
-        type: string
-        default: ''
+        description: 'LLVM release version'
+        required: true
+        type: choice
+        options:
+          - '0 - Testing 0.0.0'
+        default: '0 - Testing 0.0.0'
 
 jobs:
   build:
@@ -47,7 +50,7 @@ jobs:
 
       - name: Build tig-native
         env:
-          LLVM_RELEASE: ${{ inputs.llvm_release }}
+          LLVM_RELEASE: ${{ inputs.llvm_release %% ' -'* }}
           RUST_TOOLCHAIN: ${{ inputs.rust_toolchain }}
         run: |
           chmod +x tig-native/build.sh
