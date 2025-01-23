@@ -78,7 +78,7 @@ else
     export RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C lto=no -C debuginfo=2 -C relocation-model=static"
 fi
 
-cargo +nightly-2024-12-17 build \
+cargo +$TOOLCHAIN build \
     --target=$TARGET \
     $config \
     -Z build-std=core,alloc,std \
@@ -146,7 +146,7 @@ do
     object_files+=("$temp_obj")
 done
 
-RUST_TARGET_LIBDIR=$(rustc +nightly-2024-12-17 --print target-libdir --target=$TARGET)
+RUST_TARGET_LIBDIR=$(rustc +$TOOLCHAIN --print target-libdir --target=$TARGET)
 LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.dylib" -o -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
 
 if [ ! -L "$RUST_TARGET_LIBDIR/libstd$PLUGIN_EXT" ]

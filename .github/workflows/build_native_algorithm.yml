@@ -16,6 +16,12 @@ on:
         description: 'Algorithm name'
         required: true
         type: string
+      rust_toolchain:
+        description: 'Rust toolchain to use'
+        required: true
+        type: choice
+        options:
+          - nightly-2024-12-17
       llvm_release:
         description: 'LLVM release index (defaults to latest)'
         required: false
@@ -41,6 +47,7 @@ jobs:
       - name: Build tig-native
         env:
           LLVM_RELEASE: ${{ inputs.llvm_release }}
+          RUST_TOOLCHAIN: ${{ inputs.rust_toolchain }}
         run: |
           chmod +x tig-native/build.sh
           cd tig-native

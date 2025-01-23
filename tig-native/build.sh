@@ -76,6 +76,7 @@ LLVM_CHECKSUMS=(
     "db302cce4320024258f3e9bd7839b418e5e683214eafbfc3833dfd0e2a63b244"
 )
 
+TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2024-12-17}"
 LLVM_RELEASE_IDX=${LLVM_RELEASE:-${#LLVM_RELEASES[@]}-1}
 CURRENT_RELEASE="${LLVM_RELEASES[$LLVM_RELEASE_IDX]}"
 ARTIFACT_ID=$(echo "$CURRENT_RELEASE" | sed -E 's|.*/([^/]+)/llvm.tar.zst|\1|')
@@ -83,9 +84,9 @@ LLVM_ARCHIVE="llvm-${ARTIFACT_ID}.tar.zst"
 LLVM_DIR="llvm-${ARTIFACT_ID}"
 LLVM_CHECKSUM="${LLVM_CHECKSUMS[$LLVM_RELEASE_IDX]}"
 if [ ! -d "$SCRIPT_DIR/$LLVM_DIR" ]; then
-    rustup install nightly-2024-12-17 &&
-    rustup +nightly-2024-12-17 component add rust-src &&
-    rustup +nightly-2024-12-17 target add aarch64-unknown-linux-gnu
+    rustup install $TOOLCHAIN &&
+    rustup +$TOOLCHAIN component add rust-src &&
+    rustup +$TOOLCHAIN target add aarch64-unknown-linux-gnu
 
     if [ $? -ne 0 ]; then
         echo "Error: Failed to install rust toolchain"
@@ -227,7 +228,7 @@ PROJECT_BASE_DIR=$(dirname "$PROJECT_FOLDER")
 rm -rf "$PROJECT_FOLDER/target"
 
 pushd "$SCRIPT_DIR/$LLVM_DIR"
-"$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES"
+TOOLCHAIN="$TOOLCHAIN" "$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES"
 popd
 
 echo "$PROJECT_FOLDER/rtsig_blob.dylib"
