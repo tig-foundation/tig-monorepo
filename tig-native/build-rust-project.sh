@@ -188,6 +188,8 @@ else
             -L "$RUST_TARGET_LIBDIR" \
             -lstd \
             -Wl,--gc-sections \
+            -ffunction-sections \
+            -fdata-sections \
             -Wl,-z,noexecstack \
             -Wl,--build-id=none \
             -Wl,--eh-frame-hdr \
@@ -200,6 +202,8 @@ else
             -no-pie \
             -lstd \
             -Wl,--gc-sections \
+            -ffunction-sections \
+            -fdata-sections \
             -Wl,-z,noexecstack \
             -Wl,--build-id=none \
             -Wl,--eh-frame-hdr \
