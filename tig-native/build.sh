@@ -197,6 +197,34 @@ PROJECT_BASE_DIR=$(dirname "$PROJECT_FOLDER")
 
 rm -rf "$PROJECT_FOLDER/target"
 
+if [ -z "$ALGORITHM_NAME" ]
+then
+    echo "Error: ALGORITHM_NAME environment variable is required"
+    exit 1
+fi
+
+CATEGORY_NAME=""
+for feature in $FEATURES
+do
+    case "$feature" in
+        "knapsack") CATEGORY_NAME="knapsack" ;;
+        "vector_search") CATEGORY_NAME="vector_search" ;;
+        "satisfiability") CATEGORY_NAME="satisfiability" ;;
+        "vehicle_routing") CATEGORY_NAME="vehicle_routing" ;;
+    esac
+done
+
+if [ -z "$CATEGORY_NAME" ]
+then
+    echo "Error: No valid category feature enabled"
+    exit 1
+fi
+
+cp "$PROJECT_FOLDER/solve.rs" "$PROJECT_FOLDER/src/solve.rs"
+sed -i.bak "s/{challenge_type}/$CATEGORY_NAME/g" "$PROJECT_FOLDER/src/solve.rs"
+sed -i.bak "s/{algorithm_name}/$ALGORITHM_NAME/g" "$PROJECT_FOLDER/src/solve.rs"
+rm -f "$PROJECT_FOLDER/src/solve.rs.bak"
+
 pushd "$SCRIPT_DIR/$LLVM_DIR"
 export TOOLCHAIN
 "$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES"

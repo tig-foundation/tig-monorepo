@@ -26,3 +26,4 @@ tig-native/rtsig_blob.dylib
 tig-native/llvm-*.zip
 tig-native/llvm-*/
 tig-native/*.tar.zst
+tig-native/src/solve.rs
