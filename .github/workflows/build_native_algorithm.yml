@@ -30,7 +30,8 @@ on:
         type: choice
         options:
           - '0 - Testing 0.0.0'
-        default: '0 - Testing 0.0.0'
+          - '1 - Testing 0.0.1'
+        default: '1 - Testing 0.0.1'
 
 jobs:
   build:

@@ -69,11 +69,13 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LLVM_RELEASES=(
-    "https://github.com/tig-foundation/llvm/releases/download/build-0971e080be6c87bf551a9f41897bda4aebad32b1/llvm.tar.zst" #TESTING ONLY
+    "https://github.com/tig-foundation/llvm/releases/download/build-0971e080be6c87bf551a9f41897bda4aebad32b1/llvm.tar.zst", #TESTING ONLY
+    "https://github.com/tig-foundation/llvm/releases/download/testing-0.0.1/llvm.tar.zst"
 )
 
 LLVM_CHECKSUMS=(
     "db302cce4320024258f3e9bd7839b418e5e683214eafbfc3833dfd0e2a63b244"
+    "622db2f360bd827bd1c6f19daa6e2491886bad5c2b83934899931fc161a9b8be"
 )
 
 TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2025-01-16}" # default to latest nightly using llvm 19.1.6
