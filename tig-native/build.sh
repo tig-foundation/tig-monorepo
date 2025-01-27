@@ -75,7 +75,7 @@ LLVM_RELEASES=(
 
 LLVM_CHECKSUMS=(
     "db302cce4320024258f3e9bd7839b418e5e683214eafbfc3833dfd0e2a63b244"
-    "622db2f360bd827bd1c6f19daa6e2491886bad5c2b83934899931fc161a9b8be"
+    "2fcfd2f104f372f5dab35c3aa93ad869c0b34b02f4ca8be0a113a87724111b08"
 )
 
 TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2025-01-16}" # default to latest nightly using llvm 19.1.6
