@@ -23,3 +23,4 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 cuda = ["cudarc", "tig-challenges/cuda"]
+native = []

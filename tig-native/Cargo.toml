@@ -9,7 +9,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 tig-challenges  = { path = "../tig-challenges" }
-tig-algorithms = { path = "../tig-algorithms" }
+tig-algorithms = { path = "../tig-algorithms", features = ["native"] }
 
 [workspace]
 
