@@ -1,4 +1,4 @@
-name: Build tig-native-wrapper
+name: Build aarch64 tig-native-wrapper
 
 on:
   workflow_dispatch:

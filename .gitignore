@@ -20,10 +20,10 @@ __pycache__/
 # Ignore these. 
 db_data/
 
-tig-native/target/
-tig-native/Cargo.lock
-tig-native/rtsig_blob.dylib
-tig-native/llvm-*.zip
-tig-native/llvm-*/
-tig-native/*.tar.zst
-tig-native/src/solve.rs
+tig-aarch64/target/
+tig-aarch64/Cargo.lock
+tig-aarch64/rtsig_blob.dylib
+tig-aarch64/llvm-*.zip
+tig-aarch64/llvm-*/
+tig-aarch64/*.tar.zst
+tig-aarch64/src/solve.rs

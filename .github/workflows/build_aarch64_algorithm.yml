@@ -1,4 +1,4 @@
-name: Build tig-native algorithm
+name: Build tig-aarch64 algorithm
 
 on:
   workflow_dispatch:
@@ -34,7 +34,7 @@ on:
         default: '1 - Testing 0.0.1'
   push:
     branches:
-      - 'native/**'
+      - 'aarch64/**'
 
 jobs:
   build:
@@ -70,14 +70,14 @@ jobs:
             echo "llvm_release=$(echo '${{ inputs.llvm_release }}' | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build tig-native
+      - name: Build tig-aarch64
         env:
           ALGORITHM_NAME: ${{ steps.branch_info.outputs.algorithm_name }}
           LLVM_RELEASE: ${{ steps.branch_info.outputs.llvm_release }}
           RUST_TOOLCHAIN: ${{ steps.branch_info.outputs.rust_toolchain }}
         run: |
-          chmod +x tig-native/build.sh
-          cd tig-native
+          chmod +x tig-aarch64/build.sh
+          cd tig-aarch64
           LLVM_RELEASE=${LLVM_RELEASE} ./build.sh --${{ steps.branch_info.outputs.challenge_type }} .
           cd ..
           git config --global --add safe.directory "$(realpath .)"
@@ -87,13 +87,13 @@ jobs:
           CHALLENGE_DIR=$(echo "${{ steps.branch_info.outputs.challenge_type }}" | tr '-' '_')
           mkdir -p tig-algorithms/native/${CHALLENGE_DIR}
           rm -f tig-algorithms/native/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
-          cp tig-native/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
+          cp tig-aarch64/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.branch_info.outputs.challenge_type }}-${{ steps.branch_info.outputs.algorithm_name }}-${{ github.sha }}-${{ steps.branch_info.outputs.rust_toolchain }}
-          path: tig-native/rtsig_blob.dylib
+          path: tig-aarch64/rtsig_blob.dylib
 
       - name: Auto commit
         id: auto_commit

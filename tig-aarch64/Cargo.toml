@@ -1,5 +1,5 @@
 [package]
-name = "tig-native"
+name = "tig-aarch64"
 version = "0.1.0"
 readme = "README.md"
 license = "https://github.com/tig-foundation/tig-monorepo/tree/main/docs/agreements/end_user_license_agreement.pdf"
@@ -9,7 +9,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 tig-challenges  = { path = "../tig-challenges" }
-tig-algorithms = { path = "../tig-algorithms", features = ["native"] }
+tig-algorithms = { path = "../tig-algorithms", features = ["native", "aarch64"] }
 
 [workspace]
 
