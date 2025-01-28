@@ -54,8 +54,9 @@ jobs:
 
       - name: Extract branch info
         id: branch_info
+        shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
+          if [ "${{ github.event_name }}" = "push" ]; then
             BRANCH_PATH="${GITHUB_REF#refs/heads/}"
             IFS='/' read -r _ CATEGORY ALGO_NAME <<< "$BRANCH_PATH"
             echo "challenge_type=$CATEGORY" >> $GITHUB_OUTPUT
