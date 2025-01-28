@@ -61,8 +61,8 @@ jobs:
             IFS='/' read -r _ CATEGORY ALGO_NAME <<< "$BRANCH_PATH"
             echo "challenge_type=$CATEGORY" >> $GITHUB_OUTPUT
             echo "algorithm_name=$ALGO_NAME" >> $GITHUB_OUTPUT
-            echo "rust_toolchain=nightly-2025-01-16" >> $GITHUB_OUTPUT
-            echo "llvm_release=1" >> $GITHUB_OUTPUT
+            echo "rust_toolchain=" >> $GITHUB_OUTPUT
+            echo "llvm_release=" >> $GITHUB_OUTPUT
           else
             echo "challenge_type=${{ inputs.challenge_type }}" >> $GITHUB_OUTPUT
             echo "algorithm_name=${{ inputs.algorithm_name }}" >> $GITHUB_OUTPUT
