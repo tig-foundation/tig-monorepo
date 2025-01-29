@@ -19,7 +19,7 @@ for w in $(find $REPO_DIR/tig-algorithms/wasm -name '*.wasm'); do
     index=$((index + 1))
 done
 
-for n in $(find $REPO_DIR/tig-algorithms/native -name '*.native'); do
+for n in $(find $REPO_DIR/tig-algorithms/aarch64 -name '*.native'); do
     a_name=$(basename $n .native)
     c_name=$(basename $(dirname $n))
     echo "$index) $c_name/$a_name (Native)"
@@ -130,7 +130,7 @@ while [ $remaining_nonces -gt 0 ]; do
         BINARY_PATH="$REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm"
         BINARY_ARG="--wasm"
     else
-        BINARY_PATH="$REPO_DIR/tig-algorithms/native/$CHALLENGE/$ALGORITHM.native"
+        BINARY_PATH="$REPO_DIR/tig-algorithms/aarch64/$CHALLENGE/$ALGORITHM.native"
         BINARY_ARG="--native"
     fi
 

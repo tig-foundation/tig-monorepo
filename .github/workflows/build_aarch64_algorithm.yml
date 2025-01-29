@@ -85,9 +85,9 @@ jobs:
       - name: Copy to algorithms directory
         run: |
           CHALLENGE_DIR=$(echo "${{ steps.branch_info.outputs.challenge_type }}" | tr '-' '_')
-          mkdir -p tig-algorithms/native/${CHALLENGE_DIR}
-          rm -f tig-algorithms/native/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
-          cp tig-aarch64/rtsig_blob.dylib tig-algorithms/native/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
+          mkdir -p tig-algorithms/aarch64/${CHALLENGE_DIR}
+          rm -f tig-algorithms/aarch64/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
+          cp tig-aarch64/rtsig_blob.dylib tig-algorithms/aarch64/${CHALLENGE_DIR}/${{ steps.branch_info.outputs.algorithm_name }}.native
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
