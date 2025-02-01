@@ -233,7 +233,10 @@ fn compute_solution(
             .ok_or_else(|| anyhow!("Failed to get executable directory"))?
             .join("tig-native-wrapper");
 
+        let stdlib_path = get_rust_stdlib_path("nightly-2025-01-16")?;
+
         let output = std::process::Command::new(wrapper_path)
+            .env("LD_LIBRARY_PATH", format!("{}:{}", stdlib_path.display(), std::env::var("LD_LIBRARY_PATH").unwrap_or_default()))
             .arg(native_path)
             .arg(challenge_type)
             .arg(challenge_json)
@@ -433,6 +436,8 @@ fn compute_batch(
             .ok_or_else(|| anyhow!("Failed to get executable directory"))?
             .join("tig-native-wrapper");
 
+        let stdlib_path = get_rust_stdlib_path("nightly-2025-01-16")?;
+
         let mut processes = Vec::new();
         let mut current_nonce = start_nonce;
 
@@ -449,6 +454,7 @@ fn compute_batch(
                 ]);
 
                 let process = std::process::Command::new(&wrapper_path)
+                    .env("LD_LIBRARY_PATH", format!("{}:{}", stdlib_path.display(), std::env::var("LD_LIBRARY_PATH").unwrap_or_default()))
                     .arg(&path)
                     .arg(&challenge_type)
                     .arg(&challenge_json)
@@ -621,4 +627,20 @@ fn load_wasm(wasm_path: &PathBuf) -> Vec<u8> {
         eprintln!("Failed to read wasm file: {}", wasm_path.display());
         std::process::exit(1);
     })
+}
+
+fn get_rust_stdlib_path(toolchain: &str) -> Result<PathBuf> {
+    let output = std::process::Command::new("rustc")
+        .arg(format!("+{}", toolchain))
+        .arg("--print")
+        .arg("target-libdir")
+        .output()?;
+
+    if !output.status.success()
+    {
+        return Err(anyhow!("Failed to get rust stdlib path"));
+    }
+
+    let path = String::from_utf8(output.stdout)?;
+    Ok(PathBuf::from(path.trim()))
 }
