@@ -175,7 +175,7 @@ do
             FEATURES="$FEATURES knapsack"
             shift
         ;;
-        --vector-search)
+        --vector-search|--vector_search)
             FEATURES="$FEATURES vector_search"
             shift
         ;;
@@ -183,7 +183,7 @@ do
             FEATURES="$FEATURES satisfiability"
             shift
         ;;
-        --vehicle-routing)
+        --vehicle-routing|--vehicle_routing)
             FEATURES="$FEATURES vehicle_routing"
             shift
         ;;
