@@ -433,89 +433,133 @@ fn compute_batch(
             .ok_or_else(|| anyhow!("Failed to get executable directory"))?
             .join("tig-native-wrapper");
 
-        for nonce in start_nonce..(start_nonce + num_nonces) {
-            let seed = settings.calc_seed(&rand_hash, nonce);
-            let (challenge_type, challenge_json) = challenge_match!(seed, &settings.difficulty, [
-                ("c001", SatisfiabilityChallenge),
-                ("c002", VehicleRoutingChallenge),
-                ("c003", KnapsackChallenge),
-                ("c004", VectorSearchChallenge)
-            ]);
+        let mut processes = Vec::new();
+        let mut current_nonce = start_nonce;
 
-            let output = std::process::Command::new(&wrapper_path)
-                .arg(&path)
-                .arg(challenge_type)
-                .arg(&challenge_json)
-                .arg(max_fuel.to_string())
-                .output()?;
+        while current_nonce < start_nonce + num_nonces || !processes.is_empty() 
+        {
+            while processes.len() < num_workers && current_nonce < start_nonce + num_nonces 
+            {
+                let seed = settings.calc_seed(&rand_hash, current_nonce);
+                let (challenge_type, challenge_json) = challenge_match!(seed, &settings.difficulty, [
+                    ("c001", SatisfiabilityChallenge),
+                    ("c002", VehicleRoutingChallenge),
+                    ("c003", KnapsackChallenge),
+                    ("c004", VectorSearchChallenge)
+                ]);
 
-            if !output.status.success() {
-                if output.status.code() == Some(87) {
-                    let mut rt_sig = 0;
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    let mut lines = stdout.lines().rev();
-                    while let Some(line) = lines.next() {
-                        if line.starts_with("Runtime signature: ") {
-                            if let Some(sig) = line.strip_prefix("Runtime signature: ") {
-                                if let Ok(sig) = sig.trim().parse::<u64>() {
-                                    rt_sig = sig;
-                                    break;
+                let process = std::process::Command::new(&wrapper_path)
+                    .arg(&path)
+                    .arg(&challenge_type)
+                    .arg(&challenge_json)
+                    .arg(max_fuel.to_string())
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::piped())
+                    .spawn()?;
+
+                processes.push((current_nonce, process));
+                current_nonce += 1
+            }
+
+            let mut finished_idx = None;
+            for (idx, (_, process)) in processes.iter_mut().enumerate() 
+            {
+                match process.try_wait() 
+                {
+                    Ok(Some(_)) => {
+                        finished_idx = Some(idx);
+                        break
+                    }
+                    Ok(None) => continue,
+                    Err(e) => return Err(anyhow!("Failed to wait on process: {}", e))
+                }
+            }
+
+            if let Some(idx) = finished_idx 
+            {
+                let (nonce, mut process) = processes.remove(idx);
+                let output = process.wait_with_output()?;
+
+                if !output.status.success() 
+                {
+                    if output.status.code() == Some(87) 
+                    {
+                        let mut rt_sig = 0;
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        let mut lines = stdout.lines().rev();
+                        while let Some(line) = lines.next() 
+                        {
+                            if line.starts_with("Runtime signature: ") 
+                            {
+                                if let Some(sig) = line.strip_prefix("Runtime signature: ") 
+                                {
+                                    if let Ok(sig) = sig.trim().parse::<u64>() 
+                                    {
+                                        rt_sig = sig;
+                                        break
+                                    }
                                 }
                             }
                         }
+
+                        let output_data = OutputData {
+                            nonce,
+                            solution: None,
+                            fuel_consumed: max_fuel,
+                            runtime_signature: rt_sig,
+                        };
+
+                        let hash = MerkleHash::from(output_data.clone());
+                        hashes[(nonce - start_nonce) as usize] = hash;
+
+                        if output_folder.is_some() 
+                        {
+                            dump.push(output_data)
+                        }
+                        
+                        println!("Ran out of fuel, runtime signature: {}", rt_sig);
+                        continue
                     }
 
-                    let output_data = OutputData {
+                    return Err(anyhow!("Native wrapper failed: {}", String::from_utf8_lossy(&output.stderr)))
+                }
+
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                let mut output_data: OutputData = match dejsonify(&output_str) 
+                {
+                    Ok(data) => data,
+                    Err(e) => {
+                        println!("Failed to parse output: {}", e);
+                        continue
+                    }
+                };
+
+                output_data.nonce = nonce;
+
+                if output_data.solution.is_some() 
+                {
+                    let is_solution = worker::verify_solution(
+                        &settings,
+                        &rand_hash,
                         nonce,
-                        solution: None,
-                        fuel_consumed: max_fuel,
-                        runtime_signature: rt_sig,
-                    };
+                        &output_data.solution.as_ref().unwrap(),
+                    ).is_ok();
 
-                    let hash = MerkleHash::from(output_data.clone());
-                    hashes[(nonce - start_nonce) as usize] = hash;
-
-                    if output_folder.is_some() {
-                        dump.push(output_data);
+                    if is_solution 
+                    {
+                        solution_nonces.push(nonce)
                     }
-                    
-                    println!("Ran out of fuel, runtime signature: {}", rt_sig);
-
-                    continue;
                 }
 
-                return Err(anyhow!("Native wrapper failed: {}", String::from_utf8_lossy(&output.stderr)));
-            }
+                let hash = MerkleHash::from(output_data.clone());
+                hashes[(nonce - start_nonce) as usize] = hash;
 
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            let mut output_data: OutputData = match dejsonify(&output_str) {
-                Ok(data) => data,
-                Err(e) => {
-                    println!("Failed to parse output: {}", e);
-                    continue
+                if output_folder.is_some() 
+                {
+                    dump.push(output_data)
                 }
-            };
-
-            output_data.nonce = nonce;
-
-            if output_data.solution.is_some() {
-                let is_solution = worker::verify_solution(
-                    &settings,
-                    &rand_hash,
-                    nonce,
-                    &output_data.solution.as_ref().unwrap(),
-                ).is_ok();
-    
-                if is_solution {
-                    solution_nonces.push(nonce);
-                }
-            }
-
-            let hash = MerkleHash::from(output_data.clone());
-            hashes[(nonce - start_nonce) as usize] = hash;
-
-            if output_folder.is_some() {
-                dump.push(output_data);
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(10))
             }
         }
 
