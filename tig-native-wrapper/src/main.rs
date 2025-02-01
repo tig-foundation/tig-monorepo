@@ -8,12 +8,14 @@ use {
         vector_search::{Challenge as VectorSearchChallenge},
         vehicle_routing::{Challenge as VehicleRoutingChallenge},
     },
+    tig_utils::{dejsonify, jsonify},
+    tig_structs::core::OutputData,
 };
 
 macro_rules! handle_challenge {
     ($challenge_type:expr, $challenge_json:expr, $library_path:expr, $max_fuel:expr, $solver_fn:ident, $challenge:ty) => {
         {
-            let challenge: $challenge = serde_json::from_str($challenge_json)
+            let challenge: $challenge = dejsonify::<$challenge>($challenge_json)
                 .map_err(|e| format!("Failed to parse challenge: {}", e))
                 .unwrap();
 
@@ -30,12 +32,17 @@ macro_rules! handle_challenge {
             }
 
             let (solution, runtime_signature, fuel_remaining) = result.unwrap();
-            println!("{}", serde_json::json!({
-                "solution": solution,
-                "runtime_signature": runtime_signature,
-                "fuel_consumed": $max_fuel as i64 - fuel_remaining.max(0),
-                "nonce": 0,
-            }));
+            let output_data = OutputData {
+                nonce: 0,
+                runtime_signature,
+                fuel_consumed: ($max_fuel as i64 - fuel_remaining.max(0)) as u64,
+                solution: if solution.is_some() 
+                    { Some(dejsonify(&jsonify(&solution.unwrap())).unwrap()) } 
+                else 
+                    { None },
+            };
+
+            println!("{}", jsonify(&output_data));
         }
     };
 }

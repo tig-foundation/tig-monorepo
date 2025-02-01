@@ -477,7 +477,7 @@ fn compute_batch(
 
             if let Some(idx) = finished_idx 
             {
-                let (nonce, mut process) = processes.remove(idx);
+                let (nonce, process) = processes.remove(idx);
                 let output = process.wait_with_output()?;
 
                 if !output.status.success() 
