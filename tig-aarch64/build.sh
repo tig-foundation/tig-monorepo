@@ -172,6 +172,7 @@ fi
 
 PROJECT_FOLDER=""
 FEATURES="entry_point"
+RELEASE=""
 while [[ $# -gt 0 ]]
 do
     case "$1" in
@@ -189,6 +190,10 @@ do
         ;;
         --vehicle-routing|--vehicle_routing)
             FEATURES="$FEATURES vehicle_routing"
+            shift
+        ;;
+        --release)
+            RELEASE="--release"
             shift
         ;;
         *)
@@ -233,7 +238,7 @@ rm -f "$PROJECT_FOLDER/src/solve.rs.bak"
 
 pushd "$SCRIPT_DIR/$LLVM_DIR"
 export TOOLCHAIN
-"$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES"
+"$SCRIPT_DIR/build-rust-project.sh" "$PROJECT_FOLDER" -r --shared -o "$PROJECT_FOLDER/rtsig_blob.dylib" -f 2500 --features "$FEATURES" $RELEASE
 popd
 
 echo "$PROJECT_FOLDER/rtsig_blob.dylib"
