@@ -235,13 +235,22 @@ fn compute_solution(
 
         let stdlib_path = get_rust_stdlib_path("nightly-2025-01-16")?;
 
-        let output = std::process::Command::new(wrapper_path)
+        let mut process = std::process::Command::new(wrapper_path)
             .env("LD_LIBRARY_PATH", format!("{}:{}", stdlib_path.display(), std::env::var("LD_LIBRARY_PATH").unwrap_or_default()))
             .arg(native_path)
             .arg(challenge_type)
-            .arg(challenge_json)
             .arg(max_fuel.to_string())
-            .output()?;
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+
+        if let Some(mut stdin) = process.stdin.take() {
+            use std::io::Write;
+            stdin.write_all(challenge_json.as_bytes())?;
+        }
+
+        let output = process.wait_with_output()?;
 
         if !output.status.success() {
             if output.status.code() == Some(87) {
@@ -253,7 +262,7 @@ fn compute_solution(
                         if let Some(sig) = line.strip_prefix("Runtime signature: ") {
                             if let Ok(sig) = sig.trim().parse::<u64>() {
                                 rt_sig = sig;
-                                break;
+                                break
                             }
                         }
                     }
@@ -275,7 +284,8 @@ fn compute_solution(
         }
 
         let output_str = String::from_utf8_lossy(&output.stdout);
-        let output_data: OutputData = dejsonify(&output_str)?;
+        let mut output_data: OutputData = dejsonify(&output_str)?;
+        output_data.nonce = nonce;
         println!("{}", jsonify(&output_data));
 
         return worker::verify_solution(&settings, &rand_hash, nonce, &output_data.solution.as_ref().unwrap())
@@ -453,15 +463,20 @@ fn compute_batch(
                     ("c004", VectorSearchChallenge)
                 ]);
 
-                let process = std::process::Command::new(&wrapper_path)
+                let mut process = std::process::Command::new(&wrapper_path)
                     .env("LD_LIBRARY_PATH", format!("{}:{}", stdlib_path.display(), std::env::var("LD_LIBRARY_PATH").unwrap_or_default()))
                     .arg(&path)
                     .arg(&challenge_type)
-                    .arg(&challenge_json)
                     .arg(max_fuel.to_string())
+                    .stdin(std::process::Stdio::piped())
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped())
                     .spawn()?;
+
+                if let Some(mut stdin) = process.stdin.take() {
+                    use std::io::Write;
+                    stdin.write_all(challenge_json.as_bytes())?;
+                }
 
                 processes.push((current_nonce, process));
                 current_nonce += 1
@@ -483,7 +498,7 @@ fn compute_batch(
 
             if let Some(idx) = finished_idx 
             {
-                let (nonce, process) = processes.remove(idx);
+                let (nonce, mut process) = processes.remove(idx);
                 let output = process.wait_with_output()?;
 
                 if !output.status.success() 

@@ -10,6 +10,7 @@ use {
     },
     tig_utils::{dejsonify, jsonify},
     tig_structs::core::OutputData,
+    std::io::{self, Read},
 };
 
 macro_rules! handle_challenge {
@@ -50,24 +51,26 @@ macro_rules! handle_challenge {
 fn main()
 {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 5
+    if args.len() != 4
     {
-        println!("Usage: {} <library_path> <challenge_type> <challenge_json> <max_fuel>", args[0]);
+        println!("Usage: {} <library_path> <challenge_type> <max_fuel>", args[0]);
         println!("Challenge types: knapsack, satisfiability, vector_search, vehicle_routing");
         return;
     }
 
     let library_path = &args[1];
     let challenge_type = &args[2];
-    let challenge_json = &args[3];
-    let max_fuel = args[4].parse::<u64>().unwrap();
+    let max_fuel = args[3].parse::<u64>().unwrap();
+
+    let mut challenge_json = String::new();
+    io::stdin().read_to_string(&mut challenge_json).unwrap();
 
     match challenge_type.as_str()
     {
-        "knapsack" => handle_challenge!(challenge_type, challenge_json, library_path, max_fuel, solve_knapsack, KnapsackChallenge),
-        "satisfiability" => handle_challenge!(challenge_type, challenge_json, library_path, max_fuel, solve_satisfiability, SatisfiabilityChallenge),
-        "vector_search" => handle_challenge!(challenge_type, challenge_json, library_path, max_fuel, solve_vector_search, VectorSearchChallenge),
-        "vehicle_routing" => handle_challenge!(challenge_type, challenge_json, library_path, max_fuel, solve_vehicle_routing, VehicleRoutingChallenge),
+        "knapsack" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_knapsack, KnapsackChallenge),
+        "satisfiability" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_satisfiability, SatisfiabilityChallenge),
+        "vector_search" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_vector_search, VectorSearchChallenge),
+        "vehicle_routing" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_vehicle_routing, VehicleRoutingChallenge),
         _ =>
         {
             println!("Invalid challenge type");
