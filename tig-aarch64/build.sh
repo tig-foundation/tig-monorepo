@@ -173,26 +173,31 @@ fi
 PROJECT_FOLDER=""
 FEATURES="entry_point"
 RELEASE=""
+CATEGORY_NAME=""
 while [[ $# -gt 0 ]]
 do
     case "$1" in
         --knapsack)
             FEATURES="$FEATURES knapsack"
+            CATEGORY_NAME="knapsack"
             shift
         ;;
         --vector-search|--vector_search)
             FEATURES="$FEATURES vector_search"
+            CATEGORY_NAME="vector_search"
             shift
         ;;
         --satisfiability)
             FEATURES="$FEATURES satisfiability"
+            CATEGORY_NAME="satisfiability"
             shift
         ;;
         --vehicle-routing|--vehicle_routing)
             FEATURES="$FEATURES vehicle_routing"
+            CATEGORY_NAME="vehicle_routing"
             shift
         ;;
-        --release)
+        -r|--release)
             RELEASE="--release"
             shift
         ;;
@@ -213,17 +218,6 @@ then
     echo "Error: ALGORITHM_NAME environment variable is required"
     exit 1
 fi
-
-CATEGORY_NAME=""
-for feature in $FEATURES
-do
-    case "$feature" in
-        "knapsack") CATEGORY_NAME="knapsack" ;;
-        "vector_search") CATEGORY_NAME="vector_search" ;;
-        "satisfiability") CATEGORY_NAME="satisfiability" ;;
-        "vehicle_routing") CATEGORY_NAME="vehicle_routing" ;;
-    esac
-done
 
 if [ -z "$CATEGORY_NAME" ]
 then
