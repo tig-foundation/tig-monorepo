@@ -73,6 +73,7 @@ LLVM_RELEASES=(
     "https://github.com/tig-foundation/llvm/releases/download/testing-0.0.1/llvm.tar.zst"
     "https://github.com/tig-foundation/llvm/releases/download/testing-0.0.2/llvm.tar.zst"
     "https://github.com/tig-foundation/llvm/releases/download/testing-0.0.3/llvm.tar.zst"
+    "https://github.com/tig-foundation/llvm/releases/download/testing-0.0.4/llvm.tar.zst"
 )
 
 LLVM_CHECKSUMS=(
@@ -80,6 +81,7 @@ LLVM_CHECKSUMS=(
     "381b3492edfc9ebd305f79200f53c8b1de7eae8f6d5bc7e31be21fa619778522"
     "290e7e4a2afb2e3263dd195f3bd11410675b0d1f51108ff625f3d4efa2607ad7"
     "cc471b4d3e0b7396254babdd517f330d1d8d67ce77daddc9e35bee88442e1c64"
+    "0b376b3679057ab0bf4d69b66613331f7270a6e2a73441c205b5780eca9e581e"
 )
 
 TOOLCHAIN="${RUST_TOOLCHAIN:-nightly-2025-01-16}" # default to latest nightly using llvm 19.1.6
