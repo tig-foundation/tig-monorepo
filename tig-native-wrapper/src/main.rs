@@ -69,8 +69,8 @@ fn main()
     {
         "knapsack" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_knapsack, KnapsackChallenge),
         "satisfiability" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_satisfiability, SatisfiabilityChallenge),
-        "vector_search" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_vector_search, VectorSearchChallenge),
-        "vehicle_routing" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_vehicle_routing, VehicleRoutingChallenge),
+        "vector_search"|"vectorsearch" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_vector_search, VectorSearchChallenge),
+        "vehicle_routing"|"vehiclerouting" => handle_challenge!(challenge_type, &challenge_json, library_path, max_fuel, solve_vehicle_routing, VehicleRoutingChallenge),
         _ =>
         {
             println!("Invalid challenge type");
