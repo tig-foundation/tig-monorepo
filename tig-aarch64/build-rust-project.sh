@@ -168,6 +168,7 @@ if [ "$(uname)" = "Darwin" ]; then
             -o "$output_name" \
             -L "$RUST_TARGET_LIBDIR" \
             -lstd \
+            -lm \
             $LINKER_FLAGS
     else
         ./bin/clang "${object_files[@]}" \
@@ -176,6 +177,7 @@ if [ "$(uname)" = "Darwin" ]; then
             -fno-PIE \
             -no-pie \
             -lstd \
+            -lm \
             $LINKER_FLAGS
     fi
 else
@@ -187,6 +189,7 @@ else
             -o "$output_name" \
             -L "$RUST_TARGET_LIBDIR" \
             -lstd \
+            -lm \
             -Wl,--gc-sections \
             -ffunction-sections \
             -fdata-sections \
@@ -201,6 +204,7 @@ else
             -fno-PIE \
             -no-pie \
             -lstd \
+            -lm \
             -Wl,--gc-sections \
             -ffunction-sections \
             -fdata-sections \
