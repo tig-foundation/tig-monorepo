@@ -273,6 +273,8 @@ fn compute_solution(
                     solution: None,
                     fuel_consumed: max_fuel,
                     runtime_signature: rt_sig,
+                    total_memory_usage: None,
+                    max_memory_usage: None,
                 };
 
                 println!("{}", jsonify(&output_data));
@@ -528,6 +530,8 @@ fn compute_batch(
                             solution: None,
                             fuel_consumed: max_fuel,
                             runtime_signature: rt_sig,
+                            total_memory_usage: None,
+                            max_memory_usage: None,
                         };
 
                         let hash = MerkleHash::from(output_data.clone());

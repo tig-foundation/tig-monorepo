@@ -136,6 +136,8 @@ pub fn compute_solution(
         runtime_signature,
         fuel_consumed,
         solution: Some(solution),
+        total_memory_usage: None,
+        max_memory_usage: None,
     };
     Ok((solution_data, err_msg))
 }

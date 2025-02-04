@@ -41,6 +41,8 @@ macro_rules! handle_challenge {
                     { Some(dejsonify(&jsonify(&solution.unwrap())).unwrap()) } 
                 else 
                     { None },
+                max_memory_usage: Some(max_memory_usage),
+                total_memory_usage: Some(total_memory_usage),
             };
 
             println!("{}", jsonify(&output_data));

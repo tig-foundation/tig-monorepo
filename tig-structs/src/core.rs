@@ -422,6 +422,8 @@ serializable_struct_with_getters! {
         runtime_signature: u64,
         fuel_consumed: u64,
         solution: Option<Solution>,
+        total_memory_usage: Option<u64>,
+        max_memory_usage: Option<u64>,
     }
 }
 impl OutputData {
