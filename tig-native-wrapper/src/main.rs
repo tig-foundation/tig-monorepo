@@ -32,7 +32,7 @@ macro_rules! handle_challenge {
                 return;
             }
 
-            let (solution, runtime_signature, fuel_remaining) = result.unwrap();
+            let (solution, runtime_signature, fuel_remaining, max_memory_usage, total_memory_usage) = result.unwrap();
             let output_data = OutputData {
                 nonce: 0,
                 runtime_signature,
