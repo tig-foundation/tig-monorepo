@@ -273,7 +273,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for deposit in active_deposit_details.values() {
         let total_time = PreciseNumber::from(deposit.end_timestamp - deposit.start_timestamp);
         for i in 0..lock_period_cap {
-            if round_timestamps[i + 1] <= deposit.start_timestamp {
+            if i + 1 < lock_period_cap && round_timestamps[i + 1] <= deposit.start_timestamp {
                 continue;
             }
             if round_timestamps[i] >= deposit.end_timestamp {

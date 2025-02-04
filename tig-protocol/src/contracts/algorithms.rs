@@ -216,10 +216,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
             if let Some(breakthrough_id) = &active_algorithms_details[algorithm_id].breakthrough_id
             {
-                active_breakthroughs_block_data
-                    .get_mut(breakthrough_id)
-                    .unwrap()
-                    .adoption += adoption;
+                if let Some(block_data) = active_breakthroughs_block_data.get_mut(breakthrough_id) {
+                    block_data.adoption += adoption;
+                }
             }
         }
     }

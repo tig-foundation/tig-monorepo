@@ -85,6 +85,12 @@ if ! is_positive_integer "$num_workers"; then
     echo "Error: Number of workers must be a positive integer."
     exit 1
 fi
+read -p "Enter max fuel (default is 10000000000): " max_fuel
+max_fuel=${max_fuel:-1}
+if ! is_positive_integer "$max_fuel"; then
+    echo "Error: Max fuel must be a positive integer."
+    exit 1
+fi
 read -p "Enable debug mode? (leave blank to disable) " enable_debug
 if [[ -n $enable_debug ]]; then
     debug_mode=true
@@ -125,7 +131,6 @@ while [ $remaining_nonces -gt 0 ]; do
     start_time=$(date +%s%3N)
     stdout=$(mktemp)
     stderr=$(mktemp)
-
     if [ "$BINARY_TYPE" = "wasm" ]; then
         BINARY_PATH="$REPO_DIR/tig-algorithms/wasm/$CHALLENGE/$ALGORITHM.wasm"
         BINARY_ARG="--wasm"
@@ -134,7 +139,7 @@ while [ $remaining_nonces -gt 0 ]; do
         BINARY_ARG="--native"
     fi
 
-    ./target/release/tig-worker compute_batch "$SETTINGS" "random_string" $current_nonce $nonces_to_compute $power_of_2_nonces $BINARY_ARG $BINARY_PATH --workers $nonces_to_compute >"$stdout" 2>"$stderr"
+    ./target/release/tig-worker compute_batch "$SETTINGS" "random_string" $current_nonce $nonces_to_compute $power_of_2_nonces $BINARY_ARG $BINARY_PATH --workers $nonces_to_compute --fuel $max_fuel >"$stdout" 2>"$stderr"
     exit_code=$?
     output_stdout=$(cat "$stdout")
     output_stderr=$(cat "$stderr")
