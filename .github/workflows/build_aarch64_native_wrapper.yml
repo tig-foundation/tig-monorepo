@@ -1,0 +1,95 @@
+name: Build aarch64 tig-native-wrapper
+
+on:
+  workflow_dispatch:
+    inputs:
+      rust_toolchain:
+        description: 'Rust toolchain to use'
+        required: true
+        type: choice
+        options:
+          - nightly-2024-12-17
+          - nightly-2025-01-16
+        default: nightly-2025-01-16
+      release_tag:
+        description: 'Release tag (defaults to build-{sha})'
+        required: false
+        type: string
+      release_title:
+        description: 'Release title (defaults to tag)'
+        required: false
+        type: string
+      release_notes:
+        description: 'Additional release notes'
+        required: false
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: debian:12
+    permissions:
+      contents: write
+      statuses: write
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update -y
+          apt-get install -y git curl gh build-essential
+
+      - uses: actions/checkout@v4
+
+      - name: Install rustup
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          . "$HOME/.cargo/env"
+          rustup install ${{ inputs.rust_toolchain }}
+          rustup default ${{ inputs.rust_toolchain }}
+
+      - name: Build tig-native-wrapper
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --release --package tig-native-wrapper
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$(realpath .)"
+          RELEASE_TAG="${{ inputs.release_tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="build-${{ github.sha }}"
+          fi
+          RELEASE_TITLE="${{ inputs.release_title }}"
+          if [ -z "$RELEASE_TITLE" ]; then
+            RELEASE_TITLE="$RELEASE_TAG"
+          fi
+          RELEASE_NOTES="tig-native-wrapper build (commit: ${{ github.sha }}) toolchain: ${{ inputs.rust_toolchain }}"
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            RELEASE_NOTES="$RELEASE_NOTES\n\n${{ inputs.release_notes }}"
+          fi
+          if [ "${{ inputs.draft }}" = "true" ]; then
+            gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes "$RELEASE_NOTES" target/release/tig-native-wrapper --target ${{ github.sha }} --draft
+          else
+            gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes "$RELEASE_NOTES" target/release/tig-native-wrapper --target ${{ github.sha }}
+          fi
+
+      - name: Update Commit Status (Success)
+        if: success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ github.sha }}
+
+      - name: Update Commit Status (Failure)
+        if: failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'
+          sha: ${{ github.sha }}

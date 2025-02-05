@@ -41,7 +41,7 @@ impl crate::DifficultyTrait<2> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Solution {
     #[serde(with = "bool_vec_as_u8")]
     pub variables: Vec<bool>,
