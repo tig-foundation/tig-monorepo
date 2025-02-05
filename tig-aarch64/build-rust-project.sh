@@ -116,6 +116,27 @@ done < <(find "$project_dir/target/$TARGET/$config/deps" -name "*.ll" 2>/dev/nul
 
 echo "LL files: ${ll_files[@]}"
 
+symbols_to_check=(
+    "__runtime_signature"
+    "__fuel_remaining"
+    "__curr_memory_usage"
+    "__total_memory_usage"
+    "__max_memory_usage"
+    "__check_fuel"
+)
+
+for ll_file in "${ll_files[@]}"
+do
+    for symbol in "${symbols_to_check[@]}"
+    do
+        if grep -q "@$symbol\>" "$ll_file"
+        then
+            echo "Error: Found reserved symbol '$symbol' in $ll_file"
+            exit 1
+        fi
+    done
+done
+
 object_files=()
 
 for ll_file in "${ll_files[@]}"
