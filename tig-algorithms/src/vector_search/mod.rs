@@ -1,4 +1,5 @@
-// c004_a001
+pub mod basic;
+pub use basic as c004_a001;
 
 // c004_a002
 

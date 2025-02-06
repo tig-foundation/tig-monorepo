@@ -12,10 +12,7 @@ cudarc = { version = "0.12.0", features = [
     "cuda-version-from-build-system",
 ], optional = true }
 ndarray = "0.15.6"
-rand = { version = "0.8.5", default-features = false, features = [
-    "std_rng",
-    "small_rng",
-] }
+rand = { version = "0.8.5", default-features = false, features = ["std_rng"] }
 tig-challenges = { path = "../tig-challenges" }
 
 [lib]
