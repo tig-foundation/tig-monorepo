@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tig_utils::{jsonify, u64s_from_str, u8s_from_str};
-pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, Transfer, U256};
+pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, U256};
 
 serializable_struct_with_getters! {
     Algorithm {
@@ -312,14 +312,24 @@ serializable_struct_with_getters! {
 }
 
 // Deposit child structs
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DepositType {
+    Linear {
+        start_timestamp: u64,
+        end_timestamp: u64,
+    },
+    Lock {
+        eth_block_num: u64,
+    },
+}
 serializable_struct_with_getters! {
     DepositDetails {
         player_id: String,
         tx_hash: String,
         log_idx: usize,
         amount: PreciseNumber,
-        start_timestamp: u64,
-        end_timestamp: u64,
+        r#type: DepositType,
     }
 }
 serializable_struct_with_getters! {
@@ -343,7 +353,8 @@ serializable_struct_with_getters! {
         self_deposit: PreciseNumber,
         delegated_weighted_deposit: PreciseNumber,
         delegators: HashSet<String>,
-        reward_share: f64,
+        reward_share: PreciseNumber,
+        coinbase: HashMap<String, PreciseNumber>,
         imbalance: PreciseNumber,
         influence: PreciseNumber,
         reward: PreciseNumber,
@@ -369,6 +380,7 @@ serializable_struct_with_getters! {
         delegatees: Option<PlayerValue<HashMap<String, f64>>>,
         votes: HashMap<String, PlayerValue<bool>>,
         reward_share: Option<PlayerValue<f64>>,
+        coinbase: Option<PlayerValue<HashMap<String, f64>>>,
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]

@@ -313,6 +313,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RequestApiKeyResponse'
+  /set-coinbase:
+    post:
+      tags:
+        - POST
+      summary: Sets your delegatees
+      description: |-
+        # Notes
+        * Can only be updated once every `block.config.opow.coinbase_update_period` blocks
+        
+        * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
+          
+          * If `<api_key>` is invalid, a `401` error will be returned
+
+        * `<coinbase>` is a map of `<player_id>` to `float`, where the floats must sum to at most `1.0`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetCoinbaseRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetCoinbaseResponse'
   /set-delegatees:
     post:
       tags:
@@ -446,38 +478,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubmitBenchmarkResponse'
-  /submit-deposit:
-    post:
-      tags:
-        - POST
-      summary: Submit a deposit
-      description: |-
-        # Notes
-
-        * `<tx_hash>` is the id of the transaction that has sent at least `block.config.deposits.min_lock_amount` TIG to `block.config.deposits.lock_address`. Additionally:
-          * Must be non-cancellable
-          * Must be non-transferrable
-          * Minimum lock duration must be at least 1 week (604800 seconds)
-        * `<log_idx>` is the log index of the CreateLockupLinearStream event
-        * If `<log_idx>` is null, then the first CreateLockupLinearStream event will be used
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SubmitDepositRequest'
-      parameters:
-        - in: header
-          name: X-Api-Key
-          description: <api_key> from /request-api-key endpoint
-          schema:
-            $ref: '#/components/schemas/MD5'
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubmitDepositResponse'
   /submit-precommit:
     post:
       tags:
@@ -536,36 +536,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubmitProofResponse'
-  /submit-topup:
-    post:
-      tags:
-        - POST
-      summary: Submit a topup transaction
-      description: |-
-        # Notes
-
-        * `<tx_hash>` is the id of the transaction that has sent at least `block.config.topups.topup_amount` TIG to the `block.config.topups.topup_address`
-        * `<log_idx>` is the log index of the CreateLockupLinearStream event
-        * If `<log_idx>` is null, then the first CreateLockupLinearStream event will be used
-        
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SubmitTopupRequest'
-      parameters:
-        - in: header
-          name: X-Api-Key
-          description: <api_key> from /request-api-key endpoint
-          schema:
-            $ref: '#/components/schemas/MD5'
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubmitTopupResponse'
 components:
   schemas:
     Address:
@@ -1371,6 +1341,19 @@ components:
       properties:
         player:
           $ref: '#/components/schemas/Player'
+        round_earnings:
+          type: array
+          items:
+            type: object
+            properties:
+              algorithm:
+                $ref: '#/components/schemas/PreciseNumber'
+              benchmarker:
+                $ref: '#/components/schemas/PreciseNumber'
+              breakthrough:
+                $ref: '#/components/schemas/PreciseNumber'
+              delegator:
+                $ref: '#/components/schemas/PreciseNumber'
         deposits:
           type: array
           items:
@@ -1422,6 +1405,18 @@ components:
           $ref: '#/components/schemas/MD5'
         name:
           type: string
+    SetCoinbaseRequest:
+      type: object
+      properties:
+        coinbase:
+          type: object
+          additionalProperties:
+            type: number
+    SetCoinbaseResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
     SetDelegateesRequest:
       type: object
       properties:
@@ -1476,19 +1471,6 @@ components:
       properties:
         ok:
           type: boolean
-    SubmitDepositRequest:
-      type: object
-      properties:
-        tx_hash:
-          $ref: '#/components/schemas/TxHash'
-        log_idx:
-          type: integer
-          format: uint32
-    SubmitDepositResponse:
-      type: object
-      properties:
-        deposit_id:
-          $ref: '#/components/schemas/MD5'
     SubmitPrecommitRequest:
       type: object
       properties:
@@ -1516,16 +1498,3 @@ components:
       properties:
         verified:
           type: string
-    SubmitTopupRequest:
-      type: object
-      properties:
-        tx_hash:
-          $ref: '#/components/schemas/TxHash'
-        log_idx:
-          type: integer
-          format: uint32
-    SubmitTopupResponse:
-      type: object
-      properties:
-        topup_id:
-          $ref: '#/components/schemas/MD5'

@@ -1,4 +1,6 @@
+#[cfg(feature = "web3")]
 mod eth;
+#[cfg(feature = "web3")]
 pub use eth::*;
 mod hash;
 pub use hash::*;

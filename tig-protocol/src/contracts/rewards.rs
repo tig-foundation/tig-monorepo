@@ -136,24 +136,44 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let zero = PreciseNumber::from(0);
     for (delegatee, opow_data) in active_opow_block_data.iter_mut() {
         opow_data.reward = opow_data.influence * reward_pool;
-        opow_data.reward_share = active_players_state[delegatee]
-            .reward_share
+
+        if opow_data.reward == zero {
+            continue;
+        }
+
+        if opow_data.delegated_weighted_deposit > zero {
+            opow_data.reward_share = opow_data.reward
+                * PreciseNumber::from_f64(
+                    active_players_state[delegatee]
+                        .reward_share
+                        .as_ref()
+                        .map_or(config.deposits.default_reward_share, |x| x.value)
+                        .clone(),
+                )
+        }
+        let coinbase_amount = opow_data.reward - opow_data.reward_share;
+
+        for (output, fraction) in active_players_state[delegatee]
+            .coinbase
             .as_ref()
-            .map_or(config.deposits.default_reward_share, |x| x.value)
-            .clone();
+            .map_or_else(
+                || HashMap::from([(delegatee.clone(), 1.0)]),
+                |x| x.value.clone(),
+            )
+            .iter()
+        {
+            let fraction = PreciseNumber::from_f64(*fraction);
+            let amount = coinbase_amount * fraction;
+            opow_data.coinbase.insert(output.clone(), amount.clone());
 
-        let shared_amount = if opow_data.delegated_weighted_deposit == zero {
-            zero.clone()
-        } else {
-            opow_data.reward * PreciseNumber::from_f64(opow_data.reward_share)
-        };
-        active_players_block_data
-            .get_mut(delegatee)
-            .unwrap()
-            .reward_by_type
-            .insert(RewardType::Benchmarker, opow_data.reward - shared_amount);
+            let player_data = active_players_block_data.get_mut(output).unwrap();
+            *player_data
+                .reward_by_type
+                .entry(RewardType::Benchmarker)
+                .or_insert(zero.clone()) += amount;
+        }
 
-        if shared_amount == zero {
+        if opow_data.reward_share == zero {
             continue;
         }
 
@@ -163,8 +183,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             *player_data
                 .reward_by_type
                 .entry(RewardType::Delegator)
-                .or_insert(zero.clone()) += shared_amount * fraction * player_data.weighted_deposit
-                / opow_data.delegated_weighted_deposit;
+                .or_insert(zero.clone()) +=
+                opow_data.reward_share * fraction * player_data.weighted_deposit
+                    / opow_data.delegated_weighted_deposit;
         }
     }
 }
