@@ -153,6 +153,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetBlockResponse'
+  /get-delegators:
+    get:
+      tags:
+        - GET
+      summary: Get latest delegators data
+      description: |-
+        # Notes
+        
+        * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
+        
+        * All players who have a deposit are included in the response
+        
+      parameters:
+        - name: block_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDelegatorsResponse'
   /get-difficulty-data:
     get:
       tags:
@@ -271,8 +296,19 @@ paths:
       description: |-
         # Notes
         * `algorithms` is a map of `<algorithm_id>` to `uint256`
-        * `opow` is a map of `<player_id>` to `uint256`
-        * `players` is a map of `<player_id>` to dict of reward types (algorithm, benchmark, breakthroughs, delegator)
+        
+        * `breakthroughs` is a map of `<breakthrough_id>` to `uint256`
+        
+        * `opow` is a map of `<player_id>` to a dict:
+        
+          * `total` is the total reward earned by the Benchmarker this round before any sharing is deducted
+          
+          * `shared` is the total reward shared by the Benchmarker with delegators this round
+          
+          * `coinbase` is the total reward distributed by the Benchmarker with pool members this round
+          
+        * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, breakthroughs, delegator)
+        
         * `names` is a map of `<player_id>` to ENS name (only if one exists)
       parameters:
         - name: round
@@ -317,7 +353,7 @@ paths:
     post:
       tags:
         - POST
-      summary: Sets your delegatees
+      summary: Set distribution of your reward amongst pool members
       description: |-
         # Notes
         * Can only be updated once every `block.config.opow.coinbase_update_period` blocks
@@ -325,7 +361,7 @@ paths:
         * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
           
           * If `<api_key>` is invalid, a `401` error will be returned
-
+          
         * `<coinbase>` is a map of `<player_id>` to `float`, where the floats must sum to at most `1.0`
       requestBody:
         content:
@@ -408,6 +444,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SetRewardShareResponse'
+  /set-vote:
+    post:
+      tags:
+        - POST
+      summary: Cast vote on breakthrough
+      description: |-
+        # Notes
+        * Votes are immutable. Once set, cannot change
+        
+        * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
+          
+          * If `<api_key>` is invalid, a `401` error will be returned
+
+        * Signature must be from signing the following message:
+          
+          * If voting yes: `I hereby confirm my vote that '<breakthrough_name>' IS A BREAKTHROUGH`
+          
+          * If voting no: `I hereby confirm my vote that '<breakthrough_name>' IS INELIGIBLE AS A BREAKTHROUGH`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetVoteRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetVoteResponse'
   /submit-algorithm:
     post:
       tags:
@@ -418,9 +490,7 @@ paths:
         
         * This endpoint can only be invoked once every few seconds
         
-        * If an algorithm submission has failed to compile (`wasm.state.compiled_success = false`), you can re-use the same algorithm name.
-        
-        * `<tx_hash>` is the id of the transaction that has burnt the required `block.config.algorithm_submissions.submission_fee` TIG to the `block.config.erc20.burn_address`
+        * If an algorithm submission has failed to compile (`binary.state.compiled_success = false`), you can re-use the same algorithm name.
         
         * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
           
@@ -889,6 +959,12 @@ components:
         round_pushed:
           type: integer
           format: uint32
+        round_voting_starts:
+          type: integer
+          format: uint32
+        round_votes_tallied:
+          type: integer
+          format: uint32
         round_active:
           type: integer
           format: uint32
@@ -1056,15 +1132,20 @@ components:
         cutoff:
           type: integer
           format: uint32
-        associated_deposit:
+        self_deposit:
+          $ref: '#/components/schemas/PreciseNumber'
+        delegated_weighted_deposit:
           $ref: '#/components/schemas/PreciseNumber'
         delegators:
           type: array
           items:
             $ref: '#/components/schemas/Address'
+        coinbase:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PreciseNumber'
         reward_share:
-          type: number
-          format: double
+          $ref: '#/components/schemas/PreciseNumber'
         imbalance:
           $ref: '#/components/schemas/PreciseNumber'
         influence:
@@ -1318,6 +1399,25 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Challenge'
+    GetDelegatorsResponse:
+      type: object
+      properties:
+        delegators:
+          type: array
+          items:
+            type: object
+            properties:
+              player_id:
+                $ref: '#/components/schemas/Address'
+              deposit:
+                $ref: '#/components/schemas/PreciseNumber'
+              delegatees:
+                type: object
+                additionalProperties:
+                  type: number
+                  format: double
+              reward:
+                $ref: '#/components/schemas/PreciseNumber'
     GetDifficultyDataResponse:
       type: object
       properties:
@@ -1341,19 +1441,6 @@ components:
       properties:
         player:
           $ref: '#/components/schemas/Player'
-        round_earnings:
-          type: array
-          items:
-            type: object
-            properties:
-              algorithm:
-                $ref: '#/components/schemas/PreciseNumber'
-              benchmarker:
-                $ref: '#/components/schemas/PreciseNumber'
-              breakthrough:
-                $ref: '#/components/schemas/PreciseNumber'
-              delegator:
-                $ref: '#/components/schemas/PreciseNumber'
         deposits:
           type: array
           items:
@@ -1369,10 +1456,23 @@ components:
          type: object
          additionalProperties:
           $ref: '#/components/schemas/PreciseNumber'
-       opow:
+       breakthroughs:
          type: object
          additionalProperties:
           $ref: '#/components/schemas/PreciseNumber'
+       opow:
+         type: object
+         additionalProperties:
+           type: object
+           properties:
+             total:
+              $ref: '#/components/schemas/PreciseNumber'
+             shared:
+              $ref: '#/components/schemas/PreciseNumber'
+             coinbase:
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/PreciseNumber'
        players:
          type: object
          additionalProperties:
@@ -1409,9 +1509,8 @@ components:
       type: object
       properties:
         coinbase:
-          type: object
-          additionalProperties:
-            type: number
+          type: number
+          format: double
     SetCoinbaseResponse:
       type: object
       properties:
@@ -1424,6 +1523,7 @@ components:
           type: object
           additionalProperties:
             type: number
+            format: double
     SetDelegateeResponse:
       type: object
       properties:
@@ -1436,6 +1536,20 @@ components:
           type: number
           format: double
     SetRewardShareResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+    SetVoteRequest:
+      type: object
+      properties:
+        breakthrough_id:
+          type: string
+        yes:
+          type: boolean
+        signature:
+          $ref: '#/components/schemas/Signature'
+    SetVoteResponse:
       type: object
       properties:
         ok:

@@ -203,7 +203,8 @@ class OPoWBlockData(FromDict):
     delegated_weighted_deposit: PreciseNumber
     self_deposit: PreciseNumber
     delegators: Set[str]
-    reward_share: float
+    coinbase: Dict[str, PreciseNumber]
+    reward_share: PreciseNumber
     imbalance: PreciseNumber
     influence: PreciseNumber
     reward: PreciseNumber
