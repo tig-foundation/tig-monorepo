@@ -49,7 +49,7 @@ total_factors = {
     for f in list(block.data.active_ids["challenge"]) + ["weighted_deposit"]
 }
 reward_shares = {
-    benchmarker: int(opow_data[benchmarker].block_data.reward_share) / (int(opow_data[benchmarker].block_data.reward) + 1e-12)
+    benchmarker: opow_data[benchmarker].block_data.reward_share.to_float() / (opow_data[benchmarker].block_data.reward.to_float() + 1e-12)
     for benchmarker in opow_data
 }
 
