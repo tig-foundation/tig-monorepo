@@ -303,6 +303,7 @@ serializable_struct_with_getters! {
     ChallengeBlockData {
         num_qualifiers: u32,
         qualifier_difficulties: HashSet<Point>,
+        median_solution_ratio: f64,
         base_frontier: Frontier,
         scaled_frontier: Frontier,
         scaling_factor: f64,
@@ -355,6 +356,7 @@ serializable_struct_with_getters! {
         delegators: HashSet<String>,
         reward_share: PreciseNumber,
         coinbase: HashMap<String, PreciseNumber>,
+        average_reliability_by_challenge: HashMap<String, f64>,
         imbalance: PreciseNumber,
         influence: PreciseNumber,
         reward: PreciseNumber,

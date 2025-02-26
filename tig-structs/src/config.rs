@@ -111,6 +111,8 @@ serializable_struct_with_getters! {
         deposit_to_cutoff_ratio: f64,
         max_coinbase_outputs: usize,
         coinbase_update_period: u32,
+        max_reliability: f64,
+        min_reliability: f64,
     }
 }
 serializable_struct_with_getters! {
