@@ -5,7 +5,7 @@ BLOCK_ID=$(curl -s https://mainnet-api.tig.foundation/get-block | jq -r '.block.
 RESP=$(curl -s "https://mainnet-api.tig.foundation/get-algorithms?block_id=$BLOCK_ID")
 
 ALGORITHMS=$(echo $RESP | jq -c '.algorithms[]' | jq -s 'sort_by(.id)')
-WASMS_DICT=$(echo $RESP | jq -c '[.wasms[] | {key: .algorithm_id, value: .}] | from_entries')
+WASMS_DICT=$(echo $RESP | jq -c '[.binarys[] | {key: .algorithm_id, value: .}] | from_entries')
 
 for ALGO in $(echo $ALGORITHMS | jq -c '.[]'); do
     ID=$(echo $ALGO | jq -r '.id')
