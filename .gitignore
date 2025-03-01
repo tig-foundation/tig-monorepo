@@ -19,3 +19,11 @@ __pycache__/
 
 # Ignore these. 
 db_data/
+
+tig-aarch64/target/
+tig-aarch64/Cargo.lock
+tig-aarch64/rtsig_blob.dylib
+tig-aarch64/llvm-*.zip
+tig-aarch64/llvm-*/
+tig-aarch64/*.tar.zst
+tig-aarch64/src/solve.rs
