@@ -19,7 +19,10 @@ player_data = Player.from_dict(requests.get(f"{API_URL}/get-player-data?player_i
 factors = {
     benchmarker: {
         **{
-            f: opow_data[benchmarker].block_data.num_qualifiers_by_challenge.get(f, 0)
+            f: (
+                opow_data[benchmarker].block_data.num_qualifiers_by_challenge.get(f, 0) * 
+                opow_data[benchmarker].block_data.solution_ratio_by_challenge.get(f, 0)
+            )
             for f in block.data.active_ids["challenge"]
         },
         "weighted_deposit": opow_data[benchmarker].block_data.delegated_weighted_deposit.to_float()

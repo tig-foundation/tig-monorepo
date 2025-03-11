@@ -183,6 +183,7 @@ class ChallengeState(FromDict):
 class ChallengeBlockData(FromDict):
     num_qualifiers: int
     qualifier_difficulties: Set[Point]
+    average_solution_ratio: float
     base_frontier: Frontier
     scaled_frontier: Frontier
     scaling_factor: float
@@ -204,6 +205,7 @@ class OPoWBlockData(FromDict):
     self_deposit: PreciseNumber
     delegators: Set[str]
     coinbase: Dict[str, PreciseNumber]
+    solution_ratio_by_challenge: Dict[str, float]
     reward_share: PreciseNumber
     imbalance: PreciseNumber
     influence: PreciseNumber

@@ -53,7 +53,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for (settings, num_solutions) in active_solutions.values() {
+    for (settings, num_solutions, _) in active_solutions.iter() {
         *num_solutions_by_player_by_challenge
             .entry(settings.player_id.clone())
             .or_default()
@@ -93,12 +93,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     // update qualifiers
-    let mut solutions_by_challenge = HashMap::<String, Vec<(&BenchmarkSettings, &u32)>>::new();
-    for (settings, num_solutions) in active_solutions.values() {
+    let mut solutions_by_challenge =
+        HashMap::<String, Vec<(&BenchmarkSettings, &u32, &u32)>>::new();
+    for (settings, num_solutions, num_nonces) in active_solutions.iter() {
         solutions_by_challenge
             .entry(settings.challenge_id.clone())
             .or_default()
-            .push((settings, num_solutions));
+            .push((settings, num_solutions, num_nonces));
     }
 
     let max_qualifiers_by_player = active_opow_ids
@@ -118,7 +119,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
         let points = solutions
             .iter()
-            .map(|(settings, _)| settings.difficulty.clone())
+            .map(|(settings, _, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
         for (frontier_index, frontier) in pareto_algorithm(&points, false).into_iter().enumerate() {
@@ -126,7 +127,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 frontier_indexes.insert(point, frontier_index);
             }
         }
-        solutions.sort_by(|(a_settings, _), (b_settings, _)| {
+        solutions.sort_by(|(a_settings, _, _), (b_settings, _, _)| {
             let a_index = frontier_indexes[&a_settings.difficulty];
             let b_index = frontier_indexes[&b_settings.difficulty];
             a_index.cmp(&b_index)
@@ -135,7 +136,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
         let mut curr_frontier_index = 0;
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        for (settings, &num_solutions) in solutions.iter() {
+        for (settings, &num_solutions, _) in solutions.iter() {
             let BenchmarkSettings {
                 player_id,
                 algorithm_id,
@@ -181,6 +182,40 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .qualifier_difficulties
                 .insert(difficulty.clone());
         }
+    }
+
+    // update reliability
+    for challenge_id in active_challenge_ids.iter() {
+        if !solutions_by_challenge.contains_key(challenge_id) {
+            continue;
+        }
+        let solutions = solutions_by_challenge.get(challenge_id).unwrap();
+        let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
+
+        let mut total_solutions = HashMap::<String, u32>::new();
+        let mut total_nonces = HashMap::<String, u32>::new();
+        for (settings, num_solutions, num_nonces) in solutions.iter() {
+            if !challenge_data
+                .qualifier_difficulties
+                .contains(&settings.difficulty)
+            {
+                continue;
+            }
+            *total_solutions
+                .entry(settings.player_id.clone())
+                .or_default() += *num_solutions;
+            *total_nonces.entry(settings.player_id.clone()).or_default() += *num_nonces;
+        }
+
+        for player_id in total_solutions.keys() {
+            let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
+            opow_data.solution_ratio_by_challenge.insert(
+                challenge_id.clone(),
+                total_solutions[player_id] as f64 / total_nonces[player_id] as f64,
+            );
+        }
+        challenge_data.average_solution_ratio = total_solutions.values().sum::<u32>() as f64
+            / total_nonces.values().sum::<u32>() as f64;
     }
 
     // update frontiers
@@ -246,16 +281,36 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         return;
     }
 
-    let num_qualifiers_by_challenge: HashMap<String, u32> = active_challenge_ids
+    let weighted_qualifiers: HashMap<String, HashMap<String, PreciseNumber>> = active_challenge_ids
         .iter()
         .map(|challenge_id| {
             (
                 challenge_id.clone(),
-                active_challenges_block_data[challenge_id]
-                    .num_qualifiers
-                    .clone(),
+                active_opow_ids
+                    .iter()
+                    .map(|player_id| {
+                        (
+                            player_id.clone(),
+                            PreciseNumber::from(
+                                *active_opow_block_data[player_id]
+                                    .num_qualifiers_by_challenge
+                                    .get(challenge_id)
+                                    .unwrap_or(&0),
+                            ) * PreciseNumber::from_f64(
+                                *active_opow_block_data[player_id]
+                                    .solution_ratio_by_challenge
+                                    .get(challenge_id)
+                                    .unwrap_or(&0.0),
+                            ),
+                        )
+                    })
+                    .collect(),
             )
         })
+        .collect();
+    let total_weighted_qualifiers: HashMap<String, PreciseNumber> = weighted_qualifiers
+        .iter()
+        .map(|(challenge_id, x)| (challenge_id.clone(), x.values().sum()))
         .collect();
 
     for player_id in active_opow_ids.iter() {
@@ -305,16 +360,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
         let mut percent_qualifiers = Vec::<PreciseNumber>::new();
         for challenge_id in active_challenge_ids.iter() {
-            let num_qualifiers = num_qualifiers_by_challenge[challenge_id];
-            let num_qualifiers_by_player = *opow_data
-                .num_qualifiers_by_challenge
-                .get(challenge_id)
-                .unwrap_or(&0);
-
-            percent_qualifiers.push(if num_qualifiers_by_player == 0 {
-                PreciseNumber::from(0)
+            percent_qualifiers.push(if weighted_qualifiers[challenge_id][player_id] == zero {
+                zero.clone()
             } else {
-                PreciseNumber::from(num_qualifiers_by_player) / PreciseNumber::from(num_qualifiers)
+                weighted_qualifiers[challenge_id][player_id]
+                    / total_weighted_qualifiers[challenge_id]
             });
         }
 
