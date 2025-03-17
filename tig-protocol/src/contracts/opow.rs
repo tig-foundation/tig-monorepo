@@ -11,6 +11,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         block_details,
         block_data,
         active_challenges_block_data,
+        active_challenges_prev_block_data,
         active_algorithms_state,
         active_algorithms_details,
         active_algorithms_block_data,
@@ -136,7 +137,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
         let mut curr_frontier_index = 0;
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        for (settings, &num_solutions, _) in solutions.iter() {
+        let prev_solution_ratio = active_challenges_prev_block_data
+            .get(challenge_id)
+            .map(|x| x.average_solution_ratio)
+            .unwrap_or_default();
+        let min_solution_ratio = prev_solution_ratio * config.opow.min_solution_ratio_factor;
+        for (settings, &num_solutions, &num_nonces) in solutions.iter() {
             let BenchmarkSettings {
                 player_id,
                 algorithm_id,
@@ -164,7 +170,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
 
             let max_qualifiers = max_qualifiers_by_player.get(player_id).unwrap().clone();
-            let num_qualifiers = num_solutions.min(max_qualifiers);
+            let solution_ratio = num_solutions as f64 / num_nonces as f64;
+            let num_qualifiers = if solution_ratio >= min_solution_ratio {
+                num_solutions.min(max_qualifiers)
+            } else {
+                0
+            };
             max_qualifiers_by_player.insert(player_id.clone(), max_qualifiers - num_qualifiers);
 
             if num_qualifiers > 0 {
