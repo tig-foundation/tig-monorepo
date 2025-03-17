@@ -18,10 +18,6 @@ pub async fn submit_precommit<T: Context>(
         return Err(anyhow!("Invalid settings.player_id. Must be {}", player_id));
     }
 
-    if num_nonces == 0 {
-        return Err(anyhow!("Invalid num_nonces. Must be greater than 0"));
-    }
-
     let config = ctx.get_config().await;
 
     let latest_block_id = ctx.get_latest_block_id().await;
@@ -42,6 +38,15 @@ pub async fn submit_precommit<T: Context>(
         .is_some_and(|s| s.round_active <= block_details.round)
     {
         return Err(anyhow!("Invalid challenge '{}'", settings.challenge_id));
+    }
+
+    // verify min nonces
+    let min_nonces = config.benchmarks.min_nonces[&settings.challenge_id];
+    if num_nonces < min_nonces {
+        return Err(anyhow!(
+            "Invalid num_nonces. Must be at least {}",
+            min_nonces
+        ));
     }
 
     // verify algorithm is active
