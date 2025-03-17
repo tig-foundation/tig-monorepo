@@ -5,6 +5,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
+use std::collections::HashSet;
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
@@ -55,6 +56,7 @@ pub struct Challenge {
     pub distance_matrix: Vec<Vec<i32>>,
     pub max_total_distance: i32,
     pub max_capacity: i32,
+    pub max_num_routes: usize,
     pub service_time: i32,
     pub ready_times: Vec<i32>,
     pub due_times: Vec<i32>,
@@ -135,20 +137,32 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 
             if rng.gen::<f64>() < 0.5 {
                 ready_times[node] = due_times[node] - rng.gen_range(10..=60);
-                ready_times[node] = ready_times[node].min(0);
+                ready_times[node] = ready_times[node].max(0);
             }
         }
 
-        let baseline_routes =
-            calc_baseline_routes(num_nodes, max_capacity, &demands, &distance_matrix)?;
-        let baseline_routes_total_distance = calc_routes_total_distance(
+        let baseline_routes = calc_baseline_routes(
+            num_nodes,
+            max_capacity,
+            &demands,
+            &distance_matrix,
+            service_time,
+            &ready_times,
+            &due_times,
+        )?;
+
+        println!("Baseline routes: {:?}", baseline_routes);
+        let baseline_total_distance = calc_routes_total_distance(
             num_nodes,
             max_capacity,
             &demands,
             &distance_matrix,
             &baseline_routes,
+            service_time,
+            &ready_times,
+            &due_times,
         )?;
-        let max_total_distance = (baseline_routes_total_distance
+        let max_total_distance = (baseline_total_distance
             * (1000 - difficulty.better_than_baseline as i32)
             / 1000) as i32;
 
@@ -159,6 +173,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             distance_matrix,
             max_total_distance,
             max_capacity,
+            max_num_routes: baseline_routes.len(),
             service_time,
             ready_times,
             due_times,
@@ -166,6 +181,13 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 
     fn verify_solution(&self, solution: &Solution) -> Result<()> {
+        if solution.routes.len() > self.max_num_routes {
+            return Err(anyhow!(
+                "Number of routes ({}) exceeds max number of routes ({})",
+                solution.routes.len(),
+                self.max_num_routes
+            ));
+        }
         let total_distance = calc_routes_total_distance(
             self.difficulty.num_nodes,
             self.max_capacity,
@@ -188,39 +210,95 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     }
 }
 
-pub fn find_best_insertion() {
-    // best_customer: Optional[Customer] = None
-    // best_position: int = -1
-    // best_c2 = float('-inf')
+fn is_feasible(
+    route: &Vec<usize>,
+    distance_matrix: &Vec<Vec<i32>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
+    mut curr_node: usize,
+    mut curr_time: i32,
+    start_pos: usize,
+) -> bool {
+    let mut valid = true;
+    for pos in start_pos..route.len() {
+        let next_node = route[pos];
+        curr_time += distance_matrix[curr_node][next_node];
+        if curr_time > due_times[route[pos]] {
+            valid = false;
+            break;
+        }
+        curr_time = curr_time.max(ready_times[next_node]) + service_time;
+        curr_node = next_node;
+    }
+    valid
+}
 
-    // for u in unrouted_customers:
-    //     best_c1 = float('inf')
-    //     best_pos_for_u = -1
+pub fn find_best_insertion(
+    route: &Vec<usize>,
+    remaining_nodes: Vec<usize>,
+    distance_matrix: &Vec<Vec<i32>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
+) -> Option<(usize, usize)> {
+    let alpha1 = 1;
+    let alpha2 = 1;
+    let lambda = 1;
 
-    //     # Evaluate every possible insertion position
-    //     for pos in range(1, len(route.customers)):
-    //         if not route.is_feasible(u, pos):
-    //             continue
-    //         prev_cust = route.customers[pos - 1]
-    //         next_cust = route.customers[pos]
+    let mut best_c2 = None;
+    let mut best = None;
+    for insert_node in remaining_nodes {
+        let mut best_c1 = None;
 
-    //         c1 = route.calculate_c1(prev_cust, u, next_cust, pos, params)
-    //         if c1 < best_c1:
-    //             best_c1 = c1
-    //             best_pos_for_u = pos
+        let mut curr_time = 0;
+        let mut curr_node = 0;
+        for pos in 1..route.len() - 1 {
+            let next_node = route[pos];
+            let new_arrival_time =
+                ready_times[insert_node].max(curr_time + distance_matrix[curr_node][insert_node]);
+            if new_arrival_time > due_times[insert_node] {
+                continue;
+            }
+            let old_arrival_time =
+                ready_times[next_node].max(curr_time + distance_matrix[curr_node][next_node]);
 
-    //     # Once we find the best c1 for this customer, we compute c2
-    //     if best_pos_for_u != -1:
-    //         prev_cust = route.customers[best_pos_for_u - 1]
-    //         next_cust = route.customers[best_pos_for_u]
-    //         c2 = route.calculate_c2(prev_cust, u, next_cust, best_pos_for_u, best_c1, params)
+            // Distance criterion: c11 = d(i,u) + d(u,j) - mu * d(i,j)
+            let c11 = distance_matrix[curr_node][insert_node]
+                + distance_matrix[insert_node][next_node]
+                - distance_matrix[curr_node][next_node];
 
-    //         if c2 > best_c2:
-    //             best_c2 = c2
-    //             best_customer = u
-    //             best_position = best_pos_for_u
+            // Time criterion: c12 = b_ju - b_j (the shift in arrival time at position 'pos').
+            let c12 = new_arrival_time - old_arrival_time;
 
-    // return best_customer, best_position
+            let c1 = -(alpha1 * c11 + alpha2 * c12);
+            let c2 = lambda * distance_matrix[0][insert_node] + c1;
+
+            if best_c1.is_none_or(|x| x > c1)
+                && best_c2.is_none_or(|x| x > c2)
+                && is_feasible(
+                    route,
+                    distance_matrix,
+                    service_time,
+                    ready_times,
+                    due_times,
+                    insert_node,
+                    new_arrival_time + service_time,
+                    pos,
+                )
+            {
+                best_c1 = Some(c1);
+                best_c2 = Some(c2);
+                best = Some((insert_node, pos));
+            }
+
+            curr_time = ready_times[next_node]
+                .max(curr_time + distance_matrix[curr_node][next_node])
+                + service_time;
+            curr_node = next_node;
+        }
+    }
+    best
 }
 
 pub fn calc_baseline_routes(
@@ -228,24 +306,40 @@ pub fn calc_baseline_routes(
     max_capacity: i32,
     demands: &Vec<i32>,
     distance_matrix: &Vec<Vec<i32>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
 ) -> Result<Vec<Vec<usize>>> {
     let mut routes = Vec::new();
 
-    // max heap by distance
-    while !heap.empty() {
-        node = heap.pop();
-        if !remaining.contains(node) {
+    let mut nodes: Vec<usize> = (1..num_nodes).collect();
+    nodes.sort_by(|&a, &b| distance_matrix[0][a].cmp(&distance_matrix[0][b]));
+
+    let mut remaining: HashSet<usize> = nodes.iter().cloned().collect();
+
+    // popping furthest node from depot
+    while let Some(node) = nodes.pop() {
+        if !remaining.remove(&node) {
             continue;
         }
-        let route = [0,node,0];
+        let mut route = vec![0, node, 0];
+        let mut route_demand = demands[node];
 
-        loop {
-            let customer, pos = find_best_insertion(route, remaining);
-            None => break
-            Some(customer) => {
-                route.insert(pos, customer);
-                visited[customer] = true;
-            }
+        while let Some((best_node, best_pos)) = find_best_insertion(
+            &route,
+            remaining
+                .iter()
+                .cloned()
+                .filter(|&n| route_demand + demands[n] <= max_capacity)
+                .collect(),
+            distance_matrix,
+            service_time,
+            ready_times,
+            due_times,
+        ) {
+            remaining.remove(&best_node);
+            route_demand += demands[best_node];
+            route.insert(best_pos, best_node);
         }
 
         routes.push(route);
@@ -313,4 +407,24 @@ pub fn calc_routes_total_distance(
     }
 
     Ok(total_distance)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ChallengeTrait;
+
+    use super::*;
+
+    #[test]
+    fn test_generate_instance() {
+        let c = Challenge::generate_instance(
+            [0; 32],
+            &Difficulty {
+                num_nodes: 100,
+                better_than_baseline: 0,
+            },
+        )
+        .unwrap();
+        println!("Challenge: {:?}", c);
+    }
 }
