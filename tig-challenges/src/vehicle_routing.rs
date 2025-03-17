@@ -5,7 +5,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
@@ -89,8 +89,27 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .collect();
         node_positions[0] = (500.0, 500.0); // Depot is node 0, and in the center
 
-        let mut demands: Vec<i32> = (0..num_nodes).map(|_| rng.gen_range(1..=30)).collect();
-        demands[0] = 0; // Depot demand is 0
+        let num_clusters = rng.gen_range(3..=8);
+        let mut cluster_assignments = HashMap::new();
+        for node in num_clusters + 1..num_nodes {
+            if rng.gen::<f64>() < 0.5 {
+                let closest_cluster = (1..=num_clusters)
+                    .min_by_key(|&cluster| {
+                        let dx = node_positions[node].0 - node_positions[cluster].0;
+                        let dy = node_positions[node].1 - node_positions[cluster].1;
+                        dx.hypot(dy).round() as i32
+                    })
+                    .unwrap();
+                node_positions[node].0 =
+                    (node_positions[node].0 + node_positions[closest_cluster].0) / 2.0;
+                node_positions[node].1 =
+                    (node_positions[node].1 + node_positions[closest_cluster].1) / 2.0;
+                cluster_assignments.insert(node, closest_cluster);
+            }
+        }
+
+        let mut demands: Vec<i32> = (0..num_nodes).map(|_| rng.gen_range(1..=35)).collect();
+        demands[0] = 0;
 
         let distance_matrix: Vec<Vec<i32>> = node_positions
             .iter()
@@ -121,16 +140,12 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         due_times[0] = distance_matrix[0][furthest_node]
             + ((average_distance + service_time as f64) * average_route_size).ceil() as i32;
 
-        let num_clusters = 8;
         for node in 1..num_nodes {
             let min_due_time = distance_matrix[0][node];
             let max_due_time = due_times[0] - distance_matrix[0][node] - service_time;
             due_times[node] = rng.gen_range(min_due_time..=max_due_time);
 
-            if node > num_clusters && rng.gen::<f64>() < 0.5 {
-                let closest_cluster = (1..=num_clusters)
-                    .min_by_key(|&cluster| distance_matrix[node][cluster])
-                    .unwrap();
+            if let Some(&closest_cluster) = cluster_assignments.get(&node) {
                 due_times[node] = (due_times[node] + due_times[closest_cluster]) / 2;
                 due_times[node] = due_times[node].clamp(min_due_time, max_due_time);
             }
