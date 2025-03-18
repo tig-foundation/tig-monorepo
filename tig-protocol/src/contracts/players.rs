@@ -256,7 +256,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 }
             }
             DepositType::Lock { .. } => {
-                let weight = PreciseNumber::from(4);
+                let weight = PreciseNumber::from(config.deposits.token_locker_weight);
                 let player_data = active_players_block_data
                     .get_mut(&deposit.player_id)
                     .unwrap();

@@ -50,6 +50,7 @@ serializable_struct_with_getters! {
         delegatees_update_period: u32,
         delegatee_min_deposit: PreciseNumber,
         max_delegations: usize,
+        token_locker_weight: u32,
     }
 }
 serializable_struct_with_getters! {
