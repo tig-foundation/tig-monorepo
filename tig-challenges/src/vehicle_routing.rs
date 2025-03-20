@@ -5,6 +5,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
+use statrs::function::erf::{erf, erf_inv};
 use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "cuda")]
@@ -84,29 +85,37 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         let num_nodes = difficulty.num_nodes;
         let max_capacity = 200;
 
-        let mut node_positions: Vec<(f64, f64)> = (0..num_nodes)
-            .map(|_| (rng.gen::<f64>() * 1000.0, rng.gen::<f64>() * 1000.0))
-            .collect();
-        node_positions[0] = (500.0, 500.0); // Depot is node 0, and in the center
-
         let num_clusters = rng.gen_range(3..=8);
+        let mut node_positions: Vec<(f64, f64)> = Vec::with_capacity(num_nodes);
+        node_positions.push((500.0, 500.0)); // Depot is node 0, and in the center
+
         let mut cluster_assignments = HashMap::new();
-        for node in num_clusters + 1..num_nodes {
-            if rng.gen::<f64>() < 0.5 {
-                let closest_cluster = (1..=num_clusters)
-                    .min_by_key(|&cluster| {
-                        let dx = node_positions[node].0 - node_positions[cluster].0;
-                        let dy = node_positions[node].1 - node_positions[cluster].1;
-                        dx.hypot(dy).round() as i32
-                    })
-                    .unwrap();
-                node_positions[node].0 =
-                    (node_positions[node].0 + node_positions[closest_cluster].0) / 2.0;
-                node_positions[node].1 =
-                    (node_positions[node].1 + node_positions[closest_cluster].1) / 2.0;
-                cluster_assignments.insert(node, closest_cluster);
+        for node in 1..num_nodes {
+            if node <= num_clusters || rng.gen::<f64>() < 0.5 {
+                node_positions.push((rng.gen::<f64>() * 1000.0, rng.gen::<f64>() * 1000.0));
+            } else {
+                let cluster_idx = rng.gen_range(1..=num_clusters);
+                node_positions.push((
+                    truncated_normal_sample(
+                        &mut rng,
+                        node_positions[cluster_idx].0,
+                        60.0,
+                        0.0,
+                        1000.0,
+                    ),
+                    truncated_normal_sample(
+                        &mut rng,
+                        node_positions[cluster_idx].1,
+                        60.0,
+                        0.0,
+                        1000.0,
+                    ),
+                ));
+                cluster_assignments.insert(node, cluster_idx);
             }
         }
+        println!("Num clusters: {:?}", num_clusters);
+        println!("Node positions: {:?}", node_positions);
 
         let mut demands: Vec<i32> = (0..num_nodes).map(|_| rng.gen_range(1..=35)).collect();
         demands[0] = 0;
@@ -223,6 +232,19 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             ))
         }
     }
+}
+
+pub fn truncated_normal_sample<T: Rng>(
+    rng: &mut T,
+    mean: f64,
+    std_dev: f64,
+    min_val: f64,
+    max_val: f64,
+) -> f64 {
+    let cdf_min = 0.5 * (1.0 + erf((min_val - mean) / (std_dev * (2.0_f64).sqrt())));
+    let cdf_max = 0.5 * (1.0 + erf((max_val - mean) / (std_dev * (2.0_f64).sqrt())));
+    let sample = rng.gen::<f64>() * (cdf_max - cdf_min) + cdf_min;
+    mean + std_dev * (2.0_f64).sqrt() * erf_inv(2.0 * sample - 1.0)
 }
 
 fn is_feasible(
