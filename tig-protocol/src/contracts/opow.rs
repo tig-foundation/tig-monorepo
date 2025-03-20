@@ -218,15 +218,19 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             *total_nonces.entry(settings.player_id.clone()).or_default() += *num_nonces;
         }
 
+        let mut sum_weighted_solution_ratio = 0.0;
         for player_id in total_solutions.keys() {
+            let solution_ratio = total_solutions[player_id] as f64 / total_nonces[player_id] as f64;
             let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-            opow_data.solution_ratio_by_challenge.insert(
-                challenge_id.clone(),
-                total_solutions[player_id] as f64 / total_nonces[player_id] as f64,
-            );
+            if let Some(&num_qualifiers) = opow_data.num_qualifiers_by_challenge.get(challenge_id) {
+                sum_weighted_solution_ratio += solution_ratio * num_qualifiers as f64;
+            }
+            opow_data
+                .solution_ratio_by_challenge
+                .insert(challenge_id.clone(), solution_ratio);
         }
-        challenge_data.average_solution_ratio = total_solutions.values().sum::<u32>() as f64
-            / total_nonces.values().sum::<u32>() as f64;
+        challenge_data.average_solution_ratio =
+            sum_weighted_solution_ratio / challenge_data.num_qualifiers as f64;
     }
 
     // update frontiers
@@ -292,38 +296,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         return;
     }
 
-    let weighted_qualifiers: HashMap<String, HashMap<String, PreciseNumber>> = active_challenge_ids
-        .iter()
-        .map(|challenge_id| {
-            (
-                challenge_id.clone(),
-                active_opow_ids
-                    .iter()
-                    .map(|player_id| {
-                        (
-                            player_id.clone(),
-                            PreciseNumber::from(
-                                *active_opow_block_data[player_id]
-                                    .num_qualifiers_by_challenge
-                                    .get(challenge_id)
-                                    .unwrap_or(&0),
-                            ) * PreciseNumber::from_f64(
-                                *active_opow_block_data[player_id]
-                                    .solution_ratio_by_challenge
-                                    .get(challenge_id)
-                                    .unwrap_or(&0.0),
-                            ),
-                        )
-                    })
-                    .collect(),
-            )
-        })
-        .collect();
-    let total_weighted_qualifiers: HashMap<String, PreciseNumber> = weighted_qualifiers
-        .iter()
-        .map(|(challenge_id, x)| (challenge_id.clone(), x.values().sum()))
-        .collect();
-
     for player_id in active_opow_ids.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
         opow_data.self_deposit = self_deposit[player_id].clone();
@@ -369,40 +341,53 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for player_id in active_opow_ids.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
 
-        let mut percent_qualifiers = Vec::<PreciseNumber>::new();
+        let mut challenge_factors = Vec::<PreciseNumber>::new();
         for challenge_id in active_challenge_ids.iter() {
-            percent_qualifiers.push(if weighted_qualifiers[challenge_id][player_id] == zero {
+            let challenge_data = active_challenges_block_data.get(challenge_id).unwrap();
+            challenge_factors.push(if challenge_data.num_qualifiers == 0 {
                 zero.clone()
             } else {
-                weighted_qualifiers[challenge_id][player_id]
-                    / total_weighted_qualifiers[challenge_id]
+                let fraction_qualifiers = PreciseNumber::from(
+                    *opow_data
+                        .num_qualifiers_by_challenge
+                        .get(challenge_id)
+                        .unwrap_or(&0),
+                ) / PreciseNumber::from(challenge_data.num_qualifiers);
+                let reliability =
+                    PreciseNumber::from_f64(
+                        *opow_data
+                            .solution_ratio_by_challenge
+                            .get(challenge_id)
+                            .unwrap_or(&0.0),
+                    ) / PreciseNumber::from_f64(challenge_data.average_solution_ratio);
+                fraction_qualifiers * reliability
             });
         }
 
-        let mut percent_deposit = if total_deposit == zero {
+        let mut deposit_factor = if total_deposit == zero {
             zero.clone()
         } else {
             opow_data.delegated_weighted_deposit / total_deposit
         };
-        let mean_percent_qualifiers = percent_qualifiers.arithmetic_mean();
+        let mean_challenge_factor = challenge_factors.arithmetic_mean();
         let max_deposit_to_qualifier_ratio =
             PreciseNumber::from_f64(config.opow.max_deposit_to_qualifier_ratio);
-        if mean_percent_qualifiers == zero {
-            percent_deposit = zero.clone();
-        } else if percent_deposit / mean_percent_qualifiers > max_deposit_to_qualifier_ratio {
-            percent_deposit = mean_percent_qualifiers * max_deposit_to_qualifier_ratio;
+        if mean_challenge_factor == zero {
+            deposit_factor = zero.clone();
+        } else if deposit_factor / mean_challenge_factor > max_deposit_to_qualifier_ratio {
+            deposit_factor = mean_challenge_factor * max_deposit_to_qualifier_ratio;
         }
 
-        let sum_percent_qualifiers: PreciseNumber = percent_qualifiers.iter().cloned().sum();
-        let weighted_mean = (sum_percent_qualifiers
-            + percent_deposit * PreciseNumber::from_f64(config.opow.deposit_multiplier))
+        let sum_challenge_factors: PreciseNumber = challenge_factors.iter().cloned().sum();
+        let weighted_mean = (sum_challenge_factors
+            + deposit_factor * PreciseNumber::from_f64(config.opow.deposit_multiplier))
             / PreciseNumber::from_f64(
                 active_challenge_ids.len() as f64 + config.opow.deposit_multiplier,
             );
-        let mut qualifiers_and_deposit = percent_qualifiers;
-        qualifiers_and_deposit.push(percent_deposit);
-        let mean = qualifiers_and_deposit.arithmetic_mean();
-        let variance = qualifiers_and_deposit.variance();
+        let mut all_factors = challenge_factors;
+        all_factors.push(deposit_factor);
+        let mean = all_factors.arithmetic_mean();
+        let variance = all_factors.variance();
         let cv_sqr = if mean == zero {
             zero.clone()
         } else {
