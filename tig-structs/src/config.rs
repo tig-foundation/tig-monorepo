@@ -68,7 +68,6 @@ serializable_struct_with_getters! {
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
         runtime_configs: HashMap<AlgorithmType, RuntimeConfig>,
-        min_nonces: HashMap<String, u32>,
     }
 }
 serializable_struct_with_getters! {
@@ -114,6 +113,7 @@ serializable_struct_with_getters! {
         max_coinbase_outputs: usize,
         coinbase_update_period: u32,
         min_solution_ratio_factor: f64,
+        min_num_nonces: u32,
     }
 }
 serializable_struct_with_getters! {

@@ -40,15 +40,6 @@ pub async fn submit_precommit<T: Context>(
         return Err(anyhow!("Invalid challenge '{}'", settings.challenge_id));
     }
 
-    // verify min nonces
-    let min_nonces = config.benchmarks.min_nonces[&settings.challenge_id];
-    if num_nonces < min_nonces {
-        return Err(anyhow!(
-            "Invalid num_nonces. Must be at least {}",
-            min_nonces
-        ));
-    }
-
     // verify algorithm is active
     if !ctx
         .get_algorithm_state(&settings.algorithm_id)
