@@ -77,7 +77,7 @@ if ! is_positive_integer "$num_workers"; then
     exit 1
 fi
 read -p "Enter max fuel (default is 10000000000): " max_fuel
-max_fuel=${max_fuel:-1}
+max_fuel=${max_fuel:-10000000000}
 if ! is_positive_integer "$max_fuel"; then
     echo "Error: Max fuel must be a positive integer."
     exit 1
