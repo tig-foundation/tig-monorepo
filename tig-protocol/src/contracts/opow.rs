@@ -371,14 +371,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                         .get(challenge_id)
                         .unwrap_or(&0),
                 ) / PreciseNumber::from(challenge_data.num_qualifiers);
-                let reliability =
-                    PreciseNumber::from_f64(
-                        *opow_data
-                            .solution_ratio_by_challenge
-                            .get(challenge_id)
-                            .unwrap_or(&0.0),
-                    ) / PreciseNumber::from_f64(challenge_data.average_solution_ratio);
-                fraction_qualifiers * reliability
+                let reliability = *opow_data
+                    .solution_ratio_by_challenge
+                    .get(challenge_id)
+                    .unwrap_or(&0.0)
+                    / challenge_data.average_solution_ratio;
+                fraction_qualifiers
+                    * PreciseNumber::from_f64(reliability.min(config.opow.max_reliability))
             });
         }
 
