@@ -995,6 +995,9 @@ components:
         num_qualifiers:
           type: integer
           format: uint32
+        average_solution_ratio:
+          type: number
+          format: double
         qualifier_difficulties:
           type: array
           items:
@@ -1131,6 +1134,12 @@ components:
             type: integer
             format: uint32
           example: {"c001": 5, "c002": 3}
+        solution_ratio_by_challenge:
+          type: object
+          additionalProperties:
+            type: double
+            format: number
+          example: {"c001": 0.001, "c002": 0.5}
         cutoff:
           type: integer
           format: uint32
