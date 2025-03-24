@@ -1067,6 +1067,8 @@ components:
     DifficultyData:
       type: object
       properties:
+        algorithm_id:
+          $ref: '#/components/schemas/AlgorithmId'
         num_nonces:
           type: integer
           format: uint64
