@@ -143,10 +143,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .map(|x| x.average_solution_ratio)
             .unwrap_or_default();
         let min_solution_ratio = prev_solution_ratio * config.opow.min_solution_ratio_factor;
-        let min_num_nonces = config.opow.min_num_nonces;
+        let min_num_nonces = config.opow.min_num_nonces as u64;
         let mut player_algorithm_solutions = HashMap::<String, HashMap<String, u32>>::new();
         let mut player_solutions = HashMap::<String, u32>::new();
-        let mut player_nonces = HashMap::<String, u32>::new();
+        let mut player_nonces = HashMap::<String, u64>::new();
 
         for frontier_idx in 0..solutions_by_frontier_idx.len() {
             for (settings, &num_solutions, &num_nonces) in
@@ -175,7 +175,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     .entry(algorithm_id.clone())
                     .or_default() += num_solutions;
                 *player_solutions.entry(player_id.clone()).or_default() += num_solutions;
-                *player_nonces.entry(player_id.clone()).or_default() += num_nonces;
+                *player_nonces.entry(player_id.clone()).or_default() += num_nonces as u64;
 
                 challenge_data
                     .qualifier_difficulties
