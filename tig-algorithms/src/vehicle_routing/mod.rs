@@ -1,6 +1,7 @@
 // c002_a001
 
-// c002_a002
+pub mod advanced_routing;
+pub use advanced_routing as c002_a002;
 
 // c002_a003
 
