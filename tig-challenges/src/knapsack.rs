@@ -35,6 +35,11 @@ impl crate::DifficultyTrait<2> for Difficulty {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Solution {
+    pub sub_solutions: Vec<SubSolution>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubSolution {
     pub items: Vec<usize>,
 }
 
@@ -52,16 +57,25 @@ impl TryFrom<Map<String, Value>> for Solution {
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
+    pub sub_instances: Vec<SubInstance>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubInstance {
+    pub seed: [u8; 32],
+    pub difficulty: Difficulty,
     pub weights: Vec<u32>,
     pub values: Vec<u32>,
     pub interaction_values: Vec<Vec<i32>>,
     pub max_weight: u32,
-    pub min_value: u32,
+    pub baseline_value: u32,
 }
 
 // TIG dev bounty available for a GPU optimisation for instance generation!
 #[cfg(feature = "cuda")]
 pub const KERNEL: Option<CudaKernel> = None;
+
+pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
@@ -77,7 +91,53 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
+        let mut sub_instances = Vec::new();
+        for _ in 0..NUM_SUB_INSTANCES {
+            sub_instances.push(SubInstance::generate_instance(&mut rng, seed, difficulty)?);
+        }
 
+        Ok(Challenge {
+            seed,
+            difficulty: difficulty.clone(),
+            sub_instances,
+        })
+    }
+
+    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+        let mut better_than_baselines = Vec::new();
+        for (i, (sub_instance, sub_solution)) in self
+            .sub_instances
+            .iter()
+            .zip(&solution.sub_solutions)
+            .enumerate()
+        {
+            match sub_instance.verify_solution(&sub_solution) {
+                Ok(total_value) => better_than_baselines
+                    .push(total_value as f64 / sub_instance.baseline_value as f64 - 1.0),
+                Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
+            }
+        }
+        let average =
+            better_than_baselines.iter().sum::<f64>() / better_than_baselines.len() as f64;
+        let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
+        if average >= threshold {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Average better_than_baseline ({}) is less than ({})",
+                average,
+                threshold
+            ))
+        }
+    }
+}
+
+impl SubInstance {
+    fn generate_instance(
+        rng: &mut SmallRng,
+        seed: [u8; 32],
+        difficulty: &Difficulty,
+    ) -> Result<SubInstance> {
         // Set constant density for value generation
         let density = 0.25;
 
@@ -260,22 +320,20 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             }
         }
 
-        let mut min_value = calculate_total_value(&selected_items, &values, &interaction_values);
-        min_value = (min_value as f32 * (1.0 + difficulty.better_than_baseline as f32 / 1000.0))
-            .round() as u32;
+        let baseline_value = calculate_total_value(&selected_items, &values, &interaction_values);
 
-        Ok(Challenge {
+        Ok(SubInstance {
             seed,
             difficulty: difficulty.clone(),
             weights,
             values,
             interaction_values,
             max_weight,
-            min_value,
+            baseline_value,
         })
     }
 
-    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+    fn verify_solution(&self, solution: &SubSolution) -> Result<u32> {
         let selected_items: HashSet<usize> = solution.items.iter().cloned().collect();
         if selected_items.len() != solution.items.len() {
             return Err(anyhow!("Duplicate items selected."));
@@ -303,14 +361,14 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
         let total_value =
             calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
-        if total_value < self.min_value {
+        if total_value < self.baseline_value {
             Err(anyhow!(
                 "Total value ({}) does not reach minimum value ({})",
                 total_value,
-                self.min_value
+                self.baseline_value
             ))
         } else {
-            Ok(())
+            Ok(total_value)
         }
     }
 }
