@@ -41,7 +41,7 @@ for b_id in proofs:
     b = benchmarks[b_id]
     if b_id in frauds or p["settings"]["challenge_id"] != c["id"]:
         continue
-    k = f"difficulty {p['settings']['difficulty']}, algorithm_id: {p['settings']['algorithm_id']}"
+    k = (tuple(p['settings']['difficulty']), p['settings']['algorithm_id'])
     total_solutions[k] = total_solutions.get(k, 0) + b["details"]["num_solutions"]
     total_nonces[k] = total_nonces.get(k, 0) + p["details"]["num_nonces"]
 
@@ -50,5 +50,7 @@ reliability = {
     for k in total_solutions
 }
 reliability = sorted(reliability.items(), key=lambda x: x[1], reverse=True)
+qualifier_difficulties = set(tuple(x) for x in c["block_data"]["qualifier_difficulties"])
 for k, r in reliability:
-    print(f"{k}, num_solutions: {total_solutions[k]}, num_nonces: {total_nonces[k]}, reliability: {r:.4f}")
+    difficulty, algorithm_id = k
+    print(f"difficulty: {list(difficulty)}, algorithm_id: {algorithm_id}, num_solutions: {total_solutions[k]}, num_nonces: {total_nonces[k]}, reliability: {r:.4f}, qualifier: {difficulty in qualifier_difficulties}")
