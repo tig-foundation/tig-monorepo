@@ -177,6 +177,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 *player_solutions.entry(player_id.clone()).or_default() += num_solutions;
                 *player_nonces.entry(player_id.clone()).or_default() += num_nonces as u64;
 
+                if player_id == "0x79b0f131e15357ae0c96ff039363bb36a6c52614"
+                    && challenge_id == "c001"
+                {
+                    println!(
+                        "difficulty: {:?}, num_solutions: {}, num_nonces: {}",
+                        difficulty, num_solutions, num_nonces
+                    );
+                }
                 challenge_data
                     .qualifier_difficulties
                     .insert(difficulty.clone());
@@ -207,11 +215,17 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     )
                 })
                 .collect();
+            println!(
+                "player_solution_ratio: {}, player_qualifiers: {}",
+                player_solution_ratio["0x79b0f131e15357ae0c96ff039363bb36a6c52614"],
+                player_qualifiers["0x79b0f131e15357ae0c96ff039363bb36a6c52614"]
+            );
 
             let num_qualifiers = player_qualifiers.values().sum::<u32>();
             if num_qualifiers >= config.opow.total_qualifiers_threshold
                 || frontier_idx == solutions_by_frontier_idx.len() - 1
             {
+                println!("qualifiers: {:?}", challenge_data.qualifier_difficulties);
                 let mut sum_weighted_solution_ratio = 0.0;
                 for player_id in player_qualifiers.keys() {
                     let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
@@ -250,6 +264,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             }
         }
     }
+    panic!("test");
 
     // update frontiers
     for challenge_id in active_challenge_ids.iter() {
