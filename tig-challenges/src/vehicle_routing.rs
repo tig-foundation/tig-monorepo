@@ -34,6 +34,11 @@ impl crate::DifficultyTrait<2> for Difficulty {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Solution {
+    pub sub_solutions: Vec<SubSolution>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubSolution {
     pub routes: Vec<Vec<usize>>,
 }
 
@@ -51,15 +56,24 @@ impl TryFrom<Map<String, Value>> for Solution {
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
+    pub sub_instances: Vec<SubInstance>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubInstance {
+    pub seed: [u8; 32],
+    pub difficulty: Difficulty,
     pub demands: Vec<i32>,
     pub distance_matrix: Vec<Vec<i32>>,
-    pub max_total_distance: i32,
+    pub baseline_total_distance: i32,
     pub max_capacity: i32,
 }
 
 // TIG dev bounty available for a GPU optimisation for instance generation!
 #[cfg(feature = "cuda")]
 pub const KERNEL: Option<CudaKernel> = None;
+
+pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
     #[cfg(feature = "cuda")]
@@ -75,7 +89,54 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
+        let mut sub_instances = Vec::new();
+        for _ in 0..NUM_SUB_INSTANCES {
+            sub_instances.push(SubInstance::generate_instance(&mut rng, seed, difficulty)?);
+        }
 
+        Ok(Challenge {
+            seed,
+            difficulty: difficulty.clone(),
+            sub_instances,
+        })
+    }
+
+    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+        let mut better_than_baselines = Vec::new();
+        for (i, (sub_instance, sub_solution)) in self
+            .sub_instances
+            .iter()
+            .zip(&solution.sub_solutions)
+            .enumerate()
+        {
+            match sub_instance.verify_solution(&sub_solution) {
+                Ok(total_distance) => better_than_baselines.push(
+                    1.0 - total_distance as f64 / sub_instance.baseline_total_distance as f64,
+                ),
+                Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
+            }
+        }
+        let average =
+            better_than_baselines.iter().sum::<f64>() / better_than_baselines.len() as f64;
+        let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
+        if average >= threshold {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Average better_than_baseline ({}) is less than ({})",
+                average,
+                threshold
+            ))
+        }
+    }
+}
+
+impl SubInstance {
+    fn generate_instance(
+        rng: &mut SmallRng,
+        seed: [u8; 32],
+        difficulty: &Difficulty,
+    ) -> Result<SubInstance> {
         let num_nodes = difficulty.num_nodes;
         let max_capacity = 100;
 
@@ -103,28 +164,25 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 
         let baseline_routes =
             calc_baseline_routes(num_nodes, max_capacity, &demands, &distance_matrix)?;
-        let baseline_routes_total_distance = calc_routes_total_distance(
+        let baseline_total_distance = calc_routes_total_distance(
             num_nodes,
             max_capacity,
             &demands,
             &distance_matrix,
             &baseline_routes,
         )?;
-        let max_total_distance = (baseline_routes_total_distance
-            * (1000 - difficulty.better_than_baseline as i32)
-            / 1000) as i32;
 
-        Ok(Challenge {
+        Ok(SubInstance {
             seed,
             difficulty: difficulty.clone(),
             demands,
             distance_matrix,
-            max_total_distance,
+            baseline_total_distance,
             max_capacity,
         })
     }
 
-    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+    fn verify_solution(&self, solution: &SubSolution) -> Result<i32> {
         let total_distance = calc_routes_total_distance(
             self.difficulty.num_nodes,
             self.max_capacity,
@@ -132,13 +190,13 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             &self.distance_matrix,
             &solution.routes,
         )?;
-        if total_distance <= self.max_total_distance {
-            Ok(())
+        if total_distance <= self.baseline_total_distance {
+            Ok(total_distance)
         } else {
             Err(anyhow!(
                 "Total distance ({}) exceeds max total distance ({})",
                 total_distance,
-                self.max_total_distance
+                self.baseline_total_distance
             ))
         }
     }
