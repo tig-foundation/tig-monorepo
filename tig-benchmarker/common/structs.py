@@ -189,6 +189,7 @@ class ChallengeBlockData(FromDict):
     scaling_factor: float
     base_fee: PreciseNumber
     per_nonce_fee: PreciseNumber
+    hash_threshold: MerkleHash
 
 @dataclass
 class Challenge(FromDict):

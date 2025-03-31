@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import requests
 from common.merkle_tree import MerkleHash, MerkleBranch, MerkleTree
 from common.structs import *
 from common.utils import *
@@ -13,7 +14,7 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 class JobManager:
     def __init__(self):
-        pass
+        self.hash_thresholds = {}
 
     def on_new_block(
         self,
@@ -26,6 +27,7 @@ class JobManager:
         wasms: Dict[str, Binary],
         **kwargs
     ):
+        api_url = CONFIG["api_url"]
         config = CONFIG["job_manager_config"]
         # create jobs from confirmed precommits
         challenge_id_2_name = {
@@ -50,9 +52,21 @@ class JobManager:
             ):
                 continue
                 
+            if block.details.height - x.details.block_started >= 60:
+                logger.info(f"skipping precommit {benchmark_id} as it is over 60 blocks old")
+                continue
+
             logger.info(f"creating job from confirmed precommit {benchmark_id}")
             c_name = challenge_id_2_name[x.settings.challenge_id]
             a_name = algorithm_id_2_name[x.settings.algorithm_id]
+
+            if x.details.block_started not in self.hash_thresholds:
+                logger.info(f"fetching hash threshold for block {x.details.block_started}")
+                self.hash_thresholds[x.details.block_started] = {
+                    c['id']: c['block_data']['hash_threshold']
+                    for c in requests.get(f"{api_url}/get-challenges?block_id={x.settings.block_id}").json()["challenges"]
+                }
+            hash_threshold = self.hash_thresholds[x.details.block_started][x.settings.challenge_id]
 
             wasm = wasms.get(x.settings.algorithm_id, None)
             if wasm is None:
@@ -78,9 +92,10 @@ class JobManager:
                         algorithm,
                         download_url,
                         block_started,
+                        hash_threshold,
                         start_time
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
                     ON CONFLICT (benchmark_id) DO NOTHING;
                     """,
                     (
@@ -94,7 +109,8 @@ class JobManager:
                         c_name,
                         a_name,
                         wasm.details.download_url,
-                        x.details.block_started
+                        x.details.block_started,
+                        hash_threshold
                     )
                 ),
                 (
@@ -196,6 +212,11 @@ class JobManager:
             """,
             (block.details.height,)
         )
+
+        # prune old hash thresholds
+        for height in list(self.hash_thresholds.keys()):
+            if block.details.height - height >= 120:
+                del self.hash_thresholds[height]
         
                 
     def run(self):

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS job (
     challenge TEXT NOT NULL,
     algorithm TEXT NOT NULL,
     download_url TEXT NOT NULL,
+    hash_threshold TEXT NOT NULL,
     block_started INTEGER NOT NULL,
     sampled_nonces JSONB,
     benchmark_submit_time BIGINT,

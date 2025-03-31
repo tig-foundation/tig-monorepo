@@ -46,7 +46,8 @@ class SlaveManager:
                             'download_url', B.download_url,
                             'rand_hash', B.rand_hash,
                             'batch_size', B.batch_size,
-                            'batch_idx', A.batch_idx
+                            'batch_idx', A.batch_idx,
+                            'hash_threshold', B.hash_threshold
                         ) AS batch
                     FROM proofs_batch A
                     INNER JOIN job B
@@ -76,7 +77,8 @@ class SlaveManager:
                             'download_url', B.download_url,
                             'rand_hash', B.rand_hash,
                             'batch_size', B.batch_size,
-                            'batch_idx', A.batch_idx
+                            'batch_idx', A.batch_idx,
+                            'hash_threshold', B.hash_threshold
                         ) AS batch
                     FROM root_batch A
                     INNER JOIN job B

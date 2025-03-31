@@ -127,6 +127,15 @@ def send_results(headers, master_ip, master_port, tig_worker_path, download_wasm
     if batch["sampled_nonces"] is None:
         with open(f"{output_folder}/result.json") as f:
             result = json.load(f)
+        with open(f"{output_folder}/hashes.zlib", "rb") as f:
+            hashes = json.loads(zlib.decompress(f.read()).decode())
+        hash_threshold = batch["hash_threshold"].lower()
+        within_threshold_solutions = [
+            n for n in result["solution_nonces"]
+            if hashes[n - batch["start_nonce"]].lower() <= hash_threshold
+        ]
+        logger.info(f"Batch {batch_id} has {len(within_threshold_solutions)} out of {len(result['solution_nonces'])} solutions within threshold")
+        result["solution_nonces"] = within_threshold_solutions
 
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
         logger.info(f"posting root to {submit_url}")
