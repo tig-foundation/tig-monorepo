@@ -214,12 +214,13 @@ pub async fn submit_proof<T: Context>(
     }
 
     // verify merkle_proofs
+    let hash_threshold = ctx
+        .get_challenge_block_data(&settings.challenge_id, &settings.block_id)
+        .await
+        .ok_or_else(|| anyhow!("Block too old"))?
+        .hash_threshold;
     let mut verification_result = Ok(());
     let max_branch_len = (64 - (num_nonces - 1).leading_zeros()) as usize;
-    let hash_threshold = ctx
-        .get_hash_threshold(&settings.block_id, &settings.challenge_id)
-        .await
-        .unwrap();
     for merkle_proof in merkle_proofs.iter() {
         if merkle_proof.branch.0.len() > max_branch_len
             || merkle_proof

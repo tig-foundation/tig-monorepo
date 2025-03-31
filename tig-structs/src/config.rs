@@ -68,6 +68,8 @@ serializable_struct_with_getters! {
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
         runtime_configs: HashMap<AlgorithmType, RuntimeConfig>,
+        target_solution_rate: f64,
+        hash_threshold_max_percent_delta: f64,
     }
 }
 serializable_struct_with_getters! {

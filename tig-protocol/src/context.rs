@@ -38,11 +38,6 @@ pub trait Context {
         challenge_id: &String,
         block_id: &String,
     ) -> Option<ChallengeBlockData>;
-    async fn get_hash_threshold(
-        &self,
-        block_id: &String,
-        challenge_id: &String,
-    ) -> Option<MerkleHash>;
     async fn get_config(&self) -> ProtocolConfig;
     async fn add_deposit_to_mempool(&self, details: DepositDetails) -> Result<String>;
     async fn get_player_details(&self, player_id: &String) -> Option<PlayerDetails>;
@@ -108,4 +103,5 @@ pub struct AddBlockCache {
     pub active_breakthroughs_details: HashMap<String, BreakthroughDetails>,
     pub active_breakthroughs_block_data: HashMap<String, BreakthroughBlockData>,
     pub active_solutions: Vec<(BenchmarkSettings, u32, u32)>,
+    pub confirmed_num_solutions: HashMap<String, u32>,
 }
