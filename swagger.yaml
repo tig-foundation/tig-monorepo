@@ -1013,6 +1013,8 @@ components:
           $ref: '#/components/schemas/PreciseNumber'
         per_nonce_fee:
           $ref: '#/components/schemas/PreciseNumber'
+        hash_threshold:
+          $ref: '#/components/schemas/MerkleHash' 
     ChallengeDetails:
       type: object
       properties:

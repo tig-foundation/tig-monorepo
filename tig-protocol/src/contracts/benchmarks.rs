@@ -190,6 +190,7 @@ pub async fn submit_proof<T: Context>(
         .get_benchmark_details(&benchmark_id)
         .await
         .ok_or_else(|| anyhow!("Benchmark needs to be submitted first."))?;
+    let solution_nonces = ctx.get_solution_nonces(&benchmark_id).await.unwrap();
 
     // check player owns benchmark
     let settings = ctx.get_precommit_settings(&benchmark_id).await.unwrap();
@@ -215,6 +216,10 @@ pub async fn submit_proof<T: Context>(
     // verify merkle_proofs
     let mut verification_result = Ok(());
     let max_branch_len = (64 - (num_nonces - 1).leading_zeros()) as usize;
+    let hash_threshold = ctx
+        .get_hash_threshold(&settings.block_id, &settings.challenge_id)
+        .await
+        .unwrap();
     for merkle_proof in merkle_proofs.iter() {
         if merkle_proof.branch.0.len() > max_branch_len
             || merkle_proof
@@ -227,9 +232,17 @@ pub async fn submit_proof<T: Context>(
                 "Invalid merkle proof for nonce {}",
                 merkle_proof.leaf.nonce
             ));
+            break;
         }
         let output_meta_data = OutputMetaData::from(merkle_proof.leaf.clone());
         let hash = MerkleHash::from(output_meta_data);
+        if solution_nonces.contains(&merkle_proof.leaf.nonce) && hash.0 > hash_threshold.0 {
+            verification_result = Err(anyhow!(
+                "Invalid merkle hash for solution @ nonce {} does not meet threshold",
+                merkle_proof.leaf.nonce
+            ));
+            break;
+        }
         let result = merkle_proof
             .branch
             .calc_merkle_root(&hash, merkle_proof.leaf.nonce as usize);
@@ -240,27 +253,15 @@ pub async fn submit_proof<T: Context>(
                 "Invalid merkle proof for nonce {}",
                 merkle_proof.leaf.nonce
             ));
+            break;
         }
     }
 
-    ctx.add_proof_to_mempool(benchmark_id.clone(), merkle_proofs)
+    let allegation = match &verification_result {
+        Ok(_) => None,
+        Err(e) => Some(e.to_string()),
+    };
+    ctx.add_proof_to_mempool(benchmark_id.clone(), merkle_proofs, allegation)
         .await?;
-    Ok(match verification_result {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            let allegation = e.to_string();
-            let _ = submit_fraud(ctx, benchmark_id, allegation).await;
-            Err(e)
-        }
-    })
-}
-
-#[time]
-pub async fn submit_fraud<T: Context>(
-    ctx: &T,
-    benchmark_id: String,
-    allegation: String,
-) -> Result<()> {
-    ctx.add_fraud_to_mempool(benchmark_id, allegation).await?;
-    Ok(())
+    Ok(verification_result)
 }

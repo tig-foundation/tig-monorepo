@@ -309,6 +309,7 @@ serializable_struct_with_getters! {
         scaling_factor: f64,
         base_fee: PreciseNumber,
         per_nonce_fee: PreciseNumber,
+        hash_threshold: MerkleHash,
     }
 }
 

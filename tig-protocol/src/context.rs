@@ -11,6 +11,7 @@ pub trait Context {
         code: String,
     ) -> Result<String>;
     async fn get_benchmark_details(&self, benchmark_id: &String) -> Option<BenchmarkDetails>;
+    async fn get_solution_nonces(&self, benchmark_id: &String) -> Option<HashSet<u64>>;
     async fn add_benchmark_to_mempool(
         &self,
         benchmark_id: String,
@@ -37,9 +38,13 @@ pub trait Context {
         challenge_id: &String,
         block_id: &String,
     ) -> Option<ChallengeBlockData>;
+    async fn get_hash_threshold(
+        &self,
+        block_id: &String,
+        challenge_id: &String,
+    ) -> Option<MerkleHash>;
     async fn get_config(&self) -> ProtocolConfig;
     async fn add_deposit_to_mempool(&self, details: DepositDetails) -> Result<String>;
-    async fn add_fraud_to_mempool(&self, benchmark_id: String, allegation: String) -> Result<()>;
     async fn get_player_details(&self, player_id: &String) -> Option<PlayerDetails>;
     async fn get_player_state(&self, player_id: &String) -> Option<PlayerState>;
     async fn get_player_block_data(
@@ -77,6 +82,7 @@ pub trait Context {
         &self,
         benchmark_id: String,
         merkle_proofs: Vec<MerkleProof>,
+        allegation: Option<String>,
     ) -> Result<()>;
     async fn add_topup_to_mempool(&self, details: TopUpDetails) -> Result<String>;
 
