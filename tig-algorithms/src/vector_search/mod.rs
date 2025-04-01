@@ -106,7 +106,8 @@
 
 // c004_a054
 
-// c004_a055
+pub mod invector_fast;
+pub use invector_fast as c004_a055;
 
 // c004_a056
 
