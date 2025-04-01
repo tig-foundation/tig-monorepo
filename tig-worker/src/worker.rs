@@ -129,14 +129,15 @@ pub fn compute_solution(
         }
     }
 
-    // Get runtime signature
     let runtime_signature = store.get_runtime_signature();
     let fuel_consumed = max_fuel - store.get_fuel().unwrap();
     let solution_data = OutputData {
         nonce,
         runtime_signature,
         fuel_consumed,
-        solution,
+        solution: Some(solution),
+        total_memory_usage: None,
+        max_memory_usage: None,
     };
     Ok((solution_data, err_msg))
 }
