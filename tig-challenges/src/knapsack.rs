@@ -112,8 +112,10 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .enumerate()
         {
             match sub_instance.verify_solution(&sub_solution) {
-                Ok(total_value) => better_than_baselines
-                    .push(total_value as f64 / sub_instance.baseline_value as f64 - 1.0),
+                Ok(total_value) => better_than_baselines.push(
+                    (total_value as f64 - sub_instance.baseline_value as f64)
+                        / sub_instance.baseline_value as f64,
+                ),
                 Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
             }
         }
@@ -361,15 +363,7 @@ impl SubInstance {
         let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
         let total_value =
             calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
-        if total_value < self.baseline_value {
-            Err(anyhow!(
-                "Total value ({}) does not reach minimum value ({})",
-                total_value,
-                self.baseline_value
-            ))
-        } else {
-            Ok(total_value)
-        }
+        Ok(total_value)
     }
 }
 
