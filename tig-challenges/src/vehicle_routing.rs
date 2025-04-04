@@ -117,7 +117,8 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         {
             match sub_instance.verify_solution(&sub_solution) {
                 Ok(total_distance) => better_than_baselines.push(
-                    1.0 - total_distance as f64 / sub_instance.baseline_total_distance as f64,
+                    (sub_instance.baseline_total_distance as f64 - total_distance as f64)
+                        / sub_instance.baseline_total_distance as f64,
                 ),
                 Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
             }
@@ -265,15 +266,7 @@ impl SubInstance {
             &self.ready_times,
             &self.due_times,
         )?;
-        if total_distance <= self.baseline_total_distance {
-            Ok(total_distance)
-        } else {
-            Err(anyhow!(
-                "Total distance ({}) exceeds max total distance ({})",
-                total_distance,
-                self.baseline_total_distance
-            ))
-        }
+        Ok(total_distance)
     }
 }
 
