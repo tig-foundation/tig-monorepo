@@ -21,12 +21,12 @@ VRPTW involves determining a set of cost-effective routes for a fleet of identic
 The following is an example of the Vehicle Routing Problem with Time Windows with configurable difficulty. Two parameters can be adjusted in order to vary the difficulty of the challenge instance:
 
 - Parameter 1: $num\textunderscore{ }nodes$ is the number of customers (plus 1 depot) which are distributed across a grid of 1000x1000 with the depot at the centre (500, 500).  
-- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline$ is the factor by which a solution must  be better than the baseline value [link TIG challenges for explanation of baseline value].
+- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline$ (see Our Challenge)
 
 Demand of each customer is selected independently and uniformly at random from the range [1, 35]. Each customer is assigned a time window between which they must be serviced. Service duration is set to a fixed value of 10 time units per customer. The maximum capacity of each vehicle is set to 200.
 
 
-Consider an example instance with `num_nodes=8` and `better_than_baseline=0.8` with the `baseline=3875`:
+Consider an example instance with `num_nodes=8`:
 
 ```
 # A sample generated example
@@ -44,10 +44,10 @@ CUST NO.  XCOORD.   YCOORD.   DEMAND    READY TIME  DUE TIME   SERVICE TIME
        
 max_capacity = 200 # total demand for each route must not exceed this number
 fleet_size = 4 # the total number of routes must not exceed this number
-max_total_distance = baseline*better_than_baseline = 3100 # (better_than_baseline * baseline) routes must have total distance under this number to be a solution 
+baseline_total_distance = 3875
 ```
 
-The depot is the first node (node 0) with demand 0. The vehicle capacity is set to 200 and the fleet capacity to 4. In this example, routes must have a total distance of 3100 or less to be a solution.
+The depot is the first node (node 0) with demand 0. The vehicle capacity is set to 200 and the fleet capacity to 4.
 
 Now consider the following routes:
 
@@ -73,8 +73,17 @@ When evaluating these routes, each route has demand less than 200, the number of
     * Distance = 130 + 263 + 357 = 750
 * Total Distance = 1144 + 1180 + 750 = 3074
 
+These routes are 20.6% better than the baseline: 
+```
+better_than_baseline = (baseline_total_distance - total_distance) / baseline_total_distance 
+                     = (3875 - 3074) / 3875 
+                     = 0.206
+```
+
 ## Our Challenge
-In TIG, the baseline route is determined by using Solomon's I1 insertion heuristic that iteratively inserts customers into routes based on a cost function that balances distance and time constraints. The routes are built one by one until all customers are served. The goal is to produce a solution better than the baseline’s total distance by at least the specified factor (`better_than_baseline`), while ensuring all VRPTW constraints are satisfied. Please see the challenge code for a precise specification.
+In TIG, the baseline route is determined by using Solomon's I1 insertion heuristic that iteratively inserts customers into routes based on a cost function that balances distance and time constraints. The routes are built one by one until all customers are served. 
+
+Each instance of TIG's vehicle routing problem contains 16 random sub-instances with their own baseline routes & baseline distance. For each sub-instance, the total distance of your routes is used to calculate a `better_than_baseline`. Your average `better_than_baseline` over the sub-instances must be greater than the specified difficulty `better_than_baseline`. Please see the challenge code for a precise specification.
 
 ## Applications
 * **Logistics & Delivery Services:** Optimizes parcel and ship routing by ensuring vehicles meet customer and operational time constraints, reducing operational costs and environmental impact [^1].

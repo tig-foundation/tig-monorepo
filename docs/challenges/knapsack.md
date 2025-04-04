@@ -8,7 +8,7 @@ The quadratic knapsack problem is one of the most popular variants of the single
 For our challenge, we use a version of the quadratic knapsack problem with configurable difficulty, where the following two parameters can be adjusted in order to vary the difficulty of the challenge:
 
 - Parameter 1:  $num\textunderscore{ }items$ is the number of items from which you need to select a subset to put in the knapsack. 
-- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline \geq 1$ is the factor by which a solution must be better than the baseline value.
+- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline \geq 1$ (see Our Challenge)
 
 The larger the $num\textunderscore{ }items$, the more number of possible $S_{knapsack}$, making the challenge more difficult. Also, the higher $better\textunderscore{ }than\textunderscore{ }baseline$, the less likely a given $S_{knapsack}$ will be a solution, making the challenge more difficult.
 
@@ -25,30 +25,41 @@ We impose a weight constraint $W(S_{knapsack}) <= 0.5 \cdot W(S_{all})$, where t
 
 # Example
 
-Consider an example of a challenge instance with `num_items=4` and `better_than_baseline = 1.50`. Let the baseline value be 46:
+Consider an example of a challenge instance with `num_items=4`:
 
 ```
-weights = [39, 29, 15, 43]
-individual_values = [0, 14, 0, 75]
-interaction_values = [ 0,  0,  0,  0
-                       0,  0, 32,  0
-                       0, 32,  0,  0
-                       0,  0,  0,  0]
+weights = [39, 29, 15, 43, 3]
+individual_values = [0, 14, 0, 75, 10]
+interaction_values = [ 0,  0,  0,  0,  5
+                       0,  0, 32,  0, 10
+                       0, 32,  0,  0,  0
+                       0,  0,  0,  0,  0
+                       5, 10,  0,  0,  0 ]
 max_weight = 63
-min_value = baseline*better_than_baseline = 69
+baseline_value = 100
 ```
-The objective is to find a set of items where the total weight is at most 63 but has a total value of at least 69.
 
 Now consider the following selection:
 
 ```
-selected_items =  [2, 3]
+selected_items =  [2, 3, 4]
 ```
 
-When evaluating this selection, we can confirm that the total weight is less than 63, and the total value is more than 69, thereby this selection of items is a solution:
+When evaluating this selection, we can confirm that the total weight is less than 63, and the total value is 127:
 
-* Total weight = 15 + 43 = 58
-* Total value = 0 + 75 + 0 = 75
+* Total weight = 15 + 43 + 3 = 61
+* Interaction values = (2,3) + (2,4) + (3,4) = 32 + 10 + 0 = 42
+* Individual values = 0 + 75 + 10 = 85
+* Total value = 42 + 85 = 127
+
+This selection is 27% better than the baseline: 
+```
+better_than_baseline = (total_value - baseline_value) / baseline_value 
+                     = (127 - 100) / 100 
+                     = 0.27
+```
 
 # Our Challenge 
 In TIG, the baseline value is determined by a two-stage approach. First, items are selected based on their value-to-weight ratio, including interaction values, until the capacity is reached. Then, a tabu-based local search refines the solution by swapping items to improve value while avoiding reversals, with early termination for unpromising swaps.
+
+Each instance of TIG's knapsack problem contains 16 random sub-instances with their own baseline selection & baseline value. For each sub-instance, the total value of your selection is used to calculate a `better_than_baseline`. Your average `better_than_baseline` over the sub-instances must be greater than or equal to the specified difficulty `better_than_baseline`. Please see the challenge code for a precise specification.
