@@ -5,6 +5,8 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
+use statrs::function::erf::{erf, erf_inv};
+use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "cuda")]
 use crate::CudaKernel;
@@ -67,6 +69,10 @@ pub struct SubInstance {
     pub distance_matrix: Vec<Vec<i32>>,
     pub baseline_total_distance: i32,
     pub max_capacity: i32,
+    pub fleet_size: usize,
+    pub service_time: i32,
+    pub ready_times: Vec<i32>,
+    pub due_times: Vec<i32>,
 }
 
 // TIG dev bounty available for a GPU optimisation for instance generation!
@@ -138,15 +144,28 @@ impl SubInstance {
         difficulty: &Difficulty,
     ) -> Result<SubInstance> {
         let num_nodes = difficulty.num_nodes;
-        let max_capacity = 100;
+        let max_capacity = 200;
 
-        let mut node_positions: Vec<(f64, f64)> = (0..num_nodes)
-            .map(|_| (rng.gen::<f64>() * 500.0, rng.gen::<f64>() * 500.0))
-            .collect();
-        node_positions[0] = (250.0, 250.0); // Depot is node 0, and in the center
+        let num_clusters = rng.gen_range(3..=8);
+        let mut node_positions: Vec<(f64, f64)> = Vec::with_capacity(num_nodes);
+        node_positions.push((500.0, 500.0)); // Depot is node 0, and in the center
 
-        let mut demands: Vec<i32> = (0..num_nodes).map(|_| rng.gen_range(15..30)).collect();
-        demands[0] = 0; // Depot demand is 0
+        let mut cluster_assignments = HashMap::new();
+        for node in 1..num_nodes {
+            if node <= num_clusters || rng.gen::<f64>() < 0.5 {
+                node_positions.push((rng.gen::<f64>() * 1000.0, rng.gen::<f64>() * 1000.0));
+            } else {
+                let cluster_idx = rng.gen_range(1..=num_clusters);
+                node_positions.push((
+                    truncated_normal_sample(rng, node_positions[cluster_idx].0, 60.0, 0.0, 1000.0),
+                    truncated_normal_sample(rng, node_positions[cluster_idx].1, 60.0, 0.0, 1000.0),
+                ));
+                cluster_assignments.insert(node, cluster_idx);
+            }
+        }
+
+        let mut demands: Vec<i32> = (0..num_nodes).map(|_| rng.gen_range(1..=35)).collect();
+        demands[0] = 0;
 
         let distance_matrix: Vec<Vec<i32>> = node_positions
             .iter()
@@ -156,20 +175,62 @@ impl SubInstance {
                     .map(|&to| {
                         let dx = from.0 - to.0;
                         let dy = from.1 - to.1;
-                        dx.hypot(dy).round() as i32
+                        (dx.hypot(dy).round() as i32).max(1)
                     })
                     .collect()
             })
             .collect();
 
-        let baseline_routes =
-            calc_baseline_routes(num_nodes, max_capacity, &demands, &distance_matrix)?;
+        let average_demand = demands.iter().sum::<i32>() as f64 / num_nodes as f64;
+        let average_route_size = max_capacity as f64 / average_demand;
+        let average_distance = (1000.0 / 4.0) * 0.5214;
+        let furthest_node = (1..num_nodes)
+            .max_by_key(|&node| distance_matrix[0][node])
+            .unwrap();
+
+        let service_time = 10;
+        let mut ready_times = vec![0; num_nodes];
+        let mut due_times = vec![0; num_nodes];
+
+        // time to return to depot
+        due_times[0] = distance_matrix[0][furthest_node]
+            + ((average_distance + service_time as f64) * average_route_size).ceil() as i32;
+
+        for node in 1..num_nodes {
+            let min_due_time = distance_matrix[0][node];
+            let max_due_time = due_times[0] - distance_matrix[0][node] - service_time;
+            due_times[node] = rng.gen_range(min_due_time..=max_due_time);
+
+            if let Some(&closest_cluster) = cluster_assignments.get(&node) {
+                due_times[node] = (due_times[node] + due_times[closest_cluster]) / 2;
+                due_times[node] = due_times[node].clamp(min_due_time, max_due_time);
+            }
+
+            if rng.gen::<f64>() < 0.5 {
+                ready_times[node] = due_times[node] - rng.gen_range(10..=60);
+                ready_times[node] = ready_times[node].max(0);
+            }
+        }
+
+        let baseline_routes = calc_baseline_routes(
+            num_nodes,
+            max_capacity,
+            &demands,
+            &distance_matrix,
+            service_time,
+            &ready_times,
+            &due_times,
+        )?;
+
         let baseline_total_distance = calc_routes_total_distance(
             num_nodes,
             max_capacity,
             &demands,
             &distance_matrix,
             &baseline_routes,
+            service_time,
+            &ready_times,
+            &due_times,
         )?;
 
         Ok(SubInstance {
@@ -179,16 +240,30 @@ impl SubInstance {
             distance_matrix,
             baseline_total_distance,
             max_capacity,
+            fleet_size: baseline_routes.len(),
+            service_time,
+            ready_times,
+            due_times,
         })
     }
 
     fn verify_solution(&self, solution: &SubSolution) -> Result<i32> {
+        if solution.routes.len() > self.fleet_size {
+            return Err(anyhow!(
+                "Number of routes ({}) exceeds fleet size ({})",
+                solution.routes.len(),
+                self.fleet_size
+            ));
+        }
         let total_distance = calc_routes_total_distance(
             self.difficulty.num_nodes,
             self.max_capacity,
             &self.demands,
             &self.distance_matrix,
             &solution.routes,
+            self.service_time,
+            &self.ready_times,
+            &self.due_times,
         )?;
         if total_distance <= self.baseline_total_distance {
             Ok(total_distance)
@@ -202,41 +277,151 @@ impl SubInstance {
     }
 }
 
+fn truncated_normal_sample<T: Rng>(
+    rng: &mut T,
+    mean: f64,
+    std_dev: f64,
+    min_val: f64,
+    max_val: f64,
+) -> f64 {
+    let cdf_min = 0.5 * (1.0 + erf((min_val - mean) / (std_dev * (2.0_f64).sqrt())));
+    let cdf_max = 0.5 * (1.0 + erf((max_val - mean) / (std_dev * (2.0_f64).sqrt())));
+    let sample = rng.gen::<f64>() * (cdf_max - cdf_min) + cdf_min;
+    mean + std_dev * (2.0_f64).sqrt() * erf_inv(2.0 * sample - 1.0)
+}
+
+fn is_feasible(
+    route: &Vec<usize>,
+    distance_matrix: &Vec<Vec<i32>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
+    mut curr_node: usize,
+    mut curr_time: i32,
+    start_pos: usize,
+) -> bool {
+    let mut valid = true;
+    for pos in start_pos..route.len() {
+        let next_node = route[pos];
+        curr_time += distance_matrix[curr_node][next_node];
+        if curr_time > due_times[route[pos]] {
+            valid = false;
+            break;
+        }
+        curr_time = curr_time.max(ready_times[next_node]) + service_time;
+        curr_node = next_node;
+    }
+    valid
+}
+
+fn find_best_insertion(
+    route: &Vec<usize>,
+    remaining_nodes: Vec<usize>,
+    distance_matrix: &Vec<Vec<i32>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
+) -> Option<(usize, usize)> {
+    let alpha1 = 1;
+    let alpha2 = 0;
+    let lambda = 1;
+
+    let mut best_c2 = None;
+    let mut best = None;
+    for insert_node in remaining_nodes {
+        let mut best_c1 = None;
+
+        let mut curr_time = 0;
+        let mut curr_node = 0;
+        for pos in 1..route.len() {
+            let next_node = route[pos];
+            let new_arrival_time =
+                ready_times[insert_node].max(curr_time + distance_matrix[curr_node][insert_node]);
+            if new_arrival_time > due_times[insert_node] {
+                continue;
+            }
+            let old_arrival_time =
+                ready_times[next_node].max(curr_time + distance_matrix[curr_node][next_node]);
+
+            // Distance criterion: c11 = d(i,u) + d(u,j) - mu * d(i,j)
+            let c11 = distance_matrix[curr_node][insert_node]
+                + distance_matrix[insert_node][next_node]
+                - distance_matrix[curr_node][next_node];
+
+            // Time criterion: c12 = b_ju - b_j (the shift in arrival time at position 'pos').
+            let c12 = new_arrival_time - old_arrival_time;
+
+            let c1 = -(alpha1 * c11 + alpha2 * c12);
+            let c2 = lambda * distance_matrix[0][insert_node] + c1;
+
+            if best_c1.is_none_or(|x| c1 > x)
+                && best_c2.is_none_or(|x| c2 > x)
+                && is_feasible(
+                    route,
+                    distance_matrix,
+                    service_time,
+                    ready_times,
+                    due_times,
+                    insert_node,
+                    new_arrival_time + service_time,
+                    pos,
+                )
+            {
+                best_c1 = Some(c1);
+                best_c2 = Some(c2);
+                best = Some((insert_node, pos));
+            }
+
+            curr_time = ready_times[next_node]
+                .max(curr_time + distance_matrix[curr_node][next_node])
+                + service_time;
+            curr_node = next_node;
+        }
+    }
+    best
+}
+
 pub fn calc_baseline_routes(
     num_nodes: usize,
     max_capacity: i32,
     demands: &Vec<i32>,
     distance_matrix: &Vec<Vec<i32>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
 ) -> Result<Vec<Vec<usize>>> {
     let mut routes = Vec::new();
-    let mut visited = vec![false; num_nodes];
-    visited[0] = true;
 
-    while visited.iter().any(|&v| !v) {
-        let mut route = vec![0];
-        let mut current_node = 0;
-        let mut capacity = max_capacity;
+    let mut nodes: Vec<usize> = (1..num_nodes).collect();
+    nodes.sort_by(|&a, &b| distance_matrix[0][a].cmp(&distance_matrix[0][b]));
 
-        while capacity > 0 && visited.iter().any(|&v| !v) {
-            let eligible_nodes: Vec<usize> = (0..num_nodes)
-                .filter(|&node| !visited[node] && demands[node] <= capacity)
-                .collect();
+    let mut remaining: HashSet<usize> = nodes.iter().cloned().collect();
 
-            if !eligible_nodes.is_empty() {
-                let &closest_node = eligible_nodes
-                    .iter()
-                    .min_by_key(|&&node| distance_matrix[current_node][node])
-                    .unwrap();
-                capacity -= demands[closest_node];
-                route.push(closest_node);
-                visited[closest_node] = true;
-                current_node = closest_node;
-            } else {
-                break;
-            }
+    // popping furthest node from depot
+    while let Some(node) = nodes.pop() {
+        if !remaining.remove(&node) {
+            continue;
+        }
+        let mut route = vec![0, node, 0];
+        let mut route_demand = demands[node];
+
+        while let Some((best_node, best_pos)) = find_best_insertion(
+            &route,
+            remaining
+                .iter()
+                .cloned()
+                .filter(|&n| route_demand + demands[n] <= max_capacity)
+                .collect(),
+            distance_matrix,
+            service_time,
+            ready_times,
+            due_times,
+        ) {
+            remaining.remove(&best_node);
+            route_demand += demands[best_node];
+            route.insert(best_pos, best_node);
         }
 
-        route.push(0);
         routes.push(route);
     }
 
@@ -249,6 +434,9 @@ pub fn calc_routes_total_distance(
     demands: &Vec<i32>,
     distance_matrix: &Vec<Vec<i32>>,
     routes: &Vec<Vec<usize>>,
+    service_time: i32,
+    ready_times: &Vec<i32>,
+    due_times: &Vec<i32>,
 ) -> Result<i32> {
     let mut total_distance = 0;
     let mut visited = vec![false; num_nodes];
@@ -261,7 +449,7 @@ pub fn calc_routes_total_distance(
 
         let mut capacity = max_capacity;
         let mut current_node = 0;
-
+        let mut curr_time = 0;
         for &node in &route[1..route.len() - 1] {
             if visited[node] {
                 return Err(anyhow!(
@@ -273,12 +461,24 @@ pub fn calc_routes_total_distance(
                     "The total demand on each route must not exceed max capacity"
                 ));
             }
+            curr_time += distance_matrix[current_node][node];
+            if curr_time > due_times[node] {
+                return Err(anyhow!("Node must be visited before due time"));
+            }
+            if curr_time < ready_times[node] {
+                curr_time = ready_times[node];
+            }
+            curr_time += service_time;
             visited[node] = true;
             capacity -= demands[node];
             total_distance += distance_matrix[current_node][node];
             current_node = node;
         }
 
+        curr_time += distance_matrix[current_node][0];
+        if curr_time > due_times[0] {
+            return Err(anyhow!("Must return to depot before due time"));
+        }
         total_distance += distance_matrix[current_node][0];
     }
 
