@@ -112,15 +112,15 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             .enumerate()
         {
             match sub_instance.verify_solution(&sub_solution) {
-                Ok(total_value) => better_than_baselines.push(
-                    (total_value as f64 - sub_instance.baseline_value as f64)
-                        / sub_instance.baseline_value as f64,
-                ),
+                Ok(total_value) => better_than_baselines
+                    .push(total_value as f64 / sub_instance.baseline_value as f64),
                 Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
             }
         }
-        let average =
-            better_than_baselines.iter().sum::<f64>() / better_than_baselines.len() as f64;
+        let average = (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
+            / better_than_baselines.len() as f64)
+            .sqrt()
+            - 1.0;
         let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
         if average >= threshold {
             Ok(())

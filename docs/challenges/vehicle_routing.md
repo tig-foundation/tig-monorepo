@@ -83,7 +83,7 @@ better_than_baseline = (baseline_total_distance - total_distance) / baseline_tot
 ## Our Challenge
 In TIG, the baseline route is determined by using Solomon's I1 insertion heuristic that iteratively inserts customers into routes based on a cost function that balances distance and time constraints. The routes are built one by one until all customers are served. 
 
-Each instance of TIG's vehicle routing problem contains 16 random sub-instances with their own baseline routes & baseline distance. For each sub-instance, the total distance of your routes is used to calculate a `better_than_baseline`. Your average `better_than_baseline` over the sub-instances must be greater than the specified difficulty `better_than_baseline`. Please see the challenge code for a precise specification.
+Each instance of TIG's vehicle routing problem contains 16 random sub-instances with their own baseline routes & baseline distance. For each sub-instance, the total distance of your routes is used to calculate a `better_than_baseline`. Your "average" `better_than_baseline` over the sub-instances must be greater than the specified difficulty `better_than_baseline`, where the average uses root mean square. Please see the challenge code for a precise specification.
 
 ## Applications
 * **Logistics & Delivery Services:** Optimizes parcel and ship routing by ensuring vehicles meet customer and operational time constraints, reducing operational costs and environmental impact [^1].
