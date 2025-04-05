@@ -148,19 +148,46 @@ impl SubInstance {
         let max_capacity = 200;
 
         let num_clusters = rng.gen_range(3..=8);
-        let mut node_positions: Vec<(f64, f64)> = Vec::with_capacity(num_nodes);
-        node_positions.push((500.0, 500.0)); // Depot is node 0, and in the center
+        let mut node_positions: Vec<(i32, i32)> = Vec::with_capacity(num_nodes);
+        let mut node_positions_set: HashSet<(i32, i32)> = HashSet::with_capacity(num_nodes);
+        node_positions.push((500, 500)); // Depot is node 0, and in the center
+        node_positions_set.insert((500, 500));
 
         let mut cluster_assignments = HashMap::new();
-        for node in 1..num_nodes {
+        while node_positions.len() < num_nodes {
+            let node = node_positions.len();
             if node <= num_clusters || rng.gen::<f64>() < 0.5 {
-                node_positions.push((rng.gen::<f64>() * 1000.0, rng.gen::<f64>() * 1000.0));
+                let pos = (rng.gen_range(0..=1000), rng.gen_range(0..=1000));
+                if node_positions_set.contains(&pos) {
+                    continue;
+                }
+                node_positions.push(pos.clone());
+                node_positions_set.insert(pos);
             } else {
                 let cluster_idx = rng.gen_range(1..=num_clusters);
-                node_positions.push((
-                    truncated_normal_sample(rng, node_positions[cluster_idx].0, 60.0, 0.0, 1000.0),
-                    truncated_normal_sample(rng, node_positions[cluster_idx].1, 60.0, 0.0, 1000.0),
-                ));
+                let pos = (
+                    truncated_normal_sample(
+                        rng,
+                        node_positions[cluster_idx].0 as f64,
+                        60.0,
+                        0.0,
+                        1000.0,
+                    )
+                    .round() as i32,
+                    truncated_normal_sample(
+                        rng,
+                        node_positions[cluster_idx].1 as f64,
+                        60.0,
+                        0.0,
+                        1000.0,
+                    )
+                    .round() as i32,
+                );
+                if node_positions_set.contains(&pos) {
+                    continue;
+                }
+                node_positions.push(pos.clone());
+                node_positions_set.insert(pos);
                 cluster_assignments.insert(node, cluster_idx);
             }
         }
@@ -174,9 +201,9 @@ impl SubInstance {
                 node_positions
                     .iter()
                     .map(|&to| {
-                        let dx = from.0 - to.0;
-                        let dy = from.1 - to.1;
-                        (dx.hypot(dy).round() as i32).max(1)
+                        let dx = (from.0 - to.0) as f64;
+                        let dy = (from.1 - to.1) as f64;
+                        dx.hypot(dy).round() as i32
                     })
                     .collect()
             })
