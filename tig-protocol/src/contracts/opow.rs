@@ -95,29 +95,33 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     // update hash threshold
-    let max_threshold = U256::MAX;
-    let denominator: u64 = 1_000_000_000;
+
+    let denominator: u64 = 1_000_000_000_000_000;
+    let max_delta = U256::MAX / U256::from(denominator)
+        * U256::from(
+            (config.benchmarks.hash_threshold_max_percent_delta * denominator as f64) as u64,
+        );
     for challenge_id in active_challenge_ids.iter() {
         let prev_hash_threshold = active_challenges_prev_block_data
             .get(challenge_id)
             .map(|x| U256::from(x.hash_threshold.clone().0))
-            .unwrap_or(max_threshold.clone());
-        let percentage_error = 1.0
-            - *confirmed_num_solutions.get(challenge_id).unwrap_or(&0) as f64
-                / config.benchmarks.target_solution_rate;
-        let percent_delta = percentage_error
-            .abs()
-            .min(config.benchmarks.hash_threshold_max_percent_delta);
-
-        let numerator = (percent_delta * denominator as f64) as u64;
-        let delta = max_threshold / U256::from(denominator) * U256::from(numerator);
+            .unwrap_or(U256::MAX);
+        let current_solution_rate = *confirmed_num_solutions.get(challenge_id).unwrap_or(&0);
+        let target_threshold = if current_solution_rate == 0 {
+            U256::MAX
+        } else {
+            (prev_hash_threshold / U256::from(current_solution_rate))
+                .saturating_mul(U256::from(config.benchmarks.target_solution_rate))
+        };
+        let diff = prev_hash_threshold.abs_diff(target_threshold);
+        let delta = (diff / U256::from(100)).min(max_delta);
+        let hash_threshold = if prev_hash_threshold > target_threshold {
+            prev_hash_threshold.saturating_sub(delta)
+        } else {
+            prev_hash_threshold.saturating_add(delta)
+        };
 
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        let hash_threshold = if percentage_error >= 0.0 {
-            prev_hash_threshold.saturating_add(delta)
-        } else {
-            prev_hash_threshold.saturating_sub(delta)
-        };
         hash_threshold.to_big_endian(&mut challenge_data.hash_threshold.0);
     }
 
