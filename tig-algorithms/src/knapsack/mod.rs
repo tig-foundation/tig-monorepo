@@ -156,7 +156,8 @@
 
 // c003_a079
 
-// c003_a080
+pub mod relative_sub_fast;
+pub use relative_sub_fast as c003_a080;
 
 // c003_a081
 
