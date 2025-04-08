@@ -162,7 +162,8 @@
 
 // c003_a082
 
-// c003_a083
+pub mod relative_sub_optima;
+pub use relative_sub_optima as c003_a083;
 
 // c003_a084
 
