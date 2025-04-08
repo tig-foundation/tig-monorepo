@@ -172,7 +172,8 @@
 
 // c003_a087
 
-// c003_a088
+pub mod relative_raw_optima;
+pub use relative_raw_optima as c003_a088;
 
 // c003_a089
 
