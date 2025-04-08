@@ -168,7 +168,8 @@
 
 // c003_a085
 
-// c003_a086
+pub mod relative_raw_high;
+pub use relative_raw_high as c003_a086;
 
 // c003_a087
 
