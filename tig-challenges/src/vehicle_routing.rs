@@ -415,13 +415,15 @@ pub fn calc_baseline_routes(
     let mut nodes: Vec<usize> = (1..num_nodes).collect();
     nodes.sort_by(|&a, &b| distance_matrix[0][a].cmp(&distance_matrix[0][b]));
 
-    let mut remaining: HashSet<usize> = nodes.iter().cloned().collect();
+    let mut remaining: Vec<bool> = vec![true; num_nodes];
+    remaining[0] = false;
 
     // popping furthest node from depot
     while let Some(node) = nodes.pop() {
-        if !remaining.remove(&node) {
+        if !remaining[node] {
             continue;
         }
+        remaining[node] = false;
         let mut route = vec![0, node, 0];
         let mut route_demand = demands[node];
 
@@ -429,15 +431,16 @@ pub fn calc_baseline_routes(
             &route,
             remaining
                 .iter()
-                .cloned()
-                .filter(|&n| route_demand + demands[n] <= max_capacity)
+                .enumerate()
+                .filter(|(n, &flag)| flag && route_demand + demands[*n] <= max_capacity)
+                .map(|(n, _)| n)
                 .collect(),
             distance_matrix,
             service_time,
             ready_times,
             due_times,
         ) {
-            remaining.remove(&best_node);
+            remaining[best_node] = false;
             route_demand += demands[best_node];
             route.insert(best_pos, best_node);
         }
