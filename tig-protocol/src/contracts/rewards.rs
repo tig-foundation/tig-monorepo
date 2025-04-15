@@ -25,6 +25,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_breakthrough_ids = &block_data.active_ids[&ActiveType::Breakthrough];
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
 
+    let zero = PreciseNumber::from(0);
+    let gamma = 1.0258 * (1.0 - 0.8730 * (-0.0354 * active_challenge_ids.len() as f64).exp());
     let block_reward = PreciseNumber::from_f64(
         config
             .rewards
@@ -40,10 +42,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             })
             .block_reward,
     );
+    let scaled_reward = block_reward * PreciseNumber::from_f64(gamma);
 
     // update algorithm rewards
     let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
-    let zero = PreciseNumber::from(0);
     let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<String>>::new();
     for algorithm_id in active_algorithm_ids.iter() {
         let algorithm_state = &active_algorithms_state[algorithm_id];
@@ -59,7 +61,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .get_mut(&algorithm_details.player_id)
             .unwrap()
             .reward_by_type
-            .insert(RewardType::Algorithm, zero.clone());
+            .insert(EmissionsType::Algorithm, zero.clone());
 
         if algorithm_data.adoption >= adoption_threshold
             || (is_merged && algorithm_data.adoption > zero)
@@ -70,10 +72,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .push(algorithm_id.clone());
         }
     }
+    let algorithms_reward_pool =
+        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.algorithms);
+    let mut total_algorithms_reward = zero.clone();
     if eligible_algorithms_by_challenge.len() > 0 {
-        let reward_pool_per_challenge = block_reward
-            * PreciseNumber::from_f64(config.rewards.distribution.algorithms)
-            / PreciseNumber::from(eligible_algorithms_by_challenge.len());
+        let reward_pool_per_challenge =
+            algorithms_reward_pool / PreciseNumber::from(eligible_algorithms_by_challenge.len());
 
         for algorithm_ids in eligible_algorithms_by_challenge.values() {
             let total_adoption: PreciseNumber = algorithm_ids
@@ -82,15 +86,16 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .sum();
             for algorithm_id in algorithm_ids.iter() {
                 let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
-                algorithm_data.reward =
-                    reward_pool_per_challenge * algorithm_data.adoption / total_adoption;
+                let reward = reward_pool_per_challenge * algorithm_data.adoption / total_adoption;
+                algorithm_data.reward = reward;
+                total_algorithms_reward += reward;
 
                 let algorithm_details = &active_algorithms_details[algorithm_id];
                 *active_players_block_data
                     .get_mut(&algorithm_details.player_id)
                     .unwrap()
                     .reward_by_type
-                    .get_mut(&RewardType::Algorithm)
+                    .get_mut(&EmissionsType::Algorithm)
                     .unwrap() += algorithm_data.reward;
             }
         }
@@ -98,9 +103,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update breakthrough rewards
     let adoption_threshold = PreciseNumber::from_f64(config.breakthroughs.adoption_threshold);
-    let reward_pool_per_challenge = block_reward
-        * PreciseNumber::from_f64(config.rewards.distribution.breakthroughs)
-        / PreciseNumber::from(active_challenge_ids.len());
+    let breakthroughs_reward_pool =
+        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.breakthroughs);
+    let mut total_breakthroughs_reward = zero.clone();
+    let reward_pool_per_challenge =
+        breakthroughs_reward_pool / PreciseNumber::from(active_challenge_ids.len());
     for breakthrough_id in active_breakthrough_ids.iter() {
         let breakthrough_state = &active_breakthroughs_state[breakthrough_id];
         let breakthrough_details = &active_breakthroughs_details[breakthrough_id];
@@ -123,17 +130,19 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .get_mut(&breakthrough_details.player_id)
             .unwrap()
             .reward_by_type
-            .entry(RewardType::Breakthrough)
+            .entry(EmissionsType::Breakthrough)
             .or_insert(zero.clone()) += reward;
         active_breakthroughs_block_data
             .get_mut(breakthrough_id)
             .unwrap()
             .reward = reward;
+        total_breakthroughs_reward += reward;
     }
 
     // update benchmark rewards
-    let reward_pool = block_reward * PreciseNumber::from_f64(config.rewards.distribution.opow);
-    let zero = PreciseNumber::from(0);
+    let reward_pool = scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.opow);
+    let mut total_benchmarkers_reward = zero.clone();
+    let mut total_delegators_reward = zero.clone();
     for (delegatee, opow_data) in active_opow_block_data.iter_mut() {
         opow_data.reward = opow_data.influence * reward_pool;
 
@@ -163,14 +172,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .iter()
         {
             let fraction = PreciseNumber::from_f64(*fraction);
-            let amount = coinbase_amount * fraction;
-            opow_data.coinbase.insert(output.clone(), amount.clone());
+            let reward = coinbase_amount * fraction;
+            opow_data.coinbase.insert(output.clone(), reward.clone());
 
             let player_data = active_players_block_data.get_mut(output).unwrap();
             *player_data
                 .reward_by_type
-                .entry(RewardType::Benchmarker)
-                .or_insert(zero.clone()) += amount;
+                .entry(EmissionsType::Benchmarker)
+                .or_insert(zero.clone()) += reward;
+            total_benchmarkers_reward += reward;
         }
 
         if opow_data.reward_share == zero {
@@ -180,12 +190,38 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         for delegator in opow_data.delegators.iter() {
             let player_data = active_players_block_data.get_mut(delegator).unwrap();
             let fraction = PreciseNumber::from_f64(*player_data.delegatees.get(delegatee).unwrap());
+            let reward = opow_data.reward_share * fraction * player_data.weighted_deposit
+                / opow_data.delegated_weighted_deposit;
             *player_data
                 .reward_by_type
-                .entry(RewardType::Delegator)
-                .or_insert(zero.clone()) +=
-                opow_data.reward_share * fraction * player_data.weighted_deposit
-                    / opow_data.delegated_weighted_deposit;
+                .entry(EmissionsType::Delegator)
+                .or_insert(zero.clone()) += reward;
+            total_delegators_reward += reward;
         }
     }
+
+    block_details.emissions.insert(
+        EmissionsType::Bootstrap,
+        breakthroughs_reward_pool - total_breakthroughs_reward,
+    );
+    block_details.emissions.insert(
+        EmissionsType::Vault,
+        block_reward
+            - total_algorithms_reward
+            - breakthroughs_reward_pool
+            - total_benchmarkers_reward
+            - total_delegators_reward,
+    );
+    block_details
+        .emissions
+        .insert(EmissionsType::Algorithm, total_algorithms_reward);
+    block_details
+        .emissions
+        .insert(EmissionsType::Breakthrough, total_breakthroughs_reward);
+    block_details
+        .emissions
+        .insert(EmissionsType::Benchmarker, total_benchmarkers_reward);
+    block_details
+        .emissions
+        .insert(EmissionsType::Delegator, total_delegators_reward);
 }
