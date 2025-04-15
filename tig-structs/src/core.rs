@@ -241,6 +241,16 @@ pub enum ActiveType {
     OPoW,
     Player,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum EmissionsType {
+    Benchmarker,
+    Algorithm,
+    Breakthrough,
+    Delegator,
+    Bootstrap,
+    Vault,
+}
 serializable_struct_with_getters! {
     BlockDetails {
         prev_block_id: String,
@@ -249,6 +259,7 @@ serializable_struct_with_getters! {
         num_confirmed: HashMap<TxType, u32>,
         num_active: HashMap<ActiveType, u32>,
         timestamp: u64,
+        emissions: HashMap<EmissionsType, PreciseNumber>,
     }
 }
 serializable_struct_with_getters! {
@@ -386,18 +397,10 @@ serializable_struct_with_getters! {
         coinbase: Option<PlayerValue<HashMap<String, f64>>>,
     }
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum RewardType {
-    Benchmarker,
-    Algorithm,
-    Breakthrough,
-    Delegator,
-}
 serializable_struct_with_getters! {
     PlayerBlockData {
         delegatees: HashMap<String, f64>,
-        reward_by_type: HashMap<RewardType, PreciseNumber>,
+        reward_by_type: HashMap<EmissionsType, PreciseNumber>,
         deposit_by_locked_period: Vec<PreciseNumber>,
         weighted_deposit: PreciseNumber,
     }

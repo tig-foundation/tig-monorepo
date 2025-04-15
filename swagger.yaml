@@ -288,11 +288,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPlayerDataResponse'
-  /get-round-earnings:
+  /get-round-emissions:
     get:
       tags:
         - GET
-      summary: Get round earnings for algorithms, opow, and players for a specific round
+      summary: Get round emissions for a specific round (algorithms, breakthroughs, opow, players, and totals)
       description: |-
         # Notes
         * `algorithms` is a map of `<algorithm_id>` to `uint256`
@@ -310,6 +310,8 @@ paths:
         * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, breakthroughs, delegator)
         
         * `names` is a map of `<player_id>` to ENS name (only if one exists)
+
+        * `totals` is a map of emission types to `uint256`
       parameters:
         - name: round
           in: query
@@ -324,7 +326,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetRoundEarningsResponse'
+                $ref: '#/components/schemas/GetRoundEmissionsResponse'
   /request-api-key:
     post:
       tags:
@@ -836,6 +838,21 @@ components:
         timestamp:
           type: integer
           format: uint64
+        emissions:
+          type: object
+          properties:
+              algorithms:
+                $ref: '#/components/schemas/PreciseNumber'
+              breakthroughs:
+                $ref: '#/components/schemas/PreciseNumber'
+              benchmarkers:
+                $ref: '#/components/schemas/PreciseNumber'
+              delegators:
+                $ref: '#/components/schemas/PreciseNumber'
+              bootstrap:
+                $ref: '#/components/schemas/PreciseNumber'
+              vault:
+                $ref: '#/components/schemas/PreciseNumber'
     BlockData:
       type: object
       properties:
@@ -1139,7 +1156,7 @@ components:
         solution_ratio_by_challenge:
           type: object
           additionalProperties:
-            type: double
+            type: number
             format: number
           example: {"c001": 0.001, "c002": 0.5}
         cutoff:
@@ -1462,7 +1479,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TopUp'
-    GetRoundEarningsResponse:
+    GetRoundEmissionsResponse:
      type: object
      properties:
        algorithms:
@@ -1503,7 +1520,21 @@ components:
          type: object
          additionalProperties:
            type: string
-          
+       totals:
+         type: object
+         properties:
+            algorithms:
+              $ref: '#/components/schemas/PreciseNumber'
+            breakthroughs:
+              $ref: '#/components/schemas/PreciseNumber'
+            benchmarkers:
+              $ref: '#/components/schemas/PreciseNumber'
+            delegators:
+              $ref: '#/components/schemas/PreciseNumber'
+            bootstrap:
+              $ref: '#/components/schemas/PreciseNumber'
+            vault:
+              $ref: '#/components/schemas/PreciseNumber'
     RequestApiKeyRequest:
       type: object
       properties:
