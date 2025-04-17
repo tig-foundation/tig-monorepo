@@ -2,7 +2,7 @@
 members = [
     "tig-aarch64",
     "tig-algorithms",
-    "tig-challenges",
+    "tig-challenges", "tig-native-runtime",
     "tig-protocol",
     "tig-structs",
     "tig-utils",
