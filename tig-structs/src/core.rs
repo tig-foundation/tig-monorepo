@@ -229,6 +229,7 @@ pub enum TxType {
     Precommit,
     Proof,
     TopUp,
+    Verified,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
