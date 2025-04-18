@@ -39,8 +39,9 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
-          options: --user root
+          options: --user root -v ${{ github.workspace }}:/workspace
           run: |
+            cd /workspace
             build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}
 
       - name: Auto commit
