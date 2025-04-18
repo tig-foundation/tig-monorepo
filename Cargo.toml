@@ -2,11 +2,11 @@
 members = [
     "tig-aarch64",
     "tig-algorithms",
-    "tig-challenges", "tig-native-runtime",
+    "tig-challenges",
+    "tig-native-runtime",
     "tig-protocol",
     "tig-structs",
     "tig-utils",
-    "tig-wasm",
     "tig-worker",
 ]
 exclude = []

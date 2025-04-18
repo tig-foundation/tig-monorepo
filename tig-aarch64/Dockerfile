@@ -11,6 +11,9 @@ RUN rustup install nightly-2025-01-16 && \
     rustup component add rust-src && \
     rustup target add aarch64-unknown-linux-gnu
 
+RUN RUST_LIBDIR=$(rustc --print target-libdir --target=aarch64-unknown-linux-gnu) && \
+    echo "export LD_LIBRARY_PATH=\"${RUST_LIBDIR}:\$RUST_LIBDIR\"" >> /etc/bash.bashrc
+
 RUN curl -L https://github.com/tig-foundation/llvm/releases/download/aarch64.rc1-19.1.7/llvm.tar.zst -O && \
     mkdir -p /opt/llvm-aarch64 && \
     tar -xf llvm.tar.zst -C /opt/llvm-aarch64 && \
@@ -20,4 +23,3 @@ RUN curl -L https://github.com/tig-foundation/llvm/releases/download/aarch64.rc1
 
 COPY build.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/build.sh
-ENTRYPOINT ["/usr/local/bin/build.sh"]

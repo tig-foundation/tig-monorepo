@@ -89,7 +89,7 @@ then
     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.rlib" "$RUST_TARGET_LIBDIR/libstd.rlib"
 fi
 
-output=tig-algorithms/aarch64/$CHALLENGE/$ALGORITHM.dylib
+output=tig-algorithms/aarch64/$CHALLENGE/$ALGORITHM.so
 mkdir -p $(dirname $output)
 
 echo "Linking into shared library '$output'"
