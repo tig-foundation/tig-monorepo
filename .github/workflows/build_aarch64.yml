@@ -39,7 +39,7 @@ jobs:
         uses: docker://ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
         with:
           entrypoint: '/bin/bash'
-          args: '-c "source $HOME/.cargo/env && rustup default nightly-2025-01-16 && ls && build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}"'
+          args: '-c "rustup default nightly-2025-01-16 && ls && build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}"'
 
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
