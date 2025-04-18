@@ -30,16 +30,12 @@ jobs:
           echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
           echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
 
-      - name: Set up QEMU
-        if: env.SKIP_JOB != 'true'
-        uses: docker/setup-qemu-action@v3
-
       - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
         uses: docker://ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
         with:
-          entrypoint: build.sh
-          args: ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}
+          entrypoint: '/bin/bash'
+          args: '-c "source $HOME/.cargo/env && rustup default nightly-2025-01-16 && ls && build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}"'
 
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
