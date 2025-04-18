@@ -29,23 +29,32 @@ jobs:
           fi
           echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
           echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
+
+      - name: Set up QEMU
+        if: env.SKIP_JOB != 'true'
+        uses: docker/setup-qemu-action@v3
+
       - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
         uses: docker://ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
         with:
+          entrypoint: '/build.sh'
           args: ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}
+
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
         id: auto_commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Compiled algorithm ${{ env.ALGORITHM }} into WASM
+
       - name: Update Commit Status (Success)
         if: env.SKIP_JOB != 'true' && success()
         uses: myrotvorets/set-commit-status-action@master
         with:
           status: 'success'
           sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
       - name: Update Commit Status (Failure)
         if: env.SKIP_JOB != 'true' && failure()
         uses: myrotvorets/set-commit-status-action@master
