@@ -36,13 +36,15 @@ jobs:
 
       - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
-        uses: addnab/docker-run-action@v3
-        with:
-          image: ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
-          options: --user root -v ${{ github.workspace }}:/workspace
-          run: |
-            cd /workspace
-            build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}
+        run: |
+          docker run --rm --user root \
+            --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ env.CHALLENGE }} \
+            -e ALGORITHM=${{ env.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1 \
+            build.sh \$CHALLENGE \$ALGORITHM
 
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
