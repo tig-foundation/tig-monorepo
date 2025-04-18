@@ -270,7 +270,17 @@ def main(
     output_path: str,
     ttl: int,
 ):
-    print(f"Starting slave {slave_name}")
+    print(f"Starting slave with config:")
+    print(f"  Slave Name: {slave_name}")
+    print(f"  Master IP: {master_ip}")
+    print(f"  Master Port: {master_port}")
+    print(f"  Worker Path: {tig_worker_path}")
+    print(f"  Runtime Path: {tig_runtime_path}")
+    print(f"  Downloads Folder: {downloads_folder}")
+    print(f"  Number of Workers: {num_workers}")
+    print(f"  Output Path: {output_path}")
+    print(f"  TTL: {ttl}")
+    print(f"  Verbose: {args.verbose}")
 
     if not os.path.exists(tig_worker_path):
         raise FileNotFoundError(f"tig-worker not found at path: {tig_worker_path}")

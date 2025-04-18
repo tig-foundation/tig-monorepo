@@ -13,10 +13,9 @@ RUN mkdir /app && \
     mv target/release/tig-runtime /app/ && \
     cargo build -r -p tig-worker && \
     mv target/release/tig-worker /app/ && \
-    mv tig-benchmarker /app/ && \
+    mv tig-benchmarker/* /app/ && \
     rm -rf tig-monorepo
 
 WORKDIR /app
 
 ENTRYPOINT ["python3", "slave.py"]
-
