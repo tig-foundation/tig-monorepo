@@ -12,7 +12,7 @@ fn cli() -> Command {
     Command::new("tig-worker")
         .about("Computes batch of nonces and generates Merkle proofs")
         .arg_required_else_help(true)
-        .arg(arg!(<RUNTIME> "Path to a native runtime").value_parser(clap::value_parser!(PathBuf)))
+        .arg(arg!(<RUNTIME> "Path to tig-runtime executable").value_parser(clap::value_parser!(PathBuf)))
         .arg(
             arg!(<SETTINGS> "Settings json string or path to json file")
                 .value_parser(clap::value_parser!(String)),
