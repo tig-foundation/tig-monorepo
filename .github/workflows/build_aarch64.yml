@@ -36,7 +36,7 @@ jobs:
 
       - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
-        uses: docker/run-action@v2
+        uses: addnab/docker-run-action@v3
         with:
           image: ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
           options: --user root
