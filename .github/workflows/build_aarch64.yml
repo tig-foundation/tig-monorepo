@@ -38,7 +38,7 @@ jobs:
         if: env.SKIP_JOB != 'true'
         uses: docker://ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
         with:
-          entrypoint: '/build.sh'
+          entrypoint: build.sh
           args: ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}
 
       - name: Auto commit
