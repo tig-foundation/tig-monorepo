@@ -36,17 +36,19 @@ jobs:
 
       - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
-        uses: docker://ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
+        uses: docker/run-action@v2
         with:
-          entrypoint: '/bin/bash'
-          args: '-c "rustup default nightly-2025-01-16 && ls && build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}"'
+          image: ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1
+          options: --user root
+          run: |
+            build.sh ${{ env.CHALLENGE }} ${{ env.ALGORITHM }}
 
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
         id: auto_commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Compiled algorithm ${{ env.ALGORITHM }} into WASM
+          commit_message: Compiled algorithm ${{ env.ALGORITHM }} into aarch64 library
 
       - name: Update Commit Status (Success)
         if: env.SKIP_JOB != 'true' && success()
