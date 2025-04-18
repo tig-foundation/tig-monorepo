@@ -11,7 +11,7 @@ on:
 jobs:
   build_wasm:
     name: Compile Algorithm to Aarch64 .so
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-arm64
     permissions:
       contents: write
       statuses: write
@@ -29,22 +29,17 @@ jobs:
           fi
           echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
           echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
-      
-      - name: Set up QEMU
-        if: env.SKIP_JOB != 'true'
-        uses: docker/setup-qemu-action@v3
 
       - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
         run: |
           docker run --rm --user root \
-            --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             -e CHALLENGE=${{ env.CHALLENGE }} \
             -e ALGORITHM=${{ env.ALGORITHM }} \
             ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1 \
-            build.sh \$CHALLENGE \$ALGORITHM
+            build.sh $CHALLENGE $ALGORITHM
 
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
