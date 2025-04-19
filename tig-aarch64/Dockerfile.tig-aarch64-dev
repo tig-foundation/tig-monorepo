@@ -1,0 +1,13 @@
+FROM ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-base:0.0.1
+
+RUN apt install -y build-essential zstd
+
+RUN curl -L https://github.com/tig-foundation/llvm/releases/download/aarch64.rc1-19.1.7/llvm.tar.zst -O && \
+    mkdir -p /opt/llvm-aarch64 && \
+    tar -xf llvm.tar.zst -C /opt/llvm-aarch64 && \
+    mv /opt/llvm-aarch64/llvm/build/* /opt/llvm-aarch64/ && \
+    rm -rf /opt/llvm-aarch64/llvm llvm.tar.zst && \
+    ln -s /opt/llvm-aarch64/bin/* /usr/local/bin/
+
+COPY tig-aarch64/build.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/build.sh
