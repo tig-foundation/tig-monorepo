@@ -21,30 +21,30 @@ FINISHED_BATCH_IDS = {}
 def now():
     return int(time.time() * 1000)
 
-def download_wasm(download_url, wasm_path):
-    if not os.path.exists(wasm_path):
+def download_library(download_url, library_path):
+    if not os.path.exists(library_path):
         start = now()
-        logger.info(f"downloading WASM from {download_url}")
+        logger.info(f"downloading algorithm library from {download_url}")
         resp = requests.get(download_url)
         if resp.status_code != 200:
-            raise Exception(f"status {resp.status_code} when downloading WASM: {resp.text}")
-        with open(wasm_path, 'wb') as f:
+            raise Exception(f"status {resp.status_code} when downloading algorithm library: {resp.text}")
+        with open(library_path, 'wb') as f:
             f.write(resp.content)
-        logger.debug(f"downloading WASM: took {now() - start}ms")
-    logger.debug(f"WASM Path: {wasm_path}")
+        logger.debug(f"downloading algorithm library: took {now() - start}ms")
+    logger.debug(f"Library Path: {library_path}")
 
 
-def run_tig_worker(tig_worker_path, batch, wasm_path, num_workers, output_path):
+def run_tig_worker(tig_worker_path, tig_runtime_path, batch, library_path, num_workers, output_path):
     start = now()
     cmd = [
-        tig_worker_path, "compute_batch",
+        tig_worker_path,
+        tig_runtime_path,
         json.dumps(batch["settings"]), 
         batch["rand_hash"], 
         str(batch["start_nonce"]), 
         str(batch["num_nonces"]),
         str(batch["batch_size"]), 
-        wasm_path,
-        "--mem", str(batch["runtime_config"]["max_memory"]),
+        library_path,
         "--fuel", str(batch["runtime_config"]["max_fuel"]),
         "--workers", str(num_workers),
         "--output", f"{output_path}/{batch['id']}",
@@ -97,7 +97,7 @@ def purge_folders(output_path, ttl):
         FINISHED_BATCH_IDS.pop(batch_id)
 
 
-def send_results(headers, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, output_path):
+def send_results(headers, master_ip, master_port, tig_worker_path, downloads_folder, num_workers, output_path):
     try:
         batch_id = READY_BATCH_IDS.pop()
     except KeyError:
@@ -185,7 +185,7 @@ def send_results(headers, master_ip, master_port, tig_worker_path, download_wasm
             time.sleep(2)
 
 
-def process_batch(tig_worker_path, download_wasms_folder, num_workers, output_path):
+def process_batch(tig_worker_path, tig_runtime_path, downloads_folder, num_workers, output_path):
     try:
         batch_id = PENDING_BATCH_IDS.pop()
     except KeyError:
@@ -208,12 +208,16 @@ def process_batch(tig_worker_path, download_wasms_folder, num_workers, output_pa
     with open(f"{output_path}/{batch_id}/batch.json") as f:
         batch = json.load(f)
 
-    wasm_path = os.path.join(download_wasms_folder, f"{batch['settings']['algorithm_id']}.wasm")
-    download_wasm(batch['download_url'], wasm_path)
+    
+    library_path = os.path.join(
+        downloads_folder,
+        os.path.basename(batch['download_url'])
+    )
+    download_library(batch['download_url'], library_path)
     
     Thread(
         target=run_tig_worker,
-        args=(tig_worker_path, batch, wasm_path, num_workers, output_path)
+        args=(tig_worker_path, tig_runtime_path, batch, library_path, num_workers, output_path)
     ).start()
 
 
@@ -258,18 +262,31 @@ def wrap_thread(func, *args):
 def main(
     master_ip: str,
     tig_worker_path: str,
-    download_wasms_folder: str,
+    tig_runtime_path: str,
+    downloads_folder: str,
     num_workers: int,
     slave_name: str,
     master_port: int,
     output_path: str,
     ttl: int,
 ):
-    print(f"Starting slave {slave_name}")
+    print(f"Starting slave with config:")
+    print(f"  Slave Name: {slave_name}")
+    print(f"  Master IP: {master_ip}")
+    print(f"  Master Port: {master_port}")
+    print(f"  Worker Path: {tig_worker_path}")
+    print(f"  Runtime Path: {tig_runtime_path}")
+    print(f"  Downloads Folder: {downloads_folder}")
+    print(f"  Number of Workers: {num_workers}")
+    print(f"  Output Path: {output_path}")
+    print(f"  TTL: {ttl}")
+    print(f"  Verbose: {args.verbose}")
 
     if not os.path.exists(tig_worker_path):
         raise FileNotFoundError(f"tig-worker not found at path: {tig_worker_path}")
-    os.makedirs(download_wasms_folder, exist_ok=True)
+    if not os.path.exists(tig_runtime_path):
+        raise FileNotFoundError(f"tig-runtime not found at path: {tig_runtime_path}")
+    os.makedirs(downloads_folder, exist_ok=True)
 
     headers = {
         "User-Agent": slave_name
@@ -277,12 +294,12 @@ def main(
 
     Thread(
         target=wrap_thread,
-        args=(process_batch, tig_worker_path, download_wasms_folder, num_workers, output_path)
+        args=(process_batch, tig_worker_path, downloads_folder, num_workers, output_path)
     ).start()
 
     Thread(
         target=wrap_thread,
-        args=(send_results, headers, master_ip, master_port, tig_worker_path, download_wasms_folder, num_workers, output_path)
+        args=(send_results, headers, master_ip, master_port, tig_worker_path, downloads_folder, num_workers, output_path)
     ).start()
 
     Thread(
@@ -295,9 +312,10 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Slave Benchmarker")
-    parser.add_argument("tig_worker_path", help="Path to tig-worker executable")
+    parser.add_argument("--tig_worker_path", type=str, default="./tig-worker", help="Path to tig-worker executable")
+    parser.add_argument("--tig_runtime_path", type=str, default="./tig-runtime", help="Path to tig-runtime executable")
     parser.add_argument("--master", type=str, default="0.0.0.0", help="IP address of the master (default: 0.0.0.0)")
-    parser.add_argument("--download", type=str, default="wasms", help="Folder to download WASMs to (default: wasms)")
+    parser.add_argument("--download", type=str, default="libs", help="Folder to download algorithm libraries to (default: libs)")
     parser.add_argument("--workers", type=int, default=8, help="Number of workers (default: 8)")
     parser.add_argument("--name", type=str, default=randomname.get_name(), help="Name for the slave (default: randomly generated)")
     parser.add_argument("--port", type=int, default=5115, help="Port for master (default: 5115)")
@@ -312,4 +330,4 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO
     )
 
-    main(args.master, args.tig_worker_path, args.download, args.workers, args.name, args.port, args.output, args.ttl)
+    main(args.master, args.tig_worker_path, args.tig_runtime_path, args.download, args.workers, args.name, args.port, args.output, args.ttl)

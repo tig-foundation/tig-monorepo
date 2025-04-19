@@ -1,0 +1,21 @@
+FROM ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-base:0.0.1
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && apt install -y git python3 python3-pip
+RUN pip3 install blake3 requests randomname --break-system-packages
+
+COPY . /tmp/tig-monorepo
+WORKDIR /tmp/tig-monorepo
+
+RUN mkdir /app && \
+    cargo build -r -p tig-runtime && \
+    mv target/release/tig-runtime /app/ && \
+    cargo build -r -p tig-worker && \
+    mv target/release/tig-worker /app/ && \
+    mv tig-benchmarker/* /app/ && \
+    rm -rf tig-monorepo
+
+WORKDIR /app
+
+ENTRYPOINT ["python3", "slave.py"]
