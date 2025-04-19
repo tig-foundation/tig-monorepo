@@ -1,0 +1,62 @@
+name: Build Algorithm
+
+on: 
+  push:
+    branches:
+      - 'aarch64/satisfiability/*'
+      - 'aarch64/vehicle_routing/*'
+      - 'aarch64/knapsack/*'
+      - 'aarch64/vector_search/*'
+
+jobs:
+  build_wasm:
+    name: Compile Algorithm to Aarch64 .so
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Env Vars
+        run: |
+          CHALLENGE=`echo $GITHUB_REF_NAME | rev | cut -d/ -f2 | rev`
+          ALGORITHM=`echo $GITHUB_REF_NAME | rev | cut -d/ -f1 | rev`
+          LIB_PATH=tig-algorithms/aarch64/${CHALLENGE}/${ALGORITHM}.so
+          if [ -f $LIB_PATH ]; then
+            echo "SKIP_JOB=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_JOB=false" >> $GITHUB_ENV
+          fi
+          echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
+          echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
+
+      - name: Build Algorithm
+        if: env.SKIP_JOB != 'true'
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ env.CHALLENGE }} \
+            -e ALGORITHM=${{ env.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/tig-aarch64-dev:0.0.1 \
+            build.sh $CHALLENGE $ALGORITHM
+
+      - name: Auto commit
+        if: env.SKIP_JOB != 'true'
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Compiled algorithm ${{ env.ALGORITHM }} into aarch64 library
+
+      - name: Update Commit Status (Success)
+        if: env.SKIP_JOB != 'true' && success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
+      - name: Update Commit Status (Failure)
+        if: env.SKIP_JOB != 'true' && failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'
