@@ -7,7 +7,6 @@ members = [
     "tig-runtime",
     "tig-structs",
     "tig-utils",
-    "tig-wasm",
     "tig-worker",
 ]
 exclude = []
