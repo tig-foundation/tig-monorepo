@@ -46,7 +46,8 @@
 
 // c002_a024
 
-// c002_a025
+pub mod super_heaped;
+pub use super_heaped as c002_a025;
 
 // c002_a026
 
