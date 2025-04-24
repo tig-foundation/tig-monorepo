@@ -154,7 +154,7 @@ fn compute_batch(
                             is_solution,
                             output_folder.is_some().then(|| output_data),
                         ))
-                    } else if is_solution || exit_code == Some(86) || exit_code == Some(86) {
+                    } else if is_solution || exit_code == Some(86) || exit_code == Some(85) {
                         let bytes = fs::read(temp_file.path())?;
                         let output_data: OutputData = decompress_obj(&bytes)?;
                         let hash = MerkleHash::from(output_data.clone());

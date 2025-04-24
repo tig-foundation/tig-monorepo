@@ -11,3 +11,5 @@ RUN curl -L https://github.com/tig-foundation/llvm/releases/download/aarch64.rc1
 
 COPY tig-aarch64/build.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/build.sh
+
+WORKDIR /app

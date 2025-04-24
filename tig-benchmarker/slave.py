@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import json
 import os
@@ -211,7 +213,7 @@ def process_batch(tig_worker_path, tig_runtime_path, downloads_folder, num_worke
     
     library_path = os.path.join(
         downloads_folder,
-        os.path.basename(batch['download_url'])
+        batch['settings']['algorithm_id']
     )
     download_library(batch['download_url'], library_path)
     
@@ -294,7 +296,7 @@ def main(
 
     Thread(
         target=wrap_thread,
-        args=(process_batch, tig_worker_path, downloads_folder, num_workers, output_path)
+        args=(process_batch, tig_worker_path, tig_runtime_path, downloads_folder, num_workers, output_path)
     ).start()
 
     Thread(
@@ -312,8 +314,8 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TIG Slave Benchmarker")
-    parser.add_argument("--tig_worker_path", type=str, default="./tig-worker", help="Path to tig-worker executable")
-    parser.add_argument("--tig_runtime_path", type=str, default="./tig-runtime", help="Path to tig-runtime executable")
+    parser.add_argument("--tig_worker_path", type=str, default="tig-worker", help="Path to tig-worker executable")
+    parser.add_argument("--tig_runtime_path", type=str, default="tig-runtime", help="Path to tig-runtime executable")
     parser.add_argument("--master", type=str, default="0.0.0.0", help="IP address of the master (default: 0.0.0.0)")
     parser.add_argument("--download", type=str, default="libs", help="Folder to download algorithm libraries to (default: libs)")
     parser.add_argument("--workers", type=int, default=8, help="Number of workers (default: 8)")

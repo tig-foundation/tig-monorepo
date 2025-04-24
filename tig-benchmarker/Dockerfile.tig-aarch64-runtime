@@ -8,14 +8,15 @@ RUN pip3 install blake3 requests randomname --break-system-packages
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
 
-RUN mkdir /app && \
-    cargo build -r -p tig-runtime && \
-    mv target/release/tig-runtime /app/ && \
+RUN cargo build -r -p tig-runtime && \
+    mv target/release/tig-runtime /usr/local/bin/ && \
+    chmod +x /usr/local/bin/tig-runtime && \
     cargo build -r -p tig-worker && \
-    mv target/release/tig-worker /app/ && \
-    mv tig-benchmarker/* /app/ && \
+    mv target/release/tig-worker /usr/local/bin/ && \
+    chmod +x /usr/local/bin/tig-worker && \
+    mv tig-benchmarker/common /usr/local/lib/ && \
+    mv tig-benchmarker/slave.py /usr/local/bin/ && \
+    chmod +x /usr/local/bin/slave.py && \
     rm -rf tig-monorepo
 
 WORKDIR /app
-
-ENTRYPOINT ["python3", "slave.py"]
