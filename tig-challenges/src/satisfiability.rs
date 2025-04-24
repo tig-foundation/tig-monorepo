@@ -41,7 +41,7 @@ impl crate::DifficultyTrait<2> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Solution {
     #[serde(with = "bool_vec_as_u8")]
     pub variables: Vec<bool>,
@@ -57,7 +57,7 @@ impl TryFrom<Map<String, Value>> for Solution {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,

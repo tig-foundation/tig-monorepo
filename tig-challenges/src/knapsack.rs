@@ -33,12 +33,12 @@ impl crate::DifficultyTrait<2> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Solution {
     pub sub_solutions: Vec<SubSolution>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubSolution {
     pub items: Vec<usize>,
 }
@@ -53,14 +53,14 @@ impl TryFrom<Map<String, Value>> for Solution {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub sub_instances: Vec<SubInstance>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubInstance {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
@@ -135,7 +135,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 }
 
 impl SubInstance {
-    fn generate_instance(
+    pub fn generate_instance(
         rng: &mut SmallRng,
         seed: [u8; 32],
         difficulty: &Difficulty,
@@ -335,7 +335,7 @@ impl SubInstance {
         })
     }
 
-    fn verify_solution(&self, solution: &SubSolution) -> Result<u32> {
+    pub fn verify_solution(&self, solution: &SubSolution) -> Result<u32> {
         let selected_items: HashSet<usize> = solution.items.iter().cloned().collect();
         if selected_items.len() != solution.items.len() {
             return Err(anyhow!("Duplicate items selected."));
