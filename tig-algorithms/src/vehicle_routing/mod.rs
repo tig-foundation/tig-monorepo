@@ -88,7 +88,8 @@
 
 // c002_a045
 
-// c002_a046
+pub mod faster_cw_heuristic;
+pub use faster_cw_heuristic as c002_a046;
 
 // c002_a047
 
