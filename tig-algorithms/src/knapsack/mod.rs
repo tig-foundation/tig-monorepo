@@ -176,7 +176,8 @@
 
 // c003_a089
 
-// c003_a090
+pub mod new_quadkp_improved;
+pub use new_quadkp_improved as c003_a090;
 
 // c003_a091
 
