@@ -90,7 +90,8 @@
 
 // c002_a046
 
-// c002_a047
+pub mod vehicle_muting;
+pub use vehicle_muting as c002_a047;
 
 // c002_a048
 
