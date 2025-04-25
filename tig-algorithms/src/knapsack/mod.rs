@@ -124,7 +124,8 @@
 
 // c003_a063
 
-// c003_a064
+pub mod quadkp_maximize;
+pub use quadkp_maximize as c003_a064;
 
 // c003_a065
 
