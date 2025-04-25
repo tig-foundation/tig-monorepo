@@ -114,7 +114,8 @@
 
 // c003_a058
 
-// c003_a059
+pub mod kp_sonic;
+pub use kp_sonic as c003_a059;
 
 // c003_a060
 
