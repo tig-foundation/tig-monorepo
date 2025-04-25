@@ -34,7 +34,8 @@
 
 // c003_a018
 
-// c003_a019
+pub mod knapheudp;
+pub use knapheudp as c003_a019;
 
 // c003_a020
 
