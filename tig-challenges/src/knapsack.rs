@@ -121,7 +121,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             / better_than_baselines.len() as f64)
             .sqrt()
             - 1.0;
-        let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
+        let threshold = self.difficulty.better_than_baseline as f64 / 10000.0;
         if average >= threshold {
             Ok(())
         } else {

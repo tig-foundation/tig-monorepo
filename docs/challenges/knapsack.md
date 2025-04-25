@@ -54,12 +54,14 @@ When evaluating this selection, we can confirm that the total weight is less tha
 
 This selection is 27% better than the baseline: 
 ```
-better_than_baseline = (total_value - baseline_value) / baseline_value 
-                     = (127 - 100) / 100 
+better_than_baseline = total_value / baseline_value - 1
+                     = 127 / 100 - 1
                      = 0.27
 ```
 
 # Our Challenge 
 In TIG, the baseline value is determined by a two-stage approach. First, items are selected based on their value-to-weight ratio, including interaction values, until the capacity is reached. Then, a tabu-based local search refines the solution by swapping items to improve value while avoiding reversals, with early termination for unpromising swaps.
 
-Each instance of TIG's knapsack problem contains 16 random sub-instances with their own baseline selection & baseline value. For each sub-instance, the total value of your selection is used to calculate a `better_than_baseline`. Your "average" `better_than_baseline` over the sub-instances must be greater than or equal to the specified difficulty `better_than_baseline`, where the average uses root mean square. Please see the challenge code for a precise specification.
+Each instance of TIG's knapsack problem contains 16 random sub-instances, each with its own baseline selection and baseline value. For each sub-instance, we calculate how much your selection's total value exceeds the baseline value, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 16 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
+
+For precision, `better_than_baseline` is stored as an integer where each unit represents 0.01%. For example, a `better_than_baseline` value of 150 corresponds to 150/10000 = 1.5%.

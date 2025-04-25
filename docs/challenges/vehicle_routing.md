@@ -75,15 +75,17 @@ When evaluating these routes, each route has demand less than 200, the number of
 
 These routes are 20.6% better than the baseline: 
 ```
-better_than_baseline = (baseline_total_distance - total_distance) / baseline_total_distance 
-                     = (3875 - 3074) / 3875 
+better_than_baseline = 1 - total_distance / baseline_total_distance 
+                     = 1 - 3074 / 3875 
                      = 0.206
 ```
 
 ## Our Challenge
 In TIG, the baseline route is determined by using Solomon's I1 insertion heuristic that iteratively inserts customers into routes based on a cost function that balances distance and time constraints. The routes are built one by one until all customers are served. 
 
-Each instance of TIG's vehicle routing problem contains 16 random sub-instances with their own baseline routes & baseline distance. For each sub-instance, the total distance of your routes is used to calculate a `better_than_baseline`. Your "average" `better_than_baseline` over the sub-instances must be greater than the specified difficulty `better_than_baseline`, where the average uses root mean square. Please see the challenge code for a precise specification.
+Each instance of TIG's vehicle routing problem contains 16 random sub-instances, each with its own baseline routes and baseline distance. For each sub-instance, we calculate how much your routes' total distance is shorter than the baseline distance, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 16 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
+
+For precision, `better_than_baseline` is stored as an integer where each unit represents 0.1%. For example, a `better_than_baseline` value of 22 corresponds to 22/1000 = 2.2%.
 
 ## Applications
 * **Logistics & Delivery Services:** Optimizes parcel and ship routing by ensuring vehicles meet customer and operational time constraints, reducing operational costs and environmental impact [^1].
