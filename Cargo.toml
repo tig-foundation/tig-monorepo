@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "tig-aarch64",
     "tig-algorithms",
+    "tig-binary",
     "tig-challenges",
     "tig-protocol",
     "tig-runtime",

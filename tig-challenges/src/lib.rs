@@ -32,44 +32,6 @@ where
         Self::generate_instance(seed, &U::from_arr(difficulty))
     }
 
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance(
-        seed: [u8; 32],
-        difficulty: &U,
-        dev: &Arc<CudaDevice>,
-        funcs: HashMap<&'static str, CudaFunction>,
-    ) -> Result<Self>;
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance_from_str(
-        seed: [u8; 32],
-        difficulty: &str,
-        dev: &Arc<CudaDevice>,
-        funcs: HashMap<&'static str, CudaFunction>,
-    ) -> Result<Self> {
-        Self::cuda_generate_instance(seed, &serde_json::from_str(difficulty)?, dev, funcs)
-    }
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance_from_vec(
-        seed: [u8; 32],
-        difficulty: &Vec<i32>,
-        dev: &Arc<CudaDevice>,
-        funcs: HashMap<&'static str, CudaFunction>,
-    ) -> Result<Self> {
-        match difficulty.as_slice().try_into() {
-            Ok(difficulty) => Self::cuda_generate_instance_from_arr(seed, &difficulty, dev, funcs),
-            Err(_) => Err(anyhow!("Invalid difficulty length")),
-        }
-    }
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance_from_arr(
-        seed: [u8; 32],
-        difficulty: &[i32; N],
-        dev: &Arc<CudaDevice>,
-        funcs: HashMap<&'static str, CudaFunction>,
-    ) -> Result<Self> {
-        Self::cuda_generate_instance(seed, &U::from_arr(difficulty), dev, funcs)
-    }
-
     fn verify_solution(&self, solution: &T) -> Result<()>;
     fn verify_solution_from_json(&self, solution: &str) -> Result<()> {
         let solution = serde_json::from_str(solution)
@@ -86,9 +48,3 @@ pub mod vector_search;
 pub use vector_search as c004;
 pub mod vehicle_routing;
 pub use vehicle_routing as c002;
-
-// #[cfg(feature = "cuda")]
-pub struct CudaKernel {
-    pub src: &'static str,
-    pub funcs: &'static [&'static str],
-}

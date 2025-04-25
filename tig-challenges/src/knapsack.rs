@@ -7,13 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::collections::HashSet;
 
-#[cfg(feature = "cuda")]
-use crate::CudaKernel;
-#[cfg(feature = "cuda")]
-use cudarc::driver::*;
-#[cfg(feature = "cuda")]
-use std::{collections::HashMap, sync::Arc};
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Difficulty {
     pub num_items: usize,
@@ -71,24 +64,9 @@ pub struct SubInstance {
     pub baseline_value: u32,
 }
 
-// TIG dev bounty available for a GPU optimisation for instance generation!
-#[cfg(feature = "cuda")]
-pub const KERNEL: Option<CudaKernel> = None;
-
 pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance(
-        seed: [u8; 32],
-        difficulty: &Difficulty,
-        dev: &Arc<CudaDevice>,
-        mut funcs: HashMap<&'static str, CudaFunction>,
-    ) -> Result<Self> {
-        // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seed, difficulty)
-    }
-
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let mut sub_instances = Vec::new();

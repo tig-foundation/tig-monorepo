@@ -9,9 +9,7 @@ edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.81"
-cudarc = { version = "0.12.0", features = [
-    "cuda-version-from-build-system",
-], optional = true }
+cudarc = { version = "0.16.2", features = ["cuda-version-from-build-system"] }
 ndarray = "0.15.6"
 rand = { version = "0.8.5", default-features = false, features = [
     "std_rng",
@@ -22,4 +20,4 @@ serde_json = { version = "1.0.113" }
 statrs = { version = "0.18.0" }
 
 [features]
-cuda = ["cudarc"]
+# cuda = ["cudarc"]
