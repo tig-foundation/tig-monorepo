@@ -2,15 +2,33 @@
 
 set -e
 
+CUDA=false
+
 if [ $# -lt 2 ]; then
     echo "Error: Missing required arguments"
-    echo "Usage: $0 CHALLENGE ALGORITHM"
+    echo "Usage: $0 CHALLENGE ALGORITHM [--cuda]"
     echo "Example: $0 knapsack dynamic"
+    echo "Example with CUDA: $0 knapsack dynamic --cuda"
     exit 1
 fi
 
 CHALLENGE="$1"
 ALGORITHM="$2"
+
+shift 2
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --cuda)
+            CUDA=true
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 CHALLENGE ALGORITHM [--cuda]"
+            exit 1
+            ;;
+    esac
+    shift
+done
 
 if [ -z "$CHALLENGE" ]; then
     echo "Error: CHALLENGE argument is empty"
@@ -23,25 +41,31 @@ if [ -z "$ALGORITHM" ]; then
 fi
 
 echo "Compiling algorithm $ALGORITHM for challenge $CHALLENGE"
-cp tig-aarch64/src/entry_point_template.rs tig-aarch64/src/entry_point.rs
-sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-aarch64/src/entry_point.rs
-sed -i "s/{ALGORITHM}/$ALGORITHM/g" tig-aarch64/src/entry_point.rs
+cp tig-binary/src/entry_point_template.rs tig-binary/src/entry_point.rs
+sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-binary/src/entry_point.rs
+sed -i "s/{ALGORITHM}/$ALGORITHM/g" tig-binary/src/entry_point.rs
+
+if [ "$CUDA" = true ]; then
+    FEATURES="entry_point cuda"
+else
+    FEATURES="entry_point"
+fi
 
 RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C opt-level=3 -C lto=no -C debuginfo=2 -C relocation-model=pic" \
 cargo build \
-    -p tig-aarch64 \
-    --target=aarch64-unknown-linux-gnu \
+    -p tig-binary \
+    --target=$RUST_TARGET \
     --release \
     -Z build-std=core,alloc,std \
     -Z build-std-features=panic-unwind \
-    --features="entry_point"
+    --features=$FEATURES
 
 ll_files=()
 while IFS= read -r line; do
     if [[ $line != *"panic_abort"* ]]; then
         ll_files+=("$line")
     fi
-done < <(find "target/aarch64-unknown-linux-gnu/release/deps" -name "*.ll")
+done < <(find "target/$RUST_TARGET/release/deps" -name "*.ll")
 
 
 object_files=()
@@ -58,10 +82,10 @@ do
     fi
 
     cat "$ll_file" | \
-    IS_FIRST_SRC=$IS_FIRST_SRC opt \
-        -load-pass-plugin /opt/llvm-aarch64/lib/LLVMFuel.so \
-        -load-pass-plugin /opt/llvm-aarch64/lib/LLVMRuntimeSig.so \
-        -passes="runtime-signature,fuel" -S -o - | \
+    IS_FIRST_SRC=$is_first_src opt \
+        -load-pass-plugin ./lib/LLVMFuel$PLUGIN_EXT \
+        -load-pass-plugin ./lib/LLVMRuntimeSig$PLUGIN_EXT \
+        -passes="runtime-signature,fuel" -o - | \
     llc -relocation-model=pic -o - | \
     clang -fPIC -c -x assembler - -o "$temp_obj"
 
@@ -87,7 +111,7 @@ then
     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.rlib" "$RUST_TARGET_LIBDIR/libstd.rlib"
 fi
 
-output=tig-algorithms/aarch64/$CHALLENGE/$ALGORITHM.so
+output=tig-algorithms/$ARCH/$CHALLENGE/$ALGORITHM.so
 mkdir -p $(dirname $output)
 
 echo "Linking into shared library '$output'"
@@ -116,31 +140,28 @@ clang "${object_files[@]}" \
     -Wl,--version-script=export_symbols.map \
     -Wl,-Map=output.map
 
-        ./bin/clang "${object_files[@]}" \
-            -shared \
-            -fPIC \
-            -o "$output_name" \
-            -L "$RUST_TARGET_LIBDIR" \
-            -lm \
-            -Wl,--gc-sections \
-            -ffunction-sections \
-            -fdata-sections \
-            -Wl,-z,noexecstack \
-            -Wl,--build-id=none \
-            -Wl,--eh-frame-hdr \
-            -Wl,-Map=output.map \
-            -l$LIBSTD
-            
 strip --strip-debug $output
 
-cat tig-ptx/framework.cu tig-challenges/src/${CHALLENGE}.cu tig-algorithms/src/${CHALLENGE}/${ALGORITHM}.cu > temp.cu
+if [ "$CUDA" = true ]; then
+    echo "Compiling CUDA code"
+    PTX_FILE="tig-algorithms/cuda/$CHALLENGE/$ALGORITHM.ptx"
 
-nvcc -ptx "$CUDA_TEMP_FILE" -o "$PTX_FILE" \
-    -arch compute_70 \
-    -code sm_70 \
-    --use_fast_math \
-    -dopt=on
+    mkdir -p "$(dirname "$PTX_FILE")"
 
-# tar stuff
+    echo "Combining .cu source files for algorithm $ALGORITHM and challenge $CHALLENGE"
+    cat tig-binary/src/framework.cu tig-challenges/src/$CHALLENGE.cu tig-algorithms/src/$CHALLENGE/$ALGORITHM.cu > /tmp/temp.cu
+
+    echo "Compiling PTX @ $PTX_FILE"
+    nvcc -ptx /tmp/temp.cu -o "$PTX_FILE" \
+        -arch compute_70 \
+        -code sm_70 \
+        --use_fast_math \
+        -dopt=on
+
+    rm -f /tmp/temp.cu
+
+    echo "Adding runtime signature to PTX file"
+    add_runtime_signature.py $PTX_FILE
+fi
 
 echo "Done"
