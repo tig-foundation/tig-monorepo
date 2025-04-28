@@ -1,8 +1,9 @@
-ARG BASE_IMAGE=ubuntu:24.04
-ARG TARGET=dev
+ARG DEVEL_IMAGE=ubuntu:24.04
+ARG RUNTIME_IMAGE=ubuntu:24.04
+ARG TARGET=devel
 
-# Base stage with common setup
-FROM ${BASE_IMAGE} AS base
+# Development environment stage
+FROM ${DEVEL_IMAGE} AS devel
 
 ARG ARCH=aarch64
 ENV ARCH=${ARCH}
@@ -28,13 +29,20 @@ RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
     rustup component add rust-src && \
     rustup target add $RUST_TARGET && \
     RUST_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET) && \
-    echo "export LD_LIBRARY_PATH=\"${RUST_LIBDIR}:\$RUST_LIBDIR\"" >> /etc/bash.bashrc && \
+    ln -s $RUST_LIBDIR /usr/local/lib/rust && \
+    echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc && \
     echo "export RUST_TARGET=\"${RUST_TARGET}\"" >> /etc/bash.bashrc
 
-# Development environment stage
-FROM base AS dev
+COPY . /tmp/tig-monorepo
+WORKDIR /tmp/tig-monorepo
 
-ARG ARCH=aarch64
+RUN cargo build -r -p tig-runtime && \
+    mv target/release/tig-runtime /usr/local/bin/ && \
+    chmod +x /usr/local/bin/tig-runtime && \
+    cargo build -r -p tig-worker && \
+    mv target/release/tig-worker /usr/local/bin/ && \
+    chmod +x /usr/local/bin/tig-worker && \
+    rm -rf tig-monorepo
 
 RUN apt install -y build-essential zstd
 
@@ -57,28 +65,24 @@ RUN chmod +x /usr/local/bin/build.sh && \
 WORKDIR /app
 
 # Runtime environment stage
-FROM base AS runtime
+FROM ${RUNTIME_IMAGE} AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+COPY --from=devel /usr/local/bin/tig-runtime /usr/local/bin/tig-runtime
+COPY --from=devel /usr/local/bin/tig-worker /usr/local/bin/tig-worker
+COPY --from=devel /usr/local/lib/rust /usr/local/lib/rust
+
+RUN chmod +x /usr/local/bin/tig-runtime && \
+    chmod +x /usr/local/bin/tig-worker && \
+    echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc
 
 RUN apt update && apt install -y git python3 python3-pip
 RUN pip3 install blake3 requests randomname --break-system-packages
 
-COPY . /tmp/tig-monorepo
-WORKDIR /tmp/tig-monorepo
-
-RUN cargo build -r -p tig-runtime && \
-    mv target/release/tig-runtime /usr/local/bin/ && \
-    chmod +x /usr/local/bin/tig-runtime && \
-    cargo build -r -p tig-worker && \
-    mv target/release/tig-worker /usr/local/bin/ && \
-    chmod +x /usr/local/bin/tig-worker && \
-    mv tig-benchmarker/common /usr/local/lib/ && \
-    mv tig-benchmarker/slave.py /usr/local/bin/ && \
-    chmod +x /usr/local/bin/slave.py && \
-    rm -rf tig-monorepo
+COPY tig-benchmarker /app
 
 WORKDIR /app
 
-# Target selection stage
+# Select target image to export
 FROM ${TARGET} AS final

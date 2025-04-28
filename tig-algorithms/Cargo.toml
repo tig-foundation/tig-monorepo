@@ -22,4 +22,4 @@ tig-challenges = { path = "../tig-challenges" }
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# cuda = ["cudarc", "tig-challenges/cuda"]
+cuda = ["cudarc", "tig-challenges/cuda"]

@@ -2,11 +2,6 @@ use anyhow::{anyhow, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-#[cfg(feature = "cuda")]
-use cudarc::driver::*;
-#[cfg(feature = "cuda")]
-use std::{collections::HashMap, sync::Arc};
-
 pub trait DifficultyTrait<const N: usize>: Serialize + DeserializeOwned {
     fn from_arr(arr: &[i32; N]) -> Self;
     fn to_arr(&self) -> [i32; N];
@@ -44,7 +39,13 @@ pub mod knapsack;
 pub use knapsack as c003;
 pub mod satisfiability;
 pub use satisfiability as c001;
-pub mod vector_search;
-pub use vector_search as c004;
 pub mod vehicle_routing;
 pub use vehicle_routing as c002;
+
+#[cfg(feature = "cuda")]
+mod gpu_challenges {
+    pub mod vector_search;
+    pub use vector_search as c004;
+}
+#[cfg(feature = "cuda")]
+pub use gpu_challenges::*;

@@ -10,9 +10,15 @@ edition.workspace = true
 [dependencies]
 anyhow = "1.0.81"
 clap = { version = "4.5.4" }
+cudarc = { version = "0.16.2", features = [
+    "cuda-version-from-build-system",
+], optional = true }
 libloading = "0.8.6"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 tig-challenges = { path = "../tig-challenges" }
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
+
+[features]
+cuda = ["cudarc", "tig-challenges/cuda"]

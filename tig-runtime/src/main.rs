@@ -114,8 +114,8 @@ pub fn compute_solution(
             }
         }};
     }
-
-    dispatch_challenges!(c001, c002, c003, c004);
+    // fix
+    dispatch_challenges!(c001, c002, c003);
 
     let fuel_remaining = unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
     let runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };

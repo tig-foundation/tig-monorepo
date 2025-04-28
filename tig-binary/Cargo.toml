@@ -11,8 +11,12 @@ edition.workspace = true
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
+cudarc = { version = "0.16.2", features = [
+    "cuda-version-from-build-system",
+], optional = true }
 tig-challenges = { path = "../tig-challenges" }
 tig-algorithms = { path = "../tig-algorithms" }
 
 [features]
 entry_point = []
+cuda = ["tig-algorithms/cuda", "tig-challenges/cuda"]
