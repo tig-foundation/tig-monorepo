@@ -87,7 +87,7 @@ pub fn compute_solution(
                 $(
                     stringify!($c) => {
                         let solve_challenge_fn = unsafe {
-                            library.get::<fn($c::Challenge) -> Result<Option<$c::Solution>, String>>(
+                            library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(
                                 b"entry_point",
                             )?
                         };
@@ -97,7 +97,7 @@ pub fn compute_solution(
                             &settings.difficulty,
                         ).unwrap();
 
-                        match solve_challenge_fn(challenge) {
+                        match solve_challenge_fn(&challenge) {
                             Ok(Some(s)) => {
                                 solution = serde_json::to_value(s)
                                     .unwrap()

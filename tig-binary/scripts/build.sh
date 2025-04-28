@@ -82,10 +82,9 @@ do
     fi
 
     cat "$ll_file" | \
-    IS_FIRST_SRC=$is_first_src opt \
-        -load-pass-plugin ./lib/LLVMFuel$PLUGIN_EXT \
-        -load-pass-plugin ./lib/LLVMRuntimeSig$PLUGIN_EXT \
-        -passes="runtime-signature,fuel" -o - | \
+    IS_FIRST_SRC=$IS_FIRST_SRC INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
+        -load-pass-plugin LLVMFuelRTSig.so \
+        -passes="fuel-rt-sig" -S -o - | \
     llc -relocation-model=pic -o - | \
     clang -fPIC -c -x assembler - -o "$temp_obj"
 
@@ -98,17 +97,12 @@ do
     object_files+=("$temp_obj")
 done
 
-RUST_TARGET_LIBDIR=$(rustc --print target-libdir --target=aarch64-unknown-linux-gnu)
-LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.dylib" -o -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
+RUST_TARGET_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
+LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
 
 if [ ! -L "$RUST_TARGET_LIBDIR/libstd.so" ]
 then
     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
-fi
-
-if [ ! -L "$RUST_TARGET_LIBDIR/libstd.rlib" ]
-then
-    ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.rlib" "$RUST_TARGET_LIBDIR/libstd.rlib"
 fi
 
 output=tig-algorithms/$ARCH/$CHALLENGE/$ALGORITHM.so

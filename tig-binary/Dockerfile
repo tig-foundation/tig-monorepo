@@ -24,8 +24,8 @@ RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
     else \
         echo "x86_64-unknown-linux-gnu"; \
     fi) && \
-    rustup install nightly-2025-01-16 && \
-    rustup default nightly-2025-01-16 && \
+    rustup install nightly-2025-02-10 && \
+    rustup default nightly-2025-02-10 && \
     rustup component add rust-src && \
     rustup target add $RUST_TARGET && \
     RUST_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET) && \
@@ -33,7 +33,10 @@ RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
     echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc && \
     echo "export RUST_TARGET=\"${RUST_TARGET}\"" >> /etc/bash.bashrc
 
-COPY . /tmp/tig-monorepo
+RUN apt install -y build-essential zstd
+
+COPY tig-*/Cargo.toml /tmp/tig-monorepo/tig-*/
+COPY tig-*/src /tmp/tig-monorepo/tig-*/src
 WORKDIR /tmp/tig-monorepo
 
 RUN cargo build -r -p tig-runtime && \
@@ -44,14 +47,12 @@ RUN cargo build -r -p tig-runtime && \
     chmod +x /usr/local/bin/tig-worker && \
     rm -rf tig-monorepo
 
-RUN apt install -y build-essential zstd
-
-RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
-        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc1-19.1.7/llvm.tar.zst"; \
+RUN LLVM_URL=$(if [ "$ARCH" = "aarch64" ]; then \
+        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc2%2B19.1.7/llvm.tar.zst"; \
     else \
-        echo "https://github.com/tig-foundation/llvm/releases/download/amd64-rc.1%2B19.1.7/llvm.tar.zst"; \
+        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc2%2B19.1.7/llvm.tar.zst"; \
     fi) && \
-    curl -L $RUST_TARGET -O && \
+    curl -L $LLVM_URL -O && \
     mkdir -p /opt/llvm && \
     tar -xf llvm.tar.zst -C /opt/llvm && \
     mv /opt/llvm/llvm/build/* /opt/llvm/ && \
