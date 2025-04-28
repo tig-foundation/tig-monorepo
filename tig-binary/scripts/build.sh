@@ -52,7 +52,7 @@ else
 fi
 
 RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C opt-level=3 -C lto=no -C debuginfo=2 -C relocation-model=pic" \
-cargo build \
+cargo +nightly-2025-02-10 build \
     -p tig-binary \
     --target=$RUST_TARGET \
     --release \

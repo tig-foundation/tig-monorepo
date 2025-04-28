@@ -35,8 +35,7 @@ RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
 
 RUN apt install -y build-essential zstd
 
-COPY tig-*/Cargo.toml /tmp/tig-monorepo/tig-*/
-COPY tig-*/src /tmp/tig-monorepo/tig-*/src
+COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
 
 RUN cargo build -r -p tig-runtime && \
