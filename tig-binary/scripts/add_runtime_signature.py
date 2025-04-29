@@ -3,6 +3,7 @@
 import os
 import shutil
 import sys
+import argparse
 
 # Import the dictionary from ptx_instructions.py
 instruction_prime_map = {
@@ -90,8 +91,6 @@ instruction_prime_map = {
     'cvt.rn.f32.bf16': (0xB6234567890ABCDE, 1),
     'cvt.rn.tf32.f32': (0xC6234567890ABCDE, 1),
     'cvt.rn.f32.tf32': (0xD6234567890ABCDE, 1),
-    'tanh.approx.f32': (0xE6234567890ABCDE, 1),
-    'tanh.approx.f16': (0xF6234567890ABCDE, 1),
     'atom.add.u32': (0xF2D231CD2E1FBA23, 8),
     'atom.add.u64': (0xE511FE4AEA87A429, 10),
     'atom.min.u32': (0xC4FA795EB531A38B, 8),
@@ -147,7 +146,7 @@ def get_position_modifier(bb_idx, inst_idx, func_hash):
     return left_rot, right_rot
 
 # Function to modify the PTX code by inserting XOR commands after certain instructions
-def add_xor_commands(ptx_code, instruction_prime_map):
+def add_xor_commands(ptx_code, instruction_prime_map, ignore_patterns):
     modified_code = []
     inside_kernel_function = False
     skip_kernel = False
@@ -184,11 +183,12 @@ def add_xor_commands(ptx_code, instruction_prime_map):
             current_func = stripped_line.split()[-1]
             func_hash = hash(current_func) & 0xFFFFFFFFFFFFFFFF
             print(f"\nProcessing function: {current_func} (hash: {func_hash:016x})")
-            if current_func in ["initialize_kernel(", "finalize_kernel(", "generate_instance_kernel(", "verify_solution_kernel("]:
-                skip_kernel = True
+            
+            # Check if current function should be skipped
+            skip_kernel = current_func in ignore_patterns
+            if skip_kernel:
                 print(f"Skipping kernel: {current_func}")
-            else:
-                skip_kernel = False
+                    
             inside_kernel_function = True
             r_signature_inserted = False
             bb_idx = 0
@@ -308,24 +308,27 @@ def add_xor_commands(ptx_code, instruction_prime_map):
     return modified_code
 
 # Function to process the PTX file
-def process_ptx_file(input_file, output_file):
+def process_ptx_file(input_file, output_file, ignore_patterns):
     print(f"Processing PTX file: {input_file} -> {output_file}")
 
     # Step 1: Read PTX file
     ptx_code = read_ptx_file(input_file)
 
     # Step 2: Add XOR commands after specific instructions and modify specific mov instructions
-    modified_code = add_xor_commands(ptx_code, instruction_prime_map)
+    modified_code = add_xor_commands(ptx_code, instruction_prime_map, ignore_patterns)
 
     # Step 3: Write the modified PTX file
     write_ptx_file(modified_code, output_file)
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python3 add_runtime_signature.py <ptx_file>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Add runtime signature to PTX files')
+    parser.add_argument('ptx_file', help='Path to the PTX file to process')
+    parser.add_argument('--ignore', action='append', default=["initialize_kernel(", "finalize_kernel(", "generate_instance_kernel(", "verify_solution_kernel("],
+                        help='Kernel patterns to ignore (can be specified multiple times)')
+    
+    args = parser.parse_args()
 
-    original_file = sys.argv[1]
+    original_file = args.ptx_file
     if not os.path.isfile(original_file):
         print(f"Error: File '{original_file}' does not exist.")
         sys.exit(1)
@@ -343,7 +346,7 @@ def main():
 
     # Call process_ptx_file with the backup as input and the original filename as output
     try:
-        process_ptx_file(no_sig_file, original_file)
+        process_ptx_file(no_sig_file, original_file, args.ignore)
         print(f"Processed file: '{no_sig_file}' -> '{original_file}'")
     except Exception as e:
         print(f"Error processing PTX file: {e}")
