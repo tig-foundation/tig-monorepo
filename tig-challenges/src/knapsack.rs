@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::collections::HashSet;
 
-const IS_GPU: bool = false;
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Difficulty {
     pub num_items: usize,
@@ -69,7 +67,7 @@ pub struct SubInstance {
 pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl Challenge {
-    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
+    pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let mut sub_instances = Vec::new();
         for _ in 0..NUM_SUB_INSTANCES {
@@ -83,7 +81,7 @@ impl Challenge {
         })
     }
 
-    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+    pub fn verify_solution(&self, solution: &Solution) -> Result<()> {
         let mut better_than_baselines = Vec::new();
         for (i, (sub_instance, sub_solution)) in self
             .sub_instances

@@ -1,4 +1,3 @@
-use crate::{CudaChallengeTrait, DifficultyTrait, SolutionTrait};
 use anyhow::{anyhow, Result};
 use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
@@ -7,8 +6,6 @@ use cudarc::{
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::sync::Arc;
-
-const IS_GPU: bool = true;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
@@ -53,7 +50,7 @@ pub struct Challenge {
 }
 
 impl Challenge {
-    fn generate_instance(
+    pub fn generate_instance(
         seed: [u8; 32],
         difficulty: &Difficulty,
         _module: Arc<CudaModule>,
@@ -71,7 +68,7 @@ impl Challenge {
         });
     }
 
-    fn verify_solution(
+    pub fn verify_solution(
         &self,
         solution: &Solution,
         module: Arc<CudaModule>,

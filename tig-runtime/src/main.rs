@@ -5,9 +5,17 @@ use std::{fs, panic, path::PathBuf};
 use tig_challenges::*;
 use tig_structs::core::{BenchmarkSettings, OutputData, Solution};
 use tig_utils::{compress_obj, dejsonify, jsonify};
+#[cfg(feature = "cuda")]
+use {
+    cudarc::{
+        driver::{CudaModule, CudaStream},
+        runtime::sys::cudaDeviceProp,
+    },
+    std::sync::Arc,
+};
 
 fn cli() -> Command {
-    Command::new("tig-native-runtime")
+    Command::new("tig-runtime")
         .about("Computes or verifies solutions")
         .arg_required_else_help(true)
         .subcommand(
@@ -23,7 +31,11 @@ fn cli() -> Command {
                 )
                 .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
                 .arg(
-                    arg!(<BINARY> "Path to a native binary")
+                    arg!(<BINARY> "Path to a shared object (*.so) file")
+                        .value_parser(clap::value_parser!(PathBuf)),
+                )
+                .arg(
+                    arg!(--ptx [PTX] "Path to a CUDA ptx file")
                         .value_parser(clap::value_parser!(PathBuf)),
                 )
                 .arg(
@@ -38,6 +50,11 @@ fn cli() -> Command {
                 .arg(
                     arg!(--compress [COMPRESS] "If output file is set, the output data will be compressed as zlib")
                     .action(ArgAction::SetTrue)
+                )
+                .arg(
+                    arg!(--gpu [GPU] "Which GPU device to use")
+                        .default_value("0")
+                        .value_parser(clap::value_parser!(usize)),
                 ),
         )
 }
@@ -51,9 +68,11 @@ fn main() {
             sub_m.get_one::<String>("RAND_HASH").unwrap().clone(),
             *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<PathBuf>("BINARY").unwrap().clone(),
+            sub_m.get_one::<PathBuf>("ptx").cloned(),
             *sub_m.get_one::<u64>("fuel").unwrap(),
             sub_m.get_one::<PathBuf>("output").cloned(),
             sub_m.get_one::<bool>("compress").unwrap().clone(),
+            sub_m.get_one::<usize>("gpu").unwrap().clone(),
         ),
         _ => Err(anyhow!("Invalid subcommand")),
     } {
@@ -67,9 +86,11 @@ pub fn compute_solution(
     rand_hash: String,
     nonce: u64,
     library_path: PathBuf,
+    ptx_path: Option<PathBuf>,
     max_fuel: u64,
     output_file: Option<PathBuf>,
     compress: bool,
+    gpu_device: usize,
 ) -> Result<()> {
     let settings = load_settings(&settings);
 
@@ -82,40 +103,92 @@ pub fn compute_solution(
     let mut err_msg = Option::<String>::None;
 
     macro_rules! dispatch_challenges {
-        ( $( $c:ident ),+ $(,)? ) => {{
+        ( $( ($c:ident, $cpu_or_gpu:tt) ),+ $(,)? ) => {{
             match settings.challenge_id.as_str() {
                 $(
                     stringify!($c) => {
-                        let solve_challenge_fn = unsafe {
-                            library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(
-                                b"entry_point",
-                            )?
-                        };
-
-                        let challenge = $c::Challenge::generate_instance(
-                            seed,
-                            &settings.difficulty.into(),
-                        ).unwrap();
-
-                        match solve_challenge_fn(&challenge) {
-                            Ok(Some(s)) => {
-                                solution = serde_json::to_value(s)
-                                    .unwrap()
-                                    .as_object()
-                                    .unwrap()
-                                    .to_owned();
-                            }
-                            Ok(None) => {}
-                            Err(e)    => err_msg = Some(e),
-                        }
+                        dispatch_challenges!(@expand $c, $cpu_or_gpu);
                     }
                 )+
                 _ => panic!("Unsupported challenge"),
             }
         }};
+
+        (@expand $c:ident, cpu) => {{
+            let solve_challenge_fn = unsafe {
+                library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(b"entry_point")?
+            };
+
+            let challenge = $c::Challenge::generate_instance(
+                seed,
+                &settings.difficulty.into(),
+            ).unwrap();
+
+            match solve_challenge_fn(&challenge) {
+                Ok(Some(s)) => {
+                    solution = serde_json::to_value(s)
+                        .unwrap()
+                        .as_object()
+                        .unwrap()
+                        .to_owned();
+                }
+                Ok(None) => {}
+                Err(e) => err_msg = Some(e),
+            }
+        }};
+
+        (@expand $c:ident, gpu) => {{
+            #[cfg(not(feature = "cuda"))]
+            panic!("tig-runtime was not compiled with '--features cuda'");
+
+            #[cfg(feature = "cuda")]
+            {
+                if ptx_path.is_none() {
+                    panic!("PTX file is required for GPU challenges.");
+                }
+                let ptx_path = ptx_path.unwrap();
+                let solve_challenge_fn = unsafe {
+                    library.get::<fn(
+                        &$c::Challenge,
+                        Arc<CudaModule>,
+                        Arc<CudaStream>,
+                        &cudaDeviceProp
+                    ) -> Result<Option<$c::Solution>, String>>(
+                        b"entry_point",
+                    )?
+                };
+
+                let ptx = cudarc::nvrtc::Ptx::from_file(ptx_path);
+                let ctx = cudarc::driver::CudaContext::new(gpu_device).unwrap();
+                let module = ctx.load_module(ptx).unwrap();
+                let stream = ctx.default_stream();
+                let prop = cudarc::runtime::result::device::get_device_prop(gpu_device as i32).unwrap();
+
+                let challenge = $c::Challenge::generate_instance(
+                    seed,
+                    &settings.difficulty.into(),
+                    module.clone(),
+                    stream.clone(),
+                    &prop,
+                ).unwrap();
+
+                // read fuel and runtime signature
+
+                match solve_challenge_fn(&challenge, module, stream, &prop) {
+                    Ok(Some(s)) => {
+                        solution = serde_json::to_value(s)
+                            .unwrap()
+                            .as_object()
+                            .unwrap()
+                            .to_owned();
+                    }
+                    Ok(None) => {}
+                    Err(e) => err_msg = Some(e),
+                }
+            }
+        }};
     }
-    // fix
-    dispatch_challenges!(c001, c002, c003);
+    dispatch_challenges!((c001, cpu), (c002, cpu), (c003, cpu), (c004, gpu));
 
     let fuel_remaining = unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
     let runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };

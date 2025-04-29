@@ -12,8 +12,6 @@ use serde::{
 };
 use serde_json::{from_value, Map, Value};
 
-const IS_GPU: bool = false;
-
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_variables: usize,
@@ -60,7 +58,7 @@ pub struct Challenge {
 }
 
 impl Challenge {
-    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
+    pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
@@ -99,7 +97,7 @@ impl Challenge {
         })
     }
 
-    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+    pub fn verify_solution(&self, solution: &Solution) -> Result<()> {
         if solution.variables.len() != self.difficulty.num_variables {
             return Err(anyhow!(
                 "Invalid number of variables. Expected: {}, Actual: {}",
