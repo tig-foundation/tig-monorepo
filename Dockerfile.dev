@@ -30,6 +30,18 @@ RUN ARCH=$(uname -m) && \
     echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc && \
     echo "export RUST_TARGET=\"${RUST_TARGET}\"" >> /etc/bash.bashrc
 
+RUN ARCH=$(uname -m) && \
+    LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc4%2B19.1.7/llvm.tar.zst"; \
+    else \
+        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc4%2B19.1.7/llvm.tar.zst"; \
+    fi) && \
+    curl -L $LLVM_URL -O && \
+    mkdir -p /opt/llvm && \
+    tar -xf llvm.tar.zst -C /opt/llvm && \
+    rm -rf llvm.tar.zst && \
+    ln -s /opt/llvm/bin/* /usr/local/bin/
+
 RUN apt install -y build-essential zstd python3
 
 COPY . /tmp/tig-monorepo
@@ -47,18 +59,6 @@ RUN if command -v nvcc > /dev/null 2>&1; then \
     chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-worker && \
     rm -rf tig-monorepo
-
-RUN ARCH=$(uname -m) && \
-    LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc4%2B19.1.7/llvm.tar.zst"; \
-    else \
-        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc4%2B19.1.7/llvm.tar.zst"; \
-    fi) && \
-    curl -L $LLVM_URL -O && \
-    mkdir -p /opt/llvm && \
-    tar -xf llvm.tar.zst -C /opt/llvm && \
-    rm -rf llvm.tar.zst && \
-    ln -s /opt/llvm/bin/* /usr/local/bin/
 
 COPY tig-binary/scripts /usr/local/bin/
 RUN chmod +x /usr/local/bin/build_so.sh && \
