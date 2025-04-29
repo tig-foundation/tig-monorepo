@@ -328,7 +328,7 @@ def main():
 
     challenge_cu = f"tig-challenges/src/{args.challenge}.cu"
     if not os.path.exists(challenge_cu):
-        raise (
+        raise FileNotFoundError(
             f"Challenge code does not exist @ '{challenge_cu}'. Is the challenge name correct?"
         )
 
