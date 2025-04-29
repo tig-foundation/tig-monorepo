@@ -5,8 +5,9 @@ ARG TARGET=devel
 # Development environment stage
 FROM ${DEVEL_IMAGE} AS devel
 
-RUN if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "amd64" ]; then \
-        echo "Unsupported architecture: $ARCH. Must be 'aarch64' or 'amd64'." && exit 1; \
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "amd64" ] && [ "$ARCH" != "x86_64" ]; then \
+        echo "Unsupported architecture: $ARCH. Must be 'aarch64', 'arm64', 'amd64', or 'x86_64'." && exit 1; \
     fi
 
 # Common setup for all images
