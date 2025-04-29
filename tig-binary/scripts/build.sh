@@ -144,7 +144,6 @@ if [ "$CUDA" = true ]; then
 
     echo "Combining .cu source files for algorithm $ALGORITHM and challenge $CHALLENGE"
     cat tig-binary/src/framework.cu tig-challenges/src/$CHALLENGE.cu tig-algorithms/src/$CHALLENGE/$ALGORITHM.cu > /tmp/temp.cu
-
     echo "Compiling PTX @ $PTX_FILE"
     nvcc -ptx /tmp/temp.cu -o "$PTX_FILE" \
         -arch compute_70 \

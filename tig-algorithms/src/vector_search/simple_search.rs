@@ -51,7 +51,7 @@ pub fn solve_challenge(
 
 #[test]
 fn test_simple_search() {
-    let ptx = cudarc::nvrtc::Ptx::from_file("/home/ubuntu/cuda_test/asd.ptx");
+    let ptx = cudarc::nvrtc::Ptx::from_file("/app/asd.ptx");
     let ctx = cudarc::driver::CudaContext::new(0).unwrap();
     let module = ctx.load_module(ptx).unwrap();
     let stream = ctx.default_stream();

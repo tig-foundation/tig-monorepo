@@ -27,8 +27,12 @@ fn cli() -> Command {
                 .value_parser(clap::value_parser!(u64)),
         )
         .arg(
-            arg!(<BATCH_SIZE> "Batch size for Merkle tree")
-                .value_parser(clap::value_parser!(u64)),
+            arg!(<BINARY> "Path to a shared object (*.so) file")
+                .value_parser(clap::value_parser!(PathBuf)),
+        )
+        .arg(
+            arg!(--ptx [PTX] "Path to a CUDA ptx file")
+                .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(arg!(<BINARY> "Path to a binary file").value_parser(clap::value_parser!(PathBuf)))
         .arg(
@@ -58,6 +62,7 @@ fn main() {
         *matches.get_one::<u64>("NUM_NONCES").unwrap(),
         *matches.get_one::<u64>("BATCH_SIZE").unwrap(),
         matches.get_one::<PathBuf>("BINARY").unwrap().clone(),
+        matches.get_one::<PathBuf>("ptx").cloned(),
         *matches.get_one::<u64>("fuel").unwrap(),
         *matches.get_one::<usize>("workers").unwrap(),
         matches.get_one::<PathBuf>("output").cloned(),
@@ -75,6 +80,7 @@ fn compute_batch(
     num_nonces: u64,
     batch_size: u64,
     binary_path: PathBuf,
+    ptx_path: Option<PathBuf>,
     max_fuel: u64,
     num_workers: usize,
     output_folder: Option<PathBuf>,
@@ -92,7 +98,30 @@ fn compute_batch(
         fs::create_dir_all(path)?;
     }
 
-    let settings = jsonify(&load_settings(&settings));
+    let settings = load_settings(&settings);
+    match settings.challenge_id.as_str() {
+        "c004" => {
+            #[cfg(not(feature = "cuda"))]
+            panic!("tig-worker was not compiled with '--features cuda'");
+
+            #[cfg(feature = "cuda")]
+            if ptx_path.is_none() {
+                return Err(anyhow!(
+                    "PTX file is required for challenge {}",
+                    settings.challenge_id
+                ));
+            }
+        }
+        _ => {
+            if ptx_path.is_some() {
+                return Err(anyhow!(
+                    "PTX file is not required for challenge {}",
+                    settings.challenge_id
+                ));
+            }
+        }
+    }
+    let settings = jsonify(&settings);
 
     let runtime = Runtime::new()?;
 
@@ -108,20 +137,32 @@ fn compute_batch(
                 let rand_hash = rand_hash.clone();
                 let binary_path = binary_path.clone();
                 let output_folder = output_folder.clone();
+                #[cfg(feature = "cuda")]
+                let ptx_path = ptx_path.clone();
+                #[cfg(feature = "cuda")]
+                let num_gpus = cudarc::runtime::result::device::get_count().unwrap() as u64;
 
                 tokio::spawn(async move {
                     let temp_file = NamedTempFile::new()?;
-                    let output = std::process::Command::new(runtime_path)
-                        .arg("compute_solution")
+                    let mut cmd = std::process::Command::new(runtime_path);
+                    cmd.arg("compute_solution")
                         .arg(settings)
                         .arg(rand_hash)
                         .arg(nonce.to_string())
                         .arg(binary_path)
                         .arg("--output")
                         .arg(temp_file.path())
-                        .arg("--compress")
-                        .output()
-                        .unwrap();
+                        .arg("--compress");
+
+                    #[cfg(feature = "cuda")]
+                    if let Some(ptx_path) = ptx_path {
+                        cmd.arg("--ptx")
+                            .arg(ptx_path)
+                            .arg("--gpu")
+                            .arg((nonce % num_gpus).to_string());
+                    }
+
+                    let output = cmd.output().unwrap();
 
                     let exit_code = output.status.code();
                     let is_solution = output.status.success();

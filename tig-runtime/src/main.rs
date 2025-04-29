@@ -172,10 +172,44 @@ pub fn compute_solution(
                     &prop,
                 ).unwrap();
 
+                // TODO: Initialize kernel with fuel and signature
+                // let initialize_kernel = dev
+                //     .get_func(module_name, "initialize_kernel")
+                //     .ok_or_else(|| anyhow!("Failed to find initialize_kernel function"))?;
+
+                // let cfg = LaunchConfig {
+                //     grid_dim: (1, 1, 1),
+                //     block_dim: (1, 1, 1),
+                //     shared_mem_bytes: 0,
+                // };
+
+                // unsafe {
+                //     let signature_mod = u64::from_le_bytes(seed[0..8].try_into().unwrap());
+                //     initialize_kernel.launch(cfg, (max_fuel, signature_mod))?;
+                // }
                 // read fuel and runtime signature
 
                 match solve_challenge_fn(&challenge, module, stream, &prop) {
                     Ok(Some(s)) => {
+                        // TODO: Finalize kernel with fuel and signature
+                        // let mut fuelusage = ctx.dev.alloc_zeros::<u64>(1)?;
+                        // let mut signature = ctx.dev.alloc_zeros::<u64>(1)?;
+                        // let mut errorstat = ctx.dev.alloc_zeros::<u64>(1)?;
+
+                        // let finalize_kernel = ctx.dev
+                        //     .get_func(&ctx.module_name, "finalize_kernel")
+                        //     .ok_or_else(|| anyhow!("Failed to find finalize_kernel"))?;
+
+                        // let cfg = LaunchConfig {
+                        //     grid_dim: (1, 1, 1),
+                        //     block_dim: (1, 1, 1),
+                        //     shared_mem_bytes: 0,
+                        // };
+
+                        // unsafe {
+                        //     finalize_kernel.launch(cfg, (&mut fuelusage, &mut signature, &mut errorstat))?;
+                        // }
+
                         solution = serde_json::to_value(s)
                             .unwrap()
                             .as_object()

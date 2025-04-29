@@ -33,7 +33,7 @@ RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
     echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc && \
     echo "export RUST_TARGET=\"${RUST_TARGET}\"" >> /etc/bash.bashrc
 
-RUN apt install -y build-essential zstd
+RUN apt install -y build-essential zstd python3
 
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
@@ -77,7 +77,7 @@ RUN chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-worker && \
     echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc
 
-RUN apt update && apt install -y git python3 python3-pip
+RUN apt update && apt install -y python3 python3-pip
 RUN pip3 install blake3 requests randomname --break-system-packages
 
 COPY tig-benchmarker /app
