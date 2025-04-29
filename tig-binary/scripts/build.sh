@@ -105,6 +105,11 @@ then
     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
 fi
 
+ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ]; then
+    echo "aarch64"
+else
+    echo "amd64"
+fi)
 output=tig-algorithms/$ARCH/$CHALLENGE/$ALGORITHM.so
 mkdir -p $(dirname $output)
 
