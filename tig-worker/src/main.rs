@@ -34,7 +34,6 @@ fn cli() -> Command {
             arg!(--ptx [PTX] "Path to a CUDA ptx file")
                 .value_parser(clap::value_parser!(PathBuf)),
         )
-        .arg(arg!(<BINARY> "Path to a binary file").value_parser(clap::value_parser!(PathBuf)))
         .arg(
             arg!(--fuel [FUEL] "Optional maximum fuel parameter for runtime")
                 .default_value("2000000000")
