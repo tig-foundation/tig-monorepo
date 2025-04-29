@@ -5,10 +5,7 @@ ARG TARGET=devel
 # Development environment stage
 FROM ${DEVEL_IMAGE} AS devel
 
-ARG ARCH=aarch64
-ENV ARCH=${ARCH}
-
-RUN if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "amd64" ]; then \
+RUN RUN if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "amd64" ]; then \
         echo "Unsupported architecture: $ARCH. Must be 'aarch64' or 'amd64'." && exit 1; \
     fi
 
@@ -19,7 +16,7 @@ RUN apt update && apt install -y curl
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ]; then \
+RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
         echo "aarch64-unknown-linux-gnu"; \
     else \
         echo "x86_64-unknown-linux-gnu"; \
@@ -38,15 +35,20 @@ RUN apt install -y build-essential zstd python3
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
 
-RUN cargo build -r -p tig-runtime && \
+RUN if command -v nvcc > /dev/null 2>&1; then \
+        cargo build -r -p tig-runtime --features cuda && \
+        cargo build -r -p tig-worker --features cuda; \
+    else \
+        cargo build -r -p tig-runtime && \
+        cargo build -r -p tig-worker; \
+    fi && \
     mv target/release/tig-runtime /usr/local/bin/ && \
-    chmod +x /usr/local/bin/tig-runtime && \
-    cargo build -r -p tig-worker && \
     mv target/release/tig-worker /usr/local/bin/ && \
+    chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-worker && \
     rm -rf tig-monorepo
 
-RUN LLVM_URL=$(if [ "$ARCH" = "aarch64" ]; then \
+RUN LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
         echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc2%2B19.1.7/llvm.tar.zst"; \
     else \
         echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc2%2B19.1.7/llvm.tar.zst"; \

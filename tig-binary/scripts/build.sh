@@ -143,6 +143,7 @@ if [ "$CUDA" = true ]; then
     mkdir -p "$(dirname "$PTX_FILE")"
 
     echo "Combining .cu source files for algorithm $ALGORITHM and challenge $CHALLENGE"
+    # use benchmarker_outbound?
     cat tig-binary/src/framework.cu tig-challenges/src/$CHALLENGE.cu tig-algorithms/src/$CHALLENGE/$ALGORITHM.cu > /tmp/temp.cu
     echo "Compiling PTX @ $PTX_FILE"
     nvcc -ptx /tmp/temp.cu -o "$PTX_FILE" \
