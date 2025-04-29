@@ -9,7 +9,7 @@ RUN ARCH=$(uname -m) && \
     fi
 
 # Common setup for all images
-RUN apt update && apt install -y curl
+RUN apt update && apt install -y curl build-essential zstd python3
 
 # Install Rust with specific version
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -41,8 +41,6 @@ RUN ARCH=$(uname -m) && \
     tar -xf llvm.tar.zst -C /opt/llvm && \
     rm -rf llvm.tar.zst && \
     ln -s /opt/llvm/bin/* /usr/local/bin/
-
-RUN apt install -y build-essential zstd python3
 
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
