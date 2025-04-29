@@ -50,15 +50,14 @@ RUN if command -v nvcc > /dev/null 2>&1; then \
 
 RUN ARCH=$(uname -m) && \
     LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc3%2B19.1.7/llvm.tar.zst"; \
+        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc4%2B19.1.7/llvm.tar.zst"; \
     else \
-        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc3%2B19.1.7/llvm.tar.zst"; \
+        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc4%2B19.1.7/llvm.tar.zst"; \
     fi) && \
     curl -L $LLVM_URL -O && \
     mkdir -p /opt/llvm && \
     tar -xf llvm.tar.zst -C /opt/llvm && \
-    mv /opt/llvm/llvm/build/* /opt/llvm/ && \
-    rm -rf /opt/llvm/llvm llvm.tar.zst && \
+    rm -rf llvm.tar.zst && \
     ln -s /opt/llvm/bin/* /usr/local/bin/
 
 COPY tig-binary/scripts /usr/local/bin/
