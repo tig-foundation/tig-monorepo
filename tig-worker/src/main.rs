@@ -27,6 +27,10 @@ fn cli() -> Command {
                 .value_parser(clap::value_parser!(u64)),
         )
         .arg(
+            arg!(<BATCH_SIZE> "Batch size for Merkle tree")
+                .value_parser(clap::value_parser!(u64)),
+        )
+        .arg(
             arg!(<BINARY> "Path to a shared object (*.so) file")
                 .value_parser(clap::value_parser!(PathBuf)),
         )
