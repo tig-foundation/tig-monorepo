@@ -67,35 +67,151 @@ while IFS= read -r line; do
     fi
 done < <(find "target/$RUST_TARGET/release/deps" -name "*.ll")
 
+# Use number of processors available or default to 4
+MAX_PROCS=$(nproc 2>/dev/null || echo 4)
 
 object_files=()
-for ll_file in "${ll_files[@]}"
-do
-    echo "Running LLVM pass on $ll_file"
-    temp_obj=$(mktemp).o
+temp_objs=()
+pids=()
+file_pids=()
+pid_files=()
+pid_objs=()
+max_jobs=$(nproc)
 
-    if [ ${#object_files[@]} -eq 0 ]
-    then
-        IS_FIRST_SRC=1
-    else
-        IS_FIRST_SRC=0
-    fi
-
+# Process a single file
+process_file() {
+    local ll_file="$1"
+    local is_first=$2
+    local temp_obj="$3"
+    
+    echo "Processing $ll_file"
+    
     cat "$ll_file" | \
-    IS_FIRST_SRC=$IS_FIRST_SRC INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
+    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
         -load-pass-plugin LLVMFuelRTSig.so \
         -passes="fuel-rt-sig" -S -o - | \
     llc -relocation-model=pic -o - | \
     clang -fPIC -c -x assembler - -o "$temp_obj"
+    
+    return $?
+}
 
-    if [ $? -ne 0 ]
+# Launch processes up to max_jobs
+for ll_file in "${ll_files[@]}"
+do
+    temp_obj=$(mktemp).o
+    temp_objs+=("$temp_obj")
+    
+    # Set IS_FIRST_SRC flag - first file gets 1, all others get 0
+    if [ "$ll_file" = "${ll_files[0]}" ]
     then
-        echo "Failed to process $ll_file"
+        is_first=1
+    else
+        is_first=0
+    fi
+    
+    # Launch in background
+    process_file "$ll_file" $is_first "$temp_obj" &
+    pid=$!
+    
+    # Store associations
+    pids+=($pid)
+    pid_files[$pid]="$ll_file"
+    pid_objs[$pid]="$temp_obj"
+    
+    # If we've reached max_jobs, wait for one to finish
+    if [ ${#pids[@]} -ge $max_jobs ]
+    then
+        wait -n
+        exit_status=$?
+        
+        if [ $exit_status -ne 0 ]
+        then
+            # Find which process failed
+            for p in "${pids[@]}"
+            do
+                if ! kill -0 $p 2>/dev/null
+                then
+                    echo "Failed to process ${pid_files[$p]}"
+                    # Kill all remaining processes
+                    for active_pid in "${pids[@]}"
+                    do
+                        if kill -0 $active_pid 2>/dev/null
+                        then
+                            kill $active_pid 2>/dev/null || true
+                        fi
+                    done
+                    exit 1
+                fi
+            done
+            
+            # If we couldn't identify which process failed, just exit
+            echo "An error occurred during processing"
+            exit 1
+        fi
+        
+        # Remove completed process(es) from tracking
+        for idx in "${!pids[@]}"
+        do
+            if ! kill -0 ${pids[$idx]} 2>/dev/null
+            then
+                # Success - add object file
+                object_files+=("${pid_objs[${pids[$idx]}]}")
+                unset pids[$idx]
+            fi
+        done
+        
+        # Reindex arrays
+        pids=("${pids[@]}")
+    fi
+done
+
+# Wait for all remaining processes
+while [ ${#pids[@]} -gt 0 ]
+do
+    wait -n
+    exit_status=$?
+    
+    if [ $exit_status -ne 0 ]
+    then
+        # Find which process failed
+        for p in "${pids[@]}"
+        do
+            if ! kill -0 $p 2>/dev/null
+            then
+                echo "Failed to process ${pid_files[$p]}"
+                # Kill all remaining processes
+                for active_pid in "${pids[@]}"
+                do
+                    if kill -0 $active_pid 2>/dev/null
+                    then
+                        kill $active_pid 2>/dev/null || true
+                    fi
+                done
+                exit 1
+            fi
+        done
+        
+        echo "An error occurred during processing"
         exit 1
     fi
-
-    object_files+=("$temp_obj")
+    
+    # Remove completed process(es) from tracking
+    for idx in "${!pids[@]}"
+    do
+        if ! kill -0 ${pids[$idx]} 2>/dev/null
+        then
+            # Success - add object file
+            object_files+=("${pid_objs[${pids[$idx]}]}")
+            unset pids[$idx]
+        fi
+    done
+    
+    # Reindex arrays
+    pids=("${pids[@]}")
 done
+
+echo "Successfully processed all files"
 
 RUST_TARGET_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
 LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
@@ -162,5 +278,8 @@ if [ "$CUDA" = true ]; then
     echo "Adding runtime signature to PTX file"
     add_runtime_signature.py $PTX_FILE
 fi
+
+# Clean up temp files
+rm -f /tmp/*.o.path
 
 echo "Done"
