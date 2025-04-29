@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -342,23 +343,23 @@ def main():
 
     # Combine .cu source files into a temporary file
     with tempfile.TemporaryDirectory() as temp_dir:
-        temp_cu_file = os.path.join(temp_dir, "temp.cu")
-        temp_ptx_file = os.path.join(temp_dir, "temp.ptx")
+        temp_cu = os.path.join(temp_dir, "temp.cu")
+        temp_ptx = os.path.join(temp_dir, "temp.ptx")
         
-        with open(framework_file, 'r') as f:
+        with open(framework_cu, 'r') as f:
             code = f.read() + "\n"
-        with open(challenge_file, 'r') as f:
+        with open(challenge_cu, 'r') as f:
             code += f.read() + "\n"
         func_regex = r'(?:extern\s+"C"\s+__global__|__device__)\s+\w+\s+(?P<func>\w+)\s*\('
         funcs_to_ignore = [match.group('func') for match in re.finditer(func_regex, code)]
-        with open(algorithm_file, 'r') as f:
+        with open(algorithm_cu, 'r') as f:
             code += f.read()
-        with open(temp_cu_file, 'w') as f:
-            temp_file.write(code)
+        with open(temp_cu, 'w') as f:
+            f.write(code)
 
         # Compile the temporary .cu file into a .ptx file using nvcc
         nvcc_command = [
-            "nvcc", "-ptx", temp_cu_file, "-o", temp_ptx_file,
+            "nvcc", "-ptx", temp_cu, "-o", temp_ptx,
             "-arch", "compute_70",
             "-code", "sm_70",
             "--use_fast_math",
@@ -370,7 +371,7 @@ def main():
         print(f"Successfully compiled")
 
         print("Adding runtime signature opcodes")
-        with open(temp_ptx_file, 'r') as f:
+        with open(temp_ptx, 'r') as f:
             ptx_code = f.readlines()
         modified_ptx_code = add_xor_commands(
             ptx_code, 

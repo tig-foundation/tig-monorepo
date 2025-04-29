@@ -1,14 +1,15 @@
 ARG BASE_IMAGE=ubuntu:24.04
-ARG DEVEL_IMAGE
+ARG DEV_IMAGE=ghcr.io/tig-foundation/tig-monorepo/dev
 
-# Development environment stage
+FROM ${DEV_IMAGE} AS dev
+
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-COPY --from=${DEVEL_IMAGE} /usr/local/bin/tig-runtime /usr/local/bin/tig-runtime
-COPY --from=${DEVEL_IMAGE} /usr/local/bin/tig-worker /usr/local/bin/tig-worker
-COPY --from=${DEVEL_IMAGE} /usr/local/lib/rust /usr/local/lib/rust
+COPY --from=dev /usr/local/bin/tig-runtime /usr/local/bin/tig-runtime
+COPY --from=dev /usr/local/bin/tig-worker /usr/local/bin/tig-worker
+COPY --from=dev /usr/local/lib/rust /usr/local/lib/rust
 
 RUN chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-worker && \
