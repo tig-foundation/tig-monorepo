@@ -17,7 +17,8 @@ RUN apt update && apt install -y curl
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-RUN RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+RUN ARCH=$(uname -m) && \
+    RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
         echo "aarch64-unknown-linux-gnu"; \
     else \
         echo "x86_64-unknown-linux-gnu"; \
@@ -49,7 +50,8 @@ RUN if command -v nvcc > /dev/null 2>&1; then \
     chmod +x /usr/local/bin/tig-worker && \
     rm -rf tig-monorepo
 
-RUN LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+RUN ARCH=$(uname -m) && \
+    LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
         echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc2%2B19.1.7/llvm.tar.zst"; \
     else \
         echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc2%2B19.1.7/llvm.tar.zst"; \
