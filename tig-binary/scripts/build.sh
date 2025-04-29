@@ -58,7 +58,7 @@ cargo +nightly-2025-02-10 build \
     --release \
     -Z build-std=core,alloc,std \
     -Z build-std-features=panic-unwind \
-    --features=$FEATURES
+    --features="$FEATURES"
 
 ll_files=()
 while IFS= read -r line; do

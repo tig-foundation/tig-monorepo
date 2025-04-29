@@ -19,4 +19,4 @@ tig-algorithms = { path = "../tig-algorithms" }
 
 [features]
 entry_point = []
-cuda = ["tig-algorithms/cuda", "tig-challenges/cuda"]
+cuda = ["cudarc", "tig-algorithms/cuda", "tig-challenges/cuda"]

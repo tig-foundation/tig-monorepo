@@ -1,5 +1,5 @@
 use cudarc::{
-    driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, PushKernelArg},
+    driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
 use std::sync::Arc;
@@ -58,7 +58,7 @@ fn test_simple_search() {
     let prop = cudarc::runtime::result::device::get_device_prop(0).unwrap();
 
     let c = Challenge::generate_instance(
-        &[0; 32],
+        [0; 32],
         &Difficulty {
             num_queries: 10000,
             better_than_baseline: 0,
