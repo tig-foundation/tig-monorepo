@@ -88,7 +88,7 @@ process_file() {
     
     cat "$ll_file" | \
     IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
-        -load-pass-plugin LLVMFuelRTSig.so \
+        -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
         -passes="fuel-rt-sig" -S -o - | \
     llc -relocation-model=pic -o - | \
     clang -fPIC -c -x assembler - -o "$temp_obj"

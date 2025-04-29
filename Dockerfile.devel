@@ -58,8 +58,7 @@ RUN ARCH=$(uname -m) && \
     mkdir -p /opt/llvm && \
     tar -xf llvm.tar.zst -C /opt/llvm && \
     rm -rf llvm.tar.zst && \
-    ln -s /opt/llvm/bin/* /usr/local/bin/ && \
-    ln -s /opt/llvm/lib/* /usr/local/lib/
+    ln -s /opt/llvm/bin/* /usr/local/bin/
 
 COPY tig-binary/scripts /usr/local/bin/
 RUN chmod +x /usr/local/bin/build.sh && \
