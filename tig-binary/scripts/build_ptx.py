@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
+import re
 import shutil
 import sys
-import argparse
+import tempfile
 
 # Import the dictionary from ptx_instructions.py
 instruction_prime_map = {
@@ -187,7 +189,7 @@ def add_xor_commands(ptx_code, instruction_prime_map, ignore_patterns):
             # Check if current function should be skipped
             skip_kernel = current_func in ignore_patterns
             if skip_kernel:
-                print(f"Skipping kernel: {current_func}")
+                print(f"Skipping kernel: {current_func[:-1]}")
                     
             inside_kernel_function = True
             r_signature_inserted = False
@@ -307,50 +309,85 @@ def add_xor_commands(ptx_code, instruction_prime_map, ignore_patterns):
 
     return modified_code
 
-# Function to process the PTX file
-def process_ptx_file(input_file, output_file, ignore_patterns):
-    print(f"Processing PTX file: {input_file} -> {output_file}")
-
-    # Step 1: Read PTX file
-    ptx_code = read_ptx_file(input_file)
-
-    # Step 2: Add XOR commands after specific instructions and modify specific mov instructions
-    modified_code = add_xor_commands(ptx_code, instruction_prime_map, ignore_patterns)
-
-    # Step 3: Write the modified PTX file
-    write_ptx_file(modified_code, output_file)
-
 def main():
-    parser = argparse.ArgumentParser(description='Add runtime signature to PTX files')
-    parser.add_argument('ptx_file', help='Path to the PTX file to process')
-    parser.add_argument('--ignore', action='append', default=["initialize_kernel(", "finalize_kernel(", "generate_instance_kernel(", "verify_solution_kernel("],
-                        help='Kernel patterns to ignore (can be specified multiple times)')
+    parser = argparse.ArgumentParser(description='Compile PTX with injected runtime signature')
+    parser.add_argument('challenge', help='Challenge name')
+    parser.add_argument('algorithm', help='Algorithm name')
     
     args = parser.parse_args()
 
-    original_file = args.ptx_file
-    if not os.path.isfile(original_file):
-        print(f"Error: File '{original_file}' does not exist.")
-        sys.exit(1)
+    print(f"Compiling .ptx for {args.challenge}/{args.algorithm}")
 
-    # Generate the backup filename
-    no_sig_file = f"{os.path.splitext(original_file)[0]}_no_sig{os.path.splitext(original_file)[1]}"
 
-    # Rename the original file to the backup file
-    try:
-        shutil.move(original_file, no_sig_file)
-        print(f"Renamed '{original_file}' to '{no_sig_file}'")
-    except Exception as e:
-        print(f"Error renaming file: {e}")
-        sys.exit(1)
+    framework_cu = "tig-binary/src/framework.cu"
+    if not os.path.exists(framework_cu):
+        raise FileNotFoundError(
+            f"Framework code does not exist @ '{framework_cu}'. This script must be run from the root of tig-monorepo"
+        )
 
-    # Call process_ptx_file with the backup as input and the original filename as output
-    try:
-        process_ptx_file(no_sig_file, original_file, args.ignore)
-        print(f"Processed file: '{no_sig_file}' -> '{original_file}'")
-    except Exception as e:
-        print(f"Error processing PTX file: {e}")
-        sys.exit(1)
+    challenge_cu = f"tig-challenges/src/{args.challenge}.cu"
+    if not os.path.exists(challenge_cu):
+        raise (
+            f"Challenge code does not exist @ '{challenge_cu}'. Is the challenge name correct?"
+        )
+
+    algorithm_cu = f"tig-algorithms/src/{args.challenge}/{args.algorithm}.cu"
+    algorithm_cu2 = f"tig-algorithms/src/{args.challenge}/{args.algorithm}/benchmarker_outbound.cu"
+    if not os.path.exists(algorithm_cu) and not os.path.exists(algorithm_cu2):
+        raise FileNotFoundError(
+            f"Algorithm code does not exist @ '{algorithm_cu}' or '{algorithm_cu2}'. Is the algorithm name correct?"
+        )
+    if not os.path.exists(algorithm_cu):
+        algorithm_cu = algorithm_cu2
+
+    # Combine .cu source files into a temporary file
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_cu_file = os.path.join(temp_dir, "temp.cu")
+        temp_ptx_file = os.path.join(temp_dir, "temp.ptx")
+        
+        with open(framework_file, 'r') as f:
+            code = f.read() + "\n"
+        with open(challenge_file, 'r') as f:
+            code += f.read() + "\n"
+        func_regex = r'(?:extern\s+"C"\s+__global__|__device__)\s+\w+\s+(?P<func>\w+)\s*\('
+        funcs_to_ignore = [match.group('func') for match in re.finditer(func_regex, code)]
+        with open(algorithm_file, 'r') as f:
+            code += f.read()
+        with open(temp_cu_file, 'w') as f:
+            temp_file.write(code)
+
+        # Compile the temporary .cu file into a .ptx file using nvcc
+        nvcc_command = [
+            "nvcc", "-ptx", temp_cu_file, "-o", temp_ptx_file,
+            "-arch", "compute_70",
+            "-code", "sm_70",
+            "--use_fast_math",
+            "-dopt=on"
+        ]
+
+        print(f"Running nvcc command: {' '.join(nvcc_command)}")
+        subprocess.run(nvcc_command, check=True)
+        print(f"Successfully compiled")
+
+        print("Adding runtime signature opcodes")
+        with open(temp_ptx_file, 'r') as f:
+            ptx_code = f.readlines()
+        modified_ptx_code = add_xor_commands(
+            ptx_code, 
+            instruction_prime_map, 
+            set(f"{x}(" for x in funcs_to_ignore)
+        )
+        
+        output_path = f"tig-algorithms/ptx/{args.challenge}/{args.algorithm}.ptx"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, 'w') as f:
+            f.writelines(modified_ptx_code)
+        print(f"Wrote ptx to {output_path}")
+        print(f"Done")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)

@@ -40,7 +40,7 @@ if [ -z "$ALGORITHM" ]; then
     exit 1
 fi
 
-echo "Compiling algorithm $ALGORITHM for challenge $CHALLENGE"
+echo "Compiling .so for $CHALLENGE/$ALGORITHM"
 cp tig-binary/src/entry_point_template.rs tig-binary/src/entry_point.rs
 sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-binary/src/entry_point.rs
 sed -i "s/{ALGORITHM}/$ALGORITHM/g" tig-binary/src/entry_point.rs
@@ -256,28 +256,6 @@ clang "${object_files[@]}" \
     -Wl,-Map=output.map
 
 strip --strip-debug $output
-
-if [ "$CUDA" = true ]; then
-    echo "Compiling CUDA code"
-    PTX_FILE="tig-algorithms/cuda/$CHALLENGE/$ALGORITHM.ptx"
-
-    mkdir -p "$(dirname "$PTX_FILE")"
-
-    echo "Combining .cu source files for algorithm $ALGORITHM and challenge $CHALLENGE"
-    # use benchmarker_outbound?
-    cat tig-binary/src/framework.cu tig-challenges/src/$CHALLENGE.cu tig-algorithms/src/$CHALLENGE/$ALGORITHM.cu > /tmp/temp.cu
-    echo "Compiling PTX @ $PTX_FILE"
-    nvcc -ptx /tmp/temp.cu -o "$PTX_FILE" \
-        -arch compute_70 \
-        -code sm_70 \
-        --use_fast_math \
-        -dopt=on
-
-    rm -f /tmp/temp.cu
-
-    echo "Adding runtime signature to PTX file"
-    add_runtime_signature.py $PTX_FILE
-fi
 
 # Clean up temp files
 rm -f /tmp/*.o.path

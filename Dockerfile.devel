@@ -61,7 +61,7 @@ RUN ARCH=$(uname -m) && \
     ln -s /opt/llvm/bin/* /usr/local/bin/
 
 COPY tig-binary/scripts /usr/local/bin/
-RUN chmod +x /usr/local/bin/build.sh && \
-    chmod +x /usr/local/bin/add_runtime_signature.py
+RUN chmod +x /usr/local/bin/build_so.sh && \
+    chmod +x /usr/local/bin/build_ptx.py
 
 WORKDIR /app
