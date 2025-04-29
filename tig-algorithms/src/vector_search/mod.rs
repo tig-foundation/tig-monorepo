@@ -24,7 +24,8 @@
 
 // c004_a013
 
-// c004_a014
+pub mod brute_force_bacalhau;
+pub use brute_force_bacalhau as c004_a014;
 
 // c004_a015
 
@@ -48,7 +49,8 @@
 
 // c004_a025
 
-// c004_a026
+pub mod optimax_gpu;
+pub use optimax_gpu as c004_a026;
 
 // c004_a027
 
@@ -64,7 +66,8 @@
 
 // c004_a033
 
-// c004_a034
+pub mod invector;
+pub use invector as c004_a034;
 
 // c004_a035
 
@@ -80,7 +83,8 @@
 
 // c004_a041
 
-// c004_a042
+pub mod invector_hybrid;
+pub use invector_hybrid as c004_a042;
 
 // c004_a043
 

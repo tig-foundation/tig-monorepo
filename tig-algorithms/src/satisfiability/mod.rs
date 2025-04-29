@@ -1,4 +1,5 @@
-// c001_a001
+pub mod schnoing;
+pub use schnoing as c001_a001;
 
 // c001_a002
 
@@ -6,7 +7,8 @@
 
 // c001_a004
 
-// c001_a005
+pub mod walk_sat;
+pub use walk_sat as c001_a005;
 
 // c001_a006
 
@@ -18,9 +20,11 @@
 
 // c001_a010
 
-// c001_a011
+pub mod fast_walk_sat;
+pub use fast_walk_sat as c001_a011;
 
-// c001_a012
+pub mod sprint_sat;
+pub use sprint_sat as c001_a012;
 
 // c001_a013
 
@@ -32,7 +36,8 @@
 
 // c001_a017
 
-// c001_a018
+pub mod inbound;
+pub use inbound as c001_a018;
 
 // c001_a019
 
@@ -42,7 +47,8 @@
 
 // c001_a022
 
-// c001_a023
+pub mod sat_allocd;
+pub use sat_allocd as c001_a023;
 
 // c001_a024
 
@@ -58,13 +64,15 @@
 
 // c001_a030
 
-// c001_a031
+pub mod sat_optima;
+pub use sat_optima as c001_a031;
 
 // c001_a032
 
 // c001_a033
 
-// c001_a034
+pub mod sat_global;
+pub use sat_global as c001_a034;
 
 // c001_a035
 
@@ -78,9 +86,11 @@
 
 // c001_a040
 
-// c001_a041
+pub mod sat_global_opt;
+pub use sat_global_opt as c001_a041;
 
-// c001_a042
+pub mod sat_adaptive;
+pub use sat_adaptive as c001_a042;
 
 // c001_a043
 
