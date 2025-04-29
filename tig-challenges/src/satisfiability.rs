@@ -12,22 +12,26 @@ use serde::{
 };
 use serde_json::{from_value, Map, Value};
 
+const IS_GPU: bool = false;
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_variables: usize,
     pub clauses_to_variables_percent: u32,
 }
 
-impl crate::DifficultyTrait<2> for Difficulty {
-    fn from_arr(arr: &[i32; 2]) -> Self {
+impl From<Vec<i32>> for Difficulty {
+    fn from(arr: Vec<i32>) -> Self {
         Self {
             num_variables: arr[0] as usize,
             clauses_to_variables_percent: arr[1] as u32,
         }
     }
+}
 
-    fn to_arr(&self) -> [i32; 2] {
-        [
+impl Into<Vec<i32>> for Difficulty {
+    fn into(self) -> Vec<i32> {
+        vec![
             self.num_variables as i32,
             self.clauses_to_variables_percent as i32,
         ]
@@ -39,8 +43,6 @@ pub struct Solution {
     #[serde(with = "bool_vec_as_u8")]
     pub variables: Vec<bool>,
 }
-
-impl crate::SolutionTrait for Solution {}
 
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
@@ -57,7 +59,7 @@ pub struct Challenge {
     pub clauses: Vec<Vec<i32>>,
 }
 
-impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
+impl Challenge {
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let num_clauses = (difficulty.num_variables as f64

@@ -1,3 +1,4 @@
+pub mod simple_search;
 // c004_a001
 
 // c004_a002

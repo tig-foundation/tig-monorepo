@@ -8,22 +8,26 @@ use serde_json::{from_value, Map, Value};
 use statrs::function::erf::{erf, erf_inv};
 use std::collections::{HashMap, HashSet};
 
+const IS_GPU: bool = false;
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_nodes: usize,
     pub better_than_baseline: u32,
 }
 
-impl crate::DifficultyTrait<2> for Difficulty {
-    fn from_arr(arr: &[i32; 2]) -> Self {
+impl From<Vec<i32>> for Difficulty {
+    fn from(arr: Vec<i32>) -> Self {
         Self {
             num_nodes: arr[0] as usize,
             better_than_baseline: arr[1] as u32,
         }
     }
+}
 
-    fn to_arr(&self) -> [i32; 2] {
-        [self.num_nodes as i32, self.better_than_baseline as i32]
+impl Into<Vec<i32>> for Difficulty {
+    fn into(self) -> Vec<i32> {
+        vec![self.num_nodes as i32, self.better_than_baseline as i32]
     }
 }
 
@@ -36,8 +40,6 @@ pub struct Solution {
 pub struct SubSolution {
     pub routes: Vec<Vec<usize>>,
 }
-
-impl crate::SolutionTrait for Solution {}
 
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
@@ -70,7 +72,7 @@ pub struct SubInstance {
 
 pub const NUM_SUB_INSTANCES: usize = 16;
 
-impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
+impl Challenge {
     fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let mut sub_instances = Vec::new();

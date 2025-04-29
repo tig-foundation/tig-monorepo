@@ -12,13 +12,11 @@ __device__ void random_vector(
     uint32_t vector_dims,
     float *vector
 ) {
-    for (int i = 0; i < 4; i++) {
-        curandState state;
-        curand_init(((uint64_t *)(seeds))[i], id, 0, &state);
+    curandState state;
+    curand_init(((uint64_t *)(seeds))[id % 4], id, 0, &state);
 
-        for (int j = 0; j < vector_dims; j += 4) {
-            vector[j] = curand_uniform(&state); // Random float in [0, 1]
-        }
+    for (int j = 0; j < vector_dims; j++) {
+        vector[j] = curand_uniform(&state); // Random float in [0, 1]
     }
 }
 

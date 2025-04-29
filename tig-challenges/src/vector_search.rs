@@ -1,13 +1,14 @@
-use crate::{ChallengeTrait, DifficultyTrait, SolutionTrait};
+use crate::{CudaChallengeTrait, DifficultyTrait, SolutionTrait};
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Map, Value};
-
 use cudarc::{
-    driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, PushKernelArg},
+    driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
-use std::{collections::HashMap, sync::Arc};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_value, Map, Value};
+use std::sync::Arc;
+
+const IS_GPU: bool = true;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
@@ -15,16 +16,17 @@ pub struct Difficulty {
     pub better_than_baseline: u32,
 }
 
-impl DifficultyTrait<2> for Difficulty {
-    fn from_arr(arr: &[i32; 2]) -> Self {
+impl From<Vec<i32>> for Difficulty {
+    fn from(arr: Vec<i32>) -> Self {
         Self {
             num_queries: arr[0] as u32,
             better_than_baseline: arr[1] as u32,
         }
     }
-
-    fn to_arr(&self) -> [i32; 2] {
-        [self.num_queries as i32, self.better_than_baseline as i32]
+}
+impl Into<Vec<i32>> for Difficulty {
+    fn into(self) -> Vec<i32> {
+        vec![self.num_queries as i32, self.better_than_baseline as i32]
     }
 }
 
@@ -32,8 +34,6 @@ impl DifficultyTrait<2> for Difficulty {
 pub struct Solution {
     pub indexes: Vec<usize>,
 }
-
-impl SolutionTrait for Solution {}
 
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
@@ -52,21 +52,20 @@ pub struct Challenge {
     pub max_distance: f32,
 }
 
-// impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
 impl Challenge {
     fn generate_instance(
-        seed: &[u8; 32],
+        seed: [u8; 32],
         difficulty: &Difficulty,
-        module: Arc<CudaModule>,
-        stream: Arc<CudaStream>,
-        prop: &cudaDeviceProp,
+        _module: Arc<CudaModule>,
+        _stream: Arc<CudaStream>,
+        _prop: &cudaDeviceProp,
     ) -> Result<Self> {
         let better_than_baseline = difficulty.better_than_baseline;
         let max_distance = 6.0 - (better_than_baseline as f32) / 1000.0;
         return Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
-            vector_dims: 1_000,
+            vector_dims: 250,
             database_size: 1_000_000,
             max_distance,
         });

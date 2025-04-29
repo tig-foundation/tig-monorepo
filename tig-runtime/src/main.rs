@@ -92,9 +92,9 @@ pub fn compute_solution(
                             )?
                         };
 
-                        let challenge = $c::Challenge::generate_instance_from_vec(
+                        let challenge = $c::Challenge::generate_instance(
                             seed,
-                            &settings.difficulty,
+                            &settings.difficulty.into(),
                         ).unwrap();
 
                         match solve_challenge_fn(&challenge) {
