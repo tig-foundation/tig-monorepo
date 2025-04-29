@@ -379,7 +379,7 @@ def main():
             set(f"{x}(" for x in funcs_to_ignore)
         )
         
-        output_path = f"tig-algorithms/ptx/{args.challenge}/{args.algorithm}.ptx"
+        output_path = f"tig-algorithms/lib/{args.challenge}/ptx/{args.algorithm}.ptx"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w') as f:
             f.writelines(modified_ptx_code)

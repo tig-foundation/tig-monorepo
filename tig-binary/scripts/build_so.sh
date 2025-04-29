@@ -226,7 +226,7 @@ ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ]; then
 else
     echo "amd64"
 fi)
-output=tig-algorithms/$ARCH/$CHALLENGE/$ALGORITHM.so
+output=tig-algorithms/lib/$CHALLENGE/$ARCH/$ALGORITHM.so
 mkdir -p $(dirname $output)
 
 echo "Linking into shared library '$output'"

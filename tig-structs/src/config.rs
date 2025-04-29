@@ -1,4 +1,4 @@
-use crate::{core::AlgorithmType, serializable_struct_with_getters};
+use crate::serializable_struct_with_getters;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use tig_utils::Point;
@@ -67,7 +67,7 @@ serializable_struct_with_getters! {
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
-        runtime_configs: HashMap<AlgorithmType, RuntimeConfig>,
+        runtime_configs: HashMap<String, RuntimeConfig>,
         target_solution_rate: u32,
         hash_threshold_max_percent_delta: f64,
     }

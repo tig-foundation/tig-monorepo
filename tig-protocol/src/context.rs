@@ -8,7 +8,8 @@ pub trait Context {
     async fn add_algorithm_to_mempool(
         &self,
         details: AlgorithmDetails,
-        code: String,
+        rust_code: String,
+        cuda_code: Option<String>,
     ) -> Result<String>;
     async fn get_benchmark_details(&self, benchmark_id: &String) -> Option<BenchmarkDetails>;
     async fn get_solution_nonces(&self, benchmark_id: &String) -> Option<HashSet<u64>>;
