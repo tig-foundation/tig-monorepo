@@ -235,7 +235,7 @@ def add_xor_commands(ptx_code, instruction_prime_map):
                     modified_code.append("\tatom.global.add.u64 \tr_temp_fuel, [r_fuel_addr], r_fuelusage;\n")
                     modified_code.append("\tadd.u64 \tr_temp_fuel, r_temp_fuel, r_fuel_backup;\n")
                     modified_code.append("\tmov.u64 \tr_fuelusage, 0;\n")
-                    modified_code.append("\tsetp.gt.u64 p_fuel, r_temp_fuel, 0xrsrsrsrsrsrsrsrs;\n")
+                    modified_code.append("\tsetp.gt.u64 p_fuel, r_temp_fuel, 0xdeadbeefdeadbeef;\n")
                     modified_code.append("\t@p_fuel bra $FUEL_EXCEEDED;\n")
                     modified_code.append("\tbra $NORMAL_EXIT;\n")
 
@@ -276,7 +276,7 @@ def add_xor_commands(ptx_code, instruction_prime_map):
                 modified_code.append("\tatom.global.add.u64 \tr_temp_fuel, [r_fuel_addr], r_fuelusage;\n")
                 modified_code.append("\tadd.u64 \tr_temp_fuel, r_temp_fuel, r_fuel_backup;\n")
                 modified_code.append("\tmov.u64 \tr_fuelusage, 0;\n")
-                modified_code.append("\tsetp.gt.u64 p_fuel, r_temp_fuel, 0xrsrsrsrsrsrsrsrs;\n")
+                modified_code.append("\tsetp.gt.u64 p_fuel, r_temp_fuel, 0xdeadbeefdeadbeef;\n")
                 modified_code.append("\t@p_fuel bra $FUEL_EXCEEDED;\n")
                 continue
 
