@@ -12,8 +12,7 @@ pub async fn submit_algorithm<T: Context>(
     algorithm_name: String,
     challenge_id: String,
     breakthrough_id: Option<String>,
-    rust_code: String,
-    cuda_code: Option<String>,
+    code: AlgorithmCode,
 ) -> Result<String> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;
@@ -49,8 +48,7 @@ pub async fn submit_algorithm<T: Context>(
                 breakthrough_id,
                 fee_paid: config.algorithms.submission_fee,
             },
-            rust_code,
-            cuda_code,
+            code,
         )
         .await?;
     Ok(algorithm_id)

@@ -112,6 +112,12 @@ serializable_struct_with_getters! {
 
 // Algorithm child structs
 serializable_struct_with_getters! {
+    AlgorithmCode {
+        rust: String,
+        cuda: Option<String>,
+    }
+}
+serializable_struct_with_getters! {
     AlgorithmDetails {
         name: String,
         player_id: String,
