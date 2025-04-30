@@ -157,7 +157,8 @@ pub use quadkp_improved as c003_a054;
 
 // c003_a077
 
-// c003_a078
+pub mod relative_opt_optima;
+pub use relative_opt_optima as c003_a078;
 
 // c003_a079
 
