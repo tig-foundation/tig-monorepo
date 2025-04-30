@@ -120,7 +120,8 @@ pub use sat_separate_opt as c001_a053;
 
 // c001_a054
 
-// c001_a055
+pub mod sat_separate_opt_p;
+pub use sat_separate_opt_p as c001_a055;
 
 // c001_a056
 
