@@ -120,7 +120,8 @@ pub use advanced_heuristics as c002_a054;
 
 // c002_a058
 
-// c002_a059
+pub mod advanced_cw_opt;
+pub use advanced_cw_opt as c002_a059;
 
 pub mod advanced_cw_adp;
 pub use advanced_cw_adp as c002_a060;
