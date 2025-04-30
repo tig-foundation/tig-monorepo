@@ -121,7 +121,8 @@ pub use quadkp_improved as c003_a054;
 
 // c003_a059
 
-// c003_a060
+pub mod knap_one;
+pub use knap_one as c003_a060;
 
 // c003_a061
 
