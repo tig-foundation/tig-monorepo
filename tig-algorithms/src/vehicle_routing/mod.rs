@@ -135,7 +135,8 @@ pub use new_enhanced_cw as c002_a062;
 
 // c002_a063
 
-// c002_a064
+pub mod new_enhanced_cw_opt;
+pub use new_enhanced_cw_opt as c002_a064;
 
 pub mod new_enhanced_cw_low;
 pub use new_enhanced_cw_low as c002_a065;
