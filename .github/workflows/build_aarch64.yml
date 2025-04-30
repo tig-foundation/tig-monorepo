@@ -16,7 +16,7 @@ on:
 jobs:
   build_wasm:
     name: Compile Algorithm to Aarch64
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
       statuses: write
