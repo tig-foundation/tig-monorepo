@@ -3,19 +3,13 @@ name: Build Algorithm
 on: 
   push:
     branches:
-      - 'satisfiability/*'
-      - 'vehicle_routing/*'
-      - 'knapsack/*'
-      - 'test/satisfiability/*'
-      - 'test/vehicle_routing/*'
-      - 'test/knapsack/*'
-      - 'dev/satisfiability/*'
-      - 'dev/vehicle_routing/*'
-      - 'dev/knapsack/*'
+      - 'vector_search/*'
+      - 'test/vector_search/*'
+      - 'dev/vector_search/*'
 
 jobs:
   build_wasm:
-    name: Compile Algorithm to Aarch64
+    name: Compile Algorithm to Amd64 and Ptx
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -42,11 +36,12 @@ jobs:
             -w /workspace \
             -e CHALLENGE=${{ env.CHALLENGE }} \
             -e ALGORITHM=${{ env.ALGORITHM }} \
-            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64 \
-            build_so.sh $CHALLENGE $ALGORITHM && \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-amd64-cuda12.6.3 \
+            build_so.sh $CHALLENGE $ALGORITHM --cuda && \
+            build_ptx.py $CHALLENGE $ALGORITHM && \
             cd tig-algorithms && \
-            tar -czf lib/${CHALLENGE}/${ALGORITHM}.tar.gz lib/${CHALLENGE}/aarch64/${ALGORITHM}.so && \
-            rm -rf lib/${CHALLENGE}/aarch64
+            tar -czf lib/${CHALLENGE}/${ALGORITHM}.tar.gz lib/${CHALLENGE}/amd64/${ALGORITHM}.so lib/${CHALLENGE}/ptx/${ALGORITHM}.ptx && \
+            rm -rf lib/${CHALLENGE}/amd64 lib/${CHALLENGE}/ptx
 
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
