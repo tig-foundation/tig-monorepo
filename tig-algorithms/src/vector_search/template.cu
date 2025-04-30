@@ -34,26 +34,12 @@ acknowledgments below:
    - [Author(s), Details]
 
 */
+// License must be the same as the rust code
 
-// TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
-use anyhow::{anyhow, Result};
-use cudarc::{
-    driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
-    runtime::sys::cudaDeviceProp,
-};
-use std::sync::Arc;
-use tig_challenges::vector_search::{Challenge, Solution};
+// You can import any libraries available in nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
+#include <curand_kernel.h>
+#include <stdint.h>
+#include <math.h>
+#include <float.h>
 
-pub fn solve_challenge(
-    challenge: &Challenge,
-    module: Arc<CudaModule>,
-    stream: Arc<CudaStream>,
-    prop: &cudaDeviceProp,
-) -> anyhow::Result<Option<Solution>> {
-    // return Err(<msg>) if your algorithm encounters an error
-    // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(Solution { .. }) if your algorithm finds a solution
-    Err(anyhow!("Not implemented"))
-}
-
-// Important! Do not include any tests in this file, it will result in your submission being rejected
+// Any functions available in the <challenge>.cu file will be available here
