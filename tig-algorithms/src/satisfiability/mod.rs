@@ -96,7 +96,8 @@ pub use sat_adaptive as c001_a042;
 
 // c001_a044
 
-// c001_a045
+pub mod sat_adaptive_opt_un;
+pub use sat_adaptive_opt_un as c001_a045;
 
 // c001_a046
 
