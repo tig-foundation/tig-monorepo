@@ -153,7 +153,8 @@ pub use quadkp_improved as c003_a054;
 
 // c003_a075
 
-// c003_a076
+pub mod relative_opt_mid;
+pub use relative_opt_mid as c003_a076;
 
 // c003_a077
 
