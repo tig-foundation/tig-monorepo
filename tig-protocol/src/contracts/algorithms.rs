@@ -12,7 +12,7 @@ pub async fn submit_algorithm<T: Context>(
     algorithm_name: String,
     challenge_id: String,
     breakthrough_id: Option<String>,
-    code: String,
+    code: AlgorithmCode,
 ) -> Result<String> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;
@@ -46,7 +46,6 @@ pub async fn submit_algorithm<T: Context>(
                 challenge_id,
                 player_id,
                 breakthrough_id,
-                r#type: AlgorithmType::Wasm,
                 fee_paid: config.algorithms.submission_fee,
             },
             code,
