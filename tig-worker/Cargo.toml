@@ -7,18 +7,19 @@ authors.workspace = true
 repository.workspace = true
 edition.workspace = true
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 anyhow = "1.0.81"
-bincode = "1.3.3"
 clap = { version = "4.5.4" }
+cudarc = { version = "0.16.2", features = [
+    "cuda-version-from-build-system",
+], optional = true }
 futures = "0.3"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113", features = ["preserve_order"] }
-tig-challenges = { path = "../tig-challenges" }
+tempfile = "3.19.1"
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
 tokio = { version = "1.0", features = ["full"] }
-wasmi = { git = "https://github.com/tig-foundation/wasmi.git", branch = "runtime_signature_v0.38.0" }
+
+[features]
+cuda = ["cudarc"]
