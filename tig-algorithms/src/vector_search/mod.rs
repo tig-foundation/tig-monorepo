@@ -92,7 +92,8 @@ pub use invector_hybrid as c004_a042;
 
 // c004_a045
 
-// c004_a046
+pub mod invector_hybrid_adp;
+pub use invector_hybrid_adp as c004_a046;
 
 pub mod invector_revisited_s;
 pub use invector_revisited_s as c004_a047;
