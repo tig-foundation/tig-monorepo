@@ -124,7 +124,8 @@ pub use advanced_heuristics as c002_a054;
 
 // c002_a060
 
-// c002_a061
+pub mod enhanced_cw;
+pub use enhanced_cw as c002_a061;
 
 pub mod new_enhanced_cw;
 pub use new_enhanced_cw as c002_a062;
