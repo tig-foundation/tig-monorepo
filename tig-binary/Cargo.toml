@@ -1,5 +1,5 @@
 [package]
-name = "tig-challenges"
+name = "tig-binary"
 version = "0.1.0"
 readme = "README.md"
 license = "https://github.com/tig-foundation/tig-monorepo/tree/main/docs/agreements/end_user_license_agreement.pdf"
@@ -7,19 +7,16 @@ authors.workspace = true
 repository.workspace = true
 edition.workspace = true
 
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
 [dependencies]
-anyhow = "1.0.81"
 cudarc = { version = "0.16.2", features = [
     "cuda-version-from-build-system",
 ], optional = true }
-ndarray = "0.15.6"
-rand = { version = "0.8.5", default-features = false, features = [
-    "std_rng",
-    "small_rng",
-] }
-serde = { version = "1.0.196", features = ["derive"] }
-serde_json = { version = "1.0.113" }
-statrs = { version = "0.18.0" }
+tig-challenges = { path = "../tig-challenges" }
+tig-algorithms = { path = "../tig-algorithms" }
 
 [features]
-cuda = ["cudarc"]
+entry_point = []
+cuda = ["cudarc", "tig-algorithms/cuda", "tig-challenges/cuda"]

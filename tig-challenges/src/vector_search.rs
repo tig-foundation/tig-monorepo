@@ -1,19 +1,11 @@
-use crate::{ChallengeTrait, DifficultyTrait, SolutionTrait};
 use anyhow::{anyhow, Result};
-use rand::{
-    distributions::{Distribution, Uniform},
-    rngs::{SmallRng, StdRng},
-    Rng, SeedableRng,
+use cudarc::{
+    driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
+    runtime::sys::cudaDeviceProp,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
-
-#[cfg(feature = "cuda")]
-use crate::CudaKernel;
-#[cfg(feature = "cuda")]
-use cudarc::driver::*;
-#[cfg(feature = "cuda")]
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
@@ -21,16 +13,17 @@ pub struct Difficulty {
     pub better_than_baseline: u32,
 }
 
-impl DifficultyTrait<2> for Difficulty {
-    fn from_arr(arr: &[i32; 2]) -> Self {
+impl From<Vec<i32>> for Difficulty {
+    fn from(arr: Vec<i32>) -> Self {
         Self {
             num_queries: arr[0] as u32,
             better_than_baseline: arr[1] as u32,
         }
     }
-
-    fn to_arr(&self) -> [i32; 2] {
-        [self.num_queries as i32, self.better_than_baseline as i32]
+}
+impl Into<Vec<i32>> for Difficulty {
+    fn into(self) -> Vec<i32> {
+        vec![self.num_queries as i32, self.better_than_baseline as i32]
     }
 }
 
@@ -38,8 +31,6 @@ impl DifficultyTrait<2> for Difficulty {
 pub struct Solution {
     pub indexes: Vec<usize>,
 }
-
-impl SolutionTrait for Solution {}
 
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
@@ -53,56 +44,37 @@ impl TryFrom<Map<String, Value>> for Solution {
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
-    pub vector_database: Vec<Vec<f32>>,
-    pub query_vectors: Vec<Vec<f32>>,
+    pub vector_dims: usize,
+    pub database_size: usize,
     pub max_distance: f32,
 }
 
-pub fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
-    a.iter()
-        .zip(b)
-        .map(|(&x1, &x2)| (x1 - x2) * (x1 - x2))
-        .sum::<f32>()
-        .sqrt()
-}
-
-// TIG dev bounty available for a GPU optimisation for instance generation!
-#[cfg(feature = "cuda")]
-pub const KERNEL: Option<CudaKernel> = None;
-
-impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance(
+impl Challenge {
+    pub fn generate_instance(
         seed: [u8; 32],
         difficulty: &Difficulty,
-        dev: &Arc<CudaDevice>,
-        mut funcs: HashMap<&'static str, CudaFunction>,
+        _module: Arc<CudaModule>,
+        _stream: Arc<CudaStream>,
+        _prop: &cudaDeviceProp,
     ) -> Result<Self> {
-        // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seed, difficulty)
-    }
-
-    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
-        let uniform = Uniform::from(0.0..1.0);
-        let search_vectors = (0..100000)
-            .map(|_| (0..250).map(|_| uniform.sample(&mut rng)).collect())
-            .collect();
-        let query_vectors = (0..difficulty.num_queries)
-            .map(|_| (0..250).map(|_| uniform.sample(&mut rng)).collect())
-            .collect();
-        let max_distance = 6.0 - (difficulty.better_than_baseline as f32) / 1000.0;
-
-        Ok(Self {
-            seed,
+        let better_than_baseline = difficulty.better_than_baseline;
+        let max_distance = 6.0 - (better_than_baseline as f32) / 1000.0;
+        return Ok(Self {
+            seed: seed.clone(),
             difficulty: difficulty.clone(),
-            vector_database: search_vectors,
-            query_vectors,
+            vector_dims: 250,
+            database_size: 1_000_000,
             max_distance,
-        })
+        });
     }
 
-    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+    pub fn verify_solution(
+        &self,
+        solution: &Solution,
+        module: Arc<CudaModule>,
+        stream: Arc<CudaStream>,
+        prop: &cudaDeviceProp,
+    ) -> Result<()> {
         if solution.indexes.len() != self.difficulty.num_queries as usize {
             return Err(anyhow!(
                 "Invalid number of indexes. Expected: {}, Actual: {}",
@@ -111,19 +83,55 @@ impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
             ));
         }
 
-        let mut dists = Vec::new();
-        for (query, &search_index) in self.query_vectors.iter().zip(solution.indexes.iter()) {
-            if search_index >= self.vector_database.len() {
-                return Err(anyhow!(
-                    "Invalid index. Expected: less than {}, Actual: {}",
-                    self.vector_database.len(),
-                    search_index
-                ));
-            }
-            let search = &self.vector_database[search_index];
-            dists.push(euclidean_distance(query, search));
+        let calc_total_distance_kernel = module.load_function("calc_total_distance")?;
+
+        let num_queries = self.difficulty.num_queries as usize;
+        let d_seed = stream.memcpy_stod(&self.seed.to_vec())?;
+        let d_solution_indexes = stream.memcpy_stod(&solution.indexes)?;
+        let mut d_query_vectors = stream.alloc_zeros::<f32>(num_queries * self.vector_dims)?;
+        let mut d_database_vectors = stream.alloc_zeros::<f32>(num_queries * self.vector_dims)?;
+        let mut d_total_distance = stream.alloc_zeros::<f32>(1)?;
+        let mut errorflag = stream.alloc_zeros::<u32>(1)?;
+
+        let threads_per_block = prop.maxThreadsPerBlock as u32;
+        let blocks =
+            (self.difficulty.num_queries as u32 + threads_per_block - 1) / threads_per_block;
+
+        let cfg = LaunchConfig {
+            grid_dim: (blocks, 1, 1),
+            block_dim: (threads_per_block, 1, 1),
+            shared_mem_bytes: 0,
+        };
+
+        let mut builder = stream.launch_builder(&calc_total_distance_kernel);
+        unsafe {
+            builder
+                .arg(&d_seed)
+                .arg(&(self.vector_dims as u32))
+                .arg(&(self.database_size as u32))
+                .arg(&(self.difficulty.num_queries as u32))
+                .arg(&mut d_query_vectors)
+                .arg(&mut d_database_vectors)
+                .arg(&d_solution_indexes)
+                .arg(&mut d_total_distance)
+                .arg(&mut errorflag)
+                .launch(cfg)?;
         }
-        let avg_dist = dists.iter().sum::<f32>() / dists.len() as f32;
+
+        let total_distance = stream.memcpy_dtov(&d_total_distance)?[0];
+        let error_flag = stream.memcpy_dtov(&errorflag)?[0];
+
+        match error_flag {
+            0 => {}
+            1 => {
+                return Err(anyhow!("Invalid index in solution"));
+            }
+            _ => {
+                return Err(anyhow!("Unknown error code: {}", error_flag));
+            }
+        }
+
+        let avg_dist = total_distance / self.difficulty.num_queries as f32;
         if avg_dist > self.max_distance {
             return Err(anyhow!(
                 "Average query vector distance is '{}'. Max dist: '{}'",
@@ -131,6 +139,7 @@ impl ChallengeTrait<Solution, Difficulty, 2> for Challenge {
                 self.max_distance
             ));
         }
+
         Ok(())
     }
 }

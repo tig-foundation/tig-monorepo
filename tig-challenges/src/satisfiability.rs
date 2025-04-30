@@ -12,29 +12,24 @@ use serde::{
 };
 use serde_json::{from_value, Map, Value};
 
-#[cfg(feature = "cuda")]
-use crate::CudaKernel;
-#[cfg(feature = "cuda")]
-use cudarc::driver::*;
-#[cfg(feature = "cuda")]
-use std::{collections::HashMap, sync::Arc};
-
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_variables: usize,
     pub clauses_to_variables_percent: u32,
 }
 
-impl crate::DifficultyTrait<2> for Difficulty {
-    fn from_arr(arr: &[i32; 2]) -> Self {
+impl From<Vec<i32>> for Difficulty {
+    fn from(arr: Vec<i32>) -> Self {
         Self {
             num_variables: arr[0] as usize,
             clauses_to_variables_percent: arr[1] as u32,
         }
     }
+}
 
-    fn to_arr(&self) -> [i32; 2] {
-        [
+impl Into<Vec<i32>> for Difficulty {
+    fn into(self) -> Vec<i32> {
+        vec![
             self.num_variables as i32,
             self.clauses_to_variables_percent as i32,
         ]
@@ -46,8 +41,6 @@ pub struct Solution {
     #[serde(with = "bool_vec_as_u8")]
     pub variables: Vec<bool>,
 }
-
-impl crate::SolutionTrait for Solution {}
 
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
@@ -64,23 +57,8 @@ pub struct Challenge {
     pub clauses: Vec<Vec<i32>>,
 }
 
-// TIG dev bounty available for a GPU optimisation for instance generation!
-#[cfg(feature = "cuda")]
-pub const KERNEL: Option<CudaKernel> = None;
-
-impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
-    #[cfg(feature = "cuda")]
-    fn cuda_generate_instance(
-        seed: [u8; 32],
-        difficulty: &Difficulty,
-        dev: &Arc<CudaDevice>,
-        mut funcs: HashMap<&'static str, CudaFunction>,
-    ) -> Result<Self> {
-        // TIG dev bounty available for a GPU optimisation for instance generation!
-        Self::generate_instance(seed, difficulty)
-    }
-
-    fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
+impl Challenge {
+    pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
@@ -119,7 +97,7 @@ impl crate::ChallengeTrait<Solution, Difficulty, 2> for Challenge {
         })
     }
 
-    fn verify_solution(&self, solution: &Solution) -> Result<()> {
+    pub fn verify_solution(&self, solution: &Solution) -> Result<()> {
         if solution.variables.len() != self.difficulty.num_variables {
             return Err(anyhow!(
                 "Invalid number of variables. Expected: {}, Actual: {}",
