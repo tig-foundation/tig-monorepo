@@ -4,6 +4,7 @@ members = [
     "tig-binary",
     "tig-challenges",
     "tig-protocol",
+    "tig-runtime",
     "tig-structs",
     "tig-utils",
     "tig-worker",
