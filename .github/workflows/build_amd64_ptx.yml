@@ -1,0 +1,67 @@
+name: Build Algorithm
+
+on: 
+  push:
+    branches:
+      - 'vector_search/*'
+      - 'test/vector_search/*'
+      - 'dev/vector_search/*'
+
+jobs:
+  build_wasm:
+    name: Compile Algorithm to Amd64 and Ptx
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Env Vars
+        run: |
+          CHALLENGE=`echo $GITHUB_REF_NAME | rev | cut -d/ -f2 | rev`
+          ALGORITHM=`echo $GITHUB_REF_NAME | rev | cut -d/ -f1 | rev`
+          if [ -f tig-algorithms/lib/${CHALLENGE}/${ALGORITHM}.tar.gz ]; then
+            echo "SKIP_JOB=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_JOB=false" >> $GITHUB_ENV
+          fi
+          echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
+          echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
+
+      - name: Build Algorithm
+        if: env.SKIP_JOB != 'true'
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ env.CHALLENGE }} \
+            -e ALGORITHM=${{ env.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-amd64-cuda12.6.3 \
+            bash -c "RUST_TARGET=x86_64-unknown-linux-gnu \
+            LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/lib/rust \
+            build_so.sh \$CHALLENGE \$ALGORITHM --cuda && \
+            build_ptx.py \$CHALLENGE \$ALGORITHM && \
+            cd tig-algorithms/lib/\${CHALLENGE} && \
+            tar -czf \${ALGORITHM}.tar.gz amd64/\${ALGORITHM}.so ptx/\${ALGORITHM}.ptx && \
+            rm -rf amd64 ptx"
+
+      - name: Auto commit
+        if: env.SKIP_JOB != 'true'
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Compiled ${{ env.CHALLENGE }}/${{ env.ALGORITHM }}
+          file_pattern: tig-algorithms/lib/${{ env.CHALLENGE }}/${{ env.ALGORITHM }}.tar.gz
+
+      - name: Update Commit Status (Success)
+        if: env.SKIP_JOB != 'true' && success()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
+      - name: Update Commit Status (Failure)
+        if: env.SKIP_JOB != 'true' && failure()
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'

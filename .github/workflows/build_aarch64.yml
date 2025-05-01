@@ -6,20 +6,17 @@ on:
       - 'satisfiability/*'
       - 'vehicle_routing/*'
       - 'knapsack/*'
-      - 'vector_search/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
-      - 'test/vector_search/*'
       - 'dev/satisfiability/*'
       - 'dev/vehicle_routing/*'
       - 'dev/knapsack/*'
-      - 'dev/vector_search/*'
 
 jobs:
   build_wasm:
-    name: Compile Algorithm to WASM
-    runs-on: ubuntu-latest
+    name: Compile Algorithm to Aarch64
+    runs-on: ${{ !github.event.repository.private && 'ubuntu-24.04-arm' || 'self-hosted' }}
     permissions:
       contents: write
       statuses: write
@@ -29,55 +26,49 @@ jobs:
         run: |
           CHALLENGE=`echo $GITHUB_REF_NAME | rev | cut -d/ -f2 | rev`
           ALGORITHM=`echo $GITHUB_REF_NAME | rev | cut -d/ -f1 | rev`
-          WASM_PATH=tig-algorithms/wasm/${CHALLENGE}/${ALGORITHM}.wasm
-          if [ -f $WASM_PATH ]; then
+          if [ -f tig-algorithms/lib/${CHALLENGE}/${ALGORITHM}.tar.gz ]; then
             echo "SKIP_JOB=true" >> $GITHUB_ENV
           else
             echo "SKIP_JOB=false" >> $GITHUB_ENV
           fi
           echo "CHALLENGE=$CHALLENGE" >> $GITHUB_ENV
           echo "ALGORITHM=$ALGORITHM" >> $GITHUB_ENV
-          echo "WASM_PATH=$ALGORITHM" >> $GITHUB_ENV
-      - uses: dtolnay/rust-toolchain@1.82.0
-        with:
-          targets: wasm32-wasi
-      # - name: Install CUDA
-      #   if: env.SKIP_JOB != 'true' 
-      #   uses: Jimver/cuda-toolkit@v0.2.9
-      #   id: cuda-toolkit
-      #   with:
-      #     cuda: '12.1.0'
-      #     method: network
-      #     sub-packages: '["nvcc"]'
-      # - name: Cargo Build CUDA
-      #   if: env.SKIP_JOB != 'true' 
-      #   run: cargo build -p tig-algorithms --release --features cuda
-      - name: Cargo Build WASM
-        if: env.SKIP_JOB != 'true' 
-        run: >
-          CHALLENGE=${{ env.CHALLENGE }}
-          ALGORITHM=${{ env.ALGORITHM }}
-          cargo build -p tig-wasm --target wasm32-wasi --release --features entry-point;
-          mkdir -p tig-algorithms/wasm/${{ env.CHALLENGE }};
-      - name: Optimize WASM
+
+      - name: Build Algorithm
         if: env.SKIP_JOB != 'true'
-        uses: NiklasEi/wasm-opt-action@v2
-        with:
-          file: target/wasm32-wasi/release/tig_wasm.wasm
-          output: tig-algorithms/wasm/${{ env.CHALLENGE }}/${{ env.ALGORITHM }}.wasm
-          options: -O2 --remove-imports
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ env.CHALLENGE }} \
+            -e ALGORITHM=${{ env.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64 \
+            bash -c "RUST_TARGET=aarch64-unknown-linux-gnu \
+            LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/lib/rust \
+            build_so.sh \$CHALLENGE \$ALGORITHM && \
+            cd tig-algorithms/lib/\${CHALLENGE} && \
+            tar -czf \${ALGORITHM}.tar.gz aarch64/\${ALGORITHM}.so && \
+            rm -rf aarch64"
+
+      - name: Add safe directory
+        run: |
+          git config --global --add safe.directory $(realpath .)
+
       - name: Auto commit
         if: env.SKIP_JOB != 'true'
         id: auto_commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Compiled algorithm ${{ env.ALGORITHM }} into WASM
+          commit_message: Compiled ${{ env.CHALLENGE }}/${{ env.ALGORITHM }}
+          file_pattern: tig-algorithms/lib/${{ env.CHALLENGE }}/${{ env.ALGORITHM }}.tar.gz
+
       - name: Update Commit Status (Success)
         if: env.SKIP_JOB != 'true' && success()
         uses: myrotvorets/set-commit-status-action@master
         with:
           status: 'success'
           sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
       - name: Update Commit Status (Failure)
         if: env.SKIP_JOB != 'true' && failure()
         uses: myrotvorets/set-commit-status-action@master
