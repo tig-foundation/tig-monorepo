@@ -12,7 +12,6 @@ class AlgorithmDetails(FromDict):
     player_id: str
     challenge_id: str
     breakthrough_id: Optional[str]
-    type: str
     fee_paid: PreciseNumber
 
 @dataclass
@@ -158,6 +157,7 @@ class BlockDetails(FromDict):
     timestamp: int
     num_confirmed: Dict[str, int]
     num_active: Dict[str, int]
+    emissions: Dict[str, PreciseNumber]
 
 @dataclass
 class BlockData(FromDict):

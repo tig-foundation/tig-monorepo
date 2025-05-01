@@ -29,6 +29,7 @@ class JobManager:
     ):
         api_url = CONFIG["api_url"]
         config = CONFIG["job_manager_config"]
+        algo_selection = CONFIG["algo_selection"]
         # create jobs from confirmed precommits
         challenge_id_2_name = {
             c.id: c.details.name
@@ -75,7 +76,14 @@ class JobManager:
             if wasm.details.download_url is None:
                 logger.error(f"no download_url found for wasm {wasm.algorithm_id}")
                 continue
-            num_batches = math.ceil(x.details.num_nonces / config["batch_sizes"][c_name])
+            batch_size = next(
+                (s["batch_size"] for s in algo_selection if s["algorithm_id"] == x.settings.algorithm_id),
+                None
+            )
+            if batch_size is None:
+                batch_size = config["default_batch_size"][x.settings.challenge_id]
+                logger.error(f"No batch size found for algorithm_id {x.settings.algorithm_id}, using default {batch_size}")
+            num_batches = math.ceil(x.details.num_nonces / batch_size)
             atomic_inserts = [
                 (
                     """
@@ -105,7 +113,7 @@ class JobManager:
                         num_batches,
                         x.details.rand_hash,
                         json.dumps(block.config["benchmarks"]["runtime_configs"]["wasm"]),
-                        config["batch_sizes"][c_name],
+                        batch_size,
                         c_name,
                         a_name,
                         wasm.details.download_url,

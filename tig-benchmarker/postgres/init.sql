@@ -106,72 +106,65 @@ SELECT '
   "player_id": "0x0000000000000000000000000000000000000000",
   "api_key": "00000000000000000000000000000000",
   "api_url": "https://mainnet-api.tig.foundation",
-  "difficulty_sampler_config": {
-    "difficulty_ranges": {
-      "satisfiability": [0, 0.5],
-      "vehicle_routing": [0, 0.5],
-      "knapsack": [0, 0.5],
-      "vector_search": [0, 0.5]
-    },
-    "selected_difficulties": {
-      "satisfiability": [],
-      "vehicle_routing": [],
-      "knapsack": [],
-      "vector_search": []
-    }
-  },
-  "job_manager_config": {
-    "batch_sizes": {
-      "satisfiability": 8,
-      "vehicle_routing": 8,
-      "knapsack": 8,
-      "vector_search": 8
-    }
-  },
   "submissions_manager_config": {
     "time_between_retries": 60000
   },
-  "precommit_manager_config": {
-    "max_pending_benchmarks": 4,
-    "algo_selection": {
-      "satisfiability": {
-        "algorithm": "schnoing",
-        "num_nonces": 40,
-        "weight": 1,
-        "base_fee_limit": "10000000000000000"
-      },
-      "vehicle_routing": {
-        "algorithm": "clarke_wright",
-        "num_nonces": 40,
-        "weight": 1,
-        "base_fee_limit": "10000000000000000"
-      },
-      "knapsack": {
-        "algorithm": "dynamic",
-        "num_nonces": 40,
-        "weight": 1,
-        "base_fee_limit": "10000000000000000"
-      },
-      "vector_search": {
-        "algorithm": "optimal_ann",
-        "num_nonces": 40,
-        "weight": 1,
-        "base_fee_limit": "10000000000000000"
-      }
-    }
+  "job_manager_config": {
+    "default_batch_sizes": {
+      "c001": 8,
+      "c002": 8,
+      "c003": 8,
+      "c004": 8
+    },
   },
+  "precommit_manager_config": {
+    "max_pending_benchmarks": 4
+  },
+  "algo_selection": [
+    {
+      "algorithm_id": "c001_a001",
+      "num_nonces": 40,
+      "difficulty_range": [0, 0.5],
+      "selected_difficulties": [],
+      "weight": 1,
+      "batch_size": 8,
+      "base_fee_limit": "10000000000000000"
+    },
+    {
+      "algorithm_id": "c002_a001",
+      "num_nonces": 40,
+      "difficulty_range": [0, 0.5],
+      "selected_difficulties": [],
+      "weight": 1,
+      "batch_size": 8,
+      "base_fee_limit": "10000000000000000"
+    },
+    {
+      "algorithm_id": "c003_a001",
+      "num_nonces": 40,
+      "difficulty_range": [0, 0.5],
+      "selected_difficulties": [],
+      "weight": 1,
+      "batch_size": 8,
+      "base_fee_limit": "10000000000000000"
+    },
+    {
+      "algorithm_id": "c004_a001",
+      "num_nonces": 40,
+      "difficulty_range": [0, 0.5],
+      "selected_difficulties": [],
+      "weight": 1,
+      "batch_size": 8,
+      "base_fee_limit": "10000000000000000"
+    }
+  ],
   "slave_manager_config": {
     "time_before_batch_retry": 60000,
     "slaves": [
       {
         "name_regex": ".*",
-        "max_concurrent_batches": 1,
-        "selected_challenges": [
-          "satisfiability",
-          "vehicle_routing",
-          "knapsack",
-          "vector_search"
-        ]
+        "algorithm_id_regex": ".*",
+        "max_concurrent_batches": 1
       }
     ]
   }

@@ -1,0 +1,23 @@
+ARG BASE_IMAGE=ubuntu:24.04
+ARG DEV_IMAGE=ghcr.io/tig-foundation/tig-monorepo/dev
+
+FROM ${DEV_IMAGE} AS dev
+
+FROM ${BASE_IMAGE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY --from=dev /usr/local/bin/tig-runtime /usr/local/bin/tig-runtime
+COPY --from=dev /usr/local/bin/tig-worker /usr/local/bin/tig-worker
+COPY --from=dev /usr/local/lib/rust /usr/local/lib/rust
+
+RUN chmod +x /usr/local/bin/tig-runtime && \
+    chmod +x /usr/local/bin/tig-worker && \
+    echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc
+
+RUN apt update && apt install -y python3 python3-pip
+RUN pip3 install blake3 requests randomname --break-system-packages
+
+COPY tig-benchmarker /app
+
+WORKDIR /app

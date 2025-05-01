@@ -117,8 +117,7 @@ class DifficultySampler:
         self.challenges = {}
 
     def on_new_block(self, challenges: Dict[str, Challenge], **kwargs):
-        config = CONFIG["difficulty_sampler_config"]
-        for c in challenges.values():
+        for c_id, c in challenges.items():
             if c.block_data is None:
                 continue
             logger.debug(f"Calculating valid difficulties and frontiers for challenge {c.details.name}")
@@ -126,22 +125,23 @@ class DifficultySampler:
                 upper_frontier, lower_frontier = c.block_data.scaled_frontier, c.block_data.base_frontier
             else:
                 upper_frontier, lower_frontier = c.block_data.base_frontier, c.block_data.scaled_frontier
-            self.valid_difficulties[c.details.name] = calc_valid_difficulties(list(upper_frontier), list(lower_frontier))
-            if config["difficulty_ranges"] is None:
-                self.frontiers[c.details.name] = []
-            else:
-                self.frontiers[c.details.name] = calc_all_frontiers(self.valid_difficulties[c.details.name])
+            self.valid_difficulties[c_id] = calc_valid_difficulties(list(upper_frontier), list(lower_frontier))
+            self.frontiers[c_id] = None
 
-        self.challenges = [c.details.name for c in challenges.values()]
+        self.challenge_id_2_name = {
+            c_id: c.details.name for c_id, c in challenges.items()
+        }
 
     def run(self) -> Dict[str, Point]:
         samples = {}
-        config = CONFIG["difficulty_sampler_config"]
 
-        for c_name in self.challenges:
+        for config in CONFIG["algo_selection"]:
             found_valid = False
+            a_id = config["algorithm_id"]
+            c_id = a_id[:4]
+            c_name = self.challenge_id_2_name[c_id]
 
-            if len(selected_difficulties := config["selected_difficulties"].get(c_name, [])) > 0:
+            if len(selected_difficulties := config["selected_difficulties"]) > 0:
                 valid_difficulties = set(tuple(d) for d in self.valid_difficulties[c_name])
                 selected_difficulties = [tuple(d) for d in selected_difficulties]
                 selected_difficulties = [
@@ -157,17 +157,20 @@ class DifficultySampler:
                 logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
 
             if not found_valid:
-                if len(self.frontiers[c_name]) == 0 or config["difficulty_ranges"] is None:
-                    valid_difficulties = self.valid_difficulties[c_name]
+                if config["difficulty_range"] is None:
+                    valid_difficulties = self.valid_difficulties[c_id]
                     difficulty = random.choice(valid_difficulties)
                 else:
-                    frontiers = self.frontiers[c_name]
-                    difficulty_range = config["difficulty_ranges"][c_name]
+                    if self.frontiers[c_id] is None:
+                        logger.debug(f"Calculating frontiers for {c_name}")
+                        self.frontiers[c_id] = calc_all_frontiers(self.valid_difficulties[c_id])
+                    frontiers = self.frontiers[c_id]
+                    difficulty_range = config["difficulty_range"]
                     idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
                     idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
                     difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
                     difficulty = random.choice(difficulties)
-                samples[c_name] = difficulty
-                logger.debug(f"Sampled difficulty {difficulty} for challenge {c_name}")
+                samples[a_id] = difficulty
+                logger.debug(f"Sampled difficulty {difficulty} for algorithm {a_id} in challenge {c_name}")
                 
         return samples

@@ -34,7 +34,6 @@ class SlaveManager:
                         A.slave,
                         A.start_time,
                         A.end_time,
-                        B.challenge,
                         JSONB_BUILD_OBJECT(
                             'id', A.benchmark_id || '_' || A.batch_idx,
                             'benchmark_id', A.benchmark_id,
@@ -47,7 +46,9 @@ class SlaveManager:
                             'rand_hash', B.rand_hash,
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
-                            'hash_threshold', B.hash_threshold
+                            'hash_threshold', B.hash_threshold,
+                            'challenge', B.challenge,
+                            'algorithm', B.algorithm
                         ) AS batch
                     FROM proofs_batch A
                     INNER JOIN job B
@@ -65,7 +66,6 @@ class SlaveManager:
                         A.slave,
                         A.start_time,
                         A.end_time,
-                        B.challenge,
                         JSONB_BUILD_OBJECT(
                             'id', A.benchmark_id || '_' || A.batch_idx,
                             'benchmark_id', A.benchmark_id,
@@ -78,7 +78,9 @@ class SlaveManager:
                             'rand_hash', B.rand_hash,
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
-                            'hash_threshold', B.hash_threshold
+                            'hash_threshold', B.hash_threshold,
+                            'challenge', B.challenge,
+                            'algorithm', B.algorithm
                         ) AS batch
                     FROM root_batch A
                     INNER JOIN job B
@@ -109,7 +111,6 @@ class SlaveManager:
             concurrent = []
             updates = []
             now = time.time() * 1000
-            selected_challenges = set(slave["selected_challenges"])
             with self.lock:
                 concurrent = [
                     b["batch"] for b in self.batches
@@ -121,7 +122,7 @@ class SlaveManager:
                         break
                     if (
                         b["slave"] == slave_name or
-                        b["challenge"] not in selected_challenges or
+                        not re.match(slave["algorithm_id_regex"], b["batch"]["settings"]["algorithm_id"]) or
                         b["end_time"] is not None
                     ):
                         continue

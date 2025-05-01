@@ -43,14 +43,6 @@ class PrecommitManager:
     ):
         self.last_block_id = block.id
         self.num_precommits_submitted = 0
-        self.challenge_name_2_id = {
-            c.details.name: c.id
-            for c in challenges.values()
-        }
-        self.algorithm_name_2_id = {
-            f"{challenges[a.details.challenge_id].details.name}_{a.details.name}": a.id
-            for a in algorithms.values()
-        }
         self.curr_base_fees = {
             c.details.name: c.block_data.base_fee
             for c in challenges.values()
@@ -103,22 +95,16 @@ class PrecommitManager:
         )["count"]
 
         config = CONFIG["precommit_manager_config"]
+        algo_selection = CONFIG["algo_selection"]
 
         num_pending_benchmarks = num_pending_jobs + self.num_precommits_submitted
         if  num_pending_benchmarks >= config["max_pending_benchmarks"]:
             logger.debug(f"number of pending benchmarks has reached max of {config['max_pending_benchmarks']}")
             return
-        selections = [
-            (c_name, x) for c_name, x in config["algo_selection"].items()
-            #if self.curr_base_fees[c_name] <= x.base_fee_limit
-        ]
-        if len(selections) == 0:
-            logger.warning("No challenges under base fee limit")
-            return None
-        logger.debug(f"Selecting challenge from: {[(c_name, x['weight']) for c_name, x in selections]}")
-        selection = random.choices(selections, weights=[x["weight"] for _, x in selections])[0]
-        c_id = self.challenge_name_2_id[selection[0]]
-        a_id = self.algorithm_name_2_id[f"{selection[0]}_{selection[1]['algorithm']}"]
+        logger.debug(f"Selecting algorithm from: {[(x['algorithm_id'], x['weight']) for x in algo_selection]}")
+        selection = random.choices(algo_selection, weights=[x["weight"] for x in algo_selection])[0]
+        a_id = selection["algorithm_id"]
+        c_id = a_id[:4]
         self.num_precommits_submitted += 1
         req = SubmitPrecommitRequest(
             settings=BenchmarkSettings(
@@ -126,9 +112,9 @@ class PrecommitManager:
                 algorithm_id=a_id,
                 player_id=CONFIG["player_id"],
                 block_id=self.last_block_id,
-                difficulty=difficulty_samples[selection[0]]
+                difficulty=difficulty_samples[a_id]
             ),
-            num_nonces=selection[1]["num_nonces"]
+            num_nonces=selection["num_nonces"]
         )
-        logger.info(f"Created precommit (challenge: {selection[0]}, algorithm: {selection[1]['algorithm']}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
+        logger.info(f"Created precommit (algorithm_id: {a_id}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
         return req
