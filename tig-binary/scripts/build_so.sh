@@ -62,13 +62,10 @@ cargo +nightly-2025-02-10 build \
 
 ll_files=()
 while IFS= read -r line; do
-    if [[ $line != *"panic_abort"* ]]; then
+    if [[ $line != *"panic_abort-"* ]]; then
         ll_files+=("$line")
     fi
 done < <(find "target/$RUST_TARGET/release/deps" -name "*.ll")
-
-# Use number of processors available or default to 4
-MAX_PROCS=$(nproc 2>/dev/null || echo 4)
 
 object_files=()
 temp_objs=()
@@ -119,95 +116,66 @@ do
     pid_files[$pid]="$ll_file"
     pid_objs[$pid]="$temp_obj"
     
-    # If we've reached max_jobs, wait for one to finish
     if [ ${#pids[@]} -ge $max_jobs ]
     then
-        wait -n
+        wait -n -p exited_pid
         exit_status=$?
         
         if [ $exit_status -ne 0 ]
         then
-            # Find which process failed
-            for p in "${pids[@]}"
+            echo "Failed to process ${pid_files[$exited_pid]}"
+
+            for active_pid in "${pids[@]}"
             do
-                if ! kill -0 $p 2>/dev/null
+                kill $active_pid 2>/dev/null || true
+            done
+            exit 1
+        else
+            # Find index of the exited PID
+            for idx in "${!pids[@]}"
+            do
+                if [ "${pids[$idx]}" = "$exited_pid" ]
                 then
-                    echo "Failed to process ${pid_files[$p]}"
-                    # Kill all remaining processes
-                    for active_pid in "${pids[@]}"
-                    do
-                        if kill -0 $active_pid 2>/dev/null
-                        then
-                            kill $active_pid 2>/dev/null || true
-                        fi
-                    done
-                    exit 1
+                    echo "Successfully processed ${pid_files[$exited_pid]}"
+                    object_files+=("${pid_objs[$exited_pid]}")
+                    unset pids[$idx]
+                    break
                 fi
             done
-            
-            # If we couldn't identify which process failed, just exit
-            echo "An error occurred during processing"
-            exit 1
         fi
         
-        # Remove completed process(es) from tracking
-        for idx in "${!pids[@]}"
-        do
-            if ! kill -0 ${pids[$idx]} 2>/dev/null
-            then
-                # Success - add object file
-                object_files+=("${pid_objs[${pids[$idx]}]}")
-                unset pids[$idx]
-            fi
-        done
-        
-        # Reindex arrays
         pids=("${pids[@]}")
     fi
 done
 
-# Wait for all remaining processes
 while [ ${#pids[@]} -gt 0 ]
 do
-    wait -n
+    wait -n -p exited_pid
     exit_status=$?
-    
+        
     if [ $exit_status -ne 0 ]
     then
-        # Find which process failed
-        for p in "${pids[@]}"
+        echo "Failed to process ${pid_files[$exited_pid]}"
+
+        for active_pid in "${pids[@]}"
         do
-            if ! kill -0 $p 2>/dev/null
+            kill $active_pid 2>/dev/null || true
+        done
+        exit 1
+    else
+        # Find index of the exited PID
+        for idx in "${!pids[@]}"
+        do
+            if [ "${pids[$idx]}" = "$exited_pid" ]
             then
-                echo "Failed to process ${pid_files[$p]}"
-                # Kill all remaining processes
-                for active_pid in "${pids[@]}"
-                do
-                    if kill -0 $active_pid 2>/dev/null
-                    then
-                        kill $active_pid 2>/dev/null || true
-                    fi
-                done
-                exit 1
+                echo "Successfully processed ${pid_files[$exited_pid]}"
+                object_files+=("${pid_objs[$exited_pid]}")
+                unset pids[$idx]
+                break
             fi
         done
-        
-        echo "An error occurred during processing"
-        exit 1
     fi
-    
-    # Remove completed process(es) from tracking
-    for idx in "${!pids[@]}"
-    do
-        if ! kill -0 ${pids[$idx]} 2>/dev/null
-        then
-            # Success - add object file
-            object_files+=("${pid_objs[${pids[$idx]}]}")
-            unset pids[$idx]
-        fi
-    done
-    
-    # Reindex arrays
+        
     pids=("${pids[@]}")
 done
 
@@ -221,7 +189,7 @@ then
     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
 fi
 
-ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ]; then
+ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ] || [ "$(arch 2>/dev/null || echo "")" = "aarch64" ] || [ "$(arch 2>/dev/null || echo "")" = "arm64" ]; then
     echo "aarch64"
 else
     echo "amd64"
