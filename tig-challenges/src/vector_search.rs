@@ -118,6 +118,8 @@ impl Challenge {
                 .launch(cfg)?;
         }
 
+        stream.synchronize()?;
+
         let total_distance = stream.memcpy_dtov(&d_total_distance)?[0];
         let error_flag = stream.memcpy_dtov(&errorflag)?[0];
 
