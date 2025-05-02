@@ -148,8 +148,7 @@ fn compute_batch(
                 tokio::spawn(async move {
                     let temp_file = NamedTempFile::new()?;
                     let mut cmd = std::process::Command::new(runtime_path);
-                    cmd.arg("compute_solution")
-                        .arg(settings)
+                    cmd.arg(settings)
                         .arg(rand_hash)
                         .arg(nonce.to_string())
                         .arg(binary_path)

@@ -6,7 +6,7 @@ members = [
     "tig-protocol",
     "tig-runtime",
     "tig-structs",
-    "tig-utils",
+    "tig-utils", "tig-verifier",
     "tig-worker",
 ]
 exclude = []
