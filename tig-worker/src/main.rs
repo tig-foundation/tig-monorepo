@@ -171,25 +171,25 @@ fn compute_batch(
                     let is_solution = output.status.success();
                     if exit_code == Some(87) {
                         // out of fuel
-                        let mut runtime_signature = 0;
-                        let stdout = String::from_utf8_lossy(&output.stdout);
-                        let mut lines = stdout.lines().rev();
-                        while let Some(line) = lines.next() {
-                            if line.starts_with("Runtime signature: ") {
-                                if let Some(sig) = line.strip_prefix("Runtime signature: ") {
-                                    if let Ok(sig) = sig.trim().parse::<u64>() {
-                                        runtime_signature = sig;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        // let mut runtime_signature = 0;
+                        // let stdout = String::from_utf8_lossy(&output.stdout);
+                        // let mut lines = stdout.lines().rev();
+                        // while let Some(line) = lines.next() {
+                        //     if line.starts_with("Runtime signature: ") {
+                        //         if let Some(sig) = line.strip_prefix("Runtime signature: ") {
+                        //             if let Ok(sig) = sig.trim().parse::<u64>() {
+                        //                 runtime_signature = sig;
+                        //                 break;
+                        //             }
+                        //         }
+                        //     }
+                        // }
 
                         let output_data = OutputData {
                             nonce,
                             solution: Solution::new(),
-                            fuel_consumed: max_fuel,
-                            runtime_signature,
+                            fuel_consumed: max_fuel + 1,
+                            runtime_signature: 0,
                         };
                         let hash = MerkleHash::from(output_data.clone());
                         Ok::<(u64, MerkleHash, bool, Option<OutputData>), anyhow::Error>((

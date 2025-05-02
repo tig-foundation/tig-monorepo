@@ -8,7 +8,8 @@ use tig_utils::{compress_obj, dejsonify, jsonify};
 #[cfg(feature = "cuda")]
 use {
     cudarc::{
-        driver::{CudaModule, CudaStream},
+        driver::{CudaModule, CudaStream, LaunchConfig, PushKernelArg},
+        nvrtc::Ptx,
         runtime::sys::cudaDeviceProp,
     },
     std::sync::Arc,
@@ -101,6 +102,8 @@ pub fn compute_solution(
 
     let mut solution = Solution::new();
     let mut err_msg = Option::<String>::None;
+    let mut fuel_consumed = 0;
+    let mut runtime_signature = 0;
 
     macro_rules! dispatch_challenges {
         ( $( ($c:ident, $cpu_or_gpu:tt) ),+ $(,)? ) => {{
@@ -158,8 +161,15 @@ pub fn compute_solution(
                     )?
                 };
 
-                let ptx = cudarc::nvrtc::Ptx::from_file(ptx_path);
+                // Set the fuel limit in the PTX file
+                let ptx_content = std::fs::read_to_string(&ptx_path)
+                    .map_err(|e| anyhow!("Failed to read PTX file: {}", e))?;
+                let max_fuel_hex = format!("0x{:016x}", max_fuel);
+                let modified_ptx = ptx_content.replace("0xdeadbeefdeadbeef", &max_fuel_hex);
+
+                let ptx = cudarc::nvrtc::Ptx::from_src(modified_ptx);
                 let ctx = cudarc::driver::CudaContext::new(gpu_device).unwrap();
+                ctx.set_blocking_synchronize()?;
                 let module = ctx.load_module(ptx).unwrap();
                 let stream = ctx.default_stream();
                 let prop = cudarc::runtime::result::device::get_device_prop(gpu_device as i32).unwrap();
@@ -172,43 +182,50 @@ pub fn compute_solution(
                     &prop,
                 ).unwrap();
 
-                // TODO: Initialize kernel with fuel and signature
-                // let initialize_kernel = dev
-                //     .get_func(module_name, "initialize_kernel")
-                //     .ok_or_else(|| anyhow!("Failed to find initialize_kernel function"))?;
+                let initialize_kernel = module.load_function("initialize_kernel")?;
 
-                // let cfg = LaunchConfig {
-                //     grid_dim: (1, 1, 1),
-                //     block_dim: (1, 1, 1),
-                //     shared_mem_bytes: 0,
-                // };
+                let cfg = LaunchConfig {
+                    grid_dim: (1, 1, 1),
+                    block_dim: (1, 1, 1),
+                    shared_mem_bytes: 0,
+                };
 
-                // unsafe {
-                //     let signature_mod = u64::from_le_bytes(seed[0..8].try_into().unwrap());
-                //     initialize_kernel.launch(cfg, (max_fuel, signature_mod))?;
-                // }
-                // read fuel and runtime signature
+                let mut builder = stream.launch_builder(&initialize_kernel);
+                unsafe { builder.launch(cfg)?; }
 
-                match solve_challenge_fn(&challenge, module, stream, &prop) {
+                match solve_challenge_fn(&challenge, module.clone(), stream.clone(), &prop) {
                     Ok(Some(s)) => {
-                        // TODO: Finalize kernel with fuel and signature
-                        // let mut fuelusage = ctx.dev.alloc_zeros::<u64>(1)?;
-                        // let mut signature = ctx.dev.alloc_zeros::<u64>(1)?;
-                        // let mut errorstat = ctx.dev.alloc_zeros::<u64>(1)?;
+                        stream.synchronize()?;
+                        ctx.synchronize()?;
 
-                        // let finalize_kernel = ctx.dev
-                        //     .get_func(&ctx.module_name, "finalize_kernel")
-                        //     .ok_or_else(|| anyhow!("Failed to find finalize_kernel"))?;
+                        let mut fuel_usage = stream.alloc_zeros::<u64>(1)?;
+                        let mut signature = stream.alloc_zeros::<u64>(1)?;
+                        let mut error_stat = stream.alloc_zeros::<u64>(1)?;
 
-                        // let cfg = LaunchConfig {
-                        //     grid_dim: (1, 1, 1),
-                        //     block_dim: (1, 1, 1),
-                        //     shared_mem_bytes: 0,
-                        // };
+                        let finalize_kernel = module.load_function("finalize_kernel")?;
 
-                        // unsafe {
-                        //     finalize_kernel.launch(cfg, (&mut fuelusage, &mut signature, &mut errorstat))?;
-                        // }
+                        let cfg = LaunchConfig {
+                            grid_dim: (1, 1, 1),
+                            block_dim: (1, 1, 1),
+                            shared_mem_bytes: 0,
+                        };
+
+                        let mut builder = stream.launch_builder(&finalize_kernel);
+                        unsafe {
+                            builder
+                                .arg(&mut fuel_usage)
+                                .arg(&mut signature)
+                                .arg(&mut error_stat)
+                                .launch(cfg)?;
+                        }
+
+                        if stream.memcpy_dtov(&error_stat)?[0] != 0 {
+                            fuel_consumed = max_fuel + 1;
+                            runtime_signature = 0;
+                        } else {
+                            fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0];
+                            runtime_signature = stream.memcpy_dtov(&signature)?[0];
+                        }
 
                         solution = serde_json::to_value(s)
                             .unwrap()
@@ -224,13 +241,18 @@ pub fn compute_solution(
     }
     dispatch_challenges!((c001, cpu), (c002, cpu), (c003, cpu), (c004, gpu));
 
-    let fuel_remaining = unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-    let runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+    fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+    if fuel_consumed > max_fuel {
+        fuel_consumed = max_fuel + 1;
+        runtime_signature = 0;
+    } else {
+        runtime_signature ^= unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+    }
 
     let output_data = OutputData {
         nonce,
         runtime_signature,
-        fuel_consumed: max_fuel - fuel_remaining,
+        fuel_consumed,
         solution,
     };
     if let Some(path) = output_file {
@@ -277,3 +299,43 @@ pub fn load_module(path: &PathBuf) -> Result<Library> {
         Err(_) => Err(anyhow!("Failed to load module")),
     }
 }
+
+/*
+
+#include <stdio.h>
+#include <stdint.h>
+#include <cuda_runtime.h>
+#include <math.h>
+#include <float.h>
+
+#define FUELUSAGE_OK        (0)
+#define FUELUSAGE_EXCEEDED  (1)
+#define CHECK_FUEL_LIMIT    asm("trap;")
+
+__device__ u_int64_t gbl_SIGNATURE = 0; // Run-time signature
+__device__ u_int64_t gbl_FUELUSAGE = 0; // Fuel usage
+__device__ u_int64_t gbl_ERRORSTAT = 0; // Error status -- set to non-zero if fuel runs out
+
+extern "C" __global__ void initialize_kernel()
+{
+    gbl_ERRORSTAT     = FUELUSAGE_OK;
+    gbl_SIGNATURE     = 0;
+    gbl_FUELUSAGE     = 0;
+
+    return;
+}
+
+extern "C" __global__ void finalize_kernel(
+    u_int64_t *fuelusage_ptr,   // RETURNED: (64-bit) Fuel usage
+    u_int64_t *signature_ptr,   // RETURNED: (64-bit) Run-time signature
+    u_int64_t *errorstat_ptr    // RETURNED: (64-bit) Error status
+)
+{
+    fuelusage_ptr[0] = gbl_FUELUSAGE; // RETURNED: (64-bit) Fuel usage
+    signature_ptr[0] = gbl_SIGNATURE; // RETURNED: (64-bit) Run-time signature
+    errorstat_ptr[0] = gbl_ERRORSTAT; // RETURNED: (64-bit) Error status -- set to non-zero if fuel runs out
+
+    return;
+}
+
+*/
