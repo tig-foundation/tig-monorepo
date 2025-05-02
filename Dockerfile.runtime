@@ -8,10 +8,12 @@ FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
 COPY --from=dev /usr/local/bin/tig-runtime /usr/local/bin/tig-runtime
+COPY --from=dev /usr/local/bin/tig-verifier /usr/local/bin/tig-verifier
 COPY --from=dev /usr/local/bin/tig-worker /usr/local/bin/tig-worker
 COPY --from=dev /usr/local/lib/rust /usr/local/lib/rust
 
 RUN chmod +x /usr/local/bin/tig-runtime && \
+    chmod +x /usr/local/bin/tig-verifier && \
     chmod +x /usr/local/bin/tig-worker && \
     echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc
 
