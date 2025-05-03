@@ -1,0 +1,181 @@
+name: Build Algorithm
+
+on: 
+  push:
+    branches:
+      - 'satisfiability/*'
+      - 'vehicle_routing/*'
+      - 'knapsack/*'
+      - 'vector_search/*'
+      - 'test/satisfiability/*'
+      - 'test/vehicle_routing/*'
+      - 'test/knapsack/*'
+      - 'test/vector_search/*'
+      - 'dev/satisfiability/*'
+      - 'dev/vehicle_routing/*'
+      - 'dev/knapsack/*'
+      - 'dev/vector_search/*'
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      SKIP_JOB: ${{ steps.check.outputs.SKIP_JOB }}
+      CHALLENGE: ${{ steps.check.outputs.CHALLENGE }}
+      ALGORITHM: ${{ steps.check.outputs.ALGORITHM }}
+      GPU: ${{ steps.check.outputs.GPU }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check challenge and algorithm
+        id: check
+        run: |
+          CHALLENGE=`echo $GITHUB_REF_NAME | rev | cut -d/ -f2 | rev`
+          ALGORITHM=`echo $GITHUB_REF_NAME | rev | cut -d/ -f1 | rev`
+          if [ -f tig-algorithms/lib/${CHALLENGE}/${ALGORITHM}.tar.gz ]; then
+            echo "SKIP_JOB=true" >> $GITHUB_OUTPUT
+          else
+            echo "SKIP_JOB=false" >> $GITHUB_OUTPUT
+          fi
+          if [ -f tig-algorithms/src/${CHALLENGE}/${ALGORITHM}/benchmarker_outbound.cu ]; then
+            echo "GPU=true" >> $GITHUB_OUTPUT
+          else
+            echo "GPU=false" >> $GITHUB_OUTPUT
+          fi          
+          echo "CHALLENGE=$CHALLENGE" >> $GITHUB_OUTPUT
+          echo "ALGORITHM=$ALGORITHM" >> $GITHUB_OUTPUT
+          
+  build_aarch64:
+    needs: init
+    if: needs.init.outputs.SKIP_JOB == 'false'
+    name: Compile algorithm on aarch64
+    runs-on: ${{ !github.event.repository.private && 'ubuntu-24.04-arm' || 'self-hosted' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CPU Algorithm
+        if: needs.init.outputs.GPU == 'false'
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ needs.init.outputs.CHALLENGE }} \
+            -e ALGORITHM=${{ needs.init.outputs.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64 \
+            bash -c "RUST_TARGET=aarch64-unknown-linux-gnu \
+            LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/lib/rust \
+            build_so.sh \$CHALLENGE \$ALGORITHM"
+
+      - name: Build GPU Algorithm
+        if: needs.init.outputs.GPU == 'true'
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ needs.init.outputs.CHALLENGE }} \
+            -e ALGORITHM=${{ needs.init.outputs.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64-cuda12.6.3 \
+            bash -c "RUST_TARGET=aarch64-unknown-linux-gnu \
+            LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/lib/rust \
+            build_so.sh \$CHALLENGE \$ALGORITHM --cuda && \
+            build_ptx.py \$CHALLENGE \$ALGORITHM"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aarch64
+          path: |
+            tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/aarch64
+            tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/ptx
+
+  build_amd64:
+    needs: init
+    if: needs.init.outputs.SKIP_JOB == 'false'
+    name: Compile algorithm on amd64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CPU Algorithm
+        if: needs.init.outputs.GPU == 'false'
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ needs.init.outputs.CHALLENGE }} \
+            -e ALGORITHM=${{ needs.init.outputs.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-amd64 \
+            bash -c "RUST_TARGET=x86_64-unknown-linux-gnu \
+            LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/lib/rust \
+            build_so.sh \$CHALLENGE \$ALGORITHM"
+
+      - name: Build GPU Algorithm
+        if: needs.init.outputs.GPU == 'true'
+        run: |
+          docker run --rm --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CHALLENGE=${{ needs.init.outputs.CHALLENGE }} \
+            -e ALGORITHM=${{ needs.init.outputs.ALGORITHM }} \
+            ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-amd64-cuda12.6.3 \
+            bash -c "RUST_TARGET=x86_64-unknown-linux-gnu \
+            LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:/usr/local/lib/rust \
+            build_so.sh \$CHALLENGE \$ALGORITHM --cuda && \
+            build_ptx.py \$CHALLENGE \$ALGORITHM"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amd64
+          path: |
+            tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/amd64
+            tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/ptx
+
+  commit:
+    needs: [init, build_aarch64, build_amd64]
+    if: always() && needs.init.outputs.SKIP_JOB != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: |
+          git config --global --add safe.directory $(realpath .)
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        if: needs.build_aarch64.result == 'success' && needs.build_amd64.result == 'success'
+        with:
+          path: tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}
+          merge-multiple: true
+
+      - name: Create Tarball
+        if: needs.build_aarch64.result == 'success' && needs.build_amd64.result == 'success'
+        run: |
+          cd tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}
+          tar -czf ${{ needs.init.outputs.ALGORITHM }}.tar.gz */
+          rm -rf */
+
+      - name: Auto Commit
+        if: needs.build_aarch64.result == 'success' && needs.build_amd64.result == 'success'
+        id: auto_commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Compiled ${{ needs.init.outputs.CHALLENGE }}/${{ needs.init.outputs.ALGORITHM }}
+          file_pattern: tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/${{ needs.init.outputs.ALGORITHM }}.tar.gz
+
+      - name: Update Commit Status (Success)
+        if: needs.build_aarch64.result == 'success' && needs.build_amd64.result == 'success'
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'success'
+          sha: ${{ steps.auto_commit.outputs.commit_hash }}
+
+      - name: Update Commit Status (Failure)
+        if: needs.build_aarch64.result != 'success' || needs.build_amd64.result != 'success'
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          status: 'failure'
