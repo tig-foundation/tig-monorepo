@@ -111,6 +111,12 @@ serializable_struct_with_getters! {
 }
 
 // Algorithm child structs
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum AlgorithmType {
+    CPU,
+    GPU,
+}
 serializable_struct_with_getters! {
     AlgorithmCode {
         rust: String,
@@ -123,6 +129,7 @@ serializable_struct_with_getters! {
         player_id: String,
         challenge_id: String,
         breakthrough_id: Option<String>,
+        r#type: AlgorithmType,
         fee_paid: PreciseNumber,
     }
 }
@@ -433,6 +440,12 @@ serializable_struct_with_getters! {
         block_confirmed: u32,
     }
 }
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CPUArchitecture {
+    AMD64,
+    AARCH64,
+}
 pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     OutputData {
@@ -440,6 +453,7 @@ serializable_struct_with_getters! {
         runtime_signature: u64,
         fuel_consumed: u64,
         solution: Solution,
+        cpu_arch: CPUArchitecture,
     }
 }
 impl OutputData {

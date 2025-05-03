@@ -3,7 +3,7 @@ use clap::{arg, ArgAction, Command};
 use libloading::Library;
 use std::{fs, panic, path::PathBuf};
 use tig_challenges::*;
-use tig_structs::core::{BenchmarkSettings, OutputData, Solution};
+use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData, Solution};
 use tig_utils::{compress_obj, dejsonify, jsonify};
 #[cfg(feature = "cuda")]
 use {
@@ -246,6 +246,10 @@ pub fn compute_solution(
         runtime_signature,
         fuel_consumed,
         solution,
+        #[cfg(target_arch = "x86_64")]
+        cpu_arch: CPUArchitecture::AMD64,
+        #[cfg(target_arch = "aarch64")]
+        cpu_arch: CPUArchitecture::AARCH64,
     };
     if let Some(path) = output_file {
         if compress {

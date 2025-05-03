@@ -1,5 +1,5 @@
 use serde_json::json;
-use tig_structs::core::{BenchmarkSettings, OutputData};
+use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData};
 use tig_utils::MerkleHash;
 
 #[test]
@@ -17,6 +17,7 @@ fn test_calc_solution_signature() {
         runtime_signature: 456,
         fuel_consumed: 789,
         solution: solution.clone(),
+        cpu_arch: CPUArchitecture::AMD64,
     };
 
     // Assert same as Python version: tig-benchmarker/tests/core.rs
@@ -61,6 +62,7 @@ fn test_outputdata_to_merklehash() {
         runtime_signature: 456,
         fuel_consumed: 789,
         solution: solution.clone(),
+        cpu_arch: CPUArchitecture::AMD64,
     };
 
     let merkle_hash: MerkleHash = output_data.into();

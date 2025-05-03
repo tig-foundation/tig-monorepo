@@ -189,6 +189,10 @@ fn compute_batch(
                             solution: Solution::new(),
                             fuel_consumed: max_fuel + 1,
                             runtime_signature: 0,
+                            #[cfg(target_arch = "x86_64")]
+                            cpu_arch: CPUArchitecture::AMD64,
+                            #[cfg(target_arch = "aarch64")]
+                            cpu_arch: CPUArchitecture::AARCH64,
                         };
                         let hash = MerkleHash::from(output_data.clone());
                         Ok::<(u64, MerkleHash, bool, Option<OutputData>), anyhow::Error>((
