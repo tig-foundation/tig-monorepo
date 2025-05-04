@@ -4,6 +4,7 @@ import argparse
 import io
 import json
 import os
+import platform
 import logging
 import randomname
 import requests
@@ -22,15 +23,22 @@ PENDING_BATCH_IDS = set()
 PROCESSING_BATCH_IDS = set()
 READY_BATCH_IDS = set()
 FINISHED_BATCH_IDS = {}
+if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
+    CPU_ARCH = "amd64"
+elif CPU_ARCH in ["arm64", "aarch64"]:
+    CPU_ARCH = "aarch64"
+else:
+    raise Exception(f"Unsupported CPU architecture: {CPU_ARCH}")
+HAS_GPU = subprocess.run(["which", "nvidia-smi"], capture_output=True).returncode == 0
 
 def now():
     return int(time.time() * 1000)
 
 def download_library(downloads_folder, batch):
     challenge_folder = f"{downloads_folder}/{batch['challenge']}"
-    so_path = (glob(f"{challenge_folder}/*/{batch['algorithm']}.so") or [None])[0]
-
-    if so_path is None:
+    so_path = f"{challenge_folder}/{CPU_ARCH}/{batch['algorithm']}.so"
+    ptx_path = f"{challenge_folder}/ptx/{batch['algorithm']}.ptx"
+    if not os.path.exists(so_path):
         start = now()
         logger.info(f"downloading {batch['algorithm']}.tar.gz from {batch['download_url']}")
         resp = requests.get(batch['download_url'], stream=True)
@@ -39,10 +47,13 @@ def download_library(downloads_folder, batch):
         with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
             tar.extractall(path=challenge_folder)
         logger.debug(f"downloading {batch['algorithm']}.tar.gz took {now() - start}ms")
-        so_path = (glob(f"{challenge_folder}/*/{batch['algorithm']}.so") or [None])[0]
 
-    ptx_path = (glob(f"{challenge_folder}/*/{batch['algorithm']}.ptx") or [None])[0]
-    return so_path, ptx_path
+    if not os.path.exists(ptx_path):
+        return so_path, None
+    elif not HAS_GPU:
+        raise Exception(f"Algorithm {batch['algorithm']} requires GPU support, but GPU not found")
+    else:
+        return so_path, ptx_path
 
 
 def run_tig_worker(tig_worker_path, tig_runtime_path, batch, so_path, ptx_path, num_workers, output_path):
