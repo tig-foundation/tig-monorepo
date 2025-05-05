@@ -115,7 +115,7 @@ SELECT '
       "c002": 8,
       "c003": 8,
       "c004": 8
-    },
+    }
   },
   "precommit_manager_config": {
     "max_pending_benchmarks": 4

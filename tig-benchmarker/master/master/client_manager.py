@@ -70,8 +70,18 @@ class ClientManager:
         @self.app.post("/update-config")
         async def update_config(request: Request):
             logger.debug("Received config update")
+            new_config = await request.json()
+            for k, v in new_config["job_manager_config"]["default_batch_sizes"].items():
+                if v == 0:
+                    raise HTTPException(status_code=400, detail=f"Batch size for {k} cannot be 0")
+                if (v & (v - 1)) != 0:
+                    raise HTTPException(status_code=400, detail=f"Batch size for {k} must be a power of 2")
+            for x in new_config["algo_selection"]:
+                if x["batch_size"] == 0:
+                    raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} cannot be 0")
+                if (x["batch_size"] & (x["batch_size"] - 1)) != 0:
+                    raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} must be a power of 2")
             try:
-                new_config = await request.json()
                 new_config["player_id"] = new_config["player_id"].lower()
                 new_config["api_url"] = new_config["api_url"].rstrip('/')
                 
