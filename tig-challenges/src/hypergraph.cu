@@ -391,7 +391,7 @@ extern "C" __global__ void finalize_hyperedges(
     }
     __syncthreads();
     
-    for (int node_idx = threadIdx.x + blockIdx.x * gridDim.x; node_idx < num_nodes; node_idx += blockDim.x * gridDim.x) 
+    for (int node_idx = threadIdx.x + blockIdx.x * blockDim.x; node_idx < num_nodes; node_idx += blockDim.x * gridDim.x) 
     {
         int offset = 0;
         for (int hyperedge_idx = 0; hyperedge_idx < num_hyperedges; hyperedge_idx++)
@@ -626,7 +626,7 @@ extern "C" __global__ void finalize_shuffle(
     const int *hyperedge_offsets,
     int *shuffled_hyperedge_nodes
 ) {
-    for (int hyperedge_idx = threadIdx.x + blockIdx.x * gridDim.x; hyperedge_idx < num_hyperedges; hyperedge_idx += blockDim.x * gridDim.x) {
+    for (int hyperedge_idx = threadIdx.x + blockIdx.x * blockDim.x; hyperedge_idx < num_hyperedges; hyperedge_idx += blockDim.x * gridDim.x) {
         int hyperedge_size = hyperedge_sizes[hyperedge_idx];
         int hyperedge_offset = hyperedge_offsets[hyperedge_idx];
 
