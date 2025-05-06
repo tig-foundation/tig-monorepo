@@ -55,7 +55,8 @@ pub struct SubInstance {
     pub difficulty: Difficulty,
     pub num_nodes: u32,
     pub num_parts: u32,
-    pub max_partition_size: u32,
+    pub max_part_size: u32,
+    pub total_connections: u32,
     pub d_hyperedge_sizes: CudaSlice<i32>,
     // start = hyperedge_offsets[i], end = hyperedge_offsets[i + 1]
     // nodes_in_hyperedge_i = hyperedge_nodes[start..end]
@@ -66,6 +67,7 @@ pub struct SubInstance {
     pub d_node_degrees: CudaSlice<i32>,
     pub d_node_offsets: CudaSlice<i32>,
     pub d_node_hyperedges: CudaSlice<i32>,
+    pub d_partition: CudaSlice<i32>,
     pub baseline_connectivity_metric: u32,
 }
 
@@ -415,20 +417,22 @@ impl SubInstance {
         stream.synchronize()?;
 
         let connectivity_metric = stream.memcpy_dtov(&d_connectivity_metric)?[0];
-        let max_partition_size = ((num_nodes as f32 / num_parts as f32) * 1.03).ceil() as u32;
+        let max_part_size = ((num_nodes as f32 / num_parts as f32) * 1.03).ceil() as u32;
 
         Ok(Self {
             seed: *seed,
             difficulty: difficulty.clone(),
             num_nodes: target_num_nodes - num_prune,
             num_parts,
-            max_partition_size,
+            max_part_size,
+            total_connections,
             d_hyperedge_sizes,
             d_hyperedge_offsets,
             d_hyperedge_nodes: d_shuffled_hyperedge_nodes,
             d_node_degrees: d_shuffled_node_degrees,
             d_node_offsets: d_shuffled_node_offsets,
             d_node_hyperedges: d_shuffled_node_hyperedges,
+            d_partition: d_shuffled_partition,
             baseline_connectivity_metric: connectivity_metric,
         })
     }
@@ -451,7 +455,7 @@ impl SubInstance {
         // Get the kernels
         let validate_partition_kernel = module.load_function("validate_partition")?;
         let calc_connectivity_metric_kernel = module.load_function("calc_connectivity_metric")?;
-        let count_nodes_per_part_kernel = module.load_function("count_nodes_per_part")?;
+        let count_nodes_in_part_kernel = module.load_function("count_nodes_in_part")?;
 
         let block_size = prop.maxThreadsPerBlock as u32;
         let grid_size = (self.difficulty.num_hyperedges + block_size - 1) / block_size;
@@ -485,26 +489,26 @@ impl SubInstance {
         };
 
         // 1.2 Check if any partition exceeds the maximum size
-        let mut d_nodes_per_part = stream.alloc_zeros::<u32>(self.num_parts as usize)?;
+        let mut d_nodes_in_part = stream.alloc_zeros::<u32>(self.num_parts as usize)?;
         unsafe {
             stream
-                .launch_builder(&count_nodes_per_part_kernel)
+                .launch_builder(&count_nodes_in_part_kernel)
                 .arg(&self.num_nodes)
                 .arg(&self.num_parts)
                 .arg(&d_partition)
-                .arg(&mut d_nodes_per_part)
+                .arg(&mut d_nodes_in_part)
                 .launch(cfg.clone())?;
         }
         stream.synchronize()?;
 
-        let nodes_per_partition = stream.memcpy_dtov(&d_nodes_per_part)?;
-        if nodes_per_partition
+        let nodes_in_partition = stream.memcpy_dtov(&d_nodes_in_part)?;
+        if nodes_in_partition
             .iter()
-            .any(|&x| x < 1 || x > self.max_partition_size)
+            .any(|&x| x < 1 || x > self.max_part_size)
         {
             return Err(anyhow!(
                 "Each part must have at least 1 and at most {} nodes",
-                self.max_partition_size
+                self.max_part_size
             ));
         }
 

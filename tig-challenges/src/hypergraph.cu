@@ -686,14 +686,14 @@ extern "C" __global__ void calc_connectivity_metric(
     }
 }
 
-extern "C" __global__ void count_nodes_per_part(
+extern "C" __global__ void count_nodes_in_part(
     const int num_nodes,
     const int num_parts,
     const int *partition,
-    int *nodes_per_part
+    int *nodes_in_part
 ) {
     for (int node_idx = threadIdx.x + blockIdx.x * blockDim.x; node_idx < num_nodes; node_idx += blockDim.x * gridDim.x) {
         int part = partition[node_idx];        
-        atomicAdd(&nodes_per_part[part], 1);
+        atomicAdd(&nodes_in_part[part], 1);
     }
 }
