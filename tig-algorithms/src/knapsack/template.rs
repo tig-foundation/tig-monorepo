@@ -37,12 +37,27 @@ acknowledgments below:
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use anyhow::{anyhow, Result};
-use tig_challenges::knapsack::{Challenge, Solution};
+use tig_challenges::knapsack::*;
 
-pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
+pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
+    // Boiler plate for looping through and solving sub-instances
+    // You can modify this function if you want
+    let mut solution = Solution {
+        sub_solutions: Vec::new(),
+    };
+    for sub_instance in &challenge.sub_instances {
+        match solve_sub_instance(sub_instance)? {
+            Some(sub_solution) => solution.sub_solutions.push(sub_solution),
+            None => return Ok(None),
+        }
+    }
+    Ok(Some(solution))
+}
+
+pub fn solve_sub_instance(instance: &SubInstance) -> Result<Option<SubSolution>> {
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(Solution { .. }) if your algorithm finds a solution
+    // return Ok(SubSolution { .. }) if your algorithm finds a solution
     Err(anyhow!("Not implemented"))
 }
 

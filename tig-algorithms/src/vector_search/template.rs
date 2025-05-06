@@ -42,7 +42,7 @@ use cudarc::{
     runtime::sys::cudaDeviceProp,
 };
 use std::sync::Arc;
-use tig_challenges::vector_search::{Challenge, Solution};
+use tig_challenges::vector_search::*;
 
 pub fn solve_challenge(
     challenge: &Challenge,

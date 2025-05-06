@@ -37,7 +37,7 @@ acknowledgments below:
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use anyhow::{anyhow, Result};
-use tig_challenges::satisfiability::{Challenge, Solution};
+use tig_challenges::satisfiability::*;
 
 pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
     // return Err(<msg>) if your algorithm encounters an error
