@@ -86,20 +86,24 @@ language governing permissions and limitations under the License.
                 // Modify the values for different difficulties
 
                 // -- satisfiability --
-                // num_variables: 50,
-                // clauses_to_variables_percent: 300,
+                // num_variables: 2000,
+                // clauses_to_variables_percent: 415,
 
                 // -- vehicle_routing --
-                // num_nodes: 40,
-                // better_than_baseline: 250,
+                // num_nodes: 100,
+                // better_than_baseline: 15,
 
                 // -- knapsack --
-                // num_items: 50,
+                // num_items: 100,
                 // better_than_baseline: 10,
 
                 // -- vector_search --
-                // num_queries: 10,
+                // num_queries: 1000,
                 // better_than_baseline: 350,
+
+                // -- hypergraph --
+                // num_hyperedges: 500,
+                // better_than_baseline: 150,
             };
             let seed = [0u8; 32]; // change this to generate different instances
             let challenge = Challenge::generate_instance(&seed, &difficulty).unwrap();
@@ -121,20 +125,24 @@ language governing permissions and limitations under the License.
                 // Modify the values for different difficulties
 
                 // -- satisfiability --
-                // num_variables: 50,
-                // clauses_to_variables_percent: 300,
+                // num_variables: 2000,
+                // clauses_to_variables_percent: 415,
 
                 // -- vehicle_routing --
-                // num_nodes: 40,
-                // better_than_baseline: 250,
+                // num_nodes: 100,
+                // better_than_baseline: 15,
 
                 // -- knapsack --
-                // num_items: 50,
+                // num_items: 100,
                 // better_than_baseline: 10,
 
                 // -- vector_search --
-                // num_queries: 10,
+                // num_queries: 1000,
                 // better_than_baseline: 350,
+
+                // -- hypergraph --
+                // num_hyperedges: 500,
+                // better_than_baseline: 150,
             };
             let seed = [0u8; 32]; // change this to generate different instances
 
