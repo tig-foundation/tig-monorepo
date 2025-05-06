@@ -67,15 +67,15 @@ pub struct SubInstance {
 pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl Challenge {
-    pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
+    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
+        let mut rng = StdRng::from_seed(seed.clone());
         let mut sub_instances = Vec::new();
         for _ in 0..NUM_SUB_INSTANCES {
-            sub_instances.push(SubInstance::generate_instance(&mut rng, seed, difficulty)?);
+            sub_instances.push(SubInstance::generate_instance(&rng.gen(), difficulty)?);
         }
 
         Ok(Challenge {
-            seed,
+            seed: seed.clone(),
             difficulty: difficulty.clone(),
             sub_instances,
         })
@@ -113,11 +113,8 @@ impl Challenge {
 }
 
 impl SubInstance {
-    pub fn generate_instance(
-        rng: &mut SmallRng,
-        seed: [u8; 32],
-        difficulty: &Difficulty,
-    ) -> Result<SubInstance> {
+    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<SubInstance> {
+        let mut rng = SmallRng::from_seed(seed.clone());
         // Set constant density for value generation
         let density = 0.25;
 
@@ -177,17 +174,11 @@ impl SubInstance {
         let mut selected_items = Vec::with_capacity(difficulty.num_items);
         let mut unselected_items = Vec::with_capacity(difficulty.num_items);
         let mut total_weight = 0;
-        let mut total_value = 0;
         let mut is_selected = vec![false; difficulty.num_items];
 
         for &(item, _) in &item_values {
             if total_weight + weights[item] <= max_weight {
                 total_weight += weights[item];
-                total_value += values[item] as i32;
-
-                for &prev_item in &selected_items {
-                    total_value += interaction_values[item][prev_item];
-                }
                 selected_items.push(item);
                 is_selected[item] = true;
             } else {
@@ -273,7 +264,6 @@ impl SubInstance {
                 is_selected[new_item] = true;
                 is_selected[remove_item] = false;
 
-                total_value += best_improvement;
                 total_weight = total_weight + weights[new_item] - weights[remove_item];
 
                 // Update sum of interaction values after swapping items
@@ -303,7 +293,7 @@ impl SubInstance {
         let baseline_value = calculate_total_value(&selected_items, &values, &interaction_values);
 
         Ok(SubInstance {
-            seed,
+            seed: seed.clone(),
             difficulty: difficulty.clone(),
             weights,
             values,

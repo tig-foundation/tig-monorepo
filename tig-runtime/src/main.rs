@@ -116,7 +116,7 @@ pub fn compute_solution(
             };
 
             let challenge = $c::Challenge::generate_instance(
-                seed,
+                &seed,
                 &settings.difficulty.into(),
             ).unwrap();
 
@@ -167,7 +167,7 @@ pub fn compute_solution(
                 let prop = get_device_prop(gpu_device as i32).unwrap();
 
                 let challenge = $c::Challenge::generate_instance(
-                    seed,
+                    &seed,
                     &settings.difficulty.into(),
                     module.clone(),
                     stream.clone(),

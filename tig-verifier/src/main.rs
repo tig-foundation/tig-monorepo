@@ -100,7 +100,7 @@ pub fn verify_solution(
 
         (@expand $c:ident, cpu) => {{
             let challenge = $c::Challenge::generate_instance(
-                seed,
+                &seed,
                 &settings.difficulty.into(),
             ).unwrap();
 
@@ -136,7 +136,7 @@ pub fn verify_solution(
                 let prop = get_device_prop(gpu_device as i32).unwrap();
 
                 let challenge = $c::Challenge::generate_instance(
-                    seed,
+                    &seed,
                     &settings.difficulty.into(),
                     module.clone(),
                     stream.clone(),

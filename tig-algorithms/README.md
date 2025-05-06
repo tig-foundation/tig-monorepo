@@ -19,7 +19,7 @@ Shared objects and ptx for an algorithm are stored in the `lib/<CHALLENGE>` subf
 ## Algorithm Submission Flow
 
 1. New submissions get their branch pushed to a private version of this repository
-2. CI will compile submissions into WASM
+2. CI will compile submissions into shared objects and ptx
 3. A new submission made during round `X` will have its branch pushed to the public version of this repository at the start of round `X + 2`
 4. At the start of round `X + 4`, the submission becomes active, where benchmarkers can use the algorithm for benchmarking
 5. Every block, algorithms with at least 25% adoption earn rewards and a merge point

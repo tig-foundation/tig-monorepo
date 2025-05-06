@@ -72,14 +72,14 @@ pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl Challenge {
     pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
+        let mut rng = StdRng::from_seed(seed.clone());
         let mut sub_instances = Vec::new();
         for _ in 0..NUM_SUB_INSTANCES {
-            sub_instances.push(SubInstance::generate_instance(&mut rng, seed, difficulty)?);
+            sub_instances.push(SubInstance::generate_instance(&rng.gen(), difficulty)?);
         }
 
         Ok(Challenge {
-            seed,
+            seed: seed.clone(),
             difficulty: difficulty.clone(),
             sub_instances,
         })
@@ -117,11 +117,8 @@ impl Challenge {
 }
 
 impl SubInstance {
-    pub fn generate_instance(
-        rng: &mut SmallRng,
-        seed: [u8; 32],
-        difficulty: &Difficulty,
-    ) -> Result<SubInstance> {
+    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<SubInstance> {
+        let mut rng = SmallRng::from_seed(seed.clone());
         let num_nodes = difficulty.num_nodes;
         let max_capacity = 200;
 
@@ -145,7 +142,7 @@ impl SubInstance {
                 let cluster_idx = rng.gen_range(1..=num_clusters);
                 let pos = (
                     truncated_normal_sample(
-                        rng,
+                        &mut rng,
                         node_positions[cluster_idx].0 as f64,
                         60.0,
                         0.0,
@@ -153,7 +150,7 @@ impl SubInstance {
                     )
                     .round() as i32,
                     truncated_normal_sample(
-                        rng,
+                        &mut rng,
                         node_positions[cluster_idx].1 as f64,
                         60.0,
                         0.0,
@@ -240,7 +237,7 @@ impl SubInstance {
         )?;
 
         Ok(SubInstance {
-            seed,
+            seed: seed.clone(),
             difficulty: difficulty.clone(),
             demands,
             distance_matrix,

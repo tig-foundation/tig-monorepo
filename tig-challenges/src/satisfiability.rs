@@ -58,8 +58,8 @@ pub struct Challenge {
 }
 
 impl Challenge {
-    pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Self> {
-        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).gen());
+    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).gen());
         let num_clauses = (difficulty.num_variables as f64
             * difficulty.clauses_to_variables_percent as f64
             / 100.0)
@@ -91,7 +91,7 @@ impl Challenge {
             .collect();
 
         Ok(Self {
-            seed,
+            seed: seed.clone(),
             difficulty: difficulty.clone(),
             clauses,
         })

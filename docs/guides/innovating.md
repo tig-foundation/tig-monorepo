@@ -102,7 +102,7 @@ language governing permissions and limitations under the License.
                 // better_than_baseline: 350,
             };
             let seed = [0u8; 32]; // change this to generate different instances
-            let challenge = Challenge::generate_instance(seed, &difficulty).unwrap();
+            let challenge = Challenge::generate_instance(&seed, &difficulty).unwrap();
             match solve_challenge(&challenge) {
                 Ok(Some(solution)) => match challenge.verify_solution(&solution) {
                     Ok(_) => println!("Valid solution"),
@@ -148,7 +148,7 @@ language governing permissions and limitations under the License.
             let prop = get_device_prop(gpu_device as i32).unwrap();
 
             let challenge =
-                Challenge::generate_instance(seed, &difficulty, module.clone(), stream.clone(), &prop)
+                Challenge::generate_instance(&seed, &difficulty, module.clone(), stream.clone(), &prop)
                     .unwrap();
 
             match solve_challenge(&challenge, module.clone(), stream.clone(), &prop) {
@@ -204,7 +204,7 @@ See the [README](../../tig-binary/README.md) for `tig-binary`
 
 ## Testing Performance of Algorithms
 
-TODO
+TODO 
 
 ## Checking CI Successfully Compiles Your Algorithm
 

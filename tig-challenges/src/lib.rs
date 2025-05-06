@@ -9,3 +9,7 @@ pub use vehicle_routing as c002;
 pub mod vector_search;
 #[cfg(feature = "cuda")]
 pub use vector_search as c004;
+#[cfg(feature = "cuda")]
+pub mod hypergraph;
+#[cfg(feature = "cuda")]
+pub use hypergraph as c005;

@@ -51,7 +51,7 @@ pub struct Challenge {
 
 impl Challenge {
     pub fn generate_instance(
-        seed: [u8; 32],
+        seed: &[u8; 32],
         difficulty: &Difficulty,
         _module: Arc<CudaModule>,
         _stream: Arc<CudaStream>,
