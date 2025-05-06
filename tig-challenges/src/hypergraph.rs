@@ -12,6 +12,20 @@ pub struct Difficulty {
     pub better_than_baseline: u32,
 }
 
+impl From<Vec<i32>> for Difficulty {
+    fn from(arr: Vec<i32>) -> Self {
+        Self {
+            num_hyperedges: arr[0] as u32,
+            better_than_baseline: arr[1] as u32,
+        }
+    }
+}
+impl Into<Vec<i32>> for Difficulty {
+    fn into(self) -> Vec<i32> {
+        vec![self.num_hyperedges as i32, self.better_than_baseline as i32]
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Solution {
     pub sub_solutions: Vec<SubSolution>,
