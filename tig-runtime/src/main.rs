@@ -42,7 +42,7 @@ fn cli() -> Command {
                 .value_parser(clap::value_parser!(u64)),
         )
         .arg(
-            arg!(--output [OUTPUT_FILE] "If set, the output data will be saved to this file path (default json")
+            arg!(--output [OUTPUT_FILE] "If set, the output data will be saved to this file path (default json)")
                 .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(

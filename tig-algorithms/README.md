@@ -12,9 +12,9 @@ See [the guide](../docs/guides/innovating.md)
 
 ## Downloading an Algorithm
 
-WASM blobs for an algorithm are stored in the `wasm` subfolder and can be downloaded via:
+Shared objects and ptx for an algorithm are stored in the `lib/<CHALLENGE>` subfolder and can be downloaded via:
 
-`https://raw.githubusercontent.com/tig-foundation/tig-monorepo/<branch_name>/tig-algorithms/wasm/<branch_name>.wasm`
+`https://raw.githubusercontent.com/tig-foundation/tig-monorepo/<branch_name>/tig-algorithms/lib/<branch_name>.tar.gz`
 
 ## Algorithm Submission Flow
 
@@ -30,8 +30,8 @@ WASM blobs for an algorithm are stored in the `wasm` subfolder and can be downlo
 
 Each algorithm submission will have 5 versions, each under a specific license:
 
-* `commercial.rs` will be under TIG commercial license
-* `open_data.rs` will be under TIG open data license
-* `benchmarker_outbound.rs` will be under TIG benchmarker outbound license
-* `innovator_outbound.rs` will be under TIG innovator outbound license
-* `inbound.rs` will be under TIG inbound license
+* `commercial` will be under TIG commercial license
+* `open_data` will be under TIG open data license
+* `benchmarker_outbound` will be under TIG benchmarker outbound license
+* `innovator_outbound` will be under TIG innovator outbound license
+* `inbound` will be under TIG inbound license

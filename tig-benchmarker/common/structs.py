@@ -103,6 +103,7 @@ class OutputData(FromDict):
     runtime_signature: int
     fuel_consumed: int
     solution: dict
+    cpu_arch: str
 
     def calc_solution_signature(self) -> int:
         return u64s_from_str(jsonify(self.solution))[0]

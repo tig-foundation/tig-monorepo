@@ -1,51 +1,88 @@
 # tig-worker
 
-A Rust crate for verifying and computing solutions.
+A Rust crate for executing a batch of instances using [`tig-runtime`](../tig-runtime/README.md), aggregating outputs, and calculating Merkle root.
 
-Solutions are computed by executing an algorithm in a WASM virtual machine ([TIG's fork of wasmi](https://github.com/tig-foundation/wasmi)).
+# Getting Started
 
-# Compiling
+`tig-worker` executes a number of `tig-runtime` concurrently. Each `tig-runtime` loads an algorithm shared object (compiled from `tig-binary`), which expects a specific version of rust standard libraries to be available on `LD_LIBRARY_PATH`. 
 
+Users who don't intend to customise `tig-worker` are recommended to download pre-compiled version available in [TIG's runtime docker images](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fruntime).
+
+**Example:**
 ```
-cargo build -p tig-worker --release
-./target/release/tig-worker --help
+docker run -it ghcr.io/tig-foundation/tig-monorepo/runtime:0.0.1-aarch64
+# tig-worker is already on PATH
+```
+
+## Compiling (using dev docker image)
+
+The required rust environment for development are available via [TIG's development docker images](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fdev).
+
+
+**Example:**
+```
+docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64
+# cargo build -p tig-worker --release
+```
+
+## Compiling (local setup)
+
+Users who intend to customise `tig-worker` need to install a specific version of rust:
+
+1. Install rust version `nightly-2025-02-10`
+```
+ARCH=$(uname -m)
+RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    echo "aarch64-unknown-linux-gnu";
+else
+    echo "x86_64-unknown-linux-gnu";
+fi)
+rustup install nightly-2025-02-10
+rustup default nightly-2025-02-10
+rustup component add rust-src
+rustup target add $RUST_TARGET
+RUST_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
+ln -s $RUST_LIBDIR /usr/local/lib/rust
+echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> ~/.bashrc
+```
+
+2. Compile `tig-worker`
+```
+# for cuda version, add --features cuda
+cargo build -p tig-worker --release --target $RUST_TARGET
 ```
 
 # Usage
 
-`tig-worker` has sub-commands `verify_solution`, `compute_solution` and `compute_batch`. These are used in 2 scripts:
-
-* [Test algorithm performance](../scripts/test_algorithm_performance.sh)
-* [Verify benchmark solutions](../scripts/verify_benchmark_solutions.sh)
-
-## Verify Solution
-
-Given settings, nonce and a solution, `tig-worker` verifies the solution is a valid solution for the challenge instance.
-
-* If the solution is valid, `tig-worker` will terminate with exit code 0
-
-* If the solution is invalid, `tig-worker` will terminate with exit code 1
-
 ```
-Usage: tig-worker verify_solution <SETTINGS> <RAND_HASH> <NONCE> <SOLUTION>
+Usage: tig-worker [OPTIONS] <RUNTIME> <SETTINGS> <RAND_HASH> <START_NONCE> <NUM_NONCES> <BATCH_SIZE> <BINARY>
 
 Arguments:
-  <SETTINGS>   Settings json string or path to json file
-  <RAND_HASH>  A string used in seed generation
-  <NONCE>      Nonce value
-  <SOLUTION>   Solution json string or path to json file
+  <RUNTIME>      Path to tig-runtime executable
+  <SETTINGS>     Settings json string or path to json file
+  <RAND_HASH>    A string used in seed generation
+  <START_NONCE>  Starting nonce
+  <NUM_NONCES>   Number of nonces to compute
+  <BATCH_SIZE>   Batch size for Merkle tree
+  <BINARY>       Path to a shared object (*.so) file
 
 Options:
-  -h, --help  Print help
+      --ptx [<PTX>]               Path to a CUDA ptx file
+      --fuel [<FUEL>]             Optional maximum fuel parameter for runtime [default: 2000000000]
+      --workers [<WORKERS>]       Number of worker threads [default: 1]
+      --output [<OUTPUT_FOLDER>]  If set, the data for nonce will be saved as '<nonce>.json' in this folder
+  -h, --help                      Print help
 ```
 
 **Example:**
 ```
-SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
-NONCE=7
-SOLUTION='{"variables":[1,0,0,0,0,0,1,0,0,0,1,1,1,1,0,1,1,0,0,1,1,1,1,0,1,0,1,1,0,0,1,1,0,0,0,0,1,0,0,1,1,1,1,1,1,0,1,1,1,0]}'
-RAND_HASH=random_string
-./target/release/tig-worker verify_solution $SETTINGS $RAND_HASH $NONCE $SOLUTION
+SETTINGS='{"challenge_id":"c001","difficulty":[5000,415],"algorithm_id":"","player_id":"","block_id":""}'
+RANDHASH='rand_hash'$
+NONCE=1337
+FUEL=987654321123456789
+SO_PATH=./tig-algorithms/lib/satisfiability/aarch64/better_sat.so
+
+tig-worker \tig-runtime $SETTINGS $RANDHASH $NONCE $SO_PATH --fuel $FUEL
 ```
 
 ## Compute Solution
@@ -73,63 +110,20 @@ Options:
 
 **Example:**
 ```
-SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
-NONCE=7
-WASM=./tig-algorithms/wasm/satisfiability/schnoing.wasm
+SETTINGS='{"challenge_id":"c001","difficulty":[5000,415],"algorithm_id":"","player_id":"","block_id":""}'
+START=0
+NUM_NONCES=8
+BATCH_SIZE=8
+SO_PATH=./tig-algorithms/lib/satisfiability/aarch64/better_sat.so
 RAND_HASH=random_string
-./target/release/tig-worker compute_solution $SETTINGS $RAND_HASH $NONCE $WASM 
+
+tig-worker \tig-runtime $SETTINGS $RAND_HASH $START $NUM_NONCES $BATCH_SIZE $SO_PATH --workers 8
 ```
 
-# Compute Batch
-Computes a batch of nonces and generates Merkle root and proofs.
-
+**Example Output:**
 ```
-Usage: tig-worker compute_batch [OPTIONS] <SETTINGS> <RAND_HASH> <START_NONCE> <NUM_NONCES> <BATCH_SIZE> <WASM>
-
-Arguments:
-  <SETTINGS>     Settings json string or path to json file
-  <RAND_HASH>    A string used in seed generation
-  <START_NONCE>  Starting nonce
-  <NUM_NONCES>   Number of nonces to compute
-  <BATCH_SIZE>   Batch size for Merkle tree
-  <WASM>         Path to a wasm file
-
-Options:
-      --fuel [<FUEL>]                Optional maximum fuel parameter for WASM VM [default: 2000000000]
-      --mem [<MEM>]                  Optional maximum memory parameter for WASM VM [default: 1000000000]
-      --sampled <SAMPLED_NONCES>...  Sampled nonces for which to generate proofs
-      --workers [<WORKERS>]          Number of worker threads [default: 1]
-  -h, --help                         Print help
+{"merkle_root":"ab3f7ea08a2b991217bd9b08299b063bc77a0239af3a826d3b0ea91ca3384f98","solution_nonces":[6,3,4,5,7,2,1,0]}
 ```
-
-**Example:**
-```
-SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
-START_NONCE=0
-NUM_NONCES=1000
-BATCH_SIZE=1024
-WASM=./tig-algorithms/wasm/satisfiability/schnoing.wasm
-RAND_HASH=random_string
-./target/release/tig-worker compute_batch $SETTINGS $RAND_HASH $START_NONCE $NUM_NONCES $BATCH_SIZE $WASM 
-```
-
-# Notes
-
-* `challenge_id` must be set:
-  * `c001` is satisfiability
-  * `c002` is vehicle_routing
-  * `c003` is knapsack
-  * `c004` is vector_search
-* Recommended low difficulties for testing are:
-  * satisfiability [50,300]
-  * vehicle_routing [40, 250]
-  * knapsack [50, 10]
-  * vector_search [10, 350]
-* You can query the latest difficulties by using `scripts/list_challenges.sh`
-* You can test the performance of an algorithm using `scripts/test_algorithm.sh`
-* You can list all active benchmark ids with `scripts/list_benchmark_ids.sh`
-* You can get benchmark data with `scripts/list_benchmark_ids.sh`
-* You can verify a benchmark's solutions, runtime_signature and fuel_consumed with `scripts/verify_benchmark.sh`
 
 # License
 
