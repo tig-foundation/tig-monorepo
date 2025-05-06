@@ -163,7 +163,13 @@ pub fn verify_solution(
         }};
     }
 
-    dispatch_challenges!((c001, cpu), (c002, cpu), (c003, cpu), (c004, gpu));
+    dispatch_challenges!(
+        (c001, cpu),
+        (c002, cpu),
+        (c003, cpu),
+        (c004, gpu),
+        (c005, gpu)
+    );
 
     if let Some(err_msg) = err_msg {
         eprintln!("Verification error: {}", err_msg);

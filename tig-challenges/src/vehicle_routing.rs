@@ -71,7 +71,7 @@ pub struct SubInstance {
 pub const NUM_SUB_INSTANCES: usize = 16;
 
 impl Challenge {
-    pub fn generate_instance(seed: [u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
+    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
         let mut rng = StdRng::from_seed(seed.clone());
         let mut sub_instances = Vec::new();
         for _ in 0..NUM_SUB_INSTANCES {

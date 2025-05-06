@@ -231,7 +231,13 @@ pub fn compute_solution(
             }
         }};
     }
-    dispatch_challenges!((c001, cpu), (c002, cpu), (c003, cpu), (c004, gpu));
+    dispatch_challenges!(
+        (c001, cpu),
+        (c002, cpu),
+        (c003, cpu),
+        (c004, gpu),
+        (c005, gpu)
+    );
 
     fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
     if fuel_consumed > max_fuel {
