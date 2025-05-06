@@ -33,7 +33,7 @@ IT IS IMPORTANT THAT THIS SECTION IS COMPLETED IN SUFFICIENT DETAIL TO FULLY DES
 
 PLEASE IDENTIFY WHICH TIG CHALLENGE THE ALGORITHMIC METHOD ADDRESSES.
 
-> YOUR RESPONSE HERE (options are satisfiability, vehicle_routing, knapsack, or vector_search)
+> YOUR RESPONSE HERE (options are satisfiability, vehicle_routing, knapsack, vector_search, or hypergraph)
 
 PLEASE DESCRIBE THE ALGORITHMIC METHOD AND THE PROBLEM THAT IT SOLVES.
 

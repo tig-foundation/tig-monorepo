@@ -7,6 +7,7 @@ Presently, TIG features four challenges:
 2. [Capacitated vehicle routing](../docs/challenges/vehicle_routing.md)
 3. [Knapsack problem](../docs/challenges/knapsack.md)
 4. [Vector range search](../docs/challenges/vector_search.md)
+5. [Hypergraph partitioning](../docs/challenges/hypergraph.md)
 
 Over the coming year, an additional seven challenges from domains including artificial intelligence, biology, medicine, and climate science will be phased in. 
 
