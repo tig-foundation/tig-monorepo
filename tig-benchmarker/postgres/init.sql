@@ -114,7 +114,8 @@ SELECT '
       "c001": 8,
       "c002": 8,
       "c003": 8,
-      "c004": 8
+      "c004": 8,
+      "c005": 8
     }
   },
   "precommit_manager_config": {
@@ -150,6 +151,15 @@ SELECT '
     },
     {
       "algorithm_id": "c004_a001",
+      "num_nonces": 40,
+      "difficulty_range": [0, 0.5],
+      "selected_difficulties": [],
+      "weight": 1,
+      "batch_size": 8,
+      "base_fee_limit": "10000000000000000"
+    },
+    {
+      "algorithm_id": "c005_a001",
       "num_nonces": 40,
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],

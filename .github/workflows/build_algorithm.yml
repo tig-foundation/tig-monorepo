@@ -7,14 +7,17 @@ on:
       - 'vehicle_routing/*'
       - 'knapsack/*'
       - 'vector_search/*'
+      - 'hypergraph/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
       - 'test/vector_search/*'
+      - 'test/hypergraph/*'
       - 'dev/satisfiability/*'
       - 'dev/vehicle_routing/*'
       - 'dev/knapsack/*'
       - 'dev/vector_search/*'
+      - 'dev/hypergraph/*'
 
 jobs:
   init:
