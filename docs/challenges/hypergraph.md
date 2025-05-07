@@ -1,5 +1,5 @@
 ## Overview
-[A hypergraph is a generalization of a graph where edges can connect more than just two vertices. Hypergraph partitioning is a technique used to assign the vertices of a hypergraph into separate groups (partitions) with the goal of minimizing the connections (hyperedges) linking these partitions. This is important for various applications, including parallel computing, VLSI design, and data analysis.](https://en.wikipedia.org/wiki/Hypergraph)  
+[A hypergraph is a generalization of a graph where edges can connect more than just two nodes. Hypergraph partitioning is a technique used to assign the nodes of a hypergraph into separate groups (parts) with the goal of minimizing the connections (hyperedges) linking these parts. This is important for various applications, including parallel computing, VLSI design, and data analysis.](https://en.wikipedia.org/wiki/Hypergraph)  
 
 ## Challenge Overview
 
@@ -10,7 +10,7 @@ For our challenge, we use a version of the hypergraph partitioning problem with 
 
 A hypergraph is a structure made up of:
 * Nodes, each belonging to one or more hyperedges.
-* Hyperedges, each containing one or more nodes.
+* Hyperedges, each containing two or more nodes.
 
 TIG's generation method is such that:
 * The weight/cost of nodes and hyperedges are fixed at 1 (in some variants costs can be different)
@@ -22,16 +22,16 @@ TIG's generation method is such that:
 
 The goal is deceptively simple: each node must be assigned to one of 64 parts (i.e. 64-way partition).
 
-A partition is scored by connectivity metric, where the connectivity of each hyperedge is the number of parts it intersects:
+A partition is scored by the connectivity metric, where the connectivity of each hyperedge is the number of parts it connects:
 
 ```
 connectivity_metric = 0
 for each hyperedge:
-    intersected = set(
+    connected = set(
         partition[node] # contains the id of the part a node is assigned to
         for node in hyperedge
     )
-    connectivity = len(intersected)
+    connectivity = len(connected)
     connectivity_metric += connectivity - 1
 ```
 
@@ -40,9 +40,9 @@ The lower the connectivity metric, the better the partition.
 **Constraints:**
 1. Each node must be assigned to one part.
 2. Every part must contain at least one node.
-3. The number of nodes assigned to each part cannot be larger than 1.03x the average:
+3. The number of nodes assigned to each part cannot be larger than 1.03x the average part size:
 ```
-average_size = num_nodes / num_hyperedges
+average_size = num_nodes / num_parts
 max_size = ceil(average_size * 1.03)
 for part in partition:
     len(part) <= max_size
@@ -93,7 +93,7 @@ connectivity_metric = 24
 # explanation: 
 hyperedge 4 contains nodes [8, 9, 10, 11], overlapping with 3 parts (connectivity = 3)
    node 8 is in part 3
-   node 9 and 11 is in part 2
+   node 9 and 11 are in part 2
    node 10 is in part 1
 ```
 
