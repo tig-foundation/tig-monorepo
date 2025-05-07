@@ -134,7 +134,8 @@ pub use sat_unified as c001_a059;
 
 // c001_a060
 
-// c001_a061
+pub mod better_sat;
+pub use better_sat as c001_a061;
 
 // c001_a062
 
