@@ -223,7 +223,6 @@ impl Challenge {
         }
 
         let avg_dist = total_distance / self.difficulty.num_queries as f32;
-        println!("Average query vector distance: {}", avg_dist);
         if avg_dist > self.max_distance {
             return Err(anyhow!(
                 "Average query vector distance is '{}'. Max dist: '{}'",
