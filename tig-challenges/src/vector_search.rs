@@ -1,8 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 use cudarc::{
-    driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
+    driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::sync::Arc;
@@ -40,12 +41,13 @@ impl TryFrom<Map<String, Value>> for Solution {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
-    pub vector_dims: usize,
-    pub database_size: usize,
+    pub vector_dims: u32,
+    pub database_size: u32,
+    pub d_database_vectors: CudaSlice<f32>,
+    pub d_query_vectors: CudaSlice<f32>,
     pub max_distance: f32,
 }
 
@@ -53,17 +55,109 @@ impl Challenge {
     pub fn generate_instance(
         seed: &[u8; 32],
         difficulty: &Difficulty,
-        _module: Arc<CudaModule>,
-        _stream: Arc<CudaStream>,
-        _prop: &cudaDeviceProp,
+        module: Arc<CudaModule>,
+        stream: Arc<CudaStream>,
+        prop: &cudaDeviceProp,
     ) -> Result<Self> {
+        let mut rng = StdRng::from_seed(seed.clone());
         let better_than_baseline = difficulty.better_than_baseline;
-        let max_distance = 6.0 - (better_than_baseline as f32) / 1000.0;
+        let max_distance = 14.0 - (better_than_baseline as f32) / 1000.0;
+        let vector_dims = 250;
+        let database_size = 100 * difficulty.num_queries;
+        let avg_cluster_size: f32 = 700.0;
+        let num_clusters: u32 = ((1.0 + rng.gen::<f32>() * 0.05)
+            + database_size as f32 / avg_cluster_size)
+            .round() as u32;
+        let var: f32 = 0.2;
+        let alpha: f32 = 0.05;
+        let avg_cluster_weight = avg_cluster_size.ln() - var / 2.0;
+
+        let generate_clusters_kernel = module.load_function("generate_clusters")?;
+        let generate_vectors_kernel = module.load_function("generate_vectors")?;
+
+        let block_size = prop.maxThreadsPerBlock as u32;
+
+        let d_seed = stream.memcpy_stod(seed).unwrap();
+        let mut d_cluster_means = stream
+            .alloc_zeros::<f32>((num_clusters * vector_dims) as usize)
+            .unwrap();
+        let mut d_cluster_weights = stream.alloc_zeros::<f32>(num_clusters as usize).unwrap();
+        let mut d_cluster_stds = stream
+            .alloc_zeros::<f32>((num_clusters * vector_dims) as usize)
+            .unwrap();
+
+        unsafe {
+            stream
+                .launch_builder(&generate_clusters_kernel)
+                .arg(&d_seed)
+                .arg(&avg_cluster_weight)
+                .arg(&vector_dims)
+                .arg(&var)
+                .arg(&alpha)
+                .arg(&num_clusters)
+                .arg(&mut d_cluster_means)
+                .arg(&mut d_cluster_stds)
+                .arg(&mut d_cluster_weights)
+                .launch(LaunchConfig {
+                    grid_dim: ((num_clusters + block_size - 1) / block_size, 1, 1),
+                    block_dim: (block_size, 1, 1),
+                    shared_mem_bytes: 0,
+                })
+                .unwrap();
+        }
+        stream.synchronize().unwrap();
+
+        let cluster_weights = stream.memcpy_dtov(&d_cluster_weights).unwrap();
+        let total_weight: f32 = cluster_weights.iter().sum();
+        let mut cluster_cum_prob = cluster_weights
+            .iter()
+            .scan(0.0, |state, &weight| {
+                let ret = *state;
+                *state += weight / total_weight;
+                Some(ret)
+            })
+            .collect::<Vec<_>>();
+        cluster_cum_prob.push(1.0);
+
+        let d_cluster_cum_prob = stream.memcpy_stod(&cluster_cum_prob).unwrap();
+        let mut d_database_vectors = stream
+            .alloc_zeros::<f32>((database_size * vector_dims) as usize)
+            .unwrap();
+        let mut d_query_vectors = stream
+            .alloc_zeros::<f32>((difficulty.num_queries * vector_dims) as usize)
+            .unwrap();
+        let mut d_database_cluster = stream.alloc_zeros::<i32>(database_size as usize).unwrap();
+
+        unsafe {
+            stream
+                .launch_builder(&generate_vectors_kernel)
+                .arg(&d_seed)
+                .arg(&database_size)
+                .arg(&difficulty.num_queries)
+                .arg(&vector_dims)
+                .arg(&num_clusters)
+                .arg(&d_cluster_cum_prob)
+                .arg(&d_cluster_means)
+                .arg(&d_cluster_stds)
+                .arg(&mut d_database_vectors)
+                .arg(&mut d_query_vectors)
+                .arg(&mut d_database_cluster)
+                .launch(LaunchConfig {
+                    grid_dim: ((database_size + block_size - 1) / block_size, 1, 1),
+                    block_dim: (block_size, 1, 1),
+                    shared_mem_bytes: 0,
+                })
+                .unwrap();
+        }
+        stream.synchronize().unwrap();
+
         return Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
-            vector_dims: 250,
-            database_size: 1_000_000,
+            vector_dims,
+            database_size,
+            d_database_vectors,
+            d_query_vectors,
             max_distance,
         });
     }
@@ -85,11 +179,7 @@ impl Challenge {
 
         let calc_total_distance_kernel = module.load_function("calc_total_distance")?;
 
-        let num_queries = self.difficulty.num_queries as usize;
-        let d_seed = stream.memcpy_stod(&self.seed.to_vec())?;
         let d_solution_indexes = stream.memcpy_stod(&solution.indexes)?;
-        let mut d_query_vectors = stream.alloc_zeros::<f32>(num_queries * self.vector_dims)?;
-        let mut d_database_vectors = stream.alloc_zeros::<f32>(num_queries * self.vector_dims)?;
         let mut d_total_distance = stream.alloc_zeros::<f32>(1)?;
         let mut errorflag = stream.alloc_zeros::<u32>(1)?;
 
@@ -103,15 +193,14 @@ impl Challenge {
             shared_mem_bytes: 0,
         };
 
-        let mut builder = stream.launch_builder(&calc_total_distance_kernel);
         unsafe {
-            builder
-                .arg(&d_seed)
+            stream
+                .launch_builder(&calc_total_distance_kernel)
                 .arg(&(self.vector_dims as u32))
                 .arg(&(self.database_size as u32))
                 .arg(&(self.difficulty.num_queries as u32))
-                .arg(&mut d_query_vectors)
-                .arg(&mut d_database_vectors)
+                .arg(&self.d_query_vectors)
+                .arg(&self.d_database_vectors)
                 .arg(&d_solution_indexes)
                 .arg(&mut d_total_distance)
                 .arg(&mut errorflag)
@@ -134,6 +223,7 @@ impl Challenge {
         }
 
         let avg_dist = total_distance / self.difficulty.num_queries as f32;
+        println!("Average query vector distance: {}", avg_dist);
         if avg_dist > self.max_distance {
             return Err(anyhow!(
                 "Average query vector distance is '{}'. Max dist: '{}'",
