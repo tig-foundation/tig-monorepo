@@ -186,7 +186,8 @@ pub use relative_opt_optima as c003_a078;
 
 // c003_a088
 
-// c003_a089
+pub mod relative_raw_ultra;
+pub use relative_raw_ultra as c003_a089;
 
 // c003_a090
 
