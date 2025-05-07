@@ -122,11 +122,16 @@ pub fn compute_solution(
 
             match solve_challenge_fn(&challenge) {
                 Ok(Some(s)) => {
-                    solution = serde_json::to_value(s)
-                        .unwrap()
-                        .as_object()
-                        .unwrap()
-                        .to_owned();
+                    match challenge.verify_solution(&s) {
+                        Ok(_) => {
+                            solution = serde_json::to_value(s)
+                                .unwrap()
+                                .as_object()
+                                .unwrap()
+                                .to_owned();
+                        }
+                        Err(e) => err_msg = Some(e.to_string()),
+                    }
                 }
                 Ok(None) => {}
                 Err(e) => err_msg = Some(e),
@@ -218,12 +223,16 @@ pub fn compute_solution(
                             fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0];
                             runtime_signature = stream.memcpy_dtov(&signature)?[0];
                         }
-
-                        solution = serde_json::to_value(s)
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .to_owned();
+                        match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
+                            Ok(_) => {
+                                solution = serde_json::to_value(s)
+                                    .unwrap()
+                                    .as_object()
+                                    .unwrap()
+                                    .to_owned();
+                            }
+                            Err(e) => err_msg = Some(e.to_string()),
+                        }
                     }
                     Ok(None) => {}
                     Err(e) => err_msg = Some(e),
@@ -268,7 +277,7 @@ pub fn compute_solution(
         println!("{}", jsonify(&output_data));
     }
     if let Some(err_msg) = err_msg {
-        eprintln!("Runtime error: {}", err_msg);
+        eprintln!("Error: {}", err_msg);
         std::process::exit(86);
     } else if output_data.solution.len() == 0 {
         eprintln!("No solution found");
