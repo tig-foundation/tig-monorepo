@@ -121,19 +121,24 @@ pub fn compute_solution(
             ).unwrap();
 
             match solve_challenge_fn(&challenge) {
-                Ok(Some(s)) => {
-                    match challenge.verify_solution(&s) {
-                        Ok(_) => {
-                            solution = serde_json::to_value(s)
-                                .unwrap()
-                                .as_object()
-                                .unwrap()
-                                .to_owned();
+                Ok(result) => {
+                    fuel_consumed = max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                    if fuel_consumed <= max_fuel {
+                        runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                        if let Some(s) = result {
+                            match challenge.verify_solution(&s) {
+                                Ok(_) => {
+                                    solution = serde_json::to_value(s)
+                                        .unwrap()
+                                        .as_object()
+                                        .unwrap()
+                                        .to_owned();
+                                }
+                                Err(e) => err_msg = Some(e.to_string()),
+                            }
                         }
-                        Err(e) => err_msg = Some(e.to_string()),
                     }
                 }
-                Ok(None) => {}
                 Err(e) => err_msg = Some(e),
             }
         }};
@@ -191,7 +196,7 @@ pub fn compute_solution(
                 unsafe { builder.launch(cfg)?; }
 
                 match solve_challenge_fn(&challenge, module.clone(), stream.clone(), &prop) {
-                    Ok(Some(s)) => {
+                    Ok(result) => {
                         stream.synchronize()?;
                         ctx.synchronize()?;
 
@@ -218,23 +223,28 @@ pub fn compute_solution(
 
                         if stream.memcpy_dtov(&error_stat)?[0] != 0 {
                             fuel_consumed = max_fuel + 1;
-                            runtime_signature = 0;
                         } else {
                             fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0];
-                            runtime_signature = stream.memcpy_dtov(&signature)?[0];
+                            fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
                         }
-                        match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
-                            Ok(_) => {
-                                solution = serde_json::to_value(s)
-                                    .unwrap()
-                                    .as_object()
-                                    .unwrap()
-                                    .to_owned();
+
+                        if fuel_consumed <= max_fuel {
+                            runtime_signature = stream.memcpy_dtov(&signature)?[0];
+                            runtime_signature ^= unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                            if let Some(s) = result {
+                                match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
+                                    Ok(_) => {
+                                        solution = serde_json::to_value(s)
+                                            .unwrap()
+                                            .as_object()
+                                            .unwrap()
+                                            .to_owned();
+                                    }
+                                    Err(e) => err_msg = Some(e.to_string()),
+                                }
                             }
-                            Err(e) => err_msg = Some(e.to_string()),
                         }
                     }
-                    Ok(None) => {}
                     Err(e) => err_msg = Some(e),
                 }
             }
@@ -247,14 +257,6 @@ pub fn compute_solution(
         (c004, gpu),
         (c005, gpu)
     );
-
-    fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-    if fuel_consumed > max_fuel {
-        fuel_consumed = max_fuel + 1;
-        runtime_signature = 0;
-    } else {
-        runtime_signature ^= unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-    }
 
     let output_data = OutputData {
         nonce,
@@ -276,7 +278,10 @@ pub fn compute_solution(
     } else {
         println!("{}", jsonify(&output_data));
     }
-    if let Some(err_msg) = err_msg {
+    if fuel_consumed > max_fuel {
+        eprintln!("Out of fuel");
+        std::process::exit(87);
+    } else if let Some(err_msg) = err_msg {
         eprintln!("Error: {}", err_msg);
         std::process::exit(86);
     } else if output_data.solution.len() == 0 {
