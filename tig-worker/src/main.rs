@@ -103,7 +103,7 @@ fn compute_batch(
 
     let settings = load_settings(&settings);
     match settings.challenge_id.as_str() {
-        "c004" => {
+        "c004" | "c005" => {
             #[cfg(not(feature = "cuda"))]
             panic!("tig-worker was not compiled with '--features cuda'");
 
