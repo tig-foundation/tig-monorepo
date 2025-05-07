@@ -120,10 +120,10 @@ impl Challenge {
                 Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
             }
         }
-        let average = (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
-            / better_than_baselines.len() as f64)
-            .sqrt()
-            - 1.0;
+        let average = 1.0
+            - (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
+                / better_than_baselines.len() as f64)
+                .sqrt();
         let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
         if average >= threshold {
             Ok(())
