@@ -126,7 +126,6 @@ impl Challenge {
         let mut d_query_vectors = stream
             .alloc_zeros::<f32>((difficulty.num_queries * vector_dims) as usize)
             .unwrap();
-        let mut d_database_cluster = stream.alloc_zeros::<i32>(database_size as usize).unwrap();
 
         unsafe {
             stream
@@ -141,7 +140,6 @@ impl Challenge {
                 .arg(&d_cluster_stds)
                 .arg(&mut d_database_vectors)
                 .arg(&mut d_query_vectors)
-                .arg(&mut d_database_cluster)
                 .launch(LaunchConfig {
                     grid_dim: ((database_size + block_size - 1) / block_size, 1, 1),
                     block_dim: (block_size, 1, 1),

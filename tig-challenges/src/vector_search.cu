@@ -83,8 +83,7 @@ extern "C" __global__ void generate_vectors(
     const float *cluster_means,
     const float *cluster_stds,
     float *database_vectors,
-    float *query_vectors,
-    int *database_cluster
+    float *query_vectors
 )
 {
     for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < database_size; i += blockDim.x * gridDim.x) 
@@ -93,7 +92,6 @@ extern "C" __global__ void generate_vectors(
         curand_init(((uint64_t *)(seed))[i % 4], i, 0, &state);
         
         int cluster_idx = binary_search(cluster_cum_prob, curand_uniform(&state), num_clusters);
-        database_cluster[i] = cluster_idx;
         const float *means = cluster_means + cluster_idx * vector_dims;
         const float *stds = cluster_stds + cluster_idx * vector_dims;
 
