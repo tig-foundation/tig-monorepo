@@ -67,7 +67,6 @@ pub struct SubInstance {
     pub d_node_degrees: CudaSlice<i32>,
     pub d_node_offsets: CudaSlice<i32>,
     pub d_node_hyperedges: CudaSlice<i32>,
-    pub d_partition: CudaSlice<i32>,
     pub baseline_connectivity_metric: u32,
 }
 
@@ -432,7 +431,6 @@ impl SubInstance {
             d_node_degrees: d_shuffled_node_degrees,
             d_node_offsets: d_shuffled_node_offsets,
             d_node_hyperedges: d_shuffled_node_hyperedges,
-            d_partition: d_shuffled_partition,
             baseline_connectivity_metric: connectivity_metric,
         })
     }
