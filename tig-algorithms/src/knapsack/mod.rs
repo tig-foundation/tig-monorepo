@@ -1,4 +1,5 @@
-// c003_a001
+pub mod dynamic;
+pub use dynamic as c003_a001;
 
 pub mod classic_quadkp;
 pub use classic_quadkp as c003_a002;
