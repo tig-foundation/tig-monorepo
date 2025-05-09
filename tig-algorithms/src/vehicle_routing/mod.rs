@@ -3,7 +3,8 @@ pub use clarke_wright as c002_a001;
 
 // c002_a002
 
-// c002_a003
+pub mod solomon;
+pub use solomon as c002_a003;
 
 // c002_a004
 
