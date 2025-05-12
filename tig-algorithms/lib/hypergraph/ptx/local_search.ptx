@@ -55,7 +55,7 @@
 	st.global.u64 	[gbl_ERRORSTAT], %rd1;
 	st.global.u64 	[gbl_SIGNATURE], %rd1;
 	st.global.u64 	[gbl_FUELUSAGE], %rd1;
-	xor.b64 	r_signature, r_signature, 0x1856dc3ef0f96777;
+	xor.b64 	r_signature, r_signature, 0xf967771856dc3ef0;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 	mov.u64 	r_fuel_backup, r_fuelusage;
 	atom.global.add.u64 	r_temp_fuel, [r_fuel_addr], r_fuelusage;
@@ -72,7 +72,7 @@ $NORMAL_EXIT:
 	atom.global.add.u64 	r_fuel_addr, [r_fuel_addr], r_fuelusage;
 	ret;
 
-	xor.b64 	r_signature, r_signature, 0x1856dc3ef0f96777;
+	xor.b64 	r_signature, r_signature, 0xf967771856dc3ef0;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 }
 	// .globl	finalize_kernel
@@ -4329,14 +4329,14 @@ $L__BB14_3:
 	mov.u32 	%r51, %tid.x;
 	mad.lo.s32 	%r69, %r1, %r50, %r51;
 	setp.ge.s32 	%p15, %r69, %r49;
-	xor.b64 	r_signature, r_signature, 0x6a84b995d4b98397;
+	xor.b64 	r_signature, r_signature, 0xd224b888bb7bd685;
 	add.u64 	r_fuelusage, r_fuelusage, 15;
 	@%p15 bra 	$L__BB15_39;
 
 	setp.gt.s32 	%p16, %r49, 0;
 	mov.u32 	%r52, %nctaid.x;
 	mul.lo.s32 	%r3, %r1, %r52;
-	xor.b64 	r_signature, r_signature, 0x077ed571105d6049;
+	xor.b64 	r_signature, r_signature, 0x105d6049077ed571;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 	@%p16 bra 	$L__BB15_4;
 	bra.uni 	$L__BB15_2;
@@ -4346,7 +4346,7 @@ $L__BB15_4:
 	and.b32  	%r7, %r49, 3;
 	sub.s32 	%r8, %r7, %r49;
 
-	xor.b64 	r_signature, r_signature, 0xb0cc21ce1f5e2bd7;
+	xor.b64 	r_signature, r_signature, 0x1f5e2bd7b0cc21ce;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 $L__BB15_5:
 	mul.wide.s32 	%rd9, %r69, 4;
@@ -4354,7 +4354,7 @@ $L__BB15_5:
 	setp.lt.u32 	%p18, %r6, 3;
 	mov.u32 	%r78, 0;
 	mov.u32 	%r73, %r78;
-	xor.b64 	r_signature, r_signature, 0xcc3c47a963fc3852;
+	xor.b64 	r_signature, r_signature, 0x63fc3852cc3c47a9;
 	add.u64 	r_fuelusage, r_fuelusage, 7;
 	@%p18 bra 	$L__BB15_24;
 
@@ -4362,7 +4362,7 @@ $L__BB15_5:
 	mov.u32 	%r78, 0;
 	mov.u64 	%rd13, %rd1;
 
-	xor.b64 	r_signature, r_signature, 0xb1aebab1dcc33fb5;
+	xor.b64 	r_signature, r_signature, 0xdcc33fb5b1aebab1;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 $L__BB15_7:
 	sub.s32 	%r13, %r10, %r78;
@@ -4383,7 +4383,7 @@ $L__BB15_10:
 	selp.u32 	%r58, 1, 0, %p60;
 	add.s32 	%r73, %r73, %r58;
 
-	xor.b64 	r_signature, r_signature, 0xa80892b56882fe81;
+	xor.b64 	r_signature, r_signature, 0x6882fe81a80892b5;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_11:
 	setp.eq.s32 	%p24, %r13, 0;
@@ -4400,13 +4400,13 @@ $L__BB15_11:
 	setp.gt.s32 	%p28, %r69, %r59;
 	and.pred  	%p61, %p28, %p27;
 
-	xor.b64 	r_signature, r_signature, 0x52d37ddff91e6209;
+	xor.b64 	r_signature, r_signature, 0xf91e620952d37ddf;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB15_14:
 	selp.u32 	%r60, 1, 0, %p61;
 	add.s32 	%r73, %r73, %r60;
 
-	xor.b64 	r_signature, r_signature, 0x6882fe81a80892b5;
+	xor.b64 	r_signature, r_signature, 0xa80892b56882fe81;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_15:
 	setp.eq.s32 	%p29, %r13, 1;
@@ -4423,13 +4423,13 @@ $L__BB15_15:
 	setp.gt.s32 	%p33, %r69, %r61;
 	and.pred  	%p62, %p33, %p32;
 
-	xor.b64 	r_signature, r_signature, 0xf91e620952d37ddf;
+	xor.b64 	r_signature, r_signature, 0x52d37ddff91e6209;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB15_18:
 	selp.u32 	%r62, 1, 0, %p62;
 	add.s32 	%r73, %r73, %r62;
 
-	xor.b64 	r_signature, r_signature, 0xa80892b56882fe81;
+	xor.b64 	r_signature, r_signature, 0x6882fe81a80892b5;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_19:
 	setp.eq.s32 	%p34, %r13, 2;
@@ -4446,20 +4446,20 @@ $L__BB15_19:
 	setp.gt.s32 	%p38, %r69, %r63;
 	and.pred  	%p63, %p38, %p37;
 
-	xor.b64 	r_signature, r_signature, 0x52d37ddff91e6209;
+	xor.b64 	r_signature, r_signature, 0xf91e620952d37ddf;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB15_22:
 	selp.u32 	%r64, 1, 0, %p63;
 	add.s32 	%r73, %r73, %r64;
 
-	xor.b64 	r_signature, r_signature, 0x6882fe81a80892b5;
+	xor.b64 	r_signature, r_signature, 0xa80892b56882fe81;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_23:
 	add.s32 	%r78, %r78, 4;
 	add.s32 	%r65, %r8, %r78;
 	add.s64 	%rd13, %rd13, 16;
 	setp.ne.s32 	%p39, %r65, 0;
-	xor.b64 	r_signature, r_signature, 0xb09d9450d0fe657a;
+	xor.b64 	r_signature, r_signature, 0xd0fe657ab09d9450;
 	add.u64 	r_fuelusage, r_fuelusage, 7;
 	@%p39 bra 	$L__BB15_7;
 
@@ -4470,7 +4470,7 @@ $L__BB15_24:
 	setp.eq.s32 	%p41, %r69, %r78;
 	mul.wide.s32 	%rd10, %r78, 4;
 	add.s64 	%rd6, %rd1, %rd10;
-	xor.b64 	r_signature, r_signature, 0x7c3f19bd972eb467;
+	xor.b64 	r_signature, r_signature, 0x972eb4677c3f19bd;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 	@%p41 bra 	$L__BB15_29;
 
@@ -4488,12 +4488,12 @@ $L__BB15_28:
 	selp.u32 	%r66, 1, 0, %p64;
 	add.s32 	%r73, %r73, %r66;
 
-	xor.b64 	r_signature, r_signature, 0x82fe81a80892b568;
+	xor.b64 	r_signature, r_signature, 0x0892b56882fe81a8;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_29:
 	add.s32 	%r38, %r78, 1;
 	setp.eq.s32 	%p46, %r7, 1;
-	xor.b64 	r_signature, r_signature, 0x0952d37ddff91e62;
+	xor.b64 	r_signature, r_signature, 0xdff91e620952d37d;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p46 bra 	$L__BB15_38;
 
@@ -4514,14 +4514,14 @@ $L__BB15_33:
 	selp.u32 	%r67, 1, 0, %p65;
 	add.s32 	%r73, %r73, %r67;
 
-	xor.b64 	r_signature, r_signature, 0xa80892b56882fe81;
+	xor.b64 	r_signature, r_signature, 0x6882fe81a80892b5;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_34:
 	add.s32 	%r43, %r78, 2;
 	setp.eq.s32 	%p52, %r69, %r43;
 	setp.eq.s32 	%p53, %r7, 2;
 	or.pred  	%p54, %p53, %p52;
-	xor.b64 	r_signature, r_signature, 0x7ddff91e620952d3;
+	xor.b64 	r_signature, r_signature, 0x620952d37ddff91e;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p54 bra 	$L__BB15_38;
 
@@ -4539,7 +4539,7 @@ $L__BB15_37:
 	selp.u32 	%r68, 1, 0, %p66;
 	add.s32 	%r73, %r73, %r68;
 
-	xor.b64 	r_signature, r_signature, 0x6882fe81a80892b5;
+	xor.b64 	r_signature, r_signature, 0xa80892b56882fe81;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB15_38:
 	mul.wide.s32 	%rd11, %r73, 4;
@@ -4547,7 +4547,7 @@ $L__BB15_38:
 	st.global.u32 	[%rd12], %r69;
 	add.s32 	%r69, %r69, %r3;
 	setp.lt.s32 	%p59, %r69, %r49;
-	xor.b64 	r_signature, r_signature, 0x85bb7bb9950a1c08;
+	xor.b64 	r_signature, r_signature, 0x950a1c0885bb7bb9;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 	@%p59 bra 	$L__BB15_5;
 	bra.uni 	$L__BB15_39;
@@ -4556,7 +4556,7 @@ $L__BB15_2:
 	mov.u32 	%r4, %r69;
 	add.s32 	%r69, %r4, %r3;
 	setp.lt.s32 	%p17, %r69, %r49;
-	xor.b64 	r_signature, r_signature, 0x794f8ef335185705;
+	xor.b64 	r_signature, r_signature, 0x35185705794f8ef3;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 	@%p17 bra 	$L__BB15_2;
 
@@ -4590,7 +4590,8 @@ $NORMAL_EXIT:
 	.param .u64 my_greedy_bipartition_param_6,
 	.param .u64 my_greedy_bipartition_param_7,
 	.param .u64 my_greedy_bipartition_param_8,
-	.param .u64 my_greedy_bipartition_param_9
+	.param .u64 my_greedy_bipartition_param_9,
+	.param .u64 my_greedy_bipartition_param_10
 )
 {
 	.reg .u64 	r_signature;
@@ -4608,7 +4609,7 @@ $NORMAL_EXIT:
 	.reg .pred 	%p<27>;
 	.reg .f32 	%f<5>;
 	.reg .b32 	%r<74>;
-	.reg .b64 	%rd<47>;
+	.reg .b64 	%rd<51>;
 	// demoted variable
 	.shared .align 4 .u32 _ZZ21my_greedy_bipartitionE5count;
 	// demoted variable
@@ -4623,16 +4624,17 @@ $NORMAL_EXIT:
 	ld.param.u32 	%r25, [my_greedy_bipartition_param_0];
 	ld.param.u32 	%r23, [my_greedy_bipartition_param_1];
 	ld.param.u32 	%r24, [my_greedy_bipartition_param_2];
-	ld.param.u64 	%rd15, [my_greedy_bipartition_param_3];
-	ld.param.u64 	%rd13, [my_greedy_bipartition_param_4];
-	ld.param.u64 	%rd14, [my_greedy_bipartition_param_5];
-	ld.param.u64 	%rd16, [my_greedy_bipartition_param_7];
-	ld.param.u64 	%rd17, [my_greedy_bipartition_param_8];
-	ld.param.u64 	%rd18, [my_greedy_bipartition_param_9];
-	cvta.to.global.u64 	%rd1, %rd18;
-	cvta.to.global.u64 	%rd2, %rd17;
-	cvta.to.global.u64 	%rd3, %rd15;
-	cvta.to.global.u64 	%rd4, %rd16;
+	ld.param.u64 	%rd17, [my_greedy_bipartition_param_3];
+	ld.param.u64 	%rd14, [my_greedy_bipartition_param_4];
+	ld.param.u64 	%rd15, [my_greedy_bipartition_param_5];
+	ld.param.u64 	%rd18, [my_greedy_bipartition_param_7];
+	ld.param.u64 	%rd16, [my_greedy_bipartition_param_8];
+	ld.param.u64 	%rd19, [my_greedy_bipartition_param_9];
+	ld.param.u64 	%rd20, [my_greedy_bipartition_param_10];
+	cvta.to.global.u64 	%rd1, %rd20;
+	cvta.to.global.u64 	%rd2, %rd19;
+	cvta.to.global.u64 	%rd3, %rd17;
+	cvta.to.global.u64 	%rd4, %rd18;
 	mov.u32 	%r1, %ctaid.x;
 	mov.u32 	%r26, 1;
 	shl.b32 	%r27, %r26, %r25;
@@ -4640,14 +4642,14 @@ $NORMAL_EXIT:
 	add.s32 	%r2, %r28, -1;
 	mov.u32 	%r3, %tid.x;
 	setp.ne.s32 	%p4, %r3, 0;
-	xor.b64 	r_signature, r_signature, 0x2360ebe72b8065a5;
-	add.u64 	r_fuelusage, r_fuelusage, 42;
+	xor.b64 	r_signature, r_signature, 0xae9f79f9ba071ba2;
+	add.u64 	r_fuelusage, r_fuelusage, 46;
 	@%p4 bra 	$L__BB16_2;
 
 	mov.u32 	%r29, 0;
 	st.shared.u32 	[_ZZ21my_greedy_bipartitionE5count], %r29;
 
-	xor.b64 	r_signature, r_signature, 0x105d6049077ed571;
+	xor.b64 	r_signature, r_signature, 0x9077ed571105d604;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB16_2:
 	bar.sync 	0;
@@ -4657,26 +4659,26 @@ $L__BB16_2:
 	mov.u32 	%r4, %ntid.x;
 	mov.u32 	%r70, %r3;
 
-	xor.b64 	r_signature, r_signature, 0x938260158b64d970;
+	xor.b64 	r_signature, r_signature, 0x58b64d9709382601;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB16_4:
-	mul.wide.s32 	%rd19, %r70, 4;
-	add.s64 	%rd20, %rd4, %rd19;
-	ld.global.u32 	%r30, [%rd20];
+	mul.wide.s32 	%rd21, %r70, 4;
+	add.s64 	%rd22, %rd4, %rd21;
+	ld.global.u32 	%r30, [%rd22];
 	setp.ne.s32 	%p6, %r30, %r2;
-	xor.b64 	r_signature, r_signature, 0x19bd972eb4677c3f;
+	xor.b64 	r_signature, r_signature, 0xeb4677c3f19bd972;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 	@%p6 bra 	$L__BB16_6;
 
 	mov.u32 	%r31, _ZZ21my_greedy_bipartitionE5count;
 	atom.shared.add.u32 	%r32, [%r31], 1;
 
-	xor.b64 	r_signature, r_signature, 0x077ed571105d6049;
+	xor.b64 	r_signature, r_signature, 0x1105d6049077ed57;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB16_6:
 	add.s32 	%r70, %r70, %r4;
 	setp.lt.s32 	%p7, %r70, %r23;
-	xor.b64 	r_signature, r_signature, 0xdff91e620952d37d;
+	xor.b64 	r_signature, r_signature, 0x20952d37ddff91e6;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p7 bra 	$L__BB16_4;
 
@@ -4693,7 +4695,7 @@ $L__BB16_7:
 	st.shared.u32 	[_ZZ21my_greedy_bipartitionE10left_count], %r33;
 	st.shared.u32 	[_ZZ21my_greedy_bipartitionE11right_count], %r33;
 
-	xor.b64 	r_signature, r_signature, 0x71105d6049077ed5;
+	xor.b64 	r_signature, r_signature, 0x049077ed571105d6;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB16_10:
 	bar.sync 	0;
@@ -4705,7 +4707,7 @@ $L__BB16_10:
 	mul.lo.s32 	%r39, %r38, %r1;
 	cvt.u64.u32 	%rd5, %r39;
 	setp.lt.s32 	%p10, %r23, 1;
-	xor.b64 	r_signature, r_signature, 0x1add802e9fff492f;
+	xor.b64 	r_signature, r_signature, 0xe9fff492f1add802;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p10 bra 	$L__BB16_35;
 
@@ -4713,33 +4715,34 @@ $L__BB16_10:
 	or.b32  	%r9, %r41, 1;
 	mov.u32 	%r11, %ntid.x;
 	sub.s32 	%r12, %r7, %r8;
-	cvta.to.global.u64 	%rd6, %rd14;
-	cvta.to.global.u64 	%rd7, %rd13;
+	cvta.to.global.u64 	%rd6, %rd15;
+	cvta.to.global.u64 	%rd7, %rd14;
+	cvta.to.global.u64 	%rd8, %rd16;
 	mov.u32 	%r71, 0;
 
-	xor.b64 	r_signature, r_signature, 0x0f92e486b9563c79;
+	xor.b64 	r_signature, r_signature, 0x6b9563c790f92e48;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 $L__BB16_12:
-	mul.wide.s32 	%rd21, %r71, 4;
-	add.s64 	%rd22, %rd6, %rd21;
-	ld.global.u32 	%r42, [%rd22];
-	cvt.s64.s32 	%rd8, %r42;
-	mul.wide.s32 	%rd23, %r42, 4;
-	add.s64 	%rd9, %rd4, %rd23;
-	ld.global.u32 	%r43, [%rd9];
+	mul.wide.s32 	%rd23, %r71, 4;
+	add.s64 	%rd24, %rd6, %rd23;
+	ld.global.u32 	%r42, [%rd24];
+	cvt.s64.s32 	%rd9, %r42;
+	mul.wide.s32 	%rd25, %r42, 4;
+	add.s64 	%rd26, %rd4, %rd25;
+	ld.global.u32 	%r43, [%rd26];
 	setp.ne.s32 	%p11, %r43, %r2;
-	xor.b64 	r_signature, r_signature, 0xbfce8264e5c5f210;
+	xor.b64 	r_signature, r_signature, 0x4e5c5f210bfce826;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p11 bra 	$L__BB16_34;
 
-	shl.b64 	%rd24, %rd8, 2;
-	add.s64 	%rd25, %rd7, %rd24;
-	ld.global.u32 	%r14, [%rd25];
-	ld.global.u32 	%r15, [%rd25+4];
+	shl.b64 	%rd27, %rd9, 2;
+	add.s64 	%rd28, %rd7, %rd27;
+	ld.global.u32 	%r14, [%rd28];
+	ld.global.u32 	%r15, [%rd28+4];
 	ld.shared.u32 	%r44, [_ZZ21my_greedy_bipartitionE10left_count];
 	setp.ge.s32 	%p13, %r44, %r8;
 	mov.pred 	%p26, 0;
-	xor.b64 	r_signature, r_signature, 0x1d13ae9ac9631334;
+	xor.b64 	r_signature, r_signature, 0xac96313341d13ae9;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p13 bra 	$L__BB16_26;
 
@@ -4750,66 +4753,66 @@ $L__BB16_12:
 
 	@%p4 bra 	$L__BB16_17;
 
-	mov.u32 	%r46, 897988541;
+	mov.u32 	%r46, 0;
 	st.shared.u32 	[_ZZ21my_greedy_bipartitionE16connections_left], %r46;
 	st.shared.u32 	[_ZZ21my_greedy_bipartitionE17connections_right], %r46;
 
-	xor.b64 	r_signature, r_signature, 0x105d6049077ed571;
+	xor.b64 	r_signature, r_signature, 0x9077ed571105d604;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB16_17:
 	bar.sync 	0;
 	add.s32 	%r72, %r14, %r3;
 	setp.ge.s32 	%p17, %r72, %r15;
-	xor.b64 	r_signature, r_signature, 0x0952d37ddff91e62;
+	xor.b64 	r_signature, r_signature, 0xddff91e620952d37;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p17 bra 	$L__BB16_23;
 
 $L__BB16_18:
-	mul.wide.s32 	%rd26, %r72, 4;
-	add.s64 	%rd27, %rd3, %rd26;
-	ld.global.u32 	%r47, [%rd27];
+	mul.wide.s32 	%rd29, %r72, 4;
+	add.s64 	%rd30, %rd3, %rd29;
+	ld.global.u32 	%r47, [%rd30];
 	shr.s32 	%r48, %r47, 31;
 	shr.u32 	%r49, %r48, 26;
 	add.s32 	%r50, %r47, %r49;
 	shr.s32 	%r51, %r50, 6;
-	cvt.s64.s32 	%rd28, %r51;
-	add.s64 	%rd10, %rd28, %rd5;
-	shl.b64 	%rd29, %rd10, 3;
-	add.s64 	%rd30, %rd2, %rd29;
+	cvt.s64.s32 	%rd31, %r51;
+	add.s64 	%rd10, %rd31, %rd5;
+	shl.b64 	%rd32, %rd10, 3;
+	add.s64 	%rd33, %rd2, %rd32;
 	and.b32  	%r52, %r50, -64;
 	sub.s32 	%r53, %r47, %r52;
-	mov.u64 	%rd31, 1;
-	shl.b64 	%rd11, %rd31, %r53;
-	ld.global.u64 	%rd32, [%rd30];
-	and.b64  	%rd33, %rd11, %rd32;
-	setp.eq.s64 	%p18, %rd33, 0;
-	xor.b64 	r_signature, r_signature, 0xa889209b87f7c5f5;
+	mov.u64 	%rd34, 1;
+	shl.b64 	%rd11, %rd34, %r53;
+	ld.global.u64 	%rd35, [%rd33];
+	and.b64  	%rd36, %rd11, %rd35;
+	setp.eq.s64 	%p18, %rd36, 0;
+	xor.b64 	r_signature, r_signature, 0xb87f7c5f5a889209;
 	add.u64 	r_fuelusage, r_fuelusage, 20;
 	@%p18 bra 	$L__BB16_20;
 
 	mov.u32 	%r54, _ZZ21my_greedy_bipartitionE16connections_left;
 	atom.shared.add.f32 	%f3, [%r54], 0f3F800000;
 
-	xor.b64 	r_signature, r_signature, 0x077ed571105d6049;
+	xor.b64 	r_signature, r_signature, 0x1105d6049077ed57;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB16_20:
-	add.s64 	%rd35, %rd1, %rd29;
-	ld.global.u64 	%rd36, [%rd35];
-	and.b64  	%rd37, %rd36, %rd11;
-	setp.eq.s64 	%p19, %rd37, 0;
-	xor.b64 	r_signature, r_signature, 0x58cece2003ec243e;
+	add.s64 	%rd38, %rd1, %rd32;
+	ld.global.u64 	%rd39, [%rd38];
+	and.b64  	%rd40, %rd39, %rd11;
+	setp.eq.s64 	%p19, %rd40, 0;
+	xor.b64 	r_signature, r_signature, 0x003ec243e58cece2;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p19 bra 	$L__BB16_22;
 
 	mov.u32 	%r55, _ZZ21my_greedy_bipartitionE17connections_right;
 	atom.shared.add.f32 	%f4, [%r55], 0f3F800000;
 
-	xor.b64 	r_signature, r_signature, 0x6049077ed571105d;
+	xor.b64 	r_signature, r_signature, 0xed571105d6049077;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB16_22:
 	add.s32 	%r72, %r72, %r11;
 	setp.lt.s32 	%p20, %r72, %r15;
-	xor.b64 	r_signature, r_signature, 0xd37ddff91e620952;
+	xor.b64 	r_signature, r_signature, 0x91e620952d37ddff;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p20 bra 	$L__BB16_18;
 
@@ -4833,54 +4836,57 @@ $L__BB16_24:
 $L__BB16_26:
 	@%p4 bra 	$L__BB16_30;
 
+	add.s64 	%rd12, %rd8, %rd27;
+	xor.b64 	r_signature, r_signature, 0xc3f19bd972eb4677;
+	add.u64 	r_fuelusage, r_fuelusage, 3;
 	@%p26 bra 	$L__BB16_29;
 	bra.uni 	$L__BB16_28;
 
 $L__BB16_29:
-	st.global.u32 	[%rd9], %r9;
+	st.global.u32 	[%rd12], %r9;
 	mov.u32 	%r60, _ZZ21my_greedy_bipartitionE10left_count;
 	atom.shared.add.u32 	%r61, [%r60], 1;
-	xor.b64 	r_signature, r_signature, 0x7ed571105d604907;
+	xor.b64 	r_signature, r_signature, 0x05d6049077ed5711;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 	bra.uni 	$L__BB16_30;
 
 $L__BB16_28:
 	add.s32 	%r69, %r41, 2;
-	st.global.u32 	[%rd9], %r69;
+	st.global.u32 	[%rd12], %r69;
 	mov.u32 	%r58, _ZZ21my_greedy_bipartitionE11right_count;
 	atom.shared.add.u32 	%r59, [%r58], 1;
 
-	xor.b64 	r_signature, r_signature, 0xbdb69698f5e43d6a;
+	xor.b64 	r_signature, r_signature, 0x8f5e43d6abdb6969;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 $L__BB16_30:
 	add.s32 	%r73, %r14, %r3;
 	setp.ge.s32 	%p23, %r73, %r15;
-	xor.b64 	r_signature, r_signature, 0x7ddff91e620952d3;
+	xor.b64 	r_signature, r_signature, 0xe620952d37ddff91;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p23 bra 	$L__BB16_33;
 
-	selp.b64 	%rd12, %rd2, %rd1, %p26;
+	selp.b64 	%rd13, %rd2, %rd1, %p26;
 
 $L__BB16_32:
-	mul.wide.s32 	%rd38, %r73, 4;
-	add.s64 	%rd39, %rd3, %rd38;
-	ld.global.u32 	%r62, [%rd39];
+	mul.wide.s32 	%rd42, %r73, 4;
+	add.s64 	%rd43, %rd3, %rd42;
+	ld.global.u32 	%r62, [%rd43];
 	shr.s32 	%r63, %r62, 31;
 	shr.u32 	%r64, %r63, 26;
 	add.s32 	%r65, %r62, %r64;
 	shr.s32 	%r66, %r65, 6;
-	cvt.s64.s32 	%rd40, %r66;
-	add.s64 	%rd41, %rd40, %rd5;
-	shl.b64 	%rd42, %rd41, 3;
-	add.s64 	%rd43, %rd12, %rd42;
+	cvt.s64.s32 	%rd44, %r66;
+	add.s64 	%rd45, %rd44, %rd5;
+	shl.b64 	%rd46, %rd45, 3;
+	add.s64 	%rd47, %rd13, %rd46;
 	and.b32  	%r67, %r65, -64;
 	sub.s32 	%r68, %r62, %r67;
-	mov.u64 	%rd44, 1;
-	shl.b64 	%rd45, %rd44, %r68;
-	atom.global.or.b64 	%rd46, [%rd43], %rd45;
+	mov.u64 	%rd48, 1;
+	shl.b64 	%rd49, %rd48, %r68;
+	atom.global.or.b64 	%rd50, [%rd47], %rd49;
 	add.s32 	%r73, %r73, %r11;
 	setp.lt.s32 	%p24, %r73, %r15;
-	xor.b64 	r_signature, r_signature, 0x062ca517330d31b7;
+	xor.b64 	r_signature, r_signature, 0x7330d31b7062ca51;
 	add.u64 	r_fuelusage, r_fuelusage, 21;
 	@%p24 bra 	$L__BB16_32;
 
@@ -4890,7 +4896,7 @@ $L__BB16_33:
 $L__BB16_34:
 	add.s32 	%r71, %r71, 1;
 	setp.lt.s32 	%p25, %r71, %r23;
-	xor.b64 	r_signature, r_signature, 0x1e620952d37ddff9;
+	xor.b64 	r_signature, r_signature, 0x2d37ddff91e62095;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p25 bra 	$L__BB16_12;
 
@@ -4940,7 +4946,7 @@ $NORMAL_EXIT:
 	ld.param.u64 	%rd3, [my_finalize_bipartition_param_2];
 	mov.u32 	%r11, %tid.x;
 	setp.ge.s32 	%p1, %r11, %r7;
-	xor.b64 	r_signature, r_signature, 0x168350d24e59c38d;
+	xor.b64 	r_signature, r_signature, 0x24e59c38d168350d;
 	add.u64 	r_fuelusage, r_fuelusage, 11;
 	@%p1 bra 	$L__BB17_5;
 
@@ -4949,26 +4955,26 @@ $NORMAL_EXIT:
 	sub.s32 	%r3, %r9, %r8;
 	cvta.to.global.u64 	%rd1, %rd3;
 
-	xor.b64 	r_signature, r_signature, 0x8260158b64d97093;
+	xor.b64 	r_signature, r_signature, 0xb64d970938260158;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB17_2:
 	mul.wide.s32 	%rd4, %r11, 4;
 	add.s64 	%rd2, %rd1, %rd4;
 	ld.global.u32 	%r5, [%rd2];
 	setp.eq.s32 	%p2, %r5, -1;
-	xor.b64 	r_signature, r_signature, 0xbd972eb4677c3f19;
+	xor.b64 	r_signature, r_signature, 0x4677c3f19bd972eb;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 	@%p2 bra 	$L__BB17_4;
 
 	add.s32 	%r10, %r3, %r5;
 	st.global.u32 	[%rd2], %r10;
 
-	xor.b64 	r_signature, r_signature, 0x1e620952d37ddff9;
+	xor.b64 	r_signature, r_signature, 0x2d37ddff91e62095;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB17_4:
 	add.s32 	%r11, %r11, %r2;
 	setp.lt.s32 	%p3, %r11, %r7;
-	xor.b64 	r_signature, r_signature, 0xf91e620952d37ddf;
+	xor.b64 	r_signature, r_signature, 0x952d37ddff91e620;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p3 bra 	$L__BB17_2;
 
@@ -5022,7 +5028,7 @@ $NORMAL_EXIT:
 	mov.u32 	%r8, %tid.x;
 	mad.lo.s32 	%r12, %r7, %r1, %r8;
 	setp.ge.s32 	%p1, %r12, %r6;
-	xor.b64 	r_signature, r_signature, 0x40f2a3a1d54b5474;
+	xor.b64 	r_signature, r_signature, 0x547440f2a3a1d54b;
 	add.u64 	r_fuelusage, r_fuelusage, 14;
 	@%p1 bra 	$L__BB18_3;
 
@@ -5031,7 +5037,7 @@ $NORMAL_EXIT:
 	cvta.to.global.u64 	%rd1, %rd3;
 	cvta.to.global.u64 	%rd2, %rd4;
 
-	xor.b64 	r_signature, r_signature, 0xd571105d6049077e;
+	xor.b64 	r_signature, r_signature, 0x077ed571105d6049;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB18_2:
 	mul.wide.s32 	%rd5, %r12, 4;
@@ -5042,7 +5048,7 @@ $L__BB18_2:
 	atom.global.add.u32 	%r11, [%rd8], 1;
 	add.s32 	%r12, %r12, %r3;
 	setp.lt.s32 	%p2, %r12, %r6;
-	xor.b64 	r_signature, r_signature, 0x2311382c550df276;
+	xor.b64 	r_signature, r_signature, 0xf2762311382c550d;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 	@%p2 bra 	$L__BB18_2;
 
@@ -5121,14 +5127,14 @@ $NORMAL_EXIT:
 	mov.u32 	%r93, %tid.x;
 	mad.lo.s32 	%r173, %r92, %r1, %r93;
 	setp.ge.s32 	%p1, %r173, %r89;
-	xor.b64 	r_signature, r_signature, 0x01af3aaa3bf4bd97;
+	xor.b64 	r_signature, r_signature, 0xaaa3bf4bd9701af3;
 	add.u64 	r_fuelusage, r_fuelusage, 48;
 	@%p1 bra 	$L__BB19_81;
 
 	mov.u32 	%r94, %nctaid.x;
 	mul.lo.s32 	%r3, %r1, %r94;
 	setp.gt.s32 	%p2, %r90, 0;
-	xor.b64 	r_signature, r_signature, 0x05d6049077ed5711;
+	xor.b64 	r_signature, r_signature, 0x49077ed571105d60;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 	@%p2 bra 	$L__BB19_29;
 	bra.uni 	$L__BB19_2;
@@ -5145,7 +5151,7 @@ $L__BB19_30:
 	add.s64 	%rd97, %rd7, %rd96;
 	ld.global.u32 	%r116, [%rd97];
 	setp.eq.s32 	%p20, %r116, 1;
-	xor.b64 	r_signature, r_signature, 0xfce8264e5c5f210b;
+	xor.b64 	r_signature, r_signature, 0x64e5c5f210bfce82;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p20 bra 	$L__BB19_80;
 
@@ -5154,13 +5160,13 @@ $L__BB19_30:
 	ld.global.u32 	%r31, [%rd99+4];
 	ld.global.u32 	%r32, [%rd99];
 	setp.le.s32 	%p21, %r31, %r32;
-	xor.b64 	r_signature, r_signature, 0xd13ae9ac96313341;
+	xor.b64 	r_signature, r_signature, 0x9ac96313341d13ae;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p21 bra 	$L__BB19_57;
 
 	mov.u32 	%r179, %r32;
 
-	xor.b64 	r_signature, r_signature, 0x049077ed571105d6;
+	xor.b64 	r_signature, r_signature, 0x7ed571105d604907;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB19_33:
 	cvt.s64.s32 	%rd18, %r179;
@@ -5172,7 +5178,7 @@ $L__BB19_33:
 	ld.global.u32 	%r34, [%rd103];
 	ld.global.u32 	%r35, [%rd103+4];
 	setp.le.s32 	%p22, %r35, %r34;
-	xor.b64 	r_signature, r_signature, 0x5f210bfce8264e5c;
+	xor.b64 	r_signature, r_signature, 0xbfce8264e5c5f210;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p22 bra 	$L__BB19_55;
 
@@ -5182,7 +5188,7 @@ $L__BB19_33:
 	and.b32  	%r36, %r118, 3;
 	setp.eq.s32 	%p23, %r36, 0;
 	mov.u32 	%r180, %r34;
-	xor.b64 	r_signature, r_signature, 0x7024bfbffb0ff763;
+	xor.b64 	r_signature, r_signature, 0xfbffb0ff7637024b;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 	@%p23 bra 	$L__BB19_44;
 
@@ -5191,7 +5197,7 @@ $L__BB19_33:
 	add.s64 	%rd20, %rd1, %rd105;
 	ld.global.u32 	%r37, [%rd20];
 	setp.eq.s32 	%p24, %r37, %r119;
-	xor.b64 	r_signature, r_signature, 0x1aa1ec9eafabcd76;
+	xor.b64 	r_signature, r_signature, 0xc9eafabcd761aa1e;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 	@%p24 bra 	$L__BB19_37;
 
@@ -5204,12 +5210,12 @@ $L__BB19_33:
 	or.b64  	%rd111, %rd109, %rd110;
 	st.global.u64 	[%rd19], %rd111;
 
-	xor.b64 	r_signature, r_signature, 0x9e7d44a00c024607;
+	xor.b64 	r_signature, r_signature, 0x4a00c0246079e7d4;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_37:
 	add.s32 	%r180, %r34, 1;
 	setp.eq.s32 	%p25, %r36, 1;
-	xor.b64 	r_signature, r_signature, 0xe620952d37ddff91;
+	xor.b64 	r_signature, r_signature, 0x52d37ddff91e6209;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p25 bra 	$L__BB19_44;
 
@@ -5226,12 +5232,12 @@ $L__BB19_37:
 	or.b64  	%rd117, %rd115, %rd116;
 	st.global.u64 	[%rd19], %rd117;
 
-	xor.b64 	r_signature, r_signature, 0x0246079e7d44a00c;
+	xor.b64 	r_signature, r_signature, 0x79e7d44a00c02460;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_40:
 	add.s32 	%r180, %r34, 2;
 	setp.eq.s32 	%p27, %r36, 2;
-	xor.b64 	r_signature, r_signature, 0xddff91e620952d37;
+	xor.b64 	r_signature, r_signature, 0x1e620952d37ddff9;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p27 bra 	$L__BB19_44;
 
@@ -5248,31 +5254,31 @@ $L__BB19_40:
 	or.b64  	%rd123, %rd121, %rd122;
 	st.global.u64 	[%rd19], %rd123;
 
-	xor.b64 	r_signature, r_signature, 0x44a00c0246079e7d;
+	xor.b64 	r_signature, r_signature, 0xc0246079e7d44a00;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_43:
 	add.s32 	%r180, %r34, 3;
 
-	xor.b64 	r_signature, r_signature, 0x952d37ddff91e620;
+	xor.b64 	r_signature, r_signature, 0x7ddff91e620952d3;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB19_44:
 	not.b32 	%r125, %r34;
 	add.s32 	%r126, %r35, %r125;
 	setp.lt.u32 	%p29, %r126, 3;
-	xor.b64 	r_signature, r_signature, 0xfa659e1cd42a4815;
+	xor.b64 	r_signature, r_signature, 0xe1cd42a4815fa659;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p29 bra 	$L__BB19_55;
 
 	mul.wide.s32 	%rd124, %r180, 4;
 	add.s64 	%rd188, %rd1, %rd124;
 
-	xor.b64 	r_signature, r_signature, 0x9bd972eb4677c3f1;
+	xor.b64 	r_signature, r_signature, 0x2eb4677c3f19bd97;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 $L__BB19_46:
 	ld.global.u32 	%r45, [%rd188];
 	cvt.u32.u64 	%r127, %rd16;
 	setp.eq.s32 	%p30, %r45, %r127;
-	xor.b64 	r_signature, r_signature, 0x83cedc3d307d8d86;
+	xor.b64 	r_signature, r_signature, 0xc3d307d8d8683ced;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p30 bra 	$L__BB19_48;
 
@@ -5285,7 +5291,7 @@ $L__BB19_46:
 	or.b64  	%rd130, %rd128, %rd129;
 	st.global.u64 	[%rd19], %rd130;
 
-	xor.b64 	r_signature, r_signature, 0x0246079e7d44a00c;
+	xor.b64 	r_signature, r_signature, 0x79e7d44a00c02460;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_48:
 	ld.global.u32 	%r46, [%rd188+4];
@@ -5301,7 +5307,7 @@ $L__BB19_48:
 	or.b64  	%rd136, %rd134, %rd135;
 	st.global.u64 	[%rd19], %rd136;
 
-	xor.b64 	r_signature, r_signature, 0xa00c0246079e7d44;
+	xor.b64 	r_signature, r_signature, 0x246079e7d44a00c0;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_50:
 	ld.global.u32 	%r47, [%rd188+8];
@@ -5317,7 +5323,7 @@ $L__BB19_50:
 	or.b64  	%rd142, %rd140, %rd141;
 	st.global.u64 	[%rd19], %rd142;
 
-	xor.b64 	r_signature, r_signature, 0x7d44a00c0246079e;
+	xor.b64 	r_signature, r_signature, 0x00c0246079e7d44a;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_52:
 	ld.global.u32 	%r48, [%rd188+12];
@@ -5333,13 +5339,13 @@ $L__BB19_52:
 	or.b64  	%rd148, %rd146, %rd147;
 	st.global.u64 	[%rd19], %rd148;
 
-	xor.b64 	r_signature, r_signature, 0x079e7d44a00c0246;
+	xor.b64 	r_signature, r_signature, 0xd44a00c0246079e7;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_54:
 	add.s64 	%rd188, %rd188, 16;
 	add.s32 	%r180, %r180, 4;
 	setp.lt.s32 	%p34, %r180, %r35;
-	xor.b64 	r_signature, r_signature, 0xc0885bb7bb9950a1;
+	xor.b64 	r_signature, r_signature, 0xbb7bb9950a1c0885;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 	@%p34 bra 	$L__BB19_46;
 
@@ -5347,7 +5353,7 @@ $L__BB19_55:
 	cvt.u32.u64 	%r135, %rd18;
 	add.s32 	%r179, %r135, 1;
 	setp.lt.s32 	%p35, %r179, %r31;
-	xor.b64 	r_signature, r_signature, 0xef0597ad0be3462a;
+	xor.b64 	r_signature, r_signature, 0x7ad0be3462aef059;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p35 bra 	$L__BB19_33;
 
@@ -5368,7 +5374,7 @@ $L__BB19_59:
 	setp.lt.u32 	%p37, %r140, 3;
 	mov.u32 	%r189, 0;
 	mov.u32 	%r187, %r32;
-	xor.b64 	r_signature, r_signature, 0x801bb714fa63b7f3;
+	xor.b64 	r_signature, r_signature, 0x714fa63b7f3801bb;
 	add.u64 	r_fuelusage, r_fuelusage, 11;
 	@%p37 bra 	$L__BB19_62;
 
@@ -5376,7 +5382,7 @@ $L__BB19_59:
 	mov.u32 	%r189, 0;
 	mov.u32 	%r187, %r32;
 
-	xor.b64 	r_signature, r_signature, 0x970938260158b64d;
+	xor.b64 	r_signature, r_signature, 0x8260158b64d97093;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB19_61:
 	mul.wide.s32 	%rd150, %r187, 8;
@@ -5400,7 +5406,7 @@ $L__BB19_61:
 	add.s32 	%r187, %r187, 4;
 	add.s32 	%r185, %r185, -4;
 	setp.ne.s32 	%p38, %r185, 0;
-	xor.b64 	r_signature, r_signature, 0xf14f0d62ca5e8d45;
+	xor.b64 	r_signature, r_signature, 0xd62ca5e8d45f14f0;
 	add.u64 	r_fuelusage, r_fuelusage, 35;
 	@%p38 bra 	$L__BB19_61;
 
@@ -5415,7 +5421,7 @@ $L__BB19_62:
 	popc.b64 	%r149, %rd162;
 	add.s32 	%r189, %r189, %r149;
 	setp.eq.s32 	%p40, %r54, 1;
-	xor.b64 	r_signature, r_signature, 0xb27f52c3c55f7ab9;
+	xor.b64 	r_signature, r_signature, 0x2c3c55f7ab9b27f5;
 	add.u64 	r_fuelusage, r_fuelusage, 10;
 	@%p40 bra 	$L__BB19_66;
 
@@ -5424,7 +5430,7 @@ $L__BB19_62:
 	popc.b64 	%r150, %rd164;
 	add.s32 	%r189, %r189, %r150;
 	setp.eq.s32 	%p41, %r54, 2;
-	xor.b64 	r_signature, r_signature, 0x2551e6a4b9606304;
+	xor.b64 	r_signature, r_signature, 0x6a4b96063042551e;
 	add.u64 	r_fuelusage, r_fuelusage, 7;
 	@%p41 bra 	$L__BB19_66;
 
@@ -5432,14 +5438,14 @@ $L__BB19_62:
 	or.b64  	%rd166, %rd24, %rd165;
 	popc.b64 	%r151, %rd166;
 	add.s32 	%r189, %r189, %r151;
-	xor.b64 	r_signature, r_signature, 0x042551e6a4b96063;
+	xor.b64 	r_signature, r_signature, 0x1e6a4b9606304255;
 	add.u64 	r_fuelusage, r_fuelusage, 7;
 	bra.uni 	$L__BB19_66;
 
 $L__BB19_58:
 	mov.u32 	%r189, 0;
 
-	xor.b64 	r_signature, r_signature, 0x77ed571105d60490;
+	xor.b64 	r_signature, r_signature, 0x71105d6049077ed5;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 $L__BB19_66:
 	not.b32 	%r153, %r32;
@@ -5452,7 +5458,7 @@ $L__BB19_66:
 	sub.s32 	%r71, %r154, %r70;
 	mov.u32 	%r190, 0;
 
-	xor.b64 	r_signature, r_signature, 0x18d608a400de5e02;
+	xor.b64 	r_signature, r_signature, 0x8a400de5e0218d60;
 	add.u64 	r_fuelusage, r_fuelusage, 10;
 $L__BB19_67:
 	ld.global.u32 	%r155, [%rd17];
@@ -5463,12 +5469,12 @@ $L__BB19_67:
 	add.s64 	%rd169, %rd7, %rd168;
 	ld.global.u32 	%r156, [%rd169];
 	setp.eq.s32 	%p43, %r156, %r91;
-	xor.b64 	r_signature, r_signature, 0x4677c3f19bd972eb;
+	xor.b64 	r_signature, r_signature, 0x3f19bd972eb4677c;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 	@%p43 bra 	$L__BB19_79;
 
 	mov.u32 	%r197, 0;
-	xor.b64 	r_signature, r_signature, 0x05d6049077ed5711;
+	xor.b64 	r_signature, r_signature, 0x49077ed571105d60;
 	add.u64 	r_fuelusage, r_fuelusage, 1;
 	@%p21 bra 	$L__BB19_77;
 
@@ -5477,7 +5483,7 @@ $L__BB19_67:
 	shl.b64 	%rd28, %rd170, %r190;
 	mov.u32 	%r197, 0;
 	mov.u32 	%r195, %r32;
-	xor.b64 	r_signature, r_signature, 0xa016797ae2352bf5;
+	xor.b64 	r_signature, r_signature, 0x97ae2352bf5a0167;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 	@%p45 bra 	$L__BB19_73;
 
@@ -5485,7 +5491,7 @@ $L__BB19_67:
 	mov.u32 	%r195, %r32;
 	mov.u32 	%r193, %r71;
 
-	xor.b64 	r_signature, r_signature, 0xe46f37048eb2dde0;
+	xor.b64 	r_signature, r_signature, 0x7048eb2dde0e46f3;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 $L__BB19_72:
 	mul.wide.s32 	%rd171, %r195, 8;
@@ -5509,7 +5515,7 @@ $L__BB19_72:
 	add.s32 	%r195, %r195, 4;
 	add.s32 	%r193, %r193, -4;
 	setp.ne.s32 	%p46, %r193, 0;
-	xor.b64 	r_signature, r_signature, 0x0d62ca5e8d45f14f;
+	xor.b64 	r_signature, r_signature, 0xa5e8d45f14f0d62c;
 	add.u64 	r_fuelusage, r_fuelusage, 35;
 	@%p46 bra 	$L__BB19_72;
 
@@ -5524,7 +5530,7 @@ $L__BB19_73:
 	or.b64  	%rd183, %rd182, %rd28;
 	popc.b64 	%r168, %rd183;
 	add.s32 	%r197, %r197, %r168;
-	xor.b64 	r_signature, r_signature, 0x52c3c55f7ab9b27f;
+	xor.b64 	r_signature, r_signature, 0x55f7ab9b27f52c3c;
 	add.u64 	r_fuelusage, r_fuelusage, 10;
 	@%p48 bra 	$L__BB19_77;
 
@@ -5533,7 +5539,7 @@ $L__BB19_73:
 	or.b64  	%rd185, %rd184, %rd28;
 	popc.b64 	%r169, %rd185;
 	add.s32 	%r197, %r197, %r169;
-	xor.b64 	r_signature, r_signature, 0xe6a4b96063042551;
+	xor.b64 	r_signature, r_signature, 0x96063042551e6a4b;
 	add.u64 	r_fuelusage, r_fuelusage, 7;
 	@%p49 bra 	$L__BB19_77;
 
@@ -5542,7 +5548,7 @@ $L__BB19_73:
 	popc.b64 	%r170, %rd187;
 	add.s32 	%r197, %r197, %r170;
 
-	xor.b64 	r_signature, r_signature, 0x51e6a4b960630425;
+	xor.b64 	r_signature, r_signature, 0x4b96063042551e6a;
 	add.u64 	r_fuelusage, r_fuelusage, 7;
 $L__BB19_77:
 	ld.global.u32 	%r171, [%rd27];
@@ -5556,7 +5562,7 @@ $L__BB19_77:
 $L__BB19_79:
 	add.s32 	%r190, %r190, 1;
 	setp.lt.s32 	%p51, %r190, %r90;
-	xor.b64 	r_signature, r_signature, 0xe620952d37ddff91;
+	xor.b64 	r_signature, r_signature, 0x52d37ddff91e6209;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p51 bra 	$L__BB19_67;
 
@@ -5564,7 +5570,7 @@ $L__BB19_80:
 	cvt.u32.u64 	%r172, %rd16;
 	add.s32 	%r173, %r172, %r3;
 	setp.lt.s32 	%p52, %r173, %r89;
-	xor.b64 	r_signature, r_signature, 0x0597ad0be3462aef;
+	xor.b64 	r_signature, r_signature, 0xd0be3462aef0597a;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p52 bra 	$L__BB19_30;
 	bra.uni 	$L__BB19_81;
@@ -5578,7 +5584,7 @@ $L__BB19_2:
 	add.s64 	%rd41, %rd7, %rd40;
 	ld.global.u32 	%r95, [%rd41];
 	setp.eq.s32 	%p3, %r95, 1;
-	xor.b64 	r_signature, r_signature, 0x5c5f210bfce8264e;
+	xor.b64 	r_signature, r_signature, 0x10bfce8264e5c5f2;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p3 bra 	$L__BB19_28;
 
@@ -5587,7 +5593,7 @@ $L__BB19_2:
 	ld.global.u32 	%r6, [%rd43+4];
 	ld.global.u32 	%r174, [%rd43];
 	setp.ge.s32 	%p4, %r174, %r6;
-	xor.b64 	r_signature, r_signature, 0x96313341d13ae9ac;
+	xor.b64 	r_signature, r_signature, 0x341d13ae9ac96313;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p4 bra 	$L__BB19_27;
 
@@ -5601,7 +5607,7 @@ $L__BB19_4:
 	ld.global.u32 	%r9, [%rd47];
 	ld.global.u32 	%r10, [%rd47+4];
 	setp.le.s32 	%p5, %r10, %r9;
-	xor.b64 	r_signature, r_signature, 0xe8264e5c5f210bfc;
+	xor.b64 	r_signature, r_signature, 0xe5c5f210bfce8264;
 	add.u64 	r_fuelusage, r_fuelusage, 6;
 	@%p5 bra 	$L__BB19_25;
 
@@ -5611,7 +5617,7 @@ $L__BB19_4:
 	and.b32  	%r11, %r97, 3;
 	setp.eq.s32 	%p6, %r11, 0;
 	mov.u32 	%r175, %r9;
-	xor.b64 	r_signature, r_signature, 0xfb0ff7637024bfbf;
+	xor.b64 	r_signature, r_signature, 0x7637024bfbffb0ff;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 	@%p6 bra 	$L__BB19_15;
 
@@ -5620,7 +5626,7 @@ $L__BB19_4:
 	add.s64 	%rd13, %rd1, %rd49;
 	ld.global.u32 	%r12, [%rd13];
 	setp.eq.s32 	%p7, %r12, %r98;
-	xor.b64 	r_signature, r_signature, 0xafabcd761aa1ec9e;
+	xor.b64 	r_signature, r_signature, 0xd761aa1ec9eafabc;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 	@%p7 bra 	$L__BB19_8;
 
@@ -5633,12 +5639,12 @@ $L__BB19_4:
 	or.b64  	%rd55, %rd53, %rd54;
 	st.global.u64 	[%rd12], %rd55;
 
-	xor.b64 	r_signature, r_signature, 0x0c0246079e7d44a0;
+	xor.b64 	r_signature, r_signature, 0x6079e7d44a00c024;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_8:
 	add.s32 	%r175, %r9, 1;
 	setp.eq.s32 	%p8, %r11, 1;
-	xor.b64 	r_signature, r_signature, 0x37ddff91e620952d;
+	xor.b64 	r_signature, r_signature, 0xf91e620952d37ddf;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p8 bra 	$L__BB19_15;
 
@@ -5655,12 +5661,12 @@ $L__BB19_8:
 	or.b64  	%rd61, %rd59, %rd60;
 	st.global.u64 	[%rd12], %rd61;
 
-	xor.b64 	r_signature, r_signature, 0x7d44a00c0246079e;
+	xor.b64 	r_signature, r_signature, 0x00c0246079e7d44a;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_11:
 	add.s32 	%r175, %r9, 2;
 	setp.eq.s32 	%p10, %r11, 2;
-	xor.b64 	r_signature, r_signature, 0x20952d37ddff91e6;
+	xor.b64 	r_signature, r_signature, 0xd37ddff91e620952;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p10 bra 	$L__BB19_15;
 
@@ -5677,18 +5683,18 @@ $L__BB19_11:
 	or.b64  	%rd67, %rd65, %rd66;
 	st.global.u64 	[%rd12], %rd67;
 
-	xor.b64 	r_signature, r_signature, 0x46079e7d44a00c02;
+	xor.b64 	r_signature, r_signature, 0xe7d44a00c0246079;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_14:
 	add.s32 	%r175, %r9, 3;
 
-	xor.b64 	r_signature, r_signature, 0xff91e620952d37dd;
+	xor.b64 	r_signature, r_signature, 0x620952d37ddff91e;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 $L__BB19_15:
 	not.b32 	%r104, %r9;
 	add.s32 	%r105, %r10, %r104;
 	setp.lt.u32 	%p12, %r105, 3;
-	xor.b64 	r_signature, r_signature, 0xd42a4815fa659e1c;
+	xor.b64 	r_signature, r_signature, 0x815fa659e1cd42a4;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p12 bra 	$L__BB19_25;
 
@@ -5698,7 +5704,7 @@ $L__BB19_16:
 	ld.global.u32 	%r20, [%rd14];
 	cvt.u32.u64 	%r106, %rd9;
 	setp.eq.s32 	%p13, %r20, %r106;
-	xor.b64 	r_signature, r_signature, 0x13841af1b99a734b;
+	xor.b64 	r_signature, r_signature, 0xaf1b99a734b13841;
 	add.u64 	r_fuelusage, r_fuelusage, 5;
 	@%p13 bra 	$L__BB19_18;
 
@@ -5711,7 +5717,7 @@ $L__BB19_16:
 	or.b64  	%rd74, %rd72, %rd73;
 	st.global.u64 	[%rd12], %rd74;
 
-	xor.b64 	r_signature, r_signature, 0x7d44a00c0246079e;
+	xor.b64 	r_signature, r_signature, 0x00c0246079e7d44a;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_18:
 	ld.global.u32 	%r21, [%rd14+4];
@@ -5727,7 +5733,7 @@ $L__BB19_18:
 	or.b64  	%rd80, %rd78, %rd79;
 	st.global.u64 	[%rd12], %rd80;
 
-	xor.b64 	r_signature, r_signature, 0x079e7d44a00c0246;
+	xor.b64 	r_signature, r_signature, 0xd44a00c0246079e7;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_20:
 	ld.global.u32 	%r22, [%rd14+8];
@@ -5743,7 +5749,7 @@ $L__BB19_20:
 	or.b64  	%rd86, %rd84, %rd85;
 	st.global.u64 	[%rd12], %rd86;
 
-	xor.b64 	r_signature, r_signature, 0x0246079e7d44a00c;
+	xor.b64 	r_signature, r_signature, 0x79e7d44a00c02460;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_22:
 	ld.global.u32 	%r23, [%rd14+12];
@@ -5759,12 +5765,12 @@ $L__BB19_22:
 	or.b64  	%rd92, %rd90, %rd91;
 	st.global.u64 	[%rd12], %rd92;
 
-	xor.b64 	r_signature, r_signature, 0xa00c0246079e7d44;
+	xor.b64 	r_signature, r_signature, 0x246079e7d44a00c0;
 	add.u64 	r_fuelusage, r_fuelusage, 8;
 $L__BB19_24:
 	add.s32 	%r175, %r175, 4;
 	setp.lt.s32 	%p17, %r175, %r10;
-	xor.b64 	r_signature, r_signature, 0x2d37ddff91e62095;
+	xor.b64 	r_signature, r_signature, 0xdff91e620952d37d;
 	add.u64 	r_fuelusage, r_fuelusage, 2;
 	@%p17 bra 	$L__BB19_16;
 
@@ -5772,7 +5778,7 @@ $L__BB19_25:
 	cvt.u32.u64 	%r114, %rd11;
 	add.s32 	%r174, %r114, 1;
 	setp.lt.s32 	%p18, %r174, %r6;
-	xor.b64 	r_signature, r_signature, 0x0be3462aef0597ad;
+	xor.b64 	r_signature, r_signature, 0x62aef0597ad0be34;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p18 bra 	$L__BB19_4;
 
@@ -5782,13 +5788,13 @@ $L__BB19_27:
 	add.s64 	%rd94, %rd5, %rd42;
 	st.global.u32 	[%rd94], %r177;
 
-	xor.b64 	r_signature, r_signature, 0xf19bd972eb4677c3;
+	xor.b64 	r_signature, r_signature, 0x972eb4677c3f19bd;
 	add.u64 	r_fuelusage, r_fuelusage, 3;
 $L__BB19_28:
 	cvt.u32.u64 	%r115, %rd9;
 	add.s32 	%r173, %r115, %r3;
 	setp.lt.s32 	%p19, %r173, %r89;
-	xor.b64 	r_signature, r_signature, 0x0597ad0be3462aef;
+	xor.b64 	r_signature, r_signature, 0xd0be3462aef0597a;
 	add.u64 	r_fuelusage, r_fuelusage, 4;
 	@%p19 bra 	$L__BB19_2;
 
@@ -5853,7 +5859,7 @@ $NORMAL_EXIT:
 	ld.global.u32 	%r6, [%rd10];
 	add.s32 	%r7, %r6, 1;
 	st.global.u32 	[%rd10], %r7;
-	xor.b64 	r_signature, r_signature, 0x82f0920d737fffd7;
+	xor.b64 	r_signature, r_signature, 0x782f0920d737fffd;
 	add.u64 	r_fuelusage, r_fuelusage, 27;
 	mov.u64 	r_fuel_backup, r_fuelusage;
 	atom.global.add.u64 	r_temp_fuel, [r_fuel_addr], r_fuelusage;
@@ -5870,7 +5876,7 @@ $NORMAL_EXIT:
 	atom.global.add.u64 	r_fuel_addr, [r_fuel_addr], r_fuelusage;
 	ret;
 
-	xor.b64 	r_signature, r_signature, 0x82f0920d737fffd7;
+	xor.b64 	r_signature, r_signature, 0x782f0920d737fffd;
 	add.u64 	r_fuelusage, r_fuelusage, 27;
 }
 
