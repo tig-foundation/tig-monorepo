@@ -37,31 +37,12 @@ acknowledgments below:
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use anyhow::{anyhow, Result};
-use tig_challenges::vehicle_routing::*;
+use tig_challenges::vehicle_routing::{Challenge, Solution};
 
-pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
-    // Boiler plate for looping through and solving sub-instances
-    // You can modify this function if you want
-    let mut solution = Solution {
-        sub_solutions: Vec::new(),
-    };
-    for sub_instance in &challenge.sub_instances {
-        match solve_sub_instance(sub_instance)? {
-            Some(sub_solution) => solution.sub_solutions.push(sub_solution),
-            None => return Ok(None),
-        }
-    }
-    Ok(Some(solution))
-}
-
-pub fn solve_sub_instance(instance: &SubInstance) -> Result<Option<SubSolution>> {
-    // If you need random numbers, recommend using SmallRng with instance.seed:
-    // use rand::{rngs::SmallRng, Rng, SeedableRng};
-    // let mut rng = SmallRng::from_seed(instance.seed);
-
+pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(SubSolution { .. }) if your algorithm finds a solution
+    // return Ok(Solution { .. }) if your algorithm finds a solution
     Err(anyhow!("Not implemented"))
 }
 
