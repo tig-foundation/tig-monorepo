@@ -16,22 +16,22 @@ For CUDA, TIG uses `nvcc` to generate ptx using target version `sm_70/compute_70
 ```
 # example
 docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64
-# scripts build_so.sh and build_ptx.py are on PATH
+# scripts build_so and build_ptx are on PATH
 ```
 
-2. Build shared object using `build_so.sh` script:
+2. Build shared object using `build_so` script:
   * Expects `tig_algorithm::<CHALLENGE>::<ALGORITHM>::solve_challenge` to be importable
   * Outputs to `tig-algorithms/lib/<CHALLENGE>/<ARCH>/<ALGORITHM>.so`, where `ARCH` is aarch64 or amd64
   ```
   # add '--cuda' flag if building cuda algorithm
-  build_so.sh $CHALLENGE $ALGORITHM
+  build_so $CHALLENGE $ALGORITHM
   ```
 
-3. (Optional) Build ptx using `build_ptx.py` script:
+3. (Optional) Build ptx using `build_ptx` script:
   * Expects `tig_algorithm/src/<CHALLENGE>/<ALGORITHM>.cu` or `tig_algorithm/src/<CHALLENGE>/<ALGORITHM>/benchmarker_outbound.cu` file to exist
   * Outputs to `tig-algorithms/lib/<CHALLENGE>/ptx/<ALGORITHM>.ptx`
 ```
-build_ptx.py $CHALLENGE $ALGORITHM
+build_ptx $CHALLENGE $ALGORITHM
 ```
 
 # License

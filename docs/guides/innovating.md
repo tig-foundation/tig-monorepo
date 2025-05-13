@@ -41,8 +41,8 @@ Each algorithm branch will have 6 key files (11 if there is CUDA code):
 **READ THE IMPORTANT NOTES AT THE BOTTOM OF THIS SECTION**
 
 1. Pick a challenge (`<challenge_name>`) to develop an algorithm for
-2. Make a copy of `tig-algorithms/<challenge_name>/template.rs` or an existing algorithm (see notes)
-    * (Optional) for Cuda, additionally make a copy of `tig-algorithms/<challenge_name>/template.cu`
+2. Make a copy of `tig-algorithms/src/<challenge_name>/template.rs` or an existing algorithm (see notes)
+    * (Optional) for Cuda, additionally make a copy of `tig-algorithms/src/<challenge_name>/template.cu`
 3. Make sure your file has the following notice in its header if you intend to submit it to TIG:
 ```
 Copyright [year copyright work created] [name of copyright owner]
@@ -181,9 +181,9 @@ language governing permissions and limitations under the License.
     # example
     docker run -it -v $(pwd):/app --gpus all ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-amd64-cuda12.6.3
     ```
-6. If you have Cuda code, use `build_ptx.py` to compile it
+6. If you have Cuda code, use `build_ptx` to compile it
     ```
-    build_ptx.py <CHALLENGE> <ALGORITHM>
+    build_ptx <CHALLENGE> <ALGORITHM>
     ```
 7. Run the test
     * No cuda:
@@ -203,8 +203,9 @@ language governing permissions and limitations under the License.
 * If you are copying and modifying an algorithm that has been submitted to TIG, make sure to use the `innovator_outbound` version
 * Do not include tests in your algorithm file. TIG will reject your algorithm submission.
 * Only your algorithm's code gets submitted. You should not be modifying `Cargo.toml` in `tig-algorithms`. Any extra dependencies you add will not be available when TIG compiles your algorithm
-* If you need to use random number generation,  ensure that it is seeded so that your algorithm is deterministic.
-    * Suggest to use `let mut rng = SmallRng::from_seed(StdRng::from_seed(challenge.seed).gen())`
+* There are comments with more tips inside the templates!
+    * Rust: `tig-algorithms/src/<challenge_name>/template.rs`
+    * Cuda: `tig-algorithms/src/<challenge_name>/template.cu`
 
 ## Locally Compiling Your Algorithm into Shared Object 
 

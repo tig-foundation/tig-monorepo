@@ -63,7 +63,7 @@ RUN if command -v nvcc > /dev/null 2>&1; then \
     rm -rf tig-monorepo
 
 COPY tig-binary/scripts /usr/local/bin/
-RUN chmod +x /usr/local/bin/build_so.sh && \
-    chmod +x /usr/local/bin/build_ptx.py
+RUN chmod +x /usr/local/bin/build_so && \
+    chmod +x /usr/local/bin/build_ptx
 
 WORKDIR /app

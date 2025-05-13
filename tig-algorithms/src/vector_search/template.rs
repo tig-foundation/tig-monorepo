@@ -44,12 +44,27 @@ use cudarc::{
 use std::sync::Arc;
 use tig_challenges::vector_search::*;
 
+// when launching kernels, you should not exceed this const or else it may not be deterministic
+const MAX_THREADS_PER_BLOCK: u32 = 1024;
+
 pub fn solve_challenge(
     challenge: &Challenge,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
+    // If you need random numbers, recommend using SmallRng with challenge.seed:
+    //      use rand::{rngs::SmallRng, Rng, SeedableRng};
+    //      let mut rng = SmallRng::from_seed(challenge.seed);
+
+    // when launching kernels, you should hardcode the LaunchConfig for determinism:
+    //      Example:
+    //      LaunchConfig {
+    //          grid_dim: (1024, 1, 1), // do not exceed 1024 for compatibility with compute 3.6
+    //          block_dim: ((arr_len + 1023) / 1024, 1, 1),
+    //          shared_mem_bytes: 400,
+    //      }
+
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early
     // return Ok(Solution { .. }) if your algorithm finds a solution

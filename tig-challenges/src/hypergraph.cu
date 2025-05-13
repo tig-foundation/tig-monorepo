@@ -454,6 +454,7 @@ extern "C" __global__ void greedy_bipartition(
     const int *node_offsets,
     const int *sorted_nodes,
     const int *node_degrees,
+    const int *curr_partition,
     int *partition,
     unsigned long long *left_hyperedge_flags,
     unsigned long long *right_hyperedge_flags
@@ -466,7 +467,7 @@ extern "C" __global__ void greedy_bipartition(
     }
     __syncthreads();
     for (int v = threadIdx.x; v < num_nodes; v += blockDim.x) {
-        if (partition[v] == p) {
+        if (curr_partition[v] == p) {
             atomicAdd(&count, 1);
         }
     }
@@ -492,7 +493,7 @@ extern "C" __global__ void greedy_bipartition(
 
         for (int idx = 0; idx < num_nodes; idx++) {
             int v = sorted_nodes[idx];
-            if (partition[v] != p) continue;
+            if (curr_partition[v] != p) continue;
             
             // Get range of hyperedges for this node
             int start_pos = node_offsets[v];

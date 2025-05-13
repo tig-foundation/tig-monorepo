@@ -70,6 +70,18 @@ pub fn solve_sub_instance(
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<SubSolution>> {
+    // If you need random numbers, recommend using SmallRng with challenge.seed:
+    // use rand::{rngs::SmallRng, Rng, SeedableRng};
+    // let mut rng = SmallRng::from_seed(challenge.seed);
+
+    // when launching kernels, you should hardcode the LaunchConfig for determinism:
+    //      Example:
+    //      LaunchConfig {
+    //          grid_dim: (1024, 1, 1), // do not exceed 1024 for compatibility with compute 3.6
+    //          block_dim: ((arr_len + 1023) / 1024, 1, 1),
+    //          shared_mem_bytes: 400,
+    //      }
+
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early
     // return Ok(SubSolution { .. }) if your algorithm finds a solution

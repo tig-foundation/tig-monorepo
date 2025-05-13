@@ -71,6 +71,7 @@ pub struct SubInstance {
 }
 
 pub const NUM_SUB_INSTANCES: usize = 16;
+pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
 
 impl Challenge {
     pub fn generate_instance(
@@ -167,7 +168,7 @@ impl SubInstance {
         let finalize_shuffle_kernel = module.load_function("finalize_shuffle")?;
         let calc_connectivity_metric_kernel = module.load_function("calc_connectivity_metric")?;
 
-        let block_size = prop.maxThreadsPerBlock as u32;
+        let block_size = MAX_THREADS_PER_BLOCK;
         let cfg = LaunchConfig {
             grid_dim: ((num_hyperedges + block_size - 1) / block_size, 1, 1),
             block_dim: (block_size, 1, 1),
@@ -299,6 +300,7 @@ impl SubInstance {
             let num_flags = (num_hyperedges + 63) / 64 * num_parts_this_level;
             let mut d_left_hyperedge_flags = stream.alloc_zeros::<u64>(num_flags as usize)?;
             let mut d_right_hyperedge_flags = stream.alloc_zeros::<u64>(num_flags as usize)?;
+            let d_curr_partition = d_partition.clone();
 
             unsafe {
                 stream
@@ -310,6 +312,7 @@ impl SubInstance {
                     .arg(&d_node_offsets)
                     .arg(&d_sorted_nodes)
                     .arg(&d_node_degrees)
+                    .arg(&d_curr_partition)
                     .arg(&mut d_partition)
                     .arg(&mut d_left_hyperedge_flags)
                     .arg(&mut d_right_hyperedge_flags)
@@ -455,7 +458,7 @@ impl SubInstance {
         let calc_connectivity_metric_kernel = module.load_function("calc_connectivity_metric")?;
         let count_nodes_in_part_kernel = module.load_function("count_nodes_in_part")?;
 
-        let block_size = prop.maxThreadsPerBlock as u32;
+        let block_size = MAX_THREADS_PER_BLOCK;
         let grid_size = (self.difficulty.num_hyperedges + block_size - 1) / block_size;
 
         let cfg = LaunchConfig {

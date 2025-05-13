@@ -51,6 +51,8 @@ pub struct Challenge {
     pub max_distance: f32,
 }
 
+pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
+
 impl Challenge {
     pub fn generate_instance(
         seed: &[u8; 32],
@@ -75,7 +77,7 @@ impl Challenge {
         let generate_clusters_kernel = module.load_function("generate_clusters")?;
         let generate_vectors_kernel = module.load_function("generate_vectors")?;
 
-        let block_size = prop.maxThreadsPerBlock as u32;
+        let block_size = MAX_THREADS_PER_BLOCK;
 
         let d_seed = stream.memcpy_stod(seed).unwrap();
         let mut d_cluster_means = stream
@@ -181,7 +183,7 @@ impl Challenge {
         let mut d_total_distance = stream.alloc_zeros::<f32>(1)?;
         let mut errorflag = stream.alloc_zeros::<u32>(1)?;
 
-        let threads_per_block = prop.maxThreadsPerBlock as u32;
+        let threads_per_block = MAX_THREADS_PER_BLOCK;
         let blocks =
             (self.difficulty.num_queries as u32 + threads_per_block - 1) / threads_per_block;
 

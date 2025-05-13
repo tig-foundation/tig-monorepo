@@ -55,6 +55,10 @@ pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>
 }
 
 pub fn solve_sub_instance(instance: &SubInstance) -> Result<Option<SubSolution>> {
+    // If you need random numbers, recommend using SmallRng with instance.seed:
+    // use rand::{rngs::SmallRng, Rng, SeedableRng};
+    // let mut rng = SmallRng::from_seed(instance.seed);
+
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early
     // return Ok(SubSolution { .. }) if your algorithm finds a solution
