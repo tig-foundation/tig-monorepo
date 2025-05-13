@@ -37,13 +37,9 @@ acknowledgments below:
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use anyhow::{anyhow, Result};
-use tig_challenges::satisfiability::*;
+use tig_challenges::satisfiability::{Challenge, Solution};
 
 pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
-    // If you need random numbers, recommend using SmallRng with challenge.seed:
-    // use rand::{rngs::SmallRng, Rng, SeedableRng};
-    // let mut rng = SmallRng::from_seed(challenge.seed);
-
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early
     // return Ok(Solution { .. }) if your algorithm finds a solution
