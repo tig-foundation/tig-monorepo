@@ -376,7 +376,7 @@ fn find_best_insertion(
     best
 }
 
-pub fn calc_baseline_routes(
+fn calc_baseline_routes(
     num_nodes: usize,
     max_capacity: i32,
     demands: &Vec<i32>,

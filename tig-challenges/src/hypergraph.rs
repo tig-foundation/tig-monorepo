@@ -144,7 +144,7 @@ impl SubInstance {
         difficulty: &Difficulty,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
-        prop: &cudaDeviceProp,
+        _prop: &cudaDeviceProp,
     ) -> Result<Self> {
         let num_hyperedges = difficulty.num_hyperedges;
         let target_num_nodes = difficulty.num_hyperedges; // actual number may be around 8% less
@@ -443,7 +443,7 @@ impl SubInstance {
         solution: &SubSolution,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
-        prop: &cudaDeviceProp,
+        _prop: &cudaDeviceProp,
     ) -> Result<u32> {
         if solution.partition.len() != self.num_nodes as usize {
             return Err(anyhow!(
