@@ -1,3 +1,5 @@
+pub const BUILD_TIME_PATH: &str = env!("CARGO_MANIFEST_DIR");
+
 pub mod knapsack;
 pub use knapsack as c003;
 pub mod satisfiability;
