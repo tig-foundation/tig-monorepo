@@ -80,11 +80,13 @@ pub fn compute_solution(
     rand_hash: String,
     nonce: u64,
     library_path: PathBuf,
-    ptx_path: Option<PathBuf>,
+    #[cfg(feature = "cuda")] ptx_path: Option<PathBuf>,
+    #[cfg(not(feature = "cuda"))] _ptx_path: Option<PathBuf>,
     max_fuel: u64,
     output_file: Option<PathBuf>,
     compress: bool,
-    gpu_device: usize,
+    #[cfg(feature = "cuda")] gpu_device: usize,
+    #[cfg(not(feature = "cuda"))] _gpu_device: usize,
 ) -> Result<()> {
     let settings = load_settings(&settings);
 
@@ -94,8 +96,11 @@ pub fn compute_solution(
     let seed = settings.calc_seed(&rand_hash, nonce);
 
     let mut solution = Solution::new();
-    let mut err_msg = Option::<String>::None;
-    let mut fuel_consumed = 0;
+    let mut invalid_solution = Option::<String>::None;
+    #[cfg(feature = "cuda")]
+    let mut fuel_consumed;
+    #[cfg(not(feature = "cuda"))]
+    let fuel_consumed;
     let mut runtime_signature = 0;
 
     macro_rules! dispatch_challenges {
@@ -118,28 +123,24 @@ pub fn compute_solution(
             let challenge = $c::Challenge::generate_instance(
                 &seed,
                 &settings.difficulty.into(),
-            ).unwrap();
+            )?;
 
-            match solve_challenge_fn(&challenge) {
-                Ok(result) => {
-                    fuel_consumed = max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-                    if fuel_consumed <= max_fuel {
-                        runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-                        if let Some(s) = result {
-                            match challenge.verify_solution(&s) {
-                                Ok(_) => {
-                                    solution = serde_json::to_value(s)
-                                        .unwrap()
-                                        .as_object()
-                                        .unwrap()
-                                        .to_owned();
-                                }
-                                Err(e) => err_msg = Some(e.to_string()),
-                            }
+            let result = solve_challenge_fn(&challenge).map_err(|e| anyhow!("{}", e))?;
+            fuel_consumed = max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+            if fuel_consumed <= max_fuel {
+                runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                if let Some(s) = result {
+                    match challenge.verify_solution(&s) {
+                        Ok(_) => {
+                            solution = serde_json::to_value(s)
+                                .unwrap()
+                                .as_object()
+                                .unwrap()
+                                .to_owned();
                         }
+                        Err(e) => invalid_solution = Some(e.to_string()),
                     }
                 }
-                Err(e) => err_msg = Some(e),
             }
         }};
 
@@ -170,11 +171,11 @@ pub fn compute_solution(
                 let modified_ptx = ptx_content.replace("0xdeadbeefdeadbeef", &max_fuel_hex);
 
                 let ptx = Ptx::from_src(modified_ptx);
-                let ctx = CudaContext::new(gpu_device).unwrap();
+                let ctx = CudaContext::new(gpu_device)?;
                 ctx.set_blocking_synchronize()?;
-                let module = ctx.load_module(ptx).unwrap();
+                let module = ctx.load_module(ptx)?;
                 let stream = ctx.default_stream();
-                let prop = get_device_prop(gpu_device as i32).unwrap();
+                let prop = get_device_prop(gpu_device as i32)?;
 
                 let challenge = $c::Challenge::generate_instance(
                     &seed,
@@ -182,7 +183,7 @@ pub fn compute_solution(
                     module.clone(),
                     stream.clone(),
                     &prop,
-                ).unwrap();
+                )?;
 
                 let initialize_kernel = module.load_function("initialize_kernel")?;
 
@@ -195,57 +196,58 @@ pub fn compute_solution(
                 let mut builder = stream.launch_builder(&initialize_kernel);
                 unsafe { builder.launch(cfg)?; }
 
-                match solve_challenge_fn(&challenge, module.clone(), stream.clone(), &prop) {
-                    Ok(result) => {
-                        stream.synchronize()?;
-                        ctx.synchronize()?;
+                let result = solve_challenge_fn(
+                    &challenge,
+                    module.clone(),
+                    stream.clone(),
+                    &prop
+                ).map_err(|e| anyhow!("{}", e))?;
+                stream.synchronize()?;
+                ctx.synchronize()?;
 
-                        let mut fuel_usage = stream.alloc_zeros::<u64>(1)?;
-                        let mut signature = stream.alloc_zeros::<u64>(1)?;
-                        let mut error_stat = stream.alloc_zeros::<u64>(1)?;
+                let mut fuel_usage = stream.alloc_zeros::<u64>(1)?;
+                let mut signature = stream.alloc_zeros::<u64>(1)?;
+                let mut error_stat = stream.alloc_zeros::<u64>(1)?;
 
-                        let finalize_kernel = module.load_function("finalize_kernel")?;
+                let finalize_kernel = module.load_function("finalize_kernel")?;
 
-                        let cfg = LaunchConfig {
-                            grid_dim: (1, 1, 1),
-                            block_dim: (1, 1, 1),
-                            shared_mem_bytes: 0,
-                        };
+                let cfg = LaunchConfig {
+                    grid_dim: (1, 1, 1),
+                    block_dim: (1, 1, 1),
+                    shared_mem_bytes: 0,
+                };
 
-                        let mut builder = stream.launch_builder(&finalize_kernel);
-                        unsafe {
-                            builder
-                                .arg(&mut fuel_usage)
-                                .arg(&mut signature)
-                                .arg(&mut error_stat)
-                                .launch(cfg)?;
-                        }
+                let mut builder = stream.launch_builder(&finalize_kernel);
+                unsafe {
+                    builder
+                        .arg(&mut fuel_usage)
+                        .arg(&mut signature)
+                        .arg(&mut error_stat)
+                        .launch(cfg)?;
+                }
 
-                        if stream.memcpy_dtov(&error_stat)?[0] != 0 {
-                            fuel_consumed = max_fuel + 1;
-                        } else {
-                            fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0];
-                            fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-                        }
+                if stream.memcpy_dtov(&error_stat)?[0] != 0 {
+                    fuel_consumed = max_fuel + 1;
+                } else {
+                    fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0];
+                    fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                }
 
-                        if fuel_consumed <= max_fuel {
-                            runtime_signature = stream.memcpy_dtov(&signature)?[0];
-                            runtime_signature ^= unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-                            if let Some(s) = result {
-                                match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
-                                    Ok(_) => {
-                                        solution = serde_json::to_value(s)
-                                            .unwrap()
-                                            .as_object()
-                                            .unwrap()
-                                            .to_owned();
-                                    }
-                                    Err(e) => err_msg = Some(e.to_string()),
-                                }
+                if fuel_consumed <= max_fuel {
+                    runtime_signature = stream.memcpy_dtov(&signature)?[0];
+                    runtime_signature ^= unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                    if let Some(s) = result {
+                        match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
+                            Ok(_) => {
+                                solution = serde_json::to_value(s)
+                                    .unwrap()
+                                    .as_object()
+                                    .unwrap()
+                                    .to_owned();
                             }
+                            Err(e) => invalid_solution = Some(e.to_string()),
                         }
                     }
-                    Err(e) => err_msg = Some(e),
                 }
             }
         }};
@@ -281,8 +283,8 @@ pub fn compute_solution(
     if fuel_consumed > max_fuel {
         eprintln!("Out of fuel");
         std::process::exit(87);
-    } else if let Some(err_msg) = err_msg {
-        eprintln!("Error: {}", err_msg);
+    } else if let Some(msg) = invalid_solution {
+        eprintln!("Invalid solution: {}", msg);
         std::process::exit(86);
     } else if output_data.solution.len() == 0 {
         eprintln!("No solution found");
