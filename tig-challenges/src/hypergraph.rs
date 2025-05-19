@@ -70,7 +70,7 @@ pub struct SubInstance {
     pub baseline_connectivity_metric: u32,
 }
 
-pub const NUM_SUB_INSTANCES: usize = 16;
+pub const NUM_SUB_INSTANCES: usize = 4;
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
 
 impl Challenge {
