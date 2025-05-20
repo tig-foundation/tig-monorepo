@@ -1,4 +1,5 @@
 {
+    "max_workers": 100,
     "cpus": 8,
     "gpus": 0,
     "algorithms": [

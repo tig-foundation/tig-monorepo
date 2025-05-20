@@ -11,9 +11,11 @@ import re
 import requests
 import shutil
 import subprocess
+import sys
 import tarfile
 import time
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 from glob import glob
 from threading import Thread
 from common.structs import OutputData, MerkleProof
@@ -24,13 +26,14 @@ PENDING_BATCH_IDS = set()
 PROCESSING_BATCH_IDS = set()
 READY_BATCH_IDS = set()
 FINISHED_BATCH_IDS = {}
-RUNTIME_THREADS = []
+TOTAL_COSTS = {"cpu": 0, "gpu": 0}
 if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
     CPU_ARCH = "amd64"
 elif CPU_ARCH in ["arm64", "aarch64"]:
     CPU_ARCH = "aarch64"
 else:
-    raise Exception(f"Unsupported CPU architecture: {CPU_ARCH}")
+    print(f"Unsupported CPU architecture: {CPU_ARCH}")
+    sys.exit(1)
 HAS_GPU = subprocess.run(["which", "nvidia-smi"], capture_output=True).returncode == 0
 
 def now():
@@ -98,49 +101,61 @@ def run_tig_runtime(nonce, tig_runtime_path, batch, so_path, ptx_path, output_pa
 
             assert os.path.exists(output_file), f"Exit code {ret}. Output file does not exist"
             if ret == 1:
-                logger.error(f"batch {batch['id']}, nonce {nonce}, runtime error: {process.stderr.read().decode()}")
+                raise Exception(process.stderr.read().decode())
             
             break
 
         elif batch["id"] not in PROCESSING_BATCH_IDS:
             process.kill()
-            logger.info(f"batch {batch['id']} stopped")
+            logger.debug(f"batch {batch['id']}, nonce {nonce} stopped")
             break
         
         time.sleep(0.1)
 
-    if not all(
-        os.path.exists(f"{output_path}/{batch['id']}/{n}.json")
-        for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"])
-    ):
-        return
+    logger.debug(f"batch {batch['id']}, nonce {nonce} finished, took {now() - start}ms")
 
-    compute_time = now() - start
-    hashes = []
-    solution_nonces = []
-    for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
-        with open(f"{output_path}/{batch['id']}/{n}.json", "r") as f:
-            d = OutputData.from_dict(json.load(f))
-            if len(d.solution) > 0:
-                solution_nonces.append(n)
-            hashes.append(d.to_merkle_hash())
 
-    merkle_tree = MerkleTree(hashes, batch["batch_size"])
-    with open(f"{output_path}/{batch['id']}/hashes.zlib", "wb") as f:
-        hashes = [h.to_str() for h in hashes]
-        f.write(zlib.compress(json.dumps(hashes).encode()))
-    with open(f"{output_path}/{batch['id']}/result.json", "w") as f:
-        result = {
-            "solution_nonces": list(solution_nonces),
-            "merkle_root": merkle_tree.calc_merkle_root().to_str(),
-        }
-        logger.debug(f"batch {batch['id']} result: {result}")
-        json.dump(result, f)
-    merkle_root_time = now() - start - compute_time
-    logger.info(f"batch {batch['id']}, compute_time: {compute_time}ms, merkle_root_time: {merkle_root_time}ms")
-    
-    PROCESSING_BATCH_IDS.remove(batch["id"])
-    READY_BATCH_IDS.add(batch["id"])
+def compute_merkle_root(batch, output_path):
+    start = now()
+    while True:
+        if batch["id"] not in PROCESSING_BATCH_IDS:
+            logger.info(f"batch {batch['id']} stopped")
+            break
+
+        processing_nonces = set(
+            n for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"])
+            if not os.path.exists(f"{output_path}/{batch['id']}/{n}.json")
+        )
+        if len(processing_nonces) > 0:
+            logger.debug(f"batch {batch['id']} still processing nonces: {processing_nonces}")
+            time.sleep(1.5)
+            continue
+
+        hashes = []
+        solution_nonces = []
+        for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
+            with open(f"{output_path}/{batch['id']}/{n}.json", "r") as f:
+                d = OutputData.from_dict(json.load(f))
+                if len(d.solution) > 0:
+                    solution_nonces.append(n)
+                hashes.append(d.to_merkle_hash())
+
+        merkle_tree = MerkleTree(hashes, batch["batch_size"])
+        with open(f"{output_path}/{batch['id']}/hashes.zlib", "wb") as f:
+            hashes = [h.to_str() for h in hashes]
+            f.write(zlib.compress(json.dumps(hashes).encode()))
+        with open(f"{output_path}/{batch['id']}/result.json", "w") as f:
+            result = {
+                "solution_nonces": list(solution_nonces),
+                "merkle_root": merkle_tree.calc_merkle_root().to_str(),
+            }
+            logger.debug(f"batch {batch['id']} result: {result}")
+            json.dump(result, f)
+        logger.info(f"batch {batch['id']} done, took: {now() - start}ms")
+        
+        PROCESSING_BATCH_IDS.remove(batch["id"])
+        READY_BATCH_IDS.add(batch["id"])
+        break
     
 
 def purge_folders(output_path, ttl):
@@ -165,12 +180,12 @@ def send_results(headers, master_ip, master_port, output_path):
     try:
         batch_id = READY_BATCH_IDS.pop()
     except KeyError:
-        logger.debug("No batches to send")
+        logger.debug("no batches to send")
         time.sleep(1)
         return
 
     if now() - FINISHED_BATCH_IDS.get(batch_id, 0) < 10000:
-        logger.debug(f"Batch {batch_id} submitted recently")
+        logger.debug(f"batch {batch_id} submitted recently")
         return
     
     output_folder = f"{output_path}/{batch_id}"
@@ -187,7 +202,7 @@ def send_results(headers, master_ip, master_port, output_path):
     ):
         if os.path.exists(f"{output_folder}/result.json"):
             os.remove(f"{output_folder}/result.json")
-        logger.debug(f"Batch {batch_id} flagged as ready, but missing nonce files")
+        logger.debug(f"batch {batch_id} flagged as ready, but missing nonce files")
         PENDING_BATCH_IDS.add(batch_id)
         return
 
@@ -201,7 +216,7 @@ def send_results(headers, master_ip, master_port, output_path):
             n for n in result["solution_nonces"]
             if hashes[n - batch["start_nonce"]].lower() <= hash_threshold
         ]
-        logger.info(f"Batch {batch_id} has {len(within_threshold_solutions)} out of {len(result['solution_nonces'])} solutions within threshold")
+        logger.info(f"batch {batch_id} has {len(within_threshold_solutions)} out of {len(result['solution_nonces'])} solutions within threshold")
         result["solution_nonces"] = within_threshold_solutions
 
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
@@ -254,7 +269,7 @@ def send_results(headers, master_ip, master_port, output_path):
             time.sleep(2)
 
 
-def process_batch(tig_runtime_path, downloads_folder, config, output_path):
+def process_batch(pool, tig_runtime_path, downloads_folder, config, output_path):
     try:
         batch_id = PENDING_BATCH_IDS.pop()
     except KeyError:
@@ -269,7 +284,7 @@ def process_batch(tig_runtime_path, downloads_folder, config, output_path):
         return
     
     if os.path.exists(f"{output_path}/{batch_id}/result.json"):
-        logger.info(f"Batch {batch_id} already processed")
+        logger.info(f"batch {batch_id} already processed")
         READY_BATCH_IDS.add(batch_id)
         return
     PROCESSING_BATCH_IDS.add(batch_id)
@@ -289,30 +304,35 @@ def process_batch(tig_runtime_path, downloads_folder, config, output_path):
         logger.error(f"Algorithm {batch['settings']['algorithm_id']} does not match any regex in the config")
         return
 
+    logger.info(f"batch {batch['id']} started")
+    pool.submit(compute_merkle_root, batch, output_path)
+
+    def process_nonce(nonce):
+        logger.debug(f"batch {batch['id']}, nonce {nonce} started: (cpu_cost {c['cpu_cost']}, gpu_cost {c['gpu_cost']})")
+        try:
+            run_tig_runtime(nonce, tig_runtime_path, batch, so_path, ptx_path, output_path)
+        except Exception as e:
+            logger.error(f"batch {batch['id']}, nonce {nonce}, runtime error: {e}")
+        finally:
+            TOTAL_COSTS["cpu"] -= c["cpu_cost"]
+            TOTAL_COSTS["gpu"] -= c["gpu_cost"]
+
     nonce = batch["start_nonce"]
     while nonce < batch["start_nonce"] + batch["num_nonces"]:
         if batch["id"] not in PROCESSING_BATCH_IDS:
             logger.info(f"batch {batch['id']} stopped")
             break
 
-        RUNTIME_THREADS[:] = [x for x in RUNTIME_THREADS if not x[2].is_alive()]
-        total_cpu_cost = sum(x[0] for x in RUNTIME_THREADS)
-        total_gpu_cost = sum(x[1] for x in RUNTIME_THREADS)
-
         if (
-            total_cpu_cost + c["cpu_cost"] <= config["cpus"] and 
-            total_gpu_cost + c["gpu_cost"] <= config["gpus"]
+            TOTAL_COSTS["cpu"] + c["cpu_cost"] <= config["cpus"] and 
+            TOTAL_COSTS["gpu"] + c["gpu_cost"] <= config["gpus"]
         ):
-            logger.debug(f"Starting batch {batch['id']}, nonce {nonce}, cpu_cost {c['cpu_cost']}, gpu_cost {c['gpu_cost']}")
-            t = Thread(
-                target=run_tig_runtime,
-                args=(nonce, tig_runtime_path, batch, so_path, ptx_path, output_path)
-            )
-            t.start()
-            RUNTIME_THREADS.append((c["cpu_cost"], c["gpu_cost"], t))
+            TOTAL_COSTS["cpu"] += c["cpu_cost"]
+            TOTAL_COSTS["gpu"] += c["gpu_cost"]
+            pool.submit(process_nonce, nonce)
             nonce += 1
-
-        time.sleep(0.1)
+        else:
+            time.sleep(0.1)
 
 
 def poll_batches(headers, master_ip, master_port, output_path):    
@@ -395,9 +415,10 @@ def main(
         "User-Agent": slave_name
     }
 
+    pool = ThreadPoolExecutor(max_workers=config["max_workers"])
     Thread(
         target=wrap_thread,
-        args=(process_batch, tig_runtime_path, downloads_folder, config, output_path)
+        args=(process_batch, pool, tig_runtime_path, downloads_folder, config, output_path)
     ).start()
 
     Thread(
