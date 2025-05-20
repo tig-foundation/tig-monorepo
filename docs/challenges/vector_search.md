@@ -53,12 +53,12 @@ mean_distance = 0.47 / 3 = 0.16
 
 # Our Challenge
 
-In TIG, the vector search challenge features vectors with 250 dimensions, 100000 vectors in the vector database, and uses Euclidean distance. There are two parameters can be adjusted in order to vary the difficulty of the challenge instance:
+In TIG, the vector search challenge features vectors with 250 dimensions, and uses the Euclidean distance. The set we sample from is the hypercube $[-1,1]^{250}$. The number of Database vectors scales with the number of Query vectors, such that the number Database vectors is the Query vectors multiplied by $100$. There are two parameters that can be adjusted in order to vary the difficulty of the challenge instance: 
 
 - Parameter 1: $num\textunderscore{ }queries$ = **The number of queries**.  
-- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline$ = **The mean Euclidean distance of query vectors to selected nearby vectors in the database have to be below `threshold = 6 - better_than_baseline / 1000`**. 
+- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline$ = **The mean Euclidean distance of query vectors to selected nearby vectors in the database have to be below `threshold = 11 - better_than_baseline / 1000`**. 
 
-All vectors in the query and database sets are generated uniformly at random within a 250-dimensional hypercube; that is, each component in a vector is drawn from a uniform distribution over the interval $[0, 1]$.
+Real-world data is typically clustered, we generate cluster sizes from the log-normal distribution, such that the mean number of points in a cluster is $700$. All vectors in the Query and Database sets are generated in the following way. When a vector is generated it is assigned a cluster center with a probability proportional to that clusters size. Once a vector is assigned a cluster center it is generated from a anisotropic Guassian with mean equal to the cluster center.
 
 # Application
 
@@ -67,4 +67,3 @@ Vector search has a wide range of applications an example of which is Threshold-
 See also for example Outlier detection for high dimensional data: https://dl.acm.org/doi/abs/10.1145/375663.375668
 
 Another example application of vector search is in network security, where the vector database corresponds to historical traffic patterns, and query vectors are new traffic data. By tracking the mean distance between sets new data points and historic "regular" data, any deviation exceeding a threshold can indicate a potential intrusion.
-
