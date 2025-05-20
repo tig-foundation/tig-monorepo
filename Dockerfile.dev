@@ -47,19 +47,15 @@ WORKDIR /tmp/tig-monorepo
 
 RUN if command -v nvcc > /dev/null 2>&1; then \
         cargo build -r -p tig-runtime --features cuda && \
-        cargo build -r -p tig-verifier --features cuda && \
-        cargo build -r -p tig-worker --features cuda; \
+        cargo build -r -p tig-verifier --features cuda; \
     else \
         cargo build -r -p tig-runtime && \
-        cargo build -r -p tig-verifier && \
-        cargo build -r -p tig-worker; \
+        cargo build -r -p tig-verifier; \
     fi && \
     mv target/release/tig-runtime /usr/local/bin/ && \
     mv target/release/tig-verifier /usr/local/bin/ && \
-    mv target/release/tig-worker /usr/local/bin/ && \
     chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-verifier && \
-    chmod +x /usr/local/bin/tig-worker && \
     rm -rf tig-monorepo
 
 COPY tig-binary/scripts /usr/local/bin/

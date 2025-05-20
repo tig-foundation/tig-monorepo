@@ -41,6 +41,10 @@ See last section on how to find your player_id & api_key.
 2. Delete the database: `rm -rf db_data`
 3. Start your master
 
+## Optimising your Master Config
+
+See [docs.tig.foundation](https://docs.tig.foundation/benchmarking/benchmarker-config)
+
 # Connecting Slaves
 
 1. Run the appropiate [runtime docker image](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fruntime) for your slave. Available flavours are:
@@ -64,10 +68,6 @@ See last section on how to find your player_id & api_key.
 * To set the number of workers (threads), use the option `--workers <NUM_WORKERS>`
 * To use a different port, use the option `--port <MASTER_PORT>`
 * To see all options, use `--help` 
-
-# Optimising your Config
-
-See [docs.tig.foundation](https://docs.tig.foundation/benchmarking/benchmarker-config)
 
 # Finding your API Key
 
