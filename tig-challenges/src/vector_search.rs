@@ -63,7 +63,7 @@ impl Challenge {
     ) -> Result<Self> {
         let mut rng = StdRng::from_seed(seed.clone());
         let better_than_baseline = difficulty.better_than_baseline;
-        let max_distance = 14.0 - (better_than_baseline as f32) / 1000.0;
+        let max_distance = 11.0 - (better_than_baseline as f32) / 1000.0;
         let vector_dims = 250;
         let database_size = 100 * difficulty.num_queries;
         let avg_cluster_size: f32 = 700.0;
