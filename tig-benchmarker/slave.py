@@ -62,8 +62,12 @@ def download_library(downloads_folder, batch):
 
 
 def run_tig_runtime(nonce, tig_runtime_path, batch, so_path, ptx_path, output_path):
-    start = now()
     output_file = f"{output_path}/{batch['id']}/{nonce}.json"
+    if os.path.exists(output_file):
+        logger.info(f"batch {batch['id']}, nonce {nonce}: already computed")
+        return
+
+    start = now()
     cmd = [
         tig_runtime_path,
         json.dumps(batch["settings"]),
