@@ -36,6 +36,7 @@ acknowledgments below:
 */
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
+use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
 use tig_challenges::satisfiability::*;
 
@@ -43,6 +44,11 @@ pub fn solve_challenge(challenge: &Challenge) -> Result<Option<Solution>> {
     // If you need random numbers, recommend using SmallRng with challenge.seed:
     // use rand::{rngs::SmallRng, Rng, SeedableRng};
     // let mut rng = SmallRng::from_seed(challenge.seed);
+
+    // If you need HashMap or HashSet, make sure to use a deterministic hasher for consistent runtime_signature:
+    // use crate::{seeded_hasher, HashMap, HashSet};
+    // let hasher = seeded_hasher(&challenge.seed);
+    // let map = HashMap::with_hasher(hasher);
 
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(None) if your algorithm finds no solution or needs to exit early

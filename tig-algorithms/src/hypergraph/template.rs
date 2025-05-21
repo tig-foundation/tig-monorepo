@@ -36,6 +36,7 @@ acknowledgments below:
 */
 
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
+use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
 use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
@@ -73,6 +74,11 @@ pub fn solve_sub_instance(
     // If you need random numbers, recommend using SmallRng with challenge.seed:
     // use rand::{rngs::SmallRng, Rng, SeedableRng};
     // let mut rng = SmallRng::from_seed(challenge.seed);
+
+    // If you need HashMap or HashSet, make sure to use a deterministic hasher for consistent runtime_signature:
+    // use crate::{seeded_hasher, HashMap, HashSet};
+    // let hasher = seeded_hasher(&instance.seed);
+    // let map = HashMap::with_hasher(hasher);
 
     // when launching kernels, you should hardcode the LaunchConfig for determinism:
     //      Example:
