@@ -174,6 +174,7 @@ pub fn compute_solution(
                 let ptx = Ptx::from_src(modified_ptx);
                 let ctx = CudaContext::new(gpu_device)?;
                 ctx.set_blocking_synchronize()?;
+                ctx.enable_automatic_fuel_check();
                 let module = ctx.load_module(ptx)?;
                 let stream = ctx.default_stream();
                 let prop = get_device_prop(gpu_device as i32)?;
