@@ -2,6 +2,46 @@
 
 Benchmarker for TIG. Expected setup is a single master and multiple slaves on different servers.
 
+## Overview
+
+Benchmarking in TIG works as follows:
+
+1. Master submits a precommit to TIG protocol, with details of what they will benchmark:
+   * `block_id`: start of the benchmark
+   * `player_id`: address of the benchmarker
+   * `challenge_id`: challenge to benchmark
+   * `algorithm_id`: algorithm to benchmark
+   * `difficulty`: difficulty of instances to randomly generate
+   * `num_nonces`: number of instances to benchmark
+
+2. TIG protocol confirms the precommit, and assigns it a random string
+
+3. Master starts benchmarking:
+   * polls TIG protocol for the confirmed precommit + random string
+   * creates a benchmark job, splitting it into batches
+   * slaves poll the master for batches to compute
+   * slaves do the computation, and send results back to master
+
+4. After benchmarking is finished, master submits benchmark to TIG protocol:
+   * `solution_nonces`: list of nonces for which a solution was found
+   * `merkle_root`: Merkle root of the tree constructed using results as leafs
+
+5. TIG protocol confirms the benchmark, and randomly samples nonces requiring proof
+
+6. Master prepares the proof:
+   * polls TIG protocol for confirmed benchmark + sampled nonces
+   * creates proof jobs
+   * slaves poll the master for nonces requiring proof
+   * slaves send Merkle branches back to master
+
+7. Master submits proof to TIG protocol
+
+8. TIG protocol confirms the proof, calculating the block from which the solutions will become "active" (eligible to earn rewards)
+   * Verification is performed in parallel
+   * Solutions will be inactive 120 blocks from when the benchmark started
+   * The delay is determined by number of blocks between the start and when proof was confirmed
+   * Each block, active solutions which qualify will earn rewards for the Benchmarker
+
 # Starting Your Master
 
 Simply run:
@@ -41,9 +81,53 @@ See last section on how to find your player_id & api_key.
 2. Delete the database: `rm -rf db_data`
 3. Start your master
 
-## Optimising your Master Config
+## Master Config
 
-See [docs.tig.foundation](https://docs.tig.foundation/benchmarking/benchmarker-config)
+The master config defines how benchmarking jobs are selected, scheduled, and distributed to slaves. This config can be edited via the master UI or via API (`http://localhost:<MASTER_PORT>/update-config`).
+
+```json
+{
+  "player_id": "0x0000000000000000000000000000000000000000",
+  "api_key": "00000000000000000000000000000000",
+  "api_url": "https://mainnet-api.tig.foundation",
+  "time_between_resubmissions": 60000,
+  "max_concurrent_benchmarks": 4,
+  "algo_selection": [
+    {
+      "algorithm_id": "c001_a001",
+      "num_nonces": 40,
+      "difficulty_range": [0, 0.5],
+      "selected_difficulties": [],
+      "weight": 1,
+      "batch_size": 8,
+      "base_fee_limit": "10000000000000000"
+    },
+    ...
+  ],
+  "time_before_batch_retry": 60000,
+  "slaves": [
+    {
+      "name_regex": ".*",
+      "algorithm_id_regex": ".*",
+      "max_concurrent_batches": 1
+    }
+  ]
+}
+```
+
+**Explanation:**
+* `player_id`: Your wallet address (lowercase)
+* `api_key`: See last section on how to obtain your API key
+* `api_url`: mainnet (https://mainnet-api.tig.foundation) or testnet (https://testnet-api.tig.foundation)
+* `time_between_resubmissions`: Time in milliseconds to wait before resubmitting an benchmark/proof which has not confirmed into a block
+* `max_concurrent_benchmarks`: Maximum number of benchmarks that can be "in flight" at once (i.e., benchmarks where the proof has not been computed yet).
+* `algo_selection`: list of algorithms that can be picked for benchmarking. Each entry has:
+  * `algorithm_id`: id for the algorithm (e.g., c001_a001). Tip: use [list_algorithms](../scripts/list_algorithms.py) script to get list of algorithm ids
+  * `num_nonces`: Number of instances to benchmark for this algorithm
+  * `difficulty_range`: the bounds (0.0 = easiest, 1.0 = hardest) for a random difficulty sampling. Full range is `[0.0, 1.0]`
+  * `selected_difficulties`: A list of difficulties `[[x1,y1], [x2, y2], ...]`. If any of the difficulties are in valid range, one will be randomly selected instead of sampling from the difficulty range
+  * `weight`: Selection weight. An algorithm is chosen proportionally to `weight / total_weight`
+  * `batch_size`: Number of nonces per batch. Must be a power of 2. For example, if num_nonces = 40 and batch_size = 8, the benchmark is split into 5 batches
 
 # Connecting Slaves
 
@@ -64,10 +148,59 @@ See [docs.tig.foundation](https://docs.tig.foundation/benchmarking/benchmarker-c
     ```
 
 **Notes:**
-* If your master is on a different server to your slave, you need to add the option `--master <SERVER_IP>`
-* To set the number of workers (threads), use the option `--workers <NUM_WORKERS>`
-* To use a different port, use the option `--port <MASTER_PORT>`
+* If your master is on a different server, add `--master <SERVER_IP>`
+* Set a custom master port with `--port <MASTER_PORT>`
 * To see all options, use `--help` 
+
+## Slave Config
+
+You can control execution limits via a JSON config:
+
+```json
+{
+    "max_workers": 100,
+    "cpus": 8,
+    "gpus": 0,
+    "algorithms": [
+        {
+            "id_regex": ".*",
+            "cpu_cost": 1.0,
+            "gpu_cost": 0.0
+        }
+    ]
+}
+```
+
+**Explanation:**
+* `max_workers`: maximum concurrent tig-runtime processes.
+* `cpus` & `gpus`: total compute limits available to the slave.
+* `algorithms`: rules for matching algorithms based on `id_regex`.
+    * An algorithm can only be executed if it stays within the total `cpu_cost` and `gpu_cost` limits.
+    * Regex matches algorithm ids (e.g., `c004_a[\d3]` matches all vector_search algorithms).
+
+**Example:**
+
+This example limits c001/c002/c003 to 2 concurrent instances per CPU. It also limits c004/c005 to 4 concurrent instances per GPU:
+
+```json
+{
+    "max_workers": 10,
+    "cpus": 4,
+    "gpus": 2,
+    "algorithms": [
+        {
+            "id_regex": "c00[123].*",
+            "cpu_cost": 0.5,
+            "gpu_cost": 0.0
+        },
+        {
+            "id_regex": "c00[45].*",
+            "cpu_cost": 0.0,
+            "gpu_cost": 0.25
+        }
+    ]
+}
+```
 
 # Finding your API Key
 

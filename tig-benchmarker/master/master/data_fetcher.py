@@ -49,7 +49,7 @@ class DataFetcher:
             algorithms_data, benchmarks_data, challenges_data = list(executor.map(_get, tasks))
 
         algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data["algorithms"]}
-        wasms = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data["binarys"]}
+        binarys = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data["binarys"]}
         
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data["precommits"]}
         benchmarks = {b["id"]: Benchmark.from_dict(b) for b in benchmarks_data["benchmarks"]}
@@ -74,7 +74,7 @@ class DataFetcher:
         self._cache = {
             "block": block,
             "algorithms": algorithms,
-            "wasms": wasms,
+            "binarys": binarys,
             "precommits": precommits,
             "benchmarks": benchmarks,
             "proofs": proofs,

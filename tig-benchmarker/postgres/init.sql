@@ -106,21 +106,8 @@ SELECT '
   "player_id": "0x0000000000000000000000000000000000000000",
   "api_key": "00000000000000000000000000000000",
   "api_url": "https://mainnet-api.tig.foundation",
-  "submissions_manager_config": {
-    "time_between_retries": 60000
-  },
-  "job_manager_config": {
-    "default_batch_sizes": {
-      "c001": 8,
-      "c002": 8,
-      "c003": 8,
-      "c004": 8,
-      "c005": 8
-    }
-  },
-  "precommit_manager_config": {
-    "max_pending_benchmarks": 4
-  },
+  "time_between_resubmissions": 60000,
+  "max_concurrent_benchmarks": 4,
   "algo_selection": [
     {
       "algorithm_id": "c001_a001",
@@ -128,8 +115,7 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8,
-      "base_fee_limit": "10000000000000000"
+      "batch_size": 8
     },
     {
       "algorithm_id": "c002_a001",
@@ -137,8 +123,7 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8,
-      "base_fee_limit": "10000000000000000"
+      "batch_size": 8
     },
     {
       "algorithm_id": "c003_a001",
@@ -146,8 +131,7 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8,
-      "base_fee_limit": "10000000000000000"
+      "batch_size": 8
     },
     {
       "algorithm_id": "c004_a001",
@@ -155,8 +139,7 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8,
-      "base_fee_limit": "10000000000000000"
+      "batch_size": 8
     },
     {
       "algorithm_id": "c005_a001",
@@ -164,19 +147,16 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8,
-      "base_fee_limit": "10000000000000000"
+      "batch_size": 8
     }
   ],
-  "slave_manager_config": {
-    "time_before_batch_retry": 60000,
-    "slaves": [
-      {
-        "name_regex": ".*",
-        "algorithm_id_regex": ".*",
-        "max_concurrent_batches": 1
-      }
-    ]
-  }
+  "time_before_batch_retry": 60000,
+  "slaves": [
+    {
+      "name_regex": ".*",
+      "algorithm_id_regex": ".*",
+      "max_concurrent_batches": 1
+    }
+  ]
 }'
 WHERE NOT EXISTS (SELECT 1 FROM config);

@@ -92,8 +92,6 @@ class SubmissionsManager:
             )
 
     def run(self, submit_precommit_req: Optional[SubmitPrecommitRequest]):
-        config = CONFIG["submissions_manager_config"]
-
         now = int(time.time() * 1000)
         if submit_precommit_req is None:
             logger.debug("no precommit to submit")
@@ -128,7 +126,7 @@ class SubmissionsManager:
             INNER JOIN job_data B
                 ON A.benchmark_id = B.benchmark_id
             """,
-            (config["time_between_retries"],)
+            (CONFIG["time_between_resubmissions"],)
         )
 
         if benchmark_to_submit:
@@ -171,7 +169,7 @@ class SubmissionsManager:
             INNER JOIN job_data B
                 ON A.benchmark_id = B.benchmark_id
             """,
-            (config["time_between_retries"],)
+            (CONFIG["time_between_resubmissions"],)
         )
 
         if proof_to_submit:

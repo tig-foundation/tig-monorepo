@@ -11,25 +11,12 @@ from master.client_manager import CONFIG
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-@dataclass
-class AlgorithmSelectionConfig(FromDict):
-    algorithm: str
-    base_fee_limit: PreciseNumber
-    num_nonces: int
-    weight: float
-
-@dataclass
-class PrecommitManagerConfig(FromDict):
-    max_pending_benchmarks: int
-    algo_selection: Dict[str, AlgorithmSelectionConfig]
-
 class PrecommitManager:
     def __init__(self):
         self.last_block_id = None
         self.num_precommits_submitted = 0
         self.algorithm_name_2_id = {}
         self.challenge_name_2_id = {}
-        self.curr_base_fees = {}
 
     def on_new_block(
         self,
@@ -43,11 +30,6 @@ class PrecommitManager:
     ):
         self.last_block_id = block.id
         self.num_precommits_submitted = 0
-        self.curr_base_fees = {
-            c.details.name: c.block_data.base_fee
-            for c in challenges.values()
-            if c.block_data is not None
-        }
         benchmark_stats_by_challenge = {
             c.details.name: {
                 "solutions": 0,
@@ -94,12 +76,11 @@ class PrecommitManager:
             """
         )["count"]
 
-        config = CONFIG["precommit_manager_config"]
         algo_selection = CONFIG["algo_selection"]
 
         num_pending_benchmarks = num_pending_jobs + self.num_precommits_submitted
-        if  num_pending_benchmarks >= config["max_pending_benchmarks"]:
-            logger.debug(f"number of pending benchmarks has reached max of {config['max_pending_benchmarks']}")
+        if  num_pending_benchmarks >= CONFIG["max_concurrent_benchmarks"]:
+            logger.debug(f"number of pending benchmarks has reached max of {CONFIG['max_concurrent_benchmarks']}")
             return
         logger.debug(f"Selecting algorithm from: {[(x['algorithm_id'], x['weight']) for x in algo_selection]}")
         selection = random.choices(algo_selection, weights=[x["weight"] for x in algo_selection])[0]

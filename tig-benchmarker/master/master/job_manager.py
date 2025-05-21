@@ -24,7 +24,7 @@ class JobManager:
         proofs: Dict[str, Proof],
         challenges: Dict[str, Challenge],
         algorithms: Dict[str, Algorithm],
-        wasms: Dict[str, Binary],
+        binarys: Dict[str, Binary],
         **kwargs
     ):
         api_url = CONFIG["api_url"]
@@ -69,20 +69,20 @@ class JobManager:
                 }
             hash_threshold = self.hash_thresholds[x.details.block_started][x.settings.challenge_id]
 
-            wasm = wasms.get(x.settings.algorithm_id, None)
-            if wasm is None:
-                logger.error(f"no wasm found for algorithm_id {x.settings.algorithm_id}")
+            bin = binarys.get(x.settings.algorithm_id, None)
+            if bin is None:
+                logger.error(f"batch {x.id}: no binary-blob found for {x.settings.algorithm_id}. skipping job")
                 continue
-            if wasm.details.download_url is None:
-                logger.error(f"no download_url found for wasm {wasm.algorithm_id}")
+            if bin.details.download_url is None:
+                logger.error(f"batch {x.id}: no download_url found for {bin.algorithm_id}. skipping job")
                 continue
             batch_size = next(
                 (s["batch_size"] for s in algo_selection if s["algorithm_id"] == x.settings.algorithm_id),
                 None
             )
             if batch_size is None:
-                batch_size = config["default_batch_size"][x.settings.challenge_id]
-                logger.error(f"No batch size found for algorithm_id {x.settings.algorithm_id}, using default {batch_size}")
+                logger.error(f"batch {x.id}: no batch size found for {x.settings.algorithm_id}. skipping job")
+                continue
             num_batches = math.ceil(x.details.num_nonces / batch_size)
             atomic_inserts = [
                 (
@@ -112,11 +112,11 @@ class JobManager:
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,
-                        json.dumps(block.config["benchmarks"]["runtime_configs"]["wasm"]),
+                        json.dumps(block.config["benchmarks"]["runtime_config"]),
                         batch_size,
                         c_name,
                         a_name,
-                        wasm.details.download_url,
+                        bin.details.download_url,
                         x.details.block_started,
                         hash_threshold
                     )

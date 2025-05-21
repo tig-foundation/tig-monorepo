@@ -67,7 +67,7 @@ serializable_struct_with_getters! {
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
-        runtime_configs: HashMap<String, RuntimeConfig>,
+        runtime_config: RuntimeConfig,
         target_solution_rate: u32,
         hash_threshold_max_percent_delta: f64,
     }
