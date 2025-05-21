@@ -165,9 +165,10 @@ pub fn compute_solution(
                     )?
                 };
 
+                let gpu_fuel_scale = 20; // scale fuel to loosely align with CPU
                 let ptx_content = std::fs::read_to_string(&ptx_path)
                     .map_err(|e| anyhow!("Failed to read PTX file: {}", e))?;
-                let max_fuel_hex = format!("0x{:016x}", max_fuel);
+                let max_fuel_hex = format!("0x{:016x}", max_fuel * gpu_fuel_scale);
                 let modified_ptx = ptx_content.replace("0xdeadbeefdeadbeef", &max_fuel_hex);
 
                 let ptx = Ptx::from_src(modified_ptx);
@@ -229,8 +230,9 @@ pub fn compute_solution(
                 if stream.memcpy_dtov(&error_stat)?[0] != 0 {
                     fuel_consumed = max_fuel + 1;
                 } else {
-                    fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0];
-                    fuel_consumed += max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                    let gpu_fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
+                    fuel_consumed = max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                    fuel_consumed += gpu_fuel_consumed;
                 }
 
                 if fuel_consumed <= max_fuel {
