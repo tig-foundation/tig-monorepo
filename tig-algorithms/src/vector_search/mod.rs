@@ -118,7 +118,8 @@ pub use invector_fast as c004_a055;
 
 // c004_a056
 
-// c004_a057
+pub mod better_vector;
+pub use better_vector as c004_a057;
 
 // c004_a058
 
