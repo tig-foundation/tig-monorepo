@@ -89,178 +89,193 @@ pub fn compute_solution(
     #[cfg(not(feature = "cuda"))] _gpu_device: usize,
 ) -> Result<()> {
     let settings = load_settings(&settings);
+    let seed = settings.calc_seed(&rand_hash, nonce);
 
     let library = load_module(&library_path)?;
     let fuel_remaining_ptr = unsafe { *library.get::<*mut u64>(b"__fuel_remaining")? };
     unsafe { *fuel_remaining_ptr = max_fuel };
-    let seed = settings.calc_seed(&rand_hash, nonce);
+    let runtime_signature_ptr = unsafe { *library.get::<*mut u64>(b"__runtime_signature")? };
+    unsafe { *runtime_signature_ptr = u64::from_be_bytes(seed[0..8].try_into().unwrap()) };
 
-    let mut solution = Solution::new();
-    let mut invalid_solution = Option::<String>::None;
-    #[cfg(feature = "cuda")]
-    let mut fuel_consumed;
-    #[cfg(not(feature = "cuda"))]
-    let fuel_consumed;
-    let mut runtime_signature = 0;
-
-    macro_rules! dispatch_challenges {
-        ( $( ($c:ident, $cpu_or_gpu:tt) ),+ $(,)? ) => {{
-            match settings.challenge_id.as_str() {
-                $(
-                    stringify!($c) => {
-                        dispatch_challenges!(@expand $c, $cpu_or_gpu);
-                    }
-                )+
-                _ => panic!("Unsupported challenge"),
-            }
-        }};
-
-        (@expand $c:ident, cpu) => {{
-            let solve_challenge_fn = unsafe {
-                library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(b"entry_point")?
-            };
-
-            let challenge = $c::Challenge::generate_instance(
-                &seed,
-                &settings.difficulty.into(),
-            )?;
-
-            let result = solve_challenge_fn(&challenge).map_err(|e| anyhow!("{}", e))?;
-            fuel_consumed = max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-            if fuel_consumed <= max_fuel {
-                runtime_signature = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-                if let Some(s) = result {
-                    match challenge.verify_solution(&s) {
-                        Ok(_) => {
-                            solution = serde_json::to_value(s)
-                                .unwrap()
-                                .as_object()
-                                .unwrap()
-                                .to_owned();
-                        }
-                        Err(e) => invalid_solution = Some(e.to_string()),
-                    }
-                }
-            }
-        }};
-
-        (@expand $c:ident, gpu) => {{
-            #[cfg(not(feature = "cuda"))]
-            panic!("tig-runtime was not compiled with '--features cuda'");
-
-            #[cfg(feature = "cuda")]
-            {
-                if ptx_path.is_none() {
-                    panic!("PTX file is required for GPU challenges.");
-                }
-                let ptx_path = ptx_path.unwrap();
+    let (fuel_consumed, runtime_signature, solution, invalid_reason) = 'out_of_fuel: {
+        macro_rules! dispatch_challenge {
+            ($c:ident, cpu) => {{
+                // library function may exit 87 if it runs out of fuel
                 let solve_challenge_fn = unsafe {
-                    library.get::<fn(
-                        &$c::Challenge,
-                        Arc<CudaModule>,
-                        Arc<CudaStream>,
-                        &cudaDeviceProp
-                    ) -> Result<Option<$c::Solution>, String>>(
+                    library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(
                         b"entry_point",
                     )?
                 };
 
-                let gpu_fuel_scale = 20; // scale fuel to loosely align with CPU
-                let ptx_content = std::fs::read_to_string(&ptx_path)
-                    .map_err(|e| anyhow!("Failed to read PTX file: {}", e))?;
-                let max_fuel_hex = format!("0x{:016x}", max_fuel * gpu_fuel_scale);
-                let modified_ptx = ptx_content.replace("0xdeadbeefdeadbeef", &max_fuel_hex);
+                let challenge =
+                    $c::Challenge::generate_instance(&seed, &settings.difficulty.into())?;
 
-                let ptx = Ptx::from_src(modified_ptx);
-                let ctx = CudaContext::new(gpu_device)?;
-                ctx.set_blocking_synchronize()?;
-                let module = ctx.load_module(ptx)?;
-                let stream = ctx.fuel_check_stream();
-                let prop = get_device_prop(gpu_device as i32)?;
-
-                let challenge = $c::Challenge::generate_instance(
-                    &seed,
-                    &settings.difficulty.into(),
-                    module.clone(),
-                    stream.clone(),
-                    &prop,
-                )?;
-
-                let initialize_kernel = module.load_function("initialize_kernel")?;
-
-                let cfg = LaunchConfig {
-                    grid_dim: (1, 1, 1),
-                    block_dim: (1, 1, 1),
-                    shared_mem_bytes: 0,
-                };
-
-                let mut builder = stream.launch_builder(&initialize_kernel);
-                unsafe { builder.launch(cfg)?; }
-
-                let result = solve_challenge_fn(
-                    &challenge,
-                    module.clone(),
-                    stream.clone(),
-                    &prop
-                ).map_err(|e| anyhow!("{}", e))?;
-                stream.synchronize()?;
-                ctx.synchronize()?;
-
-                let mut fuel_usage = stream.alloc_zeros::<u64>(1)?;
-                let mut signature = stream.alloc_zeros::<u64>(1)?;
-                let mut error_stat = stream.alloc_zeros::<u64>(1)?;
-
-                let finalize_kernel = module.load_function("finalize_kernel")?;
-
-                let cfg = LaunchConfig {
-                    grid_dim: (1, 1, 1),
-                    block_dim: (1, 1, 1),
-                    shared_mem_bytes: 0,
-                };
-
-                let mut builder = stream.launch_builder(&finalize_kernel);
-                unsafe {
-                    builder
-                        .arg(&mut fuel_usage)
-                        .arg(&mut signature)
-                        .arg(&mut error_stat)
-                        .launch(cfg)?;
+                let result = solve_challenge_fn(&challenge).map_err(|e| anyhow!("{}", e))?;
+                let fuel_consumed =
+                    max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                if fuel_consumed > max_fuel {
+                    break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
                 }
 
-                if stream.memcpy_dtov(&error_stat)?[0] != 0 {
-                    fuel_consumed = max_fuel + 1;
-                } else {
-                    let gpu_fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
-                    fuel_consumed = max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-                    fuel_consumed += gpu_fuel_consumed;
-                }
+                let runtime_signature =
+                    unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                let (solution, invalid_reason) = match result {
+                    Some(s) => (
+                        serde_json::to_value(&s)
+                            .unwrap()
+                            .as_object()
+                            .unwrap()
+                            .to_owned(),
+                        match challenge.verify_solution(&s) {
+                            Ok(_) => None,
+                            Err(e) => Some(e.to_string()),
+                        },
+                    ),
+                    None => (Solution::new(), None),
+                };
 
-                if fuel_consumed <= max_fuel {
-                    runtime_signature = stream.memcpy_dtov(&signature)?[0];
-                    runtime_signature ^= unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-                    if let Some(s) = result {
-                        match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
-                            Ok(_) => {
-                                solution = serde_json::to_value(s)
-                                    .unwrap()
-                                    .as_object()
-                                    .unwrap()
-                                    .to_owned();
-                            }
-                            Err(e) => invalid_solution = Some(e.to_string()),
-                        }
+                (fuel_consumed, runtime_signature, solution, invalid_reason)
+            }};
+
+            ($c:ident, gpu) => {{
+                #[cfg(not(feature = "cuda"))]
+                panic!("tig-runtime was not compiled with '--features cuda'");
+
+                #[cfg(feature = "cuda")]
+                {
+                    if ptx_path.is_none() {
+                        panic!("PTX file is required for GPU challenges.");
                     }
+                    let ptx_path = ptx_path.unwrap();
+                    // library function may exit 87 if it runs out of fuel
+                    let solve_challenge_fn = unsafe {
+                        library.get::<fn(
+                            &$c::Challenge,
+                            Arc<CudaModule>,
+                            Arc<CudaStream>,
+                            &cudaDeviceProp,
+                        ) -> Result<Option<$c::Solution>, String>>(
+                            b"entry_point"
+                        )?
+                    };
+
+                    let gpu_fuel_scale = 20; // scale fuel to loosely align with CPU
+                    let ptx_content = std::fs::read_to_string(&ptx_path)
+                        .map_err(|e| anyhow!("Failed to read PTX file: {}", e))?;
+                    let max_fuel_hex = format!("0x{:016x}", max_fuel * gpu_fuel_scale);
+                    let modified_ptx = ptx_content.replace("0xdeadbeefdeadbeef", &max_fuel_hex);
+
+                    let ptx = Ptx::from_src(modified_ptx);
+                    let ctx = CudaContext::new(gpu_device)?;
+                    ctx.set_blocking_synchronize()?;
+                    let module = ctx.load_module(ptx)?;
+                    let stream = ctx.fuel_check_stream();
+                    let prop = get_device_prop(gpu_device as i32)?;
+
+                    let challenge = $c::Challenge::generate_instance(
+                        &seed,
+                        &settings.difficulty.into(),
+                        module.clone(),
+                        stream.clone(),
+                        &prop,
+                    )?;
+
+                    let initialize_kernel = module.load_function("initialize_kernel")?;
+
+                    let cfg = LaunchConfig {
+                        grid_dim: (1, 1, 1),
+                        block_dim: (1, 1, 1),
+                        shared_mem_bytes: 0,
+                    };
+
+                    unsafe {
+                        stream
+                            .launch_builder(&initialize_kernel)
+                            .arg(&(u64::from_be_bytes(seed[8..16].try_into().unwrap())))
+                            .launch(cfg)?;
+                    }
+
+                    let result =
+                        solve_challenge_fn(&challenge, module.clone(), stream.clone(), &prop);
+                    if result
+                        .as_ref()
+                        .is_err_and(|e| e.contains("ran out of fuel"))
+                    {
+                        break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    }
+                    let result = result.map_err(|e| anyhow!("{}", e))?;
+                    stream.synchronize()?;
+                    ctx.synchronize()?;
+
+                    let mut fuel_usage = stream.alloc_zeros::<u64>(1)?;
+                    let mut signature = stream.alloc_zeros::<u64>(1)?;
+                    let mut error_stat = stream.alloc_zeros::<u64>(1)?;
+
+                    let finalize_kernel = module.load_function("finalize_kernel")?;
+
+                    let cfg = LaunchConfig {
+                        grid_dim: (1, 1, 1),
+                        block_dim: (1, 1, 1),
+                        shared_mem_bytes: 0,
+                    };
+
+                    unsafe {
+                        stream
+                            .launch_builder(&finalize_kernel)
+                            .arg(&mut fuel_usage)
+                            .arg(&mut signature)
+                            .arg(&mut error_stat)
+                            .launch(cfg)?;
+                    }
+
+                    if stream.memcpy_dtov(&error_stat)?[0] != 0 {
+                        break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    }
+                    let fuel_consumed = (stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale
+                        + max_fuel
+                        - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? });
+
+                    if fuel_consumed > max_fuel {
+                        break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    }
+
+                    let runtime_signature = (stream.memcpy_dtov(&signature)?[0]
+                        ^ unsafe { **library.get::<*const u64>(b"__runtime_signature")? });
+
+                    let (solution, invalid_reason) = match result {
+                        Some(s) => (
+                            serde_json::to_value(&s)
+                                .unwrap()
+                                .as_object()
+                                .unwrap()
+                                .to_owned(),
+                            match challenge.verify_solution(
+                                &s,
+                                module.clone(),
+                                stream.clone(),
+                                &prop,
+                            ) {
+                                Ok(_) => None,
+                                Err(e) => Some(e.to_string()),
+                            },
+                        ),
+                        None => (Solution::new(), None),
+                    };
+
+                    (fuel_consumed, runtime_signature, solution, invalid_reason)
                 }
-            }
-        }};
-    }
-    dispatch_challenges!(
-        (c001, cpu),
-        (c002, cpu),
-        (c003, cpu),
-        (c004, gpu),
-        (c005, gpu)
-    );
+            }};
+        }
+
+        match settings.challenge_id.as_str() {
+            "c001" => dispatch_challenge!(c001, cpu),
+            "c002" => dispatch_challenge!(c002, cpu),
+            "c003" => dispatch_challenge!(c003, cpu),
+            "c004" => dispatch_challenge!(c004, gpu),
+            "c005" => dispatch_challenge!(c005, gpu),
+            _ => panic!("Unsupported challenge"),
+        }
+    };
 
     let output_data = OutputData {
         nonce,
@@ -283,9 +298,9 @@ pub fn compute_solution(
         println!("{}", jsonify(&output_data));
     }
     if fuel_consumed > max_fuel {
-        eprintln!("Out of fuel");
+        eprintln!("Ran out of fuel");
         std::process::exit(87);
-    } else if let Some(msg) = invalid_solution {
+    } else if let Some(msg) = invalid_reason {
         eprintln!("Invalid solution: {}", msg);
         std::process::exit(86);
     } else if output_data.solution.len() == 0 {

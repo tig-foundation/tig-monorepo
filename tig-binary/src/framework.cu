@@ -12,10 +12,12 @@ __device__ u_int64_t gbl_SIGNATURE = 0; // Run-time signature
 __device__ u_int64_t gbl_FUELUSAGE = 0; // Fuel usage
 __device__ u_int64_t gbl_ERRORSTAT = 0; // Error status -- set to non-zero if fuel runs out
 
-extern "C" __global__ void initialize_kernel()
+extern "C" __global__ void initialize_kernel(
+    u_int64_t signature
+)
 {
     gbl_ERRORSTAT     = FUELUSAGE_OK;
-    gbl_SIGNATURE     = 0;
+    gbl_SIGNATURE     = signature; 
     gbl_FUELUSAGE     = 0;
 
     return;
