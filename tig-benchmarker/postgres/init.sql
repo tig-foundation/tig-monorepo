@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS batch_data (
     batch_idx INTEGER,
     merkle_root TEXT,
     solution_nonces JSONB,
+    hashes JSONB,
     merkle_proofs JSONB,
 
     PRIMARY KEY (benchmark_id, batch_idx),

@@ -28,7 +28,6 @@ class JobManager:
         **kwargs
     ):
         api_url = CONFIG["api_url"]
-        config = CONFIG["job_manager_config"]
         algo_selection = CONFIG["algo_selection"]
         # create jobs from confirmed precommits
         challenge_id_2_name = {
@@ -234,12 +233,12 @@ class JobManager:
         rows = get_db_conn().fetch_all(
             """
             WITH ready AS (
-                SELECT A.benchmark_id, A.hash_threshold
+                SELECT A.benchmark_id, B.hash_threshold
                 FROM root_batch A
                 INNER JOIN job B
                     ON B.merkle_root_ready IS NULL
                     AND A.benchmark_id = B.benchmark_id
-                GROUP BY A.benchmark_id
+                GROUP BY A.benchmark_id, B.hash_threshold
                 HAVING COUNT(*) = COUNT(A.ready)
             )
             SELECT 
@@ -247,7 +246,7 @@ class JobManager:
                 A.hash_threshold,
                 JSONB_AGG(B.merkle_root ORDER BY B.batch_idx) AS batch_merkle_roots,
                 JSONB_AGG(B.solution_nonces) AS solution_nonces,
-                JSONB_AGG(B.hashes) AS hashes,
+                JSONB_AGG(B.hashes) AS hashes
             FROM ready A
             INNER JOIN batch_data B
                 ON A.benchmark_id = B.benchmark_id
@@ -270,7 +269,7 @@ class JobManager:
             batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
             num_batches = len(batch_merkle_roots)
             
-            logger.info(f"job {benchmark_id}: (benchmark ready, {len(within_threshold_solution_nonces)} out of {solution_nonces} solutions within threshold)")
+            logger.info(f"job {benchmark_id}: (benchmark ready, {len(within_threshold_solution_nonces)} out of {len(solution_nonces)} solutions within threshold)")
 
             tree = MerkleTree(
                 batch_merkle_roots,
