@@ -1,6 +1,7 @@
 // c004_a001
 
-// c004_a002
+pub mod invector_hybrid;
+pub use invector_hybrid as c004_a002;
 
 // c004_a003
 
