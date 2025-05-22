@@ -2,7 +2,8 @@
 
 // c004_a002
 
-// c004_a003
+pub mod simple_search;
+pub use simple_search as c004_a003;
 
 // c004_a004
 
