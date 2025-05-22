@@ -41,7 +41,7 @@ CREATE INDEX idx_job_stopped ON job(stopped);
 CREATE TABLE IF NOT EXISTS job_data (
     benchmark_id TEXT PRIMARY KEY,
     merkle_root TEXT,
-    solution_nonces JSONB,
+    within_threshold_solution_nonces JSONB,
     merkle_proofs JSONB,
 
     FOREIGN KEY (benchmark_id) REFERENCES job(benchmark_id)

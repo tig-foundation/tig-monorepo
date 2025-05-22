@@ -46,7 +46,6 @@ class SlaveManager:
                             'rand_hash', B.rand_hash,
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
-                            'hash_threshold', B.hash_threshold,
                             'challenge', B.challenge,
                             'algorithm', B.algorithm
                         ) AS batch
@@ -78,7 +77,6 @@ class SlaveManager:
                             'rand_hash', B.rand_hash,
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
-                            'hash_threshold', B.hash_threshold,
                             'challenge', B.challenge,
                             'algorithm', B.algorithm
                         ) AS batch
@@ -175,6 +173,8 @@ class SlaveManager:
                 merkle_root = MerkleHash.from_str(result["merkle_root"])
                 solution_nonces = result["solution_nonces"]
                 assert isinstance(solution_nonces, list) and all(isinstance(x, int) for x in solution_nonces)
+                hashes = result["hashes"]
+                assert isinstance(hashes, list) and all(isinstance(x, str) and len(x) == 64 for x in hashes)
                 logger.debug(f"slave {slave_name} submitted root for {batch_id}")
             except Exception as e:
                 logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
@@ -201,13 +201,15 @@ class SlaveManager:
                     """
                     UPDATE batch_data
                     SET merkle_root = %s,
-                        solution_nonces = %s
+                        solution_nonces = %s,
+                        hashes = %s
                     WHERE benchmark_id = %s 
                         AND batch_idx = %s                    
                     """,
                     (
                         merkle_root.to_str(),
                         json.dumps(solution_nonces),
+                        json.dumps(hashes),
                         benchmark_id,
                         batch_idx
                     )

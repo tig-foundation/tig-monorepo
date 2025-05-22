@@ -118,7 +118,7 @@ class JobManager:
                         a_name,
                         bin.details.download_url,
                         x.details.block_started,
-                        hash_threshold
+                        hash_threshold.lower()
                     )
                 ),
                 (
@@ -234,7 +234,7 @@ class JobManager:
         rows = get_db_conn().fetch_all(
             """
             WITH ready AS (
-                SELECT A.benchmark_id
+                SELECT A.benchmark_id, A.hash_threshold
                 FROM root_batch A
                 INNER JOIN job B
                     ON B.merkle_root_ready IS NULL
@@ -243,25 +243,34 @@ class JobManager:
                 HAVING COUNT(*) = COUNT(A.ready)
             )
             SELECT 
-                B.benchmark_id, 
+                A.benchmark_id, 
+                A.hash_threshold,
                 JSONB_AGG(B.merkle_root ORDER BY B.batch_idx) AS batch_merkle_roots,
-                JSONB_AGG(B.solution_nonces) AS solution_nonces
+                JSONB_AGG(B.solution_nonces) AS solution_nonces,
+                JSONB_AGG(B.hashes) AS hashes,
             FROM ready A
             INNER JOIN batch_data B
                 ON A.benchmark_id = B.benchmark_id
-            GROUP BY B.benchmark_id
+            GROUP BY A.benchmark_id, A.hash_threshold
             """
         )
 
         # Calculate merkle roots for completed jobs
         for row in rows:
-            solution_nonces = [x for y in row['solution_nonces'] for x in y]
-
             benchmark_id = row['benchmark_id']
+            solution_nonces = [x for y in row['solution_nonces'] for x in y]
+            hashes = [x for y in row['hashes'] for x in y]
+            hash_threshold = row["hash_threshold"]
+            assert len(hashes) == len(solution_nonces), "hashes and solution_nonces should be the same length"
+            within_threshold_solution_nonces = [
+                n for n, h in zip(solution_nonces, hashes)
+                if h <= hash_threshold
+            ]
+
             batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
             num_batches = len(batch_merkle_roots)
             
-            logger.info(f"job {benchmark_id}: (benchmark ready)")
+            logger.info(f"job {benchmark_id}: (benchmark ready, {len(within_threshold_solution_nonces)} out of {solution_nonces} solutions within threshold)")
 
             tree = MerkleTree(
                 batch_merkle_roots,
@@ -275,12 +284,12 @@ class JobManager:
                     """
                     UPDATE job_data
                     SET merkle_root = %s, 
-                        solution_nonces = %s
+                        within_threshold_solution_nonces = %s
                     WHERE benchmark_id = %s
                     """, 
                     (
                         merkle_root.to_str(), 
-                        json.dumps(solution_nonces),
+                        json.dumps(within_threshold_solution_nonces),
                         benchmark_id
                     )
                 ),

@@ -215,13 +215,10 @@ def send_results(headers, master_ip, master_port, output_path):
             result = json.load(f)
         with open(f"{output_folder}/hashes.zlib", "rb") as f:
             hashes = json.loads(zlib.decompress(f.read()).decode())
-        hash_threshold = batch["hash_threshold"].lower()
-        within_threshold_solutions = [
-            n for n in result["solution_nonces"]
-            if hashes[n - batch["start_nonce"]].lower() <= hash_threshold
+        result["hashes"] = [
+            hashes[n - batch["start_nonce"]].lower()
+            for n in result["solution_nonces"]
         ]
-        logger.info(f"batch {batch_id} has {len(within_threshold_solutions)} out of {len(result['solution_nonces'])} solutions within threshold")
-        result["solution_nonces"] = within_threshold_solutions
 
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
         logger.info(f"posting root to {submit_url}")
