@@ -85,7 +85,7 @@ process_file() {
     
     if [[ "$ll_file" == *"tig-algorithms"* ]]; then
         cat "$ll_file" | \
-        IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
+        IS_FIRST_SRC=1 INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
             -passes="fuel-rt-sig" -S -o - | \
         llc -relocation-model=pic -o - | \
