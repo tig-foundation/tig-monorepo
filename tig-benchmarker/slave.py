@@ -24,9 +24,10 @@ from common.merkle_tree import MerkleTree, MerkleHash
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 PENDING_BATCH_IDS = set()
 PROCESSING_BATCH_IDS = set()
+PROCESSING_NONCES = {}
 READY_BATCH_IDS = set()
 FINISHED_BATCH_IDS = {}
-TOTAL_COSTS = {"cpu": 0, "gpu": 0}
+TOTAL_USAGE = {"cpu": 0, "gpu": 0}
 if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
     CPU_ARCH = "amd64"
 elif CPU_ARCH in ["arm64", "aarch64"]:
@@ -34,7 +35,24 @@ elif CPU_ARCH in ["arm64", "aarch64"]:
 else:
     print(f"Unsupported CPU architecture: {CPU_ARCH}")
     sys.exit(1)
+
 HAS_GPU = subprocess.run(["which", "nvidia-smi"], capture_output=True).returncode == 0
+if (VISIBLE_CPUS := os.environ.get("CPU_VISIBLE_CORES", None)) is None:
+    VISIBLE_CPUS = list(os.sched_getaffinity(0))
+else:
+    VISIBLE_CPUS = list(map(int, VISIBLE_CPUS.split(",")))
+    os.sched_setaffinity(0, VISIBLE_CPUS)
+
+if not HAS_GPU:
+    VISIBLE_GPUS = []
+elif (VISIBLE_GPUS := os.environ.get("CUDA_VISIBLE_DEVICES", None)) is None:
+    VISIBLE_GPUS = [
+        int(match.group(1))
+        for line in subprocess.check_output(["nvidia-smi", "-L"]).decode("utf-8").splitlines()
+        if (match := re.match(r'^GPU (\d+):', line)) is not None
+    ]
+else:
+    VISIBLE_GPUS = list(map(int, VISIBLE_GPUS.split(",")))
 
 def now():
     return int(time.time() * 1000)
@@ -78,7 +96,10 @@ def run_tig_runtime(nonce, tig_runtime_path, batch, so_path, ptx_path, output_pa
         "--output", output_file,
     ]
     if ptx_path is not None:
-        cmd += ["--ptx", ptx_path]
+        cmd += [
+            "--ptx", ptx_path,
+            "--gpu", str(nonce % len(VISIBLE_GPUS)),
+        ]
     logger.debug(f"computing batch: {' '.join(cmd)}")
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -294,6 +315,10 @@ def process_batch(pool, tig_runtime_path, downloads_folder, config, output_path)
         batch = json.load(f)
 
     so_path, ptx_path = download_library(downloads_folder, batch)
+    if ptx_path is not None and not HAS_GPU:
+        logger.error(f"Algorithm {batch['algorithm']} requires GPU support, but no GPUs are visible")
+        return
+
     c = next(
         (
             x for x in config["algorithms"]
@@ -308,32 +333,59 @@ def process_batch(pool, tig_runtime_path, downloads_folder, config, output_path)
     logger.info(f"batch {batch['id']} started")
     pool.submit(compute_merkle_root, batch, output_path)
 
-    def process_nonce(nonce):
-        logger.debug(f"batch {batch['id']}, nonce {nonce} started: (cpu_cost {c['cpu_cost']}, gpu_cost {c['gpu_cost']})")
-        try:
-            run_tig_runtime(nonce, tig_runtime_path, batch, so_path, ptx_path, output_path)
-        except Exception as e:
-            logger.error(f"batch {batch['id']}, nonce {nonce}, runtime error: {e}")
-        finally:
-            TOTAL_COSTS["cpu"] -= c["cpu_cost"]
-            TOTAL_COSTS["gpu"] -= c["gpu_cost"]
+    PROCESSING_NONCES[batch['id']] = {
+        "batch": batch,
+        "so_path": so_path,
+        "ptx_path": ptx_path,
+        "current_nonce": batch["start_nonce"],
+        "cpu": c["cpu"],
+        "gpu": c["gpu"],
+    }
 
-    nonce = batch["start_nonce"]
-    while nonce < batch["start_nonce"] + batch["num_nonces"]:
+    
+def process_nonces(pool, tig_runtime_path, output_path):
+    if len(PROCESSING_NONCES) == 0:
+        logger.debug("No pending nonces")
+        time.sleep(1)
+        return
+    
+    for batch_id in list(PROCESSING_NONCES):
+        job = PROCESSING_NONCES[batch_id]
+        batch = job["batch"]
+        so_path = job["so_path"]
+        ptx_path = job["ptx_path"]
+        cpu = job["cpu"]
+        gpu = job["gpu"]
+
         if batch["id"] not in PROCESSING_BATCH_IDS:
-            logger.info(f"batch {batch['id']} stopped")
+            logger.info(f"batch {batch_id} stopped")
+            PROCESSING_NONCES.pop(batch_id, None)
             break
 
-        if (
-            TOTAL_COSTS["cpu"] + c["cpu_cost"] <= config["cpus"] and 
-            TOTAL_COSTS["gpu"] + c["gpu_cost"] <= config["gpus"]
+        def process_nonce(nonce):
+            logger.debug(f"batch {batch_id}, nonce {nonce} started: (cpu {cpu}, gpu {gpu})")
+            try:
+                run_tig_runtime(nonce, tig_runtime_path, batch, so_path, ptx_path, output_path)
+            except Exception as e:
+                logger.error(f"batch {batch_id}, nonce {nonce}, runtime error: {e}")
+            finally:
+                TOTAL_USAGE["cpu"] -= cpu
+                TOTAL_USAGE["gpu"] -= gpu
+
+        while (
+            job["current_nonce"] < batch["start_nonce"] + batch["num_nonces"] and
+            TOTAL_USAGE["cpu"] + cpu <= len(VISIBLE_CPUS) and 
+            TOTAL_USAGE["gpu"] + gpu <= len(VISIBLE_GPUS)
         ):
-            TOTAL_COSTS["cpu"] += c["cpu_cost"]
-            TOTAL_COSTS["gpu"] += c["gpu_cost"]
-            pool.submit(process_nonce, nonce)
-            nonce += 1
-        else:
-            time.sleep(0.1)
+            TOTAL_USAGE["cpu"] += cpu
+            TOTAL_USAGE["gpu"] += gpu
+            pool.submit(process_nonce, job["current_nonce"])
+            job["current_nonce"] += 1
+
+        if job["current_nonce"] >= batch["start_nonce"] + batch["num_nonces"]:
+            PROCESSING_NONCES.pop(batch_id, None)
+    
+    time.sleep(0.1)
 
 
 def poll_batches(headers, master_ip, master_port, output_path):    
@@ -399,8 +451,9 @@ def main(
 
     print(f"Starting slave with config:")
     print(f"  Slave Name: {slave_name}")
-    print(f"  Master IP: {master_ip}")
-    print(f"  Master Port: {master_port}")
+    print(f"  Visible CPUs: {VISIBLE_CPUS}")
+    print(f"  Visible GPUs: {VISIBLE_GPUS}")
+    print(f"  Master: {master_ip}:{master_port}")
     print(f"  CPU Architecture: {CPU_ARCH}")
     print(f"  GPU Available: {HAS_GPU}")
     print(f"  Runtime Path: {tig_runtime_path}")
@@ -420,6 +473,11 @@ def main(
     Thread(
         target=wrap_thread,
         args=(process_batch, pool, tig_runtime_path, downloads_folder, config, output_path)
+    ).start()
+
+    Thread(
+        target=wrap_thread,
+        args=(process_nonces, pool, tig_runtime_path, output_path)
     ).start()
 
     Thread(

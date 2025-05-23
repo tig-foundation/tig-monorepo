@@ -99,8 +99,7 @@ The master config defines how benchmarking jobs are selected, scheduled, and dis
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8,
-      "base_fee_limit": "10000000000000000"
+      "batch_size": 8
     },
     ...
   ],
@@ -159,24 +158,40 @@ You can control execution limits via a JSON config:
 ```json
 {
     "max_workers": 100,
-    "cpus": 8,
-    "gpus": 0,
     "algorithms": [
         {
             "id_regex": ".*",
-            "cpu_cost": 1.0,
-            "gpu_cost": 0.0
+            "cpu": 1.0,
+            "gpu": 0.0
         }
     ]
 }
 ```
 
 **Explanation:**
+* By default, `slave.py` uses all CPUs and all GPUs. To impose limits you should set the environment variables:
+  * `CPU_VISIBLE_CORES`. e.g. you have 8 CPUs, to only expose the first and last: `export CPU_VISIBLE_CORES=0,7`
+  * `CUDA_VISIBLE_DEVICES`. e.g. you have 4 GPUs, to only expose the first and second: `export CUDA_VISIBLE_DEVICES=0,1`
 * `max_workers`: maximum concurrent tig-runtime processes.
-* `cpus` & `gpus`: total compute limits available to the slave.
 * `algorithms`: rules for matching algorithms based on `id_regex`.
-    * An algorithm can only be executed if it stays within the total `cpu_cost` and `gpu_cost` limits.
     * Regex matches algorithm ids (e.g., `c004_a[\d3]` matches all vector_search algorithms).
+    * An algorithm + nonce only starts being processed if:
+      ```
+      TOTAL_USAGE["cpu"] + cpu <= len(VISIBLE_CPUS) and 
+      TOTAL_USAGE["gpu"] + gpu <= len(VISIBLE_GPUS)
+      ```
+    * Total costs gets adjusted when processing starts and ends
+      ```
+      # when processing starts 
+      TOTAL_USAGE["cpu"] += cpu
+      TOTAL_USAGE["gpu"] += gpu
+
+      # processing logic
+
+      # when processing ends 
+      TOTAL_USAGE["cpu"] -= cpu
+      TOTAL_USAGE["gpu"] -= gpu
+      ```
 
 **Example:**
 

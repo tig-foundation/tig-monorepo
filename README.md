@@ -24,7 +24,6 @@ This repository contains the implementation of The Innovation Game (TIG).
 * [tig-token](./tig-token/README.md) - Solidity contract for TIG's ERC20 token that is deployed on Ethereum L2 Base chain
 * [tig-utils](./tig-utils/README.md) - A Rust crate that contains utility functions used throughout TIG
 * [tig-verifier](./tig-verifier/README.md) - A Rust crate that verifies a single solution or Merkle proof.
-* [tig-worker](./tig-worker/README.md) - A Rust crate for executing a batch of instances using [`tig-runtime`](./tig-runtime/README.md), aggregating outputs, and calculating Merkle root.
 
 ## Useful Scripts
 

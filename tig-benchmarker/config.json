@@ -1,12 +1,10 @@
 {
     "max_workers": 100,
-    "cpus": 8,
-    "gpus": 0,
     "algorithms": [
         {
             "id_regex": ".*",
-            "cpu_cost": 1.0,
-            "gpu_cost": 0.0
+            "cpu": 1.0,
+            "gpu": 0.0
         }
     ]
 }
