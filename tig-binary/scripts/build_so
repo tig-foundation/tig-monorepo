@@ -81,9 +81,10 @@ process_file() {
     local is_first=$2
     local temp_obj="$3"
     
-    echo "Processing $ll_file"
+    #echo "Processing $ll_file"
     
     if [[ "$ll_file" == *"tig-algorithms"* ]]; then
+        echo "Processing $ll_file"
         cat "$ll_file" | \
         IS_FIRST_SRC=1 INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
