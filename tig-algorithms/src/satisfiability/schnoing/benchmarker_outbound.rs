@@ -37,7 +37,7 @@ pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>
     // Spawn all threads first
     for i in 0..num_variables {
         let variables = Arc::clone(&variables);
-        let challenge = &challenge;
+        let challenge = challenge.clone();
         let handle = thread::spawn(move || {
             // Evaluate clauses and find any that are unsatisfied
             let substituted: Vec<bool> = challenge
