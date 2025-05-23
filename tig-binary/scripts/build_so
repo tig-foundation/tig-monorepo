@@ -83,7 +83,7 @@ process_file() {
     
     #echo "Processing $ll_file"
     
-    if [[ "$ll_file" == *"tig-algorithms"* ]]; then
+    if [[ "$ll_file" == *"tig_algorithms"* ]]; then
         echo "Processing $ll_file"
         cat "$ll_file" | \
         IS_FIRST_SRC=1 INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
