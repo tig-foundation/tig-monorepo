@@ -1,6 +1,6 @@
 // c001_a001
 
-mod schnoing;
+pub mod schnoing;
 
 // c001_a002
 
