@@ -80,12 +80,11 @@ process_file() {
     local ll_file="$1"
     local is_first=$2
     local temp_obj="$3"
+    local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
     
     #if [[ "$ll_file" == *"tig_algorithms"* ]]; then
-        echo "Processing $ll_file"
-        # Extract base filename, remove hash if present, and remove .ll extension
-        local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
-        
+        echo "Processing $basename ($ll_file)"
+
         cat "$ll_file" | \
         IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
