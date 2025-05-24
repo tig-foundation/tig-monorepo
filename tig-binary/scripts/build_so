@@ -82,20 +82,28 @@ process_file() {
     local temp_obj="$3"
     local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
     
-    #if [[ "$ll_file" == *"tig_algorithms"* ]]; then
-        echo "Processing $basename ($ll_file)"
+    # List of base file names to skip (easy to extend)
+    local skip_files=("std" "alloc")
+    
+    # Check if basename is in skip list
+    for skip_name in "${skip_files[@]}"; do
+        if [[ "$basename" == "$skip_name" ]]; then
+            echo "Skipping $basename ($ll_file)"
+            # Just compile directly without custom passes
+            llc -relocation-model=pic "$ll_file" -o - | \
+            clang -fPIC -c -x assembler - -o "$temp_obj"
+            return $?
+        fi
+    done
+    
+    echo "Processing $basename ($ll_file)"
 
-        cat "$ll_file" | \
-        IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
-            -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
-            -passes="fuel-rt-sig" -S -o - | \
-        llc -relocation-model=pic -o - | \
-        clang -fPIC -c -x assembler - -o "$temp_obj"
-    #else
-        # For non-tig-algorithms files, just compile directly
-    #    llc -relocation-model=pic "$ll_file" -o - | \
-    #    clang -fPIC -c -x assembler - -o "$temp_obj"
-    #fi
+    cat "$ll_file" | \
+    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
+        -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
+        -passes="fuel-rt-sig" -S -o - | \
+    llc -relocation-model=pic -o - | \
+    clang -fPIC -c -x assembler - -o "$temp_obj"
     
     return $?
 }
