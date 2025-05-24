@@ -81,7 +81,7 @@ process_file() {
     local is_first=$2
     local temp_obj="$3"
     
-    if [[ "$ll_file" == *"tig_algorithms"* ]]; then
+    #if [[ "$ll_file" == *"tig_algorithms"* ]]; then
         echo "Processing $ll_file"
         # Extract base filename, remove hash if present, and remove .ll extension
         local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
@@ -92,11 +92,11 @@ process_file() {
             -passes="fuel-rt-sig" -S -o - | \
         llc -relocation-model=pic -o - | \
         clang -fPIC -c -x assembler - -o "$temp_obj"
-    else
+    #else
         # For non-tig-algorithms files, just compile directly
-        llc -relocation-model=pic "$ll_file" -o - | \
-        clang -fPIC -c -x assembler - -o "$temp_obj"
-    fi
+    #    llc -relocation-model=pic "$ll_file" -o - | \
+    #    clang -fPIC -c -x assembler - -o "$temp_obj"
+    #fi
     
     return $?
 }
