@@ -15,7 +15,7 @@ language governing permissions and limitations under the License.
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tig_challenges::satisfiability::*;
-use std::thread;
+use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 
 pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
@@ -31,14 +31,11 @@ pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>
 
     // Create shared state
     let variables = Arc::new(Mutex::new(variables));
-    let mut thread_results = Vec::with_capacity(num_variables);
-    let mut handles = Vec::with_capacity(num_variables);
 
-    // Spawn all threads first
-    for i in 0..num_variables {
-        let variables = Arc::clone(&variables);
-        let challenge = challenge.clone();
-        let handle = thread::spawn(move || {
+    // Use rayon parallel iterator instead of manual threading
+    let thread_results: Vec<(usize, Vec<usize>)> = (0..num_variables)
+        .into_par_iter()
+        .map(|_| {
             // Evaluate clauses and find any that are unsatisfied
             let substituted: Vec<bool> = challenge
                 .clauses
@@ -59,28 +56,22 @@ pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>
                 .collect();
 
             (unsatisfied_clauses.len(), unsatisfied_clauses)
-        });
-        handles.push(handle);
-    }
-
-    // Wait for all threads to complete and collect results
-    for handle in handles {
-        thread_results.push(handle.join().unwrap());
-    }
+        })
+        .collect();
 
     // Sequential loop for checking results and updating variables
     let mut variables = Arc::try_unwrap(variables).unwrap().into_inner().unwrap();
-    for i in 0..num_variables {
-        let (num_unsatisfied_clauses, unsatisfied_clauses) = &thread_results[i];
+    for idx in 0..num_variables {
+        let (num_unsatisfied_clauses, unsatisfied_clauses) = &thread_results[idx];
         
         if *num_unsatisfied_clauses == 0 {
             break;
         }
 
         // Flip the value of a random variable from a random unsatisfied clause
-        let rand_unsatisfied_clause_idx = rand_ints[2 * i] % num_unsatisfied_clauses;
+        let rand_unsatisfied_clause_idx = rand_ints[2 * idx] % num_unsatisfied_clauses;
         let rand_unsatisfied_clause = unsatisfied_clauses[rand_unsatisfied_clause_idx];
-        let rand_variable_idx = rand_ints[2 * i + 1] % 3;
+        let rand_variable_idx = rand_ints[2 * idx + 1] % 3;
         let rand_variable =
             challenge.clauses[rand_unsatisfied_clause][rand_variable_idx].abs() as usize - 1;
         variables[rand_variable] = !variables[rand_variable];

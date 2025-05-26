@@ -17,6 +17,7 @@ rand = { version = "0.8.5", default-features = false, features = [
     "small_rng",
 ] }
 tig-challenges = { path = "../tig-challenges" }
+rayon = "1.10.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
