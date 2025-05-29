@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+
+import argparse
+import io
+import os
+import requests
+import sys
+import tarfile
+
+def main():
+    parser = argparse.ArgumentParser(description='TIG Algorithm Downloader')
+    parser.add_argument('challenge', help="Challenge name or id")
+    parser.add_argument('algorithm', help="Algorithm name or id")
+    parser.add_argument('--out', default="tig-algorithms/lib", help="Output directory (default: tig-algorithms/lib)")
+    parser.add_argument('--testnet', action='store_true', help="Use testnet API")
+    
+    args = parser.parse_args()
+
+    api_url = f"https://{'test' if args.testnet else 'main'}net-api.tig.foundation"
+    block = requests.get(f"{api_url}/get-block").json()["block"]
+    challenges = requests.get(f"{api_url}/get-challenges?block_id={block['id']}").json()["challenges"]
+    data = requests.get(f"{api_url}/get-algorithms?block_id={block['id']}").json()
+    algorithms = data["algorithms"]
+    download_urls = {x['algorithm_id']: x['details']['download_url'] for x in data['binarys']}
+
+    c_id = next(
+        (
+            c['id'] for c in challenges 
+            if c['details']['name'] == args.challenge or c['id'] == args.challenge
+        ),
+        None
+    )
+    if c_id is None:
+        print(f"Challenge '{args.challenge}' not found.")
+        sys.exit(1)
+    
+    a_id = next(
+        (
+            a['id'] for a in algorithms
+            if (
+                a['details']['name'] == args.algorithm or a['id'] == args.algorithm
+            ) and a['details']['challenge_id'] == c_id
+        ),
+        None
+    )
+    if a_id is None:
+        print(f"Algorithm '{args.algorithm}' not found for challenge '{args.challenge}'.")
+        sys.exit(1)
+
+    download_url = download_urls.get(a_id)
+    if download_url is None:
+        print(f"Download URL for algorithm '{args.algorithm}' not found.")
+        sys.exit(1)
+
+    print(f"Downloading algorithm '{args.algorithm}' from {download_url}...")
+    resp = requests.get(download_url, stream=True)
+    output_dir = f"{args.out}/{args.challenge}"
+    os.makedirs(output_dir, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(resp.content), mode='r:gz') as tar:
+        tar.extractall(path=output_dir)
+    print(f"Algorithm '{args.algorithm}' downloaded and extracted to '{output_dir}'.")
+
+if __name__ == "__main__":
+    main()

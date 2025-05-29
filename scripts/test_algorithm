@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
+    CPU_ARCH = "amd64"
+elif CPU_ARCH in ["arm64", "aarch64"]:
+    CPU_ARCH = "aarch64"
+else:
+    print(f"Unsupported CPU architecture: {CPU_ARCH}")
+    sys.exit(1)
+
+HAS_GPU = subprocess.run(["which", "nvidia-smi"], capture_output=True).returncode == 0
+if (VISIBLE_CPUS := os.environ.get("CPU_VISIBLE_CORES", None)) is None:
+    VISIBLE_CPUS = list(os.sched_getaffinity(0))
+else:
+    VISIBLE_CPUS = list(map(int, VISIBLE_CPUS.split(",")))
+    os.sched_setaffinity(0, VISIBLE_CPUS)
+
+if not HAS_GPU:
+    VISIBLE_GPUS = []
+elif (VISIBLE_GPUS := os.environ.get("CUDA_VISIBLE_DEVICES", None)) is None:
+    VISIBLE_GPUS = [
+        int(match.group(1))
+        for line in subprocess.check_output(["nvidia-smi", "-L"]).decode("utf-8").splitlines()
+        if (match := re.match(r'^GPU (\d+):', line)) is not None
+    ]
+else:
+    VISIBLE_GPUS = list(map(int, VISIBLE_GPUS.split(",")))
+
+def now():
+    return int(time.time() * 1000)
+
+
+if __name__ == "__main__":
+    tig_runtime_path = shutil.which("tig-runtime")
+    parser = argparse.ArgumentParser(description="TIG Algorithm Tester")
+    parser.add_argument("challenge", type=str, help="Challenge name")
+    parser.add_argument("algorithm", type=str, help="Algorithm name")
+    parser.add_argument("difficulty", type=str, help="JSON string of difficulty")
+    parser.add_argument("--tig_runtime_path", type=str, default=tig_runtime_path, help=f"Path to tig-runtime executable (default: {tig_runtime_path})")
+    parser.add_argument("--lib-dir", type=str, default="./tig-algorithms/lib", help="Path to the algorithms library folder (default: ./tig-algorithms/lib)")
+    parser.add_argument("--seed", type=str, default="rand_hash", help="String to use as seed instance generation (default: 'rand_hash')")
+    parser.add_argument("--start", type=int, default=0, help="Starting nonce (default: 0)")
+    parser.add_argument("--nonces", type=int, default=100, help="Number of nonces to process (default: 100)")
+    parser.add_argument("--fuel", type=int, default=int(100e9), help="Max fuel (default: 100 billion)")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker threads (default: 1)")
+    parser.add_argument("--verbose", action='store_true', help="Print debug logs")
+    
+    args = parser.parse_args()
+    
+    so_path = f"{args.lib_dir}/{args.challenge}/{CPU_ARCH}/{args.algorithm}.so"
+    ptx_path = f"{args.lib_dir}/{args.challenge}/ptx/{args.algorithm}.ptx"
+
+    if not os.path.exists(so_path):
+        print(
+f"""Library not found at {so_path}:
+    * To download: use download_algorithm
+    * To build: use build_so and/or build_ptx
+    * To set the lib folder: set --lib-dir <path_to_folder>
+""")
+        sys.exit(1)
+
+    if not os.path.exists(ptx_path):
+        ptx_path = None
+    elif not HAS_GPU:
+        print(f"PTX file found at {ptx_path}, but no GPU support detected (failed to run nvidia-smi)")
+        sys.exit(1)
+
+    difficulty = json.loads(args.difficulty)
+    if not (
+        isinstance(difficulty, list) and
+        len(difficulty) == 2 and
+        all(isinstance(x, int) for x in difficulty)
+    ):
+        print("Difficulty must be a JSON array of two integers '[x,y]'")
+        sys.exit(1)
+
+    challenge_ids = {
+        "satisfiability": "c001",
+        "vehicle_routing": "c002",
+        "knapsack": "c003",
+        "vector_search": "c004",
+        "hypergraph": "c005",
+        "optimiser": "c006",
+    }
+    challenge_id = challenge_ids.get(args.challenge, None)
+    if challenge_id is None:
+        print(f"Unknown challenge '{args.challenge}'. Choices: ({', '.join(challenge_ids.keys())})")
+        sys.exit(1)
+
+    settings = {"algorithm_id": "", "challenge_id": challenge_id, "difficulty": difficulty, "block_id": "", "player_id": ""}
+    pool = ThreadPoolExecutor(max_workers=args.workers + 1)
+
+    results = {}
+    def print_results():
+        start = now()
+        while True:
+            time.sleep(0.5)
+            num_processing, num_finished, num_solutions = 0, 0, 0
+            for (_, _, ret) in results.values():
+                if ret is None:
+                    num_processing += 1
+                else:
+                    num_finished += 1
+                    num_solutions += int(ret == 0)
+            
+            elapsed = (now() - start) / 1000
+            solution_ratio = num_solutions / (num_finished or 1)
+            solution_rate = num_solutions / elapsed
+            score = solution_rate * solution_ratio
+            out = f"#processing: {num_processing}, #finished: {num_finished}, #solutions: {num_solutions}, elapsed: {elapsed:.2f}s, solution_ratio: {solution_ratio:.4f}, solution_rate: {solution_rate:.4f}, score: {score:.4f}"
+            if args.verbose:
+                print(out)
+            else:
+                print(f"\r{out}", end="")
+            
+            if num_finished == args.nonces:
+                break
+        if not args.verbose:
+            print("\n")
+
+    def run_tig_runtime(nonce):
+        cmd = [
+            args.tig_runtime_path,
+            json.dumps(settings),
+            args.seed,
+            str(nonce),
+            so_path,
+            "--fuel", str(args.fuel),
+        ]
+        if ptx_path is not None:
+            cmd += [
+                "--ptx", ptx_path,
+                "--gpu", str(nonce % len(VISIBLE_GPUS)),
+            ]
+        if args.verbose:
+            print(f"computing nonce {nonce}: {' '.join(cmd)}")
+        start = now()
+        results[nonce] = (start, None, None)
+        ret = subprocess.run(cmd, capture_output=True, text=True)
+        elapsed = now() - start
+        results[nonce] = (start, elapsed, ret.returncode)
+        if args.verbose:
+            out = f"computing nonce {nonce}: took {elapsed}ms, "
+            if ret.returncode == 0:
+                out += "found solution"
+            elif ret.returncode == 1:
+                out += f"error: {ret.stderr.strip()}"
+            elif ret.returncode == 85:
+                out += "no solution found"
+            elif ret.returncode == 86:
+                out += f"invalid solution: {ret.stderr.strip()}"
+            elif ret.returncode == 87:
+                out += "out of fuel"
+            else:
+                out += f"unknown exit code {ret.returncode}"
+            print(out)
+
+    nonces = list(range(args.start, args.start + args.nonces))
+    if args.verbose:
+        print(f"Processing {len(nonces)} nonces with {args.workers} workers...")
+    pool.submit(print_results)
+    list(pool.map(run_tig_runtime, nonces))

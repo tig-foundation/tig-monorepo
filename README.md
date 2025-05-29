@@ -25,16 +25,23 @@ This repository contains the implementation of The Innovation Game (TIG).
 * [tig-utils](./tig-utils/README.md) - A Rust crate that contains utility functions used throughout TIG
 * [tig-verifier](./tig-verifier/README.md) - A Rust crate that verifies a single solution or Merkle proof.
 
+## Docker Images
+
+TIG docker images are hosted on [Github Packages](https://github.com/orgs/tig-foundation/packages):
+
+* [dev](https://github.com/orgs/tig-foundation/packages/container/package/tig-monorepo%2Fdev) - environment for Innovators who are developing algorithms
+* [runtime](https://github.com/orgs/tig-foundation/packages/container/package/tig-monorepo%2Fruntime) - environment for Benchmarkers who are running slaves
+
 ## Useful Scripts
 
-Under `scripts/` folder is a bunch of useful bash scripts:
+Under `scripts/` folder is a bunch of useful scripts:
 
-* `list_algorithms.sh`
-* `list_benchmark_ids.sh`
-* `list_challenges.sh`
-* `get_benchmark_data.sh`
-* `test_algorithm.sh`
-* `verify_benchmark.sh`
+* `download_algorithm`
+* `list_algorithms`
+* `list_challenges`
+* `test_algorithms`
+
+These are available on `PATH` in the `dev` and `runtime` docker images
 
 ## License
 

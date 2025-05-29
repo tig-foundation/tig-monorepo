@@ -18,6 +18,10 @@ RUN chmod +x /usr/local/bin/tig-runtime && \
 RUN apt update && apt install -y python3 python3-pip
 RUN pip3 install blake3 requests randomname --break-system-packages
 
+COPY scripts/ /usr/local/bin/tig-scripts/
+RUN chmod +x /usr/local/bin/tig-scripts/*
+ENV PATH="/usr/local/bin/tig-scripts:${PATH}"
+
 COPY tig-benchmarker /app
 
 WORKDIR /app

@@ -8,8 +8,8 @@ RUN ARCH=$(uname -m) && \
         echo "Unsupported architecture: $ARCH. Must be 'aarch64', 'arm64', 'amd64', or 'x86_64'." && exit 1; \
     fi
 
-# Common setup for all images
-RUN apt update && apt install -y curl build-essential zstd python3
+RUN apt update && apt install -y curl build-essential zstd python3 python3-pip
+RUN pip3 install blake3 requests --break-system-packages
 
 # Install Rust with specific version
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -58,8 +58,9 @@ RUN if command -v nvcc > /dev/null 2>&1; then \
     chmod +x /usr/local/bin/tig-verifier && \
     rm -rf tig-monorepo
 
-COPY tig-binary/scripts /usr/local/bin/
-RUN chmod +x /usr/local/bin/build_so && \
-    chmod +x /usr/local/bin/build_ptx
+COPY scripts/ /usr/local/bin/tig-scripts/
+COPY tig-binary/scripts/ /usr/local/bin/tig-scripts/
+RUN chmod +x /usr/local/bin/tig-scripts/*
+ENV PATH="/usr/local/bin/tig-scripts:${PATH}"
 
 WORKDIR /app

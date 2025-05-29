@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+import argparse
+import io
+import os
+import requests
+import sys
+import tarfile
+
+def main():
+    parser = argparse.ArgumentParser(description='TIG Algorithm Lister')
+    parser.add_argument('challenge', help="Challenge name or id")
+    parser.add_argument('--testnet', action='store_true', help="Use testnet API")
+    
+    args = parser.parse_args()
+
+    api_url = f"https://{'test' if args.testnet else 'main'}net-api.tig.foundation"
+    block = requests.get(f"{api_url}/get-block").json()["block"]
+    challenges = requests.get(f"{api_url}/get-challenges?block_id={block['id']}").json()["challenges"]
+    data = requests.get(f"{api_url}/get-algorithms?block_id={block['id']}").json()
+    algorithms = data["algorithms"]
+    compile_success = {x['algorithm_id']: x['details']['compile_success'] for x in data['binarys']}
+
+    c_id = next(
+        (
+            c['id'] for c in challenges
+            if c['details']['name'] == args.challenge or c['id'] == args.challenge
+        ),
+        None
+    )
+    if c_id is None:
+        print(f"Challenge '{args.challenge}' not found.")
+        sys.exit(1)
+    
+    algorithms = sorted([
+        a for a in algorithms if a['details']['challenge_id'] == c_id
+    ], key=lambda x: x['id'])
+
+    for a in algorithms:
+        if a["id"] not in compile_success:
+            status = f"pending compilation"
+        elif not compile_success[a["id"]]:
+            status = f"failed to compile"
+        elif a["state"]["round_merged"] is not None:
+            status = f"merged @ round {a['state']['round_merged']}"
+        elif a["state"]["round_active"] <= block["details"]["round"]:
+            status = f"active with {a['block_data']['merge_points']} merge points"
+        elif a["state"]["round_pushed"] <= block["details"]["round"]:
+            status = f"active @ round {a['state']['round_active']}"
+        else:
+            status = f"pushed @ round {a['state']['round_pushed']}"
+        print(f"id: {a['id']:<12} name: {a['details']['name']:<20} status: {status}")
+
+if __name__ == "__main__":
+    main()
