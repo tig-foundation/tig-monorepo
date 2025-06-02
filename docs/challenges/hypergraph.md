@@ -108,7 +108,7 @@ better_than_baseline = 1 - connectivity_metric / baseline_connectivity_metric
 
 At TIG, the baseline connectivity is determined using a greedy bipartition approach. The nodes are ordered by degree, then at each bipartition, nodes are assigned to the left or right part based on the number of hyperedges in common with the nodes already in each part. This process is repeated until the desired number of partitions is reached (eg: 64). 
 
-Each instance of TIG's hypergraph partitioning problem contains 16 random sub-instances, each with its own baseline connectivity metric. For each sub-instance, we calculate how much your connectivity metric is better than the baseline connectivity metric, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 16 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
+Each instance of TIG's hypergraph partitioning problem contains 4 random sub-instances, each with its own baseline connectivity metric. For each sub-instance, we calculate how much your connectivity metric is better than the baseline connectivity metric, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 4 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
 
 For precision, `better_than_baseline` is stored as an integer where each unit represents 0.1%. For example, a `better_than_baseline` value of 22 corresponds to 22/1000 = 2.2%.
 
