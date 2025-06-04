@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
     CPU_ARCH = "amd64"
 elif CPU_ARCH in ["arm64", "aarch64"]:
-    CPU_ARCH = "aarch64"
+    CPU_ARCH = "arm64"
 else:
     print(f"Unsupported CPU architecture: {CPU_ARCH}")
     sys.exit(1)

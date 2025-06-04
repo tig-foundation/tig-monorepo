@@ -444,7 +444,7 @@ serializable_struct_with_getters! {
 #[serde(rename_all = "lowercase")]
 pub enum CPUArchitecture {
     AMD64,
-    AARCH64,
+    ARM64,
 }
 pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {

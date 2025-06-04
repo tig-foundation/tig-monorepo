@@ -31,7 +31,7 @@ TOTAL_COST = [0]
 if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
     CPU_ARCH = "amd64"
 elif CPU_ARCH in ["arm64", "aarch64"]:
-    CPU_ARCH = "aarch64"
+    CPU_ARCH = "arm64"
 else:
     print(f"Unsupported CPU architecture: {CPU_ARCH}")
     sys.exit(1)
@@ -131,7 +131,7 @@ def compute_merkle_root(batch, results_dir):
             if not os.path.exists(f"{results_dir}/{batch['id']}/{n}.json")
         )
         if len(processing_nonces) > 0:
-            logger.debug(f"batch {batch['id']} still processing nonces: {processing_nonces}")
+            logger.debug(f"batch {batch['id']} still processing {len(processing_nonces)} nonces")
             time.sleep(1.5)
             continue
 

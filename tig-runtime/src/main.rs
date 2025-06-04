@@ -303,7 +303,7 @@ pub fn compute_solution(
         #[cfg(target_arch = "x86_64")]
         cpu_arch: CPUArchitecture::AMD64,
         #[cfg(target_arch = "aarch64")]
-        cpu_arch: CPUArchitecture::AARCH64,
+        cpu_arch: CPUArchitecture::ARM64,
     };
     if let Some(path) = output_file {
         if compress {

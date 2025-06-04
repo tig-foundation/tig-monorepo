@@ -169,7 +169,7 @@ then
 fi
 
 ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ] || [ "$(arch 2>/dev/null || echo "")" = "aarch64" ] || [ "$(arch 2>/dev/null || echo "")" = "arm64" ]; then
-    echo "aarch64"
+    echo "arm64"
 else
     echo "amd64"
 fi)
