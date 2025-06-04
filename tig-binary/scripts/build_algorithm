@@ -1,0 +1,48 @@
+#!/bin/bash
+
+set -e
+
+# Check if CHALLENGE environment variable is set
+if [ -z "$CHALLENGE" ]; then
+  echo "Error: CHALLENGE environment variable is not set."
+  exit 1
+fi
+
+# Check if ALGORITHM argument is provided
+if [ -z "$1" ]; then
+  echo "Error: ALGORITHM argument is required."
+  echo "Usage: $0 <ALGORITHM>"
+  exit 1
+fi
+
+ALGORITHM="$1"
+
+# Match CHALLENGE value
+case "$CHALLENGE" in
+  satisfiability)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'satisfiability'"
+    build_so $ALGORITHM
+    ;;
+  vehicle_routing)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'vehicle_routing'"
+    build_so $ALGORITHM
+    ;;
+  knapsack)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'knapsack'"
+    build_so $ALGORITHM
+    ;;
+  vector_search)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'vector_search'"
+    build_so $ALGORITHM
+    build_ptx $ALGORITHM
+    ;;
+  hypergraph)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'hypergraph'"
+    build_so $ALGORITHM
+    build_ptx $ALGORITHM
+    ;;
+  *)
+    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, knapsack, vehicle_routing, vector_search, hypergraph"
+    exit 1
+    ;;
+esac

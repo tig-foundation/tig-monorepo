@@ -7,9 +7,13 @@ import requests
 import sys
 import tarfile
 
+CHALLENGE = os.getenv("CHALLENGE")
+if CHALLENGE is None:
+    print("CHALLENGE environment variable must be set!")
+    sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(description='TIG Algorithm Downloader')
-    parser.add_argument('challenge', help="Challenge name or id")
     parser.add_argument('algorithm', help="Algorithm name or id")
     parser.add_argument('--out', default="tig-algorithms/lib", help="Output directory (default: tig-algorithms/lib)")
     parser.add_argument('--testnet', action='store_true', help="Use testnet API")
@@ -26,12 +30,12 @@ def main():
     c_id = next(
         (
             c['id'] for c in challenges 
-            if c['details']['name'] == args.challenge or c['id'] == args.challenge
+            if c['details']['name'] == CHALLENGE
         ),
         None
     )
     if c_id is None:
-        print(f"Challenge '{args.challenge}' not found.")
+        print(f"Challenge '{CHALLENGE}' not found.")
         sys.exit(1)
     
     a_id = next(
@@ -44,7 +48,7 @@ def main():
         None
     )
     if a_id is None:
-        print(f"Algorithm '{args.algorithm}' not found for challenge '{args.challenge}'.")
+        print(f"Algorithm '{args.algorithm}' not found for challenge '{CHALLENGE}'.")
         sys.exit(1)
 
     download_url = download_urls.get(a_id)
@@ -54,7 +58,7 @@ def main():
 
     print(f"Downloading algorithm '{args.algorithm}' from {download_url}...")
     resp = requests.get(download_url, stream=True)
-    output_dir = f"{args.out}/{args.challenge}"
+    output_dir = f"{args.out}/{CHALLENGE}"
     os.makedirs(output_dir, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode='r:gz') as tar:
         tar.extractall(path=output_dir)

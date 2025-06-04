@@ -1,7 +1,12 @@
 ARG BASE_IMAGE=ubuntu:24.04
+ARG CHALLENGE
 
 # Development environment stage
 FROM ${BASE_IMAGE}
+
+ARG CHALLENGE
+ENV CHALLENGE=${CHALLENGE}
+RUN if [ -z "$CHALLENGE" ]; then echo "Error: '--build-arg CHALLENGE' must be set." && exit 1; fi
 
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "amd64" ] && [ "$ARCH" != "x86_64" ]; then \
@@ -26,9 +31,8 @@ RUN ARCH=$(uname -m) && \
     rustup component add rust-src && \
     rustup target add $RUST_TARGET && \
     RUST_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET) && \
-    ln -s $RUST_LIBDIR /usr/local/lib/rust && \
-    echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> /etc/bash.bashrc && \
-    echo "export RUST_TARGET=\"${RUST_TARGET}\"" >> /etc/bash.bashrc
+    ln -s $RUST_LIBDIR /usr/local/lib/rust
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib/rust"
 
 RUN ARCH=$(uname -m) && \
     LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
@@ -42,25 +46,20 @@ RUN ARCH=$(uname -m) && \
     rm -rf llvm.tar.zst && \
     ln -s /opt/llvm/bin/* /usr/local/bin/
 
+COPY scripts/ /usr/local/bin/tig-scripts/
+COPY tig-binary/scripts/ /usr/local/bin/tig-scripts/
+RUN chmod +x /usr/local/bin/tig-scripts/*
+ENV PATH="/usr/local/bin/tig-scripts:${PATH}"
+
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
 
-RUN if command -v nvcc > /dev/null 2>&1; then \
-        cargo build -r -p tig-runtime --features cuda && \
-        cargo build -r -p tig-verifier --features cuda; \
-    else \
-        cargo build -r -p tig-runtime && \
-        cargo build -r -p tig-verifier; \
-    fi && \
+RUN cargo build -r -p tig-runtime --features $CHALLENGE && \
+    cargo build -r -p tig-verifier --features $CHALLENGE && \
     mv target/release/tig-runtime /usr/local/bin/ && \
     mv target/release/tig-verifier /usr/local/bin/ && \
     chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-verifier && \
     rm -rf tig-monorepo
-
-COPY scripts/ /usr/local/bin/tig-scripts/
-COPY tig-binary/scripts/ /usr/local/bin/tig-scripts/
-RUN chmod +x /usr/local/bin/tig-scripts/*
-ENV PATH="/usr/local/bin/tig-scripts:${PATH}"
 
 WORKDIR /app

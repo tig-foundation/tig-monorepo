@@ -37,6 +37,11 @@ elif (VISIBLE_GPUS := os.environ.get("CUDA_VISIBLE_DEVICES", None)) is None:
 else:
     VISIBLE_GPUS = list(map(int, VISIBLE_GPUS.split(",")))
 
+CHALLENGE = os.getenv("CHALLENGE")
+if CHALLENGE is None:
+    print("CHALLENGE environment variable must be set!")
+    sys.exit(1)
+
 def now():
     return int(time.time() * 1000)
 
@@ -44,7 +49,6 @@ def now():
 if __name__ == "__main__":
     tig_runtime_path = shutil.which("tig-runtime")
     parser = argparse.ArgumentParser(description="TIG Algorithm Tester")
-    parser.add_argument("challenge", type=str, help="Challenge name")
     parser.add_argument("algorithm", type=str, help="Algorithm name")
     parser.add_argument("difficulty", type=str, help="JSON string of difficulty")
     parser.add_argument("--tig_runtime_path", type=str, default=tig_runtime_path, help=f"Path to tig-runtime executable (default: {tig_runtime_path})")
@@ -58,8 +62,8 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    so_path = f"{args.lib_dir}/{args.challenge}/{CPU_ARCH}/{args.algorithm}.so"
-    ptx_path = f"{args.lib_dir}/{args.challenge}/ptx/{args.algorithm}.ptx"
+    so_path = f"{args.lib_dir}/{CHALLENGE}/{CPU_ARCH}/{args.algorithm}.so"
+    ptx_path = f"{args.lib_dir}/{CHALLENGE}/ptx/{args.algorithm}.ptx"
 
     if not os.path.exists(so_path):
         print(
@@ -93,10 +97,7 @@ f"""Library not found at {so_path}:
         "hypergraph": "c005",
         "optimiser": "c006",
     }
-    challenge_id = challenge_ids.get(args.challenge, None)
-    if challenge_id is None:
-        print(f"Unknown challenge '{args.challenge}'. Choices: ({', '.join(challenge_ids.keys())})")
-        sys.exit(1)
+    challenge_id = challenge_ids[CHALLENGE]
 
     settings = {"algorithm_id": "", "challenge_id": challenge_id, "difficulty": difficulty, "block_id": "", "player_id": ""}
     pool = ThreadPoolExecutor(max_workers=args.workers + 1)

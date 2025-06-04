@@ -19,4 +19,14 @@ tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
 
 [features]
-cuda = ["cudarc", "tig-challenges/cuda"]
+cuda = ["cudarc"]
+c001 = ["tig-challenges/c001"]
+satisfiability = ["c001"]
+c002 = ["tig-challenges/c002"]
+vehicle_routing = ["c002"]
+c003 = ["tig-challenges/c003"]
+knapsack = ["c003"]
+c004 = ["cuda", "tig-challenges/c004"]
+vector_search = ["c004"]
+c005 = ["cuda", "tig-challenges/c005"]
+hypergraph = ["c005"]

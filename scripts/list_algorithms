@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 
 import argparse
-import io
 import os
 import requests
 import sys
-import tarfile
+
+CHALLENGE = os.getenv("CHALLENGE")
+if CHALLENGE is None:
+    print("CHALLENGE environment variable must be set!")
+    sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description='TIG Algorithm Lister')
-    parser.add_argument('challenge', help="Challenge name or id")
     parser.add_argument('--testnet', action='store_true', help="Use testnet API")
     
     args = parser.parse_args()
@@ -24,12 +26,12 @@ def main():
     c_id = next(
         (
             c['id'] for c in challenges
-            if c['details']['name'] == args.challenge or c['id'] == args.challenge
+            if c['details']['name'] == CHALLENGE
         ),
         None
     )
     if c_id is None:
-        print(f"Challenge '{args.challenge}' not found.")
+        print(f"Challenge '{CHALLENGE}' not found.")
         sys.exit(1)
     
     algorithms = sorted([

@@ -3,10 +3,14 @@
 import argparse
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
+
+CHALLENGE = os.getenv("CHALLENGE")
+if CHALLENGE is None:
+    print("CHALLENGE environment variable must be set!")
+    sys.exit(1)
 
 # Import the dictionary from ptx_instructions.py
 instruction_fuel_cost = {
@@ -232,12 +236,11 @@ $NORMAL_EXIT:
 
 def main():
     parser = argparse.ArgumentParser(description='Compile PTX with injected runtime signature')
-    parser.add_argument('challenge', help='Challenge name')
     parser.add_argument('algorithm', help='Algorithm name')
     
     args = parser.parse_args()
 
-    print(f"Compiling .ptx for {args.challenge}/{args.algorithm}")
+    print(f"Compiling .ptx for {CHALLENGE}/{args.algorithm}")
 
     framework_cu = "tig-binary/src/framework.cu"
     if not os.path.exists(framework_cu):
@@ -245,14 +248,14 @@ def main():
             f"Framework code does not exist @ '{framework_cu}'. This script must be run from the root of tig-monorepo"
         )
 
-    challenge_cu = f"tig-challenges/src/{args.challenge}.cu"
+    challenge_cu = f"tig-challenges/src/{CHALLENGE}.cu"
     if not os.path.exists(challenge_cu):
         raise FileNotFoundError(
             f"Challenge code does not exist @ '{challenge_cu}'. Is the challenge name correct?"
         )
 
-    algorithm_cu = f"tig-algorithms/src/{args.challenge}/{args.algorithm}.cu"
-    algorithm_cu2 = f"tig-algorithms/src/{args.challenge}/{args.algorithm}/benchmarker_outbound.cu"
+    algorithm_cu = f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}.cu"
+    algorithm_cu2 = f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}/benchmarker_outbound.cu"
     if not os.path.exists(algorithm_cu) and not os.path.exists(algorithm_cu2):
         raise FileNotFoundError(
             f"Algorithm code does not exist @ '{algorithm_cu}' or '{algorithm_cu2}'. Is the algorithm name correct?"
@@ -295,10 +298,8 @@ def main():
         parsed = parse_ptx_code(ptx_code)
         modified_code = inject_fuel_and_runtime_sig(parsed, kernels_to_ignore)
         
-        output_path = f"tig-algorithms/lib/{args.challenge}/ptx/{args.algorithm}.ptx"
+        output_path = f"tig-algorithms/lib/{CHALLENGE}/ptx/{args.algorithm}.ptx"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        # with open(output_path, 'w') as f:
-        #     f.writelines(ptx_code)
         with open(output_path, 'w') as f:
             f.writelines(modified_code)
         print(f"Wrote ptx to {output_path}")

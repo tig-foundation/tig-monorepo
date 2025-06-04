@@ -34,7 +34,6 @@ fn cli() -> Command {
                 )
                 .arg(
                     arg!(--gpu [GPU] "Which GPU device to use")
-                        .default_value("0")
                         .value_parser(clap::value_parser!(usize)),
                 ),
         )
@@ -59,7 +58,7 @@ fn main() {
             *sub_m.get_one::<u64>("NONCE").unwrap(),
             sub_m.get_one::<String>("SOLUTION").unwrap().clone(),
             sub_m.get_one::<PathBuf>("ptx").cloned(),
-            sub_m.get_one::<usize>("gpu").unwrap().clone(),
+            sub_m.get_one::<usize>("gpu").cloned(),
         ),
         Some(("verify_merkle_proof", sub_m)) => verify_merkle_proof(
             sub_m.get_one::<String>("ROOT").unwrap().clone(),
@@ -78,7 +77,7 @@ pub fn verify_solution(
     nonce: u64,
     solution_path: String,
     ptx_path: Option<PathBuf>,
-    gpu_device: usize,
+    gpu_device: Option<usize>,
 ) -> Result<()> {
     let settings = load_settings(&settings);
     let solution = load_solution(&solution_path);
@@ -86,90 +85,110 @@ pub fn verify_solution(
 
     let mut err_msg = Option::<String>::None;
 
-    macro_rules! dispatch_challenges {
-        ( $( ($c:ident, $cpu_or_gpu:tt) ),+ $(,)? ) => {{
-            match settings.challenge_id.as_str() {
-                $(
-                    stringify!($c) => {
-                        dispatch_challenges!(@expand $c, $cpu_or_gpu);
-                    }
-                )+
-                _ => panic!("Unsupported challenge"),
+    macro_rules! dispatch_challenge {
+        ($c:ident, cpu) => {{
+            let challenge =
+                $c::Challenge::generate_instance(&seed, &settings.difficulty.into()).unwrap();
+
+            match $c::Solution::try_from(solution) {
+                Ok(solution) => match challenge.verify_solution(&solution) {
+                    Ok(_) => println!("Solution is valid"),
+                    Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
+                },
+                Err(_) => {
+                    err_msg = Some(format!(
+                        "Invalid solution. Cannot convert to {}::Solution",
+                        stringify!($c)
+                    ))
+                }
             }
         }};
 
-        (@expand $c:ident, cpu) => {{
+        ($c:ident, gpu) => {{
+            if ptx_path.is_none() {
+                panic!("PTX file is required for GPU challenges.");
+            }
+
+            let num_gpus = CudaContext::device_count()?;
+            if num_gpus == 0 {
+                panic!("No CUDA devices found");
+            }
+            let gpu_device = gpu_device.unwrap_or((nonce % num_gpus as u64) as usize);
+            let ptx = Ptx::from_file(ptx_path.unwrap());
+            let ctx = CudaContext::new(gpu_device).unwrap();
+            ctx.set_blocking_synchronize()?;
+            let module = ctx.load_module(ptx).unwrap();
+            let stream = ctx.default_stream();
+            let prop = get_device_prop(gpu_device as i32).unwrap();
+
             let challenge = $c::Challenge::generate_instance(
                 &seed,
                 &settings.difficulty.into(),
-            ).unwrap();
+                module.clone(),
+                stream.clone(),
+                &prop,
+            )
+            .unwrap();
 
             match $c::Solution::try_from(solution) {
                 Ok(solution) => {
-                    match challenge.verify_solution(&solution) {
-                        Ok(_) => println!("Solution is valid"),
+                    match challenge.verify_solution(
+                        &solution,
+                        module.clone(),
+                        stream.clone(),
+                        &prop,
+                    ) {
+                        Ok(_) => {
+                            stream.synchronize()?;
+                            ctx.synchronize()?;
+                            println!("Solution is valid");
+                        }
                         Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
                     }
-                },
-                Err(_) => err_msg = Some(format!(
-                    "Invalid solution. Cannot convert to {}::Solution",
-                    stringify!($c)
-                )),
-            }
-        }};
-
-        (@expand $c:ident, gpu) => {{
-            #[cfg(not(feature = "cuda"))]
-            panic!("tig-runtime was not compiled with '--features cuda'");
-
-            #[cfg(feature = "cuda")]
-            {
-                if ptx_path.is_none() {
-                    panic!("PTX file is required for GPU challenges.");
                 }
-
-                let ptx = Ptx::from_file(ptx_path.unwrap());
-                let ctx = CudaContext::new(gpu_device).unwrap();
-                ctx.set_blocking_synchronize()?;
-                let module = ctx.load_module(ptx).unwrap();
-                let stream = ctx.default_stream();
-                let prop = get_device_prop(gpu_device as i32).unwrap();
-
-                let challenge = $c::Challenge::generate_instance(
-                    &seed,
-                    &settings.difficulty.into(),
-                    module.clone(),
-                    stream.clone(),
-                    &prop,
-                ).unwrap();
-
-                match $c::Solution::try_from(solution) {
-                    Ok(solution) => {
-                        match challenge.verify_solution(&solution, module.clone(), stream.clone(), &prop) {
-                            Ok(_) => {
-                                stream.synchronize()?;
-                                ctx.synchronize()?;
-                                println!("Solution is valid");
-                            },
-                            Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
-                        }
-                    },
-                    Err(_) => err_msg = Some(format!(
+                Err(_) => {
+                    err_msg = Some(format!(
                         "Invalid solution. Cannot convert to {}::Solution",
                         stringify!($c)
-                    )),
+                    ))
                 }
             }
         }};
     }
 
-    dispatch_challenges!(
-        (c001, cpu),
-        (c002, cpu),
-        (c003, cpu),
-        (c004, gpu),
-        (c005, gpu)
-    );
+    match settings.challenge_id.as_str() {
+        "c001" => {
+            #[cfg(not(feature = "c001"))]
+            panic!("tig-verifier was not compiled with '--features c001'");
+            #[cfg(feature = "c001")]
+            dispatch_challenge!(c001, cpu)
+        }
+        "c002" => {
+            #[cfg(not(feature = "c002"))]
+            panic!("tig-verifier was not compiled with '--features c002'");
+            #[cfg(feature = "c002")]
+            dispatch_challenge!(c002, cpu)
+        }
+        "c003" => {
+            #[cfg(not(feature = "c003"))]
+            panic!("tig-verifier was not compiled with '--features c003'");
+            #[cfg(feature = "c003")]
+            dispatch_challenge!(c003, cpu)
+        }
+        "c004" => {
+            #[cfg(not(feature = "c004"))]
+            panic!("tig-verifier was not compiled with '--features c004'");
+            #[cfg(feature = "c004")]
+            dispatch_challenge!(c004, gpu)
+        }
+        "c005" => {
+            #[cfg(not(feature = "c005"))]
+            panic!("tig-verifier was not compiled with '--features c005'");
+            #[cfg(feature = "c005")]
+            dispatch_challenge!(c005, gpu)
+        }
+        _ => panic!("Unsupported challenge"),
+    }
 
     if let Some(err_msg) = err_msg {
         eprintln!("Verification error: {}", err_msg);
