@@ -68,7 +68,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
     start = now()
     cmd = [
         "docker", "exec", batch["challenge"], "tig-runtime",
-        json.dumps(batch["settings"]),
+        json.dumps(batch["settings"], separators=(',',':')),
         batch["rand_hash"],
         str(nonce),
         so_path,
@@ -79,7 +79,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         cmd += [
             "--ptx", ptx_path,
         ]
-    logger.debug(f"computing batch: {' '.join(cmd)}")
+    logger.debug(f"computing batch: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )

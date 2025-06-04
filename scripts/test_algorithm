@@ -133,7 +133,7 @@ f"""Library not found at {so_path}:
     def run_tig_runtime(nonce):
         cmd = [
             args.tig_runtime_path,
-            json.dumps(settings),
+            json.dumps(settings, separators=(',',':')),
             args.seed,
             str(nonce),
             so_path,
@@ -145,7 +145,7 @@ f"""Library not found at {so_path}:
                 "--gpu", str(nonce % len(VISIBLE_GPUS)),
             ]
         if args.verbose:
-            print(f"computing nonce {nonce}: {' '.join(cmd)}")
+            print(f"computing nonce {nonce}: {' '.join(cmd[:1] + [f"'{cmd[1]}'"] + cmd[2:])}")
         start = now()
         results[nonce] = (start, None, None)
         ret = subprocess.run(cmd, capture_output=True, text=True)
