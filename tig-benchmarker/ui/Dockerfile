@@ -2,7 +2,7 @@ FROM node:latest AS build
 
 WORKDIR /app
 
-COPY . .
+COPY ui/ .
 
 RUN npm install -g @angular/cli
 RUN npm install --legacy-peer-deps
@@ -14,7 +14,7 @@ RUN ng build
 FROM nginx:latest
 
 COPY --from=build /app/dist/tig-brenchmarker-ui/browser /usr/share/nginx/html
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+COPY ui/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

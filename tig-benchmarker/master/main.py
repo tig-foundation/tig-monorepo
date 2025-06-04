@@ -1,8 +1,5 @@
-import argparse
-import json
 import logging
 import os
-import threading
 import time
 from master.data_fetcher import *
 from master.difficulty_sampler import *
@@ -53,10 +50,6 @@ def main():
             time.sleep(5)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="TIG Benchmarker")
-    
-    args = parser.parse_args()
-
     logging.basicConfig(
         format='%(levelname)s - [%(name)s] - %(message)s',
         level=logging.DEBUG if os.environ.get("VERBOSE") else logging.INFO

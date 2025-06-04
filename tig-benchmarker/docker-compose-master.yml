@@ -1,8 +1,6 @@
 services:
   db:
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/postgres:${VERSION}
     container_name: db
     restart: unless-stopped
     environment:
@@ -22,9 +20,7 @@ services:
       retries: 5
 
   master:
-    build:
-      context: ./
-      dockerfile: ./master/Dockerfile
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/master:${VERSION}
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -42,9 +38,7 @@ services:
         condition: service_healthy
 
   ui:
-    build: 
-      context: ./ui
-      dockerfile: Dockerfile
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/ui:${VERSION}
     restart: unless-stopped
     networks:
       - tig-benchmarker
@@ -54,9 +48,7 @@ services:
       - master
 
   nginx:
-    build: 
-      context: ./nginx
-      dockerfile: Dockerfile
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/nginx:${VERSION}
     ports:
       - "${UI_PORT}:80"
     networks:

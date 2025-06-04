@@ -274,7 +274,7 @@ def process_batch(pool, algorithms_dir, config, results_dir):
     try:
         batch_id = PENDING_BATCH_IDS.pop()
     except KeyError:
-        logger.debug("No pending batches")
+        logger.debug("no pending batches")
         time.sleep(1)
         return
 
@@ -401,7 +401,8 @@ def wrap_thread(func, *args):
             time.sleep(5)
 
 
-def main(config_path: str):
+def main():
+    config_path = "config.json"
     if not os.path.exists(config_path):
         logger.error(f"Config file not found at path: {config_path}")
         sys.exit(1)
@@ -419,8 +420,8 @@ def main(config_path: str):
         sys.exit(1)
     master_port = int(master_port)
 
-    algorithms_dir = os.getenv("ALGORITHMS_DIR") or "lib"
-    results_dir = os.getenv("RESULTS_DIR") or "results"
+    algorithms_dir = "algorithms"
+    results_dir = "results"
     ttl = int(os.getenv("TTL") or 300)
 
     print(f"Starting slave with config:")
@@ -462,15 +463,10 @@ def main(config_path: str):
     wrap_thread(poll_batches, headers, master_ip, master_port, results_dir)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="TIG Slave Benchmarker")
-    parser.add_argument("config", type=str, help="Path to config file")
-    
-    args = parser.parse_args()
-    
+if __name__ == "__main__":    
     logging.basicConfig(
         format='%(levelname)s - [%(name)s] - %(message)s',
         level=logging.DEBUG if os.getenv("VERBOSE") else logging.INFO
     )
 
-    main(args.config)
+    main()

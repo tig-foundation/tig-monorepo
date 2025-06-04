@@ -2,7 +2,8 @@ version: "3.8"
 
 x-common: &common
   volumes:
-    - ./:/app
+    - ${ALGORITHMS_DIR}:/app/algorithms
+    - ${RESULTS_DIR}:/app/results
   command: ["sleep", "infinity"]
 
 x-common-gpu: &common-gpu
@@ -16,43 +17,40 @@ x-common-gpu: &common-gpu
 
 services:
   slave:
-    build:
-      context: ./
-      dockerfile: ./slave/Dockerfile
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/slave:${VERSION}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./:/app
+      - ${ALGORITHMS_DIR}:/app/algorithms
+      - ${RESULTS_DIR}:/app/results
+      - ${SLAVE_CONFIG}:/app/config.json
     environment:
       - VERBOSE=${VERBOSE}
       - SLAVE_NAME=${SLAVE_NAME}
       - MASTER_PORT=${MASTER_PORT}
       - MASTER_IP=${MASTER_IP}
-      - ALGORITHMS_DIR=${ALGORITHMS_DIR}
-      - RESULTS_DIR=${RESULTS_DIR}
       - TTL=${TTL}
-    command: ["python", "slave/main.py", "slave/config.json"]
 
   satisfiability:
     <<: *common
-    image: ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime:0.0.1
+    image: ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime:${VERSION}
     container_name: satisfiability
 
   vehicle_routing:
     <<: *common
-    image: ghcr.io/tig-foundation/tig-monorepo/vehicle_routing/runtime:0.0.1
+    image: ghcr.io/tig-foundation/tig-monorepo/vehicle_routing/runtime:${VERSION}
     container_name: vehicle_routing
 
   knapsack:
     <<: *common
-    image: ghcr.io/tig-foundation/tig-monorepo/knapsack/runtime:0.0.1
+    image: ghcr.io/tig-foundation/tig-monorepo/knapsack/runtime:${VERSION}
     container_name: knapsack
 
   vector_search:
     <<: [*common, *common-gpu]
-    image: ghcr.io/tig-foundation/tig-monorepo/vector_search/runtime:0.0.1
+    image: ghcr.io/tig-foundation/tig-monorepo/vector_search/runtime:${VERSION}
     container_name: vector_search
 
   hypergraph:
     <<: [*common, *common-gpu]
-    image: ghcr.io/tig-foundation/tig-monorepo/hypergraph/runtime:0.0.1
+    image: ghcr.io/tig-foundation/tig-monorepo/hypergraph/runtime:${VERSION}
     container_name: hypergraph
