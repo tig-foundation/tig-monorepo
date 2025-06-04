@@ -1,0 +1,60 @@
+version: "3.8"
+
+x-common: &common
+  volumes:
+    - ./:/app
+  command: ["sleep", "infinity"]
+
+x-common-gpu: &common-gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  slave:
+    build:
+      context: ./
+      dockerfile: ./slave/Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/app
+    environment:
+      - VERBOSE=${VERBOSE}
+      - SLAVE_NAME=${SLAVE_NAME}
+      - MASTER_PORT=${MASTER_PORT}
+      - MASTER_IP=${MASTER_IP}
+      - ALGORITHMS_DIR=${ALGORITHMS_DIR}
+      - RESULTS_DIR=${RESULTS_DIR}
+      - TTL=${TTL}
+    command: ["python", "slave/main.py", "slave/config.json"]
+
+  satisfiability:
+    <<: *common
+    image: ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime:0.0.1
+    container_name: satisfiability
+
+  vehicle_routing:
+    <<: *common
+    image: ghcr.io/tig-foundation/tig-monorepo/vehicle_routing/runtime:0.0.1
+    container_name: vehicle_routing
+
+  knapsack:
+    <<: *common
+    image: ghcr.io/tig-foundation/tig-monorepo/knapsack/runtime:0.0.1
+    container_name: knapsack
+
+  vector_search:
+    <<: *common
+    <<: *common-gpu
+    image: ghcr.io/tig-foundation/tig-monorepo/vector_search/runtime:0.0.1
+    container_name: vector_search
+
+  hypergraph:
+    <<: *common
+    <<: *common-gpu
+    image: ghcr.io/tig-foundation/tig-monorepo/hypergraph/runtime:0.0.1
+    container_name: hypergraph
