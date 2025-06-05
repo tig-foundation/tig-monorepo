@@ -19,6 +19,7 @@ serializable_struct_with_getters! {
         details: BenchmarkDetails,
         state: BenchmarkState,
         solution_nonces: Option<HashSet<u64>>,
+        discarded_solution_nonces: Option<HashSet<u64>>,
     }
 }
 serializable_struct_with_getters! {
@@ -170,6 +171,7 @@ impl BenchmarkSettings {
 serializable_struct_with_getters! {
     BenchmarkDetails {
         num_solutions: u32,
+        num_discarded_solutions: u32,
         merkle_root: MerkleHash,
         sampled_nonces: HashSet<u64>,
     }

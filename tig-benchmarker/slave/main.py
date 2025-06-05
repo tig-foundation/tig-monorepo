@@ -137,11 +137,16 @@ def compute_merkle_root(batch, results_dir):
 
         hashes = []
         solution_nonces = []
+        discarded_solution_nonces = []
         for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
             with open(f"{results_dir}/{batch['id']}/{n}.json", "r") as f:
                 d = OutputData.from_dict(json.load(f))
+                h = d.to_merkle_hash()
                 if len(d.solution) > 0:
-                    solution_nonces.append(n)
+                    if h.to_str() <= batch["hash_threshold"]:
+                        solution_nonces.append(n)
+                    else:
+                        discarded_solution_nonces.append(n)
                 hashes.append(d.to_merkle_hash())
 
         merkle_tree = MerkleTree(hashes, batch["batch_size"])
@@ -150,7 +155,8 @@ def compute_merkle_root(batch, results_dir):
             f.write(zlib.compress(json.dumps(hashes).encode()))
         with open(f"{results_dir}/{batch['id']}/result.json", "w") as f:
             result = {
-                "solution_nonces": list(solution_nonces),
+                "solution_nonces": solution_nonces,
+                "discarded_solution_nonces": discarded_solution_nonces,
                 "merkle_root": merkle_tree.calc_merkle_root().to_str(),
             }
             logger.debug(f"batch {batch['id']} result: {result}")

@@ -1,5 +1,4 @@
 use crate::context::*;
-use core::num;
 use logging_timer::time;
 use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
@@ -56,7 +55,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
-    for (settings, num_solutions, _) in active_solutions.iter() {
+    for (settings, num_solutions, _, _) in active_solutions.iter() {
         *num_solutions_by_player_by_challenge
             .entry(settings.player_id.clone())
             .or_default()
@@ -128,12 +127,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update qualifiers
     let mut solutions_by_challenge =
-        HashMap::<String, Vec<(&BenchmarkSettings, &u32, &u32)>>::new();
-    for (settings, num_solutions, num_nonces) in active_solutions.iter() {
+        HashMap::<String, Vec<(&BenchmarkSettings, &u32, &u32, &u32)>>::new();
+    for (settings, num_solutions, num_discarded_solutions, num_nonces) in active_solutions.iter() {
         solutions_by_challenge
             .entry(settings.challenge_id.clone())
             .or_default()
-            .push((settings, num_solutions, num_nonces));
+            .push((settings, num_solutions, num_discarded_solutions, num_nonces));
     }
 
     let max_qualifiers_by_player = active_opow_ids
@@ -153,8 +152,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
         let points = solutions
             .iter()
-            .filter(|(_, &num_solutions, _)| num_solutions > 0)
-            .map(|(settings, _, _)| settings.difficulty.clone())
+            .filter(|(_, &num_solutions, _, _)| num_solutions > 0)
+            .map(|(settings, _, _, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
         for (frontier_index, frontier) in pareto_algorithm(&points, false).into_iter().enumerate() {
@@ -163,7 +162,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             }
         }
         let mut solutions_by_frontier_idx =
-            HashMap::<usize, Vec<(&BenchmarkSettings, &u32, &u32)>>::new();
+            HashMap::<usize, Vec<(&BenchmarkSettings, &u32, &u32, &u32)>>::new();
         for &x in solutions.iter() {
             if !points.contains(&x.0.difficulty) {
                 continue;
@@ -183,10 +182,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let min_num_nonces = config.opow.min_num_nonces as u64;
         let mut player_algorithm_solutions = HashMap::<String, HashMap<String, u32>>::new();
         let mut player_solutions = HashMap::<String, u32>::new();
+        let mut player_discarded_solutions = HashMap::<String, u32>::new();
         let mut player_nonces = HashMap::<String, u64>::new();
 
         for frontier_idx in 0..solutions_by_frontier_idx.len() {
-            for (settings, &num_solutions, &num_nonces) in
+            for (settings, &num_solutions, &num_discarded_solutions, &num_nonces) in
                 solutions_by_frontier_idx[&frontier_idx].iter()
             {
                 let BenchmarkSettings {
@@ -212,6 +212,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     .entry(algorithm_id.clone())
                     .or_default() += num_solutions;
                 *player_solutions.entry(player_id.clone()).or_default() += num_solutions;
+                *player_discarded_solutions
+                    .entry(player_id.clone())
+                    .or_default() += num_discarded_solutions;
                 *player_nonces.entry(player_id.clone()).or_default() += num_nonces as u64;
 
                 challenge_data
@@ -225,7 +228,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|player_id| {
                     (
                         player_id.clone(),
-                        player_solutions[player_id] as f64 / player_nonces[player_id] as f64,
+                        (player_solutions[player_id] + player_discarded_solutions[player_id])
+                            as f64
+                            / player_nonces[player_id] as f64,
                     )
                 })
                 .collect();

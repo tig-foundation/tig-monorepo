@@ -2,7 +2,6 @@ import brotli
 import requests
 import threading
 import logging
-import json
 import os
 from common.structs import *
 from common.utils import *
@@ -21,6 +20,7 @@ class SubmitPrecommitRequest(FromDict):
 class SubmitBenchmarkRequest(FromDict):
     benchmark_id: str
     merkle_root: MerkleHash
+    discarded_solution_nonces: Set[int]
     solution_nonces: Set[int]
 
 @dataclass
@@ -121,7 +121,8 @@ class SubmissionsManager:
             SELECT 
                 B.benchmark_id, 
                 B.merkle_root,
-                B.within_threshold_solution_nonces 
+                B.solution_nonces,
+                B.discarded_solution_nonces
             FROM updated A
             INNER JOIN job_data B
                 ON A.benchmark_id = B.benchmark_id
@@ -132,12 +133,14 @@ class SubmissionsManager:
         if benchmark_to_submit:
             benchmark_id = benchmark_to_submit["benchmark_id"]
             merkle_root = benchmark_to_submit["merkle_root"] 
-            solution_nonces = benchmark_to_submit["within_threshold_solution_nonces"]
+            solution_nonces = benchmark_to_submit["solution_nonces"]
+            discarded_solution_nonces = benchmark_to_submit["discarded_solution_nonces"]
 
             self._post_thread("benchmark", SubmitBenchmarkRequest(
                 benchmark_id=benchmark_id,
                 merkle_root=merkle_root,
-                solution_nonces=solution_nonces
+                solution_nonces=solution_nonces,
+                discarded_solution_nonces=discarded_solution_nonces,
             ))
         else:
             logger.debug("no benchmark to submit")

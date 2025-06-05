@@ -67,7 +67,7 @@ paths:
 
         * Returns all confirmed precommits, benchmarks, proofs, and frauds for the player where the benchmark was started within `120` blocks of the latest block.
       
-        * Fields `benchmark.solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
+        * Fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
         
             * To retrieve that data, use /get-benchmark-data endpoint
       parameters:
@@ -97,7 +97,7 @@ paths:
       description: |-
         # Notes
         
-        * Will include data for fields `benchmark.solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
+        * Will include data for fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
       parameters:
         - name: benchmark_id
           in: query
@@ -702,10 +702,18 @@ components:
           items:
             type: integer
             format: uint64
+        discarded_solution_nonces:
+          type: array
+          items:
+            type: integer
+            format: uint64
     BenchmarkDetails:
       type: object
       properties:
         num_solutions:
+          type: integer
+          format: uint32
+        num_discarded_solutions:
           type: integer
           format: uint32
         merkle_root:
@@ -1620,6 +1628,11 @@ components:
         merkle_root:
           $ref: '#/components/schemas/MerkleHash'
         solution_nonces:
+          type: array
+          items:
+            type: integer
+            format: uint64
+        discarded_solution_nonces:
           type: array
           items:
             type: integer

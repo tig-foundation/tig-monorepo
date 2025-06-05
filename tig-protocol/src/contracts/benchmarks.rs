@@ -112,6 +112,7 @@ pub async fn submit_benchmark<T: Context>(
     benchmark_id: String,
     merkle_root: MerkleHash,
     solution_nonces: HashSet<u64>,
+    discarded_solution_nonces: HashSet<u64>,
     seed: u64,
 ) -> Result<()> {
     // check benchmark is not duplicate
@@ -141,33 +142,75 @@ pub async fn submit_benchmark<T: Context>(
 
     // random sample nonces
     let config = ctx.get_config().await;
-    let mut sampled_nonces = HashSet::new();
     let mut rng = StdRng::seed_from_u64(seed);
     let max_samples = config.benchmarks.max_samples;
+
+    // sample nonces from solutions
+    let mut sampled_solution_nonces = HashSet::new();
     if !solution_nonces.is_empty() {
         for _ in 0..25 {
-            if sampled_nonces.len() == max_samples {
+            if sampled_solution_nonces.len() == max_samples {
                 break;
             }
-            sampled_nonces.insert(*solution_nonces.iter().choose(&mut rng).unwrap());
+            sampled_solution_nonces.insert(*solution_nonces.iter().choose(&mut rng).unwrap());
         }
     }
-    let max_samples = sampled_nonces.len() + config.benchmarks.max_samples;
-    for _ in 0..25 {
-        if sampled_nonces.len() == max_samples {
-            break;
+
+    // sample nonces from discarded solutions
+    let mut sampled_discarded_solution_nonces = HashSet::new();
+    if !discarded_solution_nonces.is_empty() {
+        for _ in 0..25 {
+            if sampled_discarded_solution_nonces.len() == max_samples {
+                break;
+            }
+            sampled_discarded_solution_nonces
+                .insert(*discarded_solution_nonces.iter().choose(&mut rng).unwrap());
         }
-        sampled_nonces.insert(rng.gen_range(0..num_nonces));
     }
+
+    // sample nonces from non-solutions
+    let mut sampled_non_solution_nonces = HashSet::new();
+    let num_non_solution_nonces =
+        num_nonces - solution_nonces.len() as u64 - discarded_solution_nonces.len() as u64;
+    if num_non_solution_nonces > 0 {
+        if num_non_solution_nonces * 2 <= num_nonces {
+            let non_solution_nonces: HashSet<u64> = (0..num_nonces)
+                .filter(|n| !solution_nonces.contains(n) && !discarded_solution_nonces.contains(n))
+                .collect();
+            for _ in 0..25 {
+                if sampled_non_solution_nonces.len() == max_samples {
+                    break;
+                }
+                sampled_non_solution_nonces
+                    .insert(*non_solution_nonces.iter().choose(&mut rng).unwrap());
+            }
+        } else {
+            // if there are more non-solutions than solutions, sample from all non-solutions
+            for _ in 0..25 {
+                if sampled_non_solution_nonces.len() == max_samples {
+                    break;
+                }
+                sampled_non_solution_nonces.insert(rng.gen_range(0..num_nonces));
+            }
+        }
+    }
+
+    let sampled_nonces: HashSet<u64> = sampled_solution_nonces
+        .into_iter()
+        .chain(sampled_non_solution_nonces.into_iter())
+        .chain(sampled_discarded_solution_nonces.into_iter())
+        .collect();
 
     ctx.add_benchmark_to_mempool(
         benchmark_id,
         BenchmarkDetails {
             num_solutions: solution_nonces.len() as u32,
+            num_discarded_solutions: discarded_solution_nonces.len() as u32,
             merkle_root,
             sampled_nonces,
         },
         solution_nonces,
+        discarded_solution_nonces,
     )
     .await?;
     Ok(())
@@ -190,7 +233,8 @@ pub async fn submit_proof<T: Context>(
         .get_benchmark_details(&benchmark_id)
         .await
         .ok_or_else(|| anyhow!("Benchmark needs to be submitted first."))?;
-    let solution_nonces = ctx.get_solution_nonces(&benchmark_id).await.unwrap();
+    let (solution_nonces, discarded_solution_nonces) =
+        ctx.get_benchmark_data(&benchmark_id).await.unwrap();
 
     // check player owns benchmark
     let settings = ctx.get_precommit_settings(&benchmark_id).await.unwrap();
@@ -240,6 +284,14 @@ pub async fn submit_proof<T: Context>(
         if solution_nonces.contains(&merkle_proof.leaf.nonce) && hash.0 > hash_threshold.0 {
             verification_result = Err(anyhow!(
                 "Invalid merkle hash for solution @ nonce {} does not meet threshold",
+                merkle_proof.leaf.nonce
+            ));
+            break;
+        } else if discarded_solution_nonces.contains(&merkle_proof.leaf.nonce)
+            && hash.0 <= hash_threshold.0
+        {
+            verification_result = Err(anyhow!(
+                "Invalid merkle hash for discarded solution @ nonce {} meets threshold",
                 merkle_proof.leaf.nonce
             ));
             break;

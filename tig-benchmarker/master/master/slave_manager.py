@@ -47,7 +47,8 @@ class SlaveManager:
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
                             'challenge', B.challenge,
-                            'algorithm', B.algorithm
+                            'algorithm', B.algorithm,
+                            'hash_threshold', B.hash_threshold
                         ) AS batch
                     FROM proofs_batch A
                     INNER JOIN job B
@@ -78,7 +79,8 @@ class SlaveManager:
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
                             'challenge', B.challenge,
-                            'algorithm', B.algorithm
+                            'algorithm', B.algorithm,
+                            'hash_threshold', B.hash_threshold
                         ) AS batch
                     FROM root_batch A
                     INNER JOIN job B
@@ -172,9 +174,20 @@ class SlaveManager:
                 result = await request.json()
                 merkle_root = MerkleHash.from_str(result["merkle_root"])
                 solution_nonces = result["solution_nonces"]
+                discarded_solution_nonces = result["discarded_solution_nonces"]
                 assert isinstance(solution_nonces, list) and all(isinstance(x, int) for x in solution_nonces)
+                assert isinstance(discarded_solution_nonces, list) and all(isinstance(x, int) for x in discarded_solution_nonces)
                 hashes = result["hashes"]
-                assert isinstance(hashes, list) and all(isinstance(x, str) and len(x) == 64 for x in hashes)
+                assert (
+                    isinstance(hashes, list) and 
+                    len(hashes) == len(solution_nonces) and
+                    all(
+                        isinstance(x, str) and 
+                        len(x) == 64 and
+                        x <= b["batch"]["hash_threshold"]
+                        for x in hashes
+                    )
+                )
                 logger.debug(f"slave {slave_name} submitted root for {batch_id}")
             except Exception as e:
                 logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
@@ -202,6 +215,7 @@ class SlaveManager:
                     UPDATE batch_data
                     SET merkle_root = %s,
                         solution_nonces = %s,
+                        discarded_solution_nonces = %s,
                         hashes = %s
                     WHERE benchmark_id = %s 
                         AND batch_idx = %s                    
@@ -209,6 +223,7 @@ class SlaveManager:
                     (
                         merkle_root.to_str(),
                         json.dumps(solution_nonces),
+                        json.dumps(discarded_solution_nonces),
                         json.dumps(hashes),
                         benchmark_id,
                         batch_idx
