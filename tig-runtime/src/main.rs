@@ -69,8 +69,8 @@ fn main() {
         matches.get_one::<bool>("compress").unwrap().clone(),
         matches.get_one::<usize>("gpu").cloned(),
     ) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+        eprintln!("Runtime Error: {}", e);
+        std::process::exit(84);
     }
 }
 

@@ -23,7 +23,7 @@ from common.merkle_tree import MerkleTree, MerkleHash
 
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 PENDING_BATCH_IDS = set()
-PROCESSING_BATCH_IDS = set()
+PROCESSING_BATCH_IDS = {}
 PROCESSING_NONCES = {}
 READY_BATCH_IDS = set()
 FINISHED_BATCH_IDS = {}
@@ -61,10 +61,6 @@ def download_library(algorithms_dir, batch):
 
 def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
     output_file = f"{results_dir}/{batch['id']}/{nonce}.json"
-    if os.path.exists(output_file):
-        logger.info(f"batch {batch['id']}, nonce {nonce}: already computed")
-        return
-
     start = now()
     cmd = [
         "docker", "exec", batch["challenge"], "tig-runtime",
@@ -88,24 +84,22 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         if ret is not None:
             # exit codes:
             # 0 - success
-            # 1 - runtime error
+            # 84 - runtime error
             # 85 - no solution
             # 86 - invalid solution
             # 87 - out of fuel
-            if (ret == 1 or ret == 87) and not os.path.exists(output_file):
-                d = OutputData(
-                    nonce=nonce,
-                    runtime_signature=0,
-                    fuel_consumed=(ret == 87) and (batch["runtime_config"]["max_fuel"] + 1),
-                    solution={},
-                    cpu_arch=CPU_ARCH,
-                )
-                with open(output_file, "wb") as f:
-                    json.dump(d.to_dict(), f)
+            if (ret == 84 or ret == 87) and not os.path.exists(output_file):
+                with open(output_file, "w") as f:
+                    json.dump(dict(
+                        nonce=nonce,
+                        runtime_signature=0,
+                        fuel_consumed=(ret == 87) and (batch["runtime_config"]["max_fuel"] + 1),
+                        solution={},
+                        cpu_arch=CPU_ARCH
+                    ), f)
 
-            assert os.path.exists(output_file), f"Exit code {ret}. Output file does not exist"
-            if ret == 1:
-                raise Exception(process.stderr.read().decode())
+            if ret not in {0, 84, 85, 86, 87}:
+                logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
             
             break
 
@@ -124,48 +118,49 @@ def compute_merkle_root(batch, results_dir):
     while True:
         if batch["id"] not in PROCESSING_BATCH_IDS:
             logger.info(f"batch {batch['id']} stopped")
-            break
+            return
 
-        processing_nonces = set(
-            n for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"])
-            if not os.path.exists(f"{results_dir}/{batch['id']}/{n}.json")
-        )
-        if len(processing_nonces) > 0:
-            logger.debug(f"batch {batch['id']} still processing {len(processing_nonces)} nonces")
+        num_processing = len(PROCESSING_BATCH_IDS[batch["id"]])
+        if num_processing > 0:
+            logger.debug(f"batch {batch['id']} still processing {num_processing} nonces")
             time.sleep(1.5)
             continue
 
-        hashes = []
-        solution_nonces = []
-        discarded_solution_nonces = []
-        for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
-            with open(f"{results_dir}/{batch['id']}/{n}.json", "r") as f:
-                d = OutputData.from_dict(json.load(f))
-                h = d.to_merkle_hash()
-                if len(d.solution) > 0:
-                    if h.to_str() <= batch["hash_threshold"]:
-                        solution_nonces.append(n)
-                    else:
-                        discarded_solution_nonces.append(n)
-                hashes.append(d.to_merkle_hash())
+        try:
+            hashes = []
+            solution_nonces = []
+            discarded_solution_nonces = []
+            for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
+                with open(f"{results_dir}/{batch['id']}/{n}.json", "r") as f:
+                    d = OutputData.from_dict(json.load(f))
+                    h = d.to_merkle_hash()
+                    if len(d.solution) > 0:
+                        if h.to_str() <= batch["hash_threshold"]:
+                            solution_nonces.append(n)
+                        else:
+                            discarded_solution_nonces.append(n)
+                    hashes.append(d.to_merkle_hash())
 
-        merkle_tree = MerkleTree(hashes, batch["batch_size"])
-        with open(f"{results_dir}/{batch['id']}/hashes.zlib", "wb") as f:
-            hashes = [h.to_str() for h in hashes]
-            f.write(zlib.compress(json.dumps(hashes).encode()))
-        with open(f"{results_dir}/{batch['id']}/result.json", "w") as f:
-            result = {
-                "solution_nonces": solution_nonces,
-                "discarded_solution_nonces": discarded_solution_nonces,
-                "merkle_root": merkle_tree.calc_merkle_root().to_str(),
-            }
-            logger.debug(f"batch {batch['id']} result: {result}")
-            json.dump(result, f)
-        logger.info(f"batch {batch['id']} done, took: {now() - start}ms")
-        
-        PROCESSING_BATCH_IDS.remove(batch["id"])
-        READY_BATCH_IDS.add(batch["id"])
-        break
+            merkle_tree = MerkleTree(hashes, batch["batch_size"])
+            with open(f"{results_dir}/{batch['id']}/hashes.zlib", "wb") as f:
+                hashes = [h.to_str() for h in hashes]
+                f.write(zlib.compress(json.dumps(hashes).encode()))
+            with open(f"{results_dir}/{batch['id']}/result.json", "w") as f:
+                result = {
+                    "solution_nonces": solution_nonces,
+                    "discarded_solution_nonces": discarded_solution_nonces,
+                    "merkle_root": merkle_tree.calc_merkle_root().to_str(),
+                }
+                logger.debug(f"batch {batch['id']} result: {result}")
+                json.dump(result, f)
+            logger.info(f"batch {batch['id']} done, took: {now() - start}ms")
+            
+            READY_BATCH_IDS.add(batch["id"])
+        except Exception as e:
+            logger.error(f"batch {batch['id']}, error computing merkle root : {e}")
+        finally:
+            PROCESSING_BATCH_IDS.pop(batch["id"], None)
+            return
     
 
 def purge_folders(output_path, ttl):
@@ -314,7 +309,7 @@ def process_batch(pool, algorithms_dir, config, results_dir):
         logger.error(f"Error processing batch {batch_id}: Algorithm {batch['settings']['algorithm_id']} does not match any regex in the config")
         return
     
-    PROCESSING_BATCH_IDS.add(batch_id)
+    PROCESSING_BATCH_IDS[batch_id] = set(range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]))
     so_path, ptx_path = download_library(algorithms_dir, batch)
     logger.info(f"batch {batch['id']} started")
     pool.submit(compute_merkle_root, batch, results_dir)
@@ -354,6 +349,8 @@ def process_nonces(pool, config, results_dir):
                 logger.error(f"batch {batch_id}, nonce {nonce}, runtime error: {e}")
             finally:
                 TOTAL_COST[0] -= cost
+                if batch_id in PROCESSING_BATCH_IDS:
+                    PROCESSING_BATCH_IDS[batch_id].remove(nonce)
 
         while (
             job["current_nonce"] < batch["start_nonce"] + batch["num_nonces"] and
@@ -387,9 +384,9 @@ def poll_batches(headers, master_ip, master_port, results_dir):
                 json.dump(batch, f)
         PENDING_BATCH_IDS.clear()
         PENDING_BATCH_IDS.update(root_batch_ids + proofs_batch_ids)
-        for batch_id in PROCESSING_BATCH_IDS - set(root_batch_ids + proofs_batch_ids):
+        for batch_id in set(PROCESSING_BATCH_IDS) - set(root_batch_ids + proofs_batch_ids):
             logger.info(f"stopping batch {batch_id}")
-            PROCESSING_BATCH_IDS.remove(batch_id)
+            PROCESSING_BATCH_IDS.pop(batch_id, None)
         time.sleep(5)
 
     else:
