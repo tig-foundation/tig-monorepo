@@ -4,50 +4,36 @@ A Rust crate that execute an algorithm (compiled from [`tig-binary`](../tig-bina
 
 # Getting Started
 
-Users who don't intend to customise `tig-runtime` are recommended to download pre-compiled version available in [TIG's runtime docker images](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fruntime).
+Users who don't intend to customise `tig-runtime` are recommended to download pre-compiled version available in [TIG's runtime docker images](../README.md#docker-images).
+
+Note there is a different `tig-runtime` for each challenge.
 
 **Example:**
 ```
-docker run -it ghcr.io/tig-foundation/tig-monorepo/runtime:0.0.1-aarch64
-# tig-runtime is already on PATH
+CHALLENGE=knapsack
+VERSION=0.0.1
+docker run -it ghcr.io/tig-foundation/tig-monorepo/$CHALLENGE/runtime:$VERSION
+
+# inside docker
+tig-runtime --help
 ```
 
-## Compiling (using dev docker image)
+## Compiling
 
-The required rust environment for development are available via [TIG's development docker images](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fdev).
+The required rust environment for development are available via [TIG's development docker images](../README.md#docker-images).
 
+You will need to add `--features <CHALLENGE>` to compile for a specific challenge.
 
 **Example:**
 ```
-docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64
-# cargo build -p tig-runtime --release
-```
+# clone this repo
+cd tig-monorepo
+CHALLENGE=knapsack
+VERSION=0.0.1
+docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/$CHALLENGE/dev:$VERSION
 
-## Compiling (local setup)
-
-Users who intend to customise `tig-runtime` need to install a specific version of rust:
-
-1. Install rust version `nightly-2025-02-10`
-```
-ARCH=$(uname -m)
-RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    echo "aarch64-unknown-linux-gnu";
-else
-    echo "x86_64-unknown-linux-gnu";
-fi)
-rustup install nightly-2025-02-10
-rustup default nightly-2025-02-10
-rustup component add rust-src
-rustup target add $RUST_TARGET
-RUST_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
-ln -s $RUST_LIBDIR /usr/local/lib/rust
-echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> ~/.bashrc
-```
-
-2. Compile `tig-runtime`
-```
-# for cuda version, add --features cuda
-cargo build -p tig-runtime --release --target $RUST_TARGET
+# inside docker
+cargo build -p tig-runtime --release --features knapsack
 ```
 
 # Usage
@@ -72,24 +58,37 @@ Options:
 
 The following exit codes indicate specific meanings:
 * 0 - solution found
+* 84 - runtime error
 * 85 - no solution found
-* 86 - runtime error
+* 86 - invalid solution
 * 87 - out of fuel
 
 **Example:**
 ```
+CHALLENGE=satisfiability
+VERSION=0.0.1
+docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/$CHALLENGE/runtime:$VERSION
+
+# inside docker
+download_algorithm sat_global_opt --testnet
+
+ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ] || [ "$(arch 2>/dev/null || echo "")" = "aarch64" ] || [ "$(arch 2>/dev/null || echo "")" = "arm64" ]; then
+    echo "arm64"
+else
+    echo "amd64"
+fi)
 SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
 RANDHASH='rand_hash'$
 NONCE=1337
 FUEL=987654321123456789
-SO_PATH=./tig-algorithms/lib/satisfiability/aarch64/better_sat.so
+SO_PATH=./tig-algorithms/lib/satisfiability/$ARCH/sat_global_opt.so
 
 tig-runtime $SETTINGS $RANDHASH $NONCE $SO_PATH --fuel $FUEL
 ```
 
 **Example Output:**
 ```
-{"cpu_arch":"aarch64","fuel_consumed":95496,"nonce":1337,"runtime_signature":4125818588297548058,"solution":{"variables":[0,1,0,1,0,0,0,0,0,1,0,0,0,1,1,1,0,1,1,1,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,1,0,0]}}
+{"cpu_arch":"arm64","fuel_consumed":97188,"nonce":1337,"runtime_signature":13607024390209669967,"solution":{"variables":[1,0,0,0,0,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0]}}
 ```
 
 # License

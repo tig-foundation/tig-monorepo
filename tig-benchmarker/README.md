@@ -1,89 +1,149 @@
 # tig-benchmarker
 
-Benchmarker for TIG. Expected setup is a single master and multiple slaves on different servers.
+Benchmarker for TIG. Designed to run with a single master and multiple slaves distributed across servers.
 
-## Overview
+## Table of Contents
 
-Benchmarking in TIG works as follows:
+1. [Quick Start](#quick-start)
+2. [Architecture Overview](#architecture-overview)
+3. [Configuration Details](#configuration-details)
+   * [.env file](#env-file)
+   * [Master Config](#master-config)
+   * [Slave Config](#slave-config)
+4. [Hard Resetting](#hard-resetting)
+5. [Finding your API Key](#finding-your-api-key)
+6. [License](#license)
 
-1. Master submits a precommit to TIG protocol, with details of what they will benchmark:
-   * `block_id`: start of the benchmark
-   * `player_id`: address of the benchmarker
-   * `challenge_id`: challenge to benchmark
-   * `algorithm_id`: algorithm to benchmark
-   * `difficulty`: difficulty of instances to randomly generate
-   * `num_nonces`: number of instances to benchmark
+# Quick Start
 
-2. TIG protocol confirms the precommit, and assigns it a random string
+1. Obtain a Testnet API Key (see last section)
+   * Each new address on testnet gets 10 TIG balance
+   * For more tokens, use testnet faucet at https://tigstats.com/faucet
 
-3. Master starts benchmarking:
-   * polls TIG protocol for the confirmed precommit + random string
-   * creates a benchmark job, splitting it into batches
-   * slaves poll the master for batches to compute
-   * slaves do the computation, and send results back to master
+2. Clone this repo
+    ```
+    git clone https://github.com/tig-foundation/tig-monorepo
+    cd tig-monorepo/tig-benchmarker
+    ```
 
-4. After benchmarking is finished, master submits benchmark to TIG protocol:
-   * `solution_nonces`: list of nonces for which a solution was found
-   * `merkle_root`: Merkle root of the tree constructed using results as leafs
+3. Start a master 
+   * If port 80 is in use, modify `UI_PORT` in your `.env` file
+    ```
+    docker-compose -f master.yml up
+    ```
 
-5. TIG protocol confirms the benchmark, and randomly samples nonces requiring proof
+4. Start a slave (in a separate terminal)
+    ```
+    docker-compose -f slave.yml up slave satisfiability
+    ```
 
-6. Master prepares the proof:
-   * polls TIG protocol for confirmed benchmark + sampled nonces
-   * creates proof jobs
-   * slaves poll the master for nonces requiring proof
-   * slaves send Merkle branches back to master
+5. Configure the master:
+   * Visit `http://localhost/config` (or `http://localhost:<UI_PORT>/config` if `UI_PORT` was changed)
+   * Paste and edit the following config:
+     * Replace `player_id` with your wallet address
+     * Replace `api_key` with your API key from step 1
+     * Press **Save** after updating
+    ```
+    {
+      "player_id": "0x0000000000000000000000000000000000000000",
+      "api_key": "00000000000000000000000000000000",
+      "api_url": "https://testnet-api.tig.foundation",
+      "time_between_resubmissions": 60000,
+      "max_concurrent_benchmarks": 4,
+      "algo_selection": [
+        {
+          "algorithm_id": "c001_a004",
+          "num_nonces": 40,
+          "difficulty_range": [0, 0.5],
+          "selected_difficulties": [],
+          "weight": 1,
+          "batch_size": 8
+        }
+      ],
+      "time_before_batch_retry": 60000,
+      "slaves": [
+        {
+          "name_regex": ".*",
+          "algorithm_id_regex": ".*",
+          "max_concurrent_batches": 1
+        }
+      ]
+    }
+    ```
 
-7. Master submits proof to TIG protocol
+6. Sit back and watch as benchmarks are submitted!
+   * You can list available algorithms using:
+   ```
+   docker exec satisfiability list_algorithms --testnet
+   ```
 
-8. TIG protocol confirms the proof, calculating the block from which the solutions will become "active" (eligible to earn rewards)
-   * Verification is performed in parallel
-   * Solutions will be inactive 120 blocks from when the benchmark started
-   * The delay is determined by number of blocks between the start and when proof was confirmed
-   * Each block, active solutions which qualify will earn rewards for the Benchmarker
+# Architecture Overview
 
-# Starting Your Master
+* The **Master** defines benchmark scheduling strategy:
+  * Algorithm selection
+  * Difficulty selection
+  * Batch sizing
+  * Slave assignment
+  ```
+  docker-compose -f master.yml up
+  ```
 
-Simply run:
+* A **Slave** benchmarks specific challenges
+  ```
+  docker-compose -f slave.yml up slave [challenge] .. [challenge]
+  ```
+  * CPU challenges include: `satisfiability`, `vehicle_routing`, and `knapsack`U
+  * GPU challenges (requires CUDA 12.6.3+) include: `vector_search`, and `hypergraph`
+  * `slave/config.json` controls how many algorithms are ran concurrently
+
+# Configuration Details
+
+## `.env` file
+
+Shared by both `master.yml` and `slave.yml`:
 
 ```
-docker-compose up --build
-```
+# Version of all benchmarker containers
+VERSION=0.0.1
+# Set to 1 to enable verbose logging
+VERBOSE=1
 
-This uses the `.env` file:
-
-```
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=mysecretpassword
 POSTGRES_DB=postgres
 UI_PORT=80
 DB_PORT=5432
+
+# This is used by both master and slave
 MASTER_PORT=5115
-VERBOSE=
+# This is used by slave to connect to master. Set to 172.17.0.1 if master and slave are running on same server
+MASTER_IP=172.17.0.1
+
+# Path to config file for slave. Mounts to /app/config.json inside slave container
+SLAVE_CONFIG=./slave/config.json
+# Directory for slave to download algorithms. Mounts to /app/algorithms inside slave containers
+ALGORITHMS_DIR=./algorithms
+# Directory for slave to store results. Mounts to /app/results inside slave containers
+RESULTS_DIR=./results
+# Seconds for results to live
+TTL=300
+# Name of the slave. Defaults to randomly generated name
+SLAVE_NAME=
+# How many worker threads to spawn in the slave container
+NUM_WORKERS=8
 ```
 
-See last section on how to find your player_id & api_key.
-
-**Notes:**
-* Interaction with the master is via UI: `http://localhost`
-    * If your UI port is not 80, then your UI is accessed via `http://localhost:<UI_PORT>`
-    * If you are running on a server, then your UI is access via: `http://<SERVER_IP>`
-    * Alternatively, you can [ssh port forward](https://www.ssh.com/academy/ssh/tunneling-example)
-* The config of the master can be updated via the UI
-* Recommend to run dockers in detached mode: `docker-compose up --detach`
-* You can view the logs of each service individually: `docker-compose logs -f <service>`
-    * There are 4 services: `db`, `master`, `ui`, `nginx`
-* To query the database, recommend to use [pgAdmin](https://www.pgadmin.org/)
-
-## Hard Resetting Your Master
-
-1. Kill the services: `docker-compose down`
-2. Delete the database: `rm -rf db_data`
-3. Start your master
+Common variables to customise:
+1. `VERBOSE=` (empty string for quieter logging)
+2. `POSTGRES_PASSWORD`
+3. `MASTER_IP` (set to `172.17.0.1` for slaves on same host as master)
+4. `MASTER_PORT`
+4. `SLAVE_NAME` (must be a unique name, or else master will assign duplicate batches)
+5. `NUM_WORKERS` (number of worker threads on a slave)
 
 ## Master Config
 
-The master config defines how benchmarking jobs are selected, scheduled, and distributed to slaves. This config can be edited via the master UI or via API (`http://localhost:<MASTER_PORT>/update-config`).
+The master config defines how benchmarking jobs are selected, scheduled, and distributed to slaves. This config can be edited via the master UI `/config` or via API `/update-config`.
 
 ```json
 {
@@ -121,101 +181,66 @@ The master config defines how benchmarking jobs are selected, scheduled, and dis
 * `time_between_resubmissions`: Time in milliseconds to wait before resubmitting an benchmark/proof which has not confirmed into a block
 * `max_concurrent_benchmarks`: Maximum number of benchmarks that can be "in flight" at once (i.e., benchmarks where the proof has not been computed yet).
 * `algo_selection`: list of algorithms that can be picked for benchmarking. Each entry has:
-  * `algorithm_id`: id for the algorithm (e.g., c001_a001). Tip: use [list_algorithms](../scripts/list_algorithms.py) script to get list of algorithm ids
+  * `algorithm_id`: id for the algorithm (e.g., c001_a001)
   * `num_nonces`: Number of instances to benchmark for this algorithm
   * `difficulty_range`: the bounds (0.0 = easiest, 1.0 = hardest) for a random difficulty sampling. Full range is `[0.0, 1.0]`
   * `selected_difficulties`: A list of difficulties `[[x1,y1], [x2, y2], ...]`. If any of the difficulties are in valid range, one will be randomly selected instead of sampling from the difficulty range
   * `weight`: Selection weight. An algorithm is chosen proportionally to `weight / total_weight`
   * `batch_size`: Number of nonces per batch. Must be a power of 2. For example, if num_nonces = 40 and batch_size = 8, the benchmark is split into 5 batches
 
-# Connecting Slaves
-
-1. Run the appropiate [runtime docker image](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fruntime) for your slave. Available flavours are:
-    * amd64 (x86_64 compatible)
-    * aarch64
-    * amd64-cuda12.6.3 (x86_64 compatible)
-    * aarch64-cuda12.6.3
-    ```
-    # example
-    docker run -it --gpus all ghcr.io/tig-foundation/tig-monorepo/runtime:0.0.1-amd64-cuda12.6.3
-    ```
-
-2. Run `slave.py`:
-    ```
-    # runtime docker container should start you in /app
-    python3 slave.py --help
-    ```
-
-**Notes:**
-* If your master is on a different server, add `--master <SERVER_IP>`
-* Set a custom master port with `--port <MASTER_PORT>`
-* To see all options, use `--help` 
-
 ## Slave Config
 
-You can control execution limits via a JSON config:
+The slave config lives under `slave/config.json`. It controls concurrency for algorithms using cost limits:
 
 ```json
 {
-    "max_workers": 100,
+    "max_cost": 100,
     "algorithms": [
         {
             "id_regex": ".*",
-            "cpu": 1.0,
-            "gpu": 0.0
+            "cost": 1.0
         }
     ]
 }
 ```
 
 **Explanation:**
-* By default, `slave.py` uses all CPUs and all GPUs. To impose limits you should set the environment variables:
-  * `CPU_VISIBLE_CORES`. e.g. you have 8 CPUs, to only expose the first and last: `export CPU_VISIBLE_CORES=0,7`
-  * `CUDA_VISIBLE_DEVICES`. e.g. you have 4 GPUs, to only expose the first and second: `export CUDA_VISIBLE_DEVICES=0,1`
-* `max_workers`: maximum concurrent tig-runtime processes.
+* `max_cost`: maximum total "cost" of running algorithms.
 * `algorithms`: rules for matching algorithms based on `id_regex`.
     * Regex matches algorithm ids (e.g., `c004_a[\d3]` matches all vector_search algorithms).
-    * An algorithm + nonce only starts being processed if:
-      ```
-      TOTAL_USAGE["cpu"] + cpu <= len(VISIBLE_CPUS) and 
-      TOTAL_USAGE["gpu"] + gpu <= len(VISIBLE_GPUS)
-      ```
-    * Total costs gets adjusted when processing starts and ends
-      ```
-      # when processing starts 
-      TOTAL_USAGE["cpu"] += cpu
-      TOTAL_USAGE["gpu"] += gpu
-
-      # processing logic
-
-      # when processing ends 
-      TOTAL_USAGE["cpu"] -= cpu
-      TOTAL_USAGE["gpu"] -= gpu
-      ```
+    * An algorithm only starts running if the total cost is below the limit
 
 **Example:**
 
-This example limits c001/c002/c003 to 2 concurrent instances per CPU. It also limits c004/c005 to 4 concurrent instances per GPU:
+This example means that up to 10 satisfiability (c001) algorithms can be ran concurrently, or up to 5 vehicle_routing (c002) algorithms, or some combination of both:
 
 ```json
 {
-    "max_workers": 10,
-    "cpus": 4,
-    "gpus": 2,
+    "max_cost": 10,
     "algorithms": [
         {
-            "id_regex": "c00[123].*",
-            "cpu_cost": 0.5,
+            "id_regex": "c001.*",
+            "cpu_cost": 1.0,
             "gpu_cost": 0.0
         },
         {
-            "id_regex": "c00[45].*",
-            "cpu_cost": 0.0,
-            "gpu_cost": 0.25
+            "id_regex": "c002.*",
+            "cpu_cost": 2.0,
+            "gpu_cost": 0.0
         }
     ]
 }
 ```
+
+# Hard Resetting
+
+To hard reset master:
+1. Kill the services `docker-compose -f master.yml down`
+2. Delete the database: `rm -rf db_data`
+
+To hard reset slave:
+1. Kill the services `docker-compose -f slave.yml down`
+2. Delete the data: `rm -rf algorithms results`
 
 # Finding your API Key
 

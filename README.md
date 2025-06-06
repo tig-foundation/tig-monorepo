@@ -4,10 +4,11 @@ This repository contains the implementation of The Innovation Game (TIG).
 
 ## Important Links
 
+* [Quick Start for Benchmarkers](./tig-benchmarker/README.md#quick-start)
+* [Quick Start for Innovators](./tig-algorithms/README.md#quick-start)
 * [TIG Documentation](https://docs.tig.foundation/)
 * [TIG Whitepaper](docs/whitepaper.pdf)
 * [TIG Licensing Explainer](docs/guides/anatomy.md)
-* [Getting Started with Innovating](docs/guides/innovating.md)
 * [Implementations vs Breakthroughs](docs/guides/breakthroughs.md)
 * [Voting Guidelines for Token Holders](docs/guides/voting.md)
 
@@ -27,21 +28,44 @@ This repository contains the implementation of The Innovation Game (TIG).
 
 ## Docker Images
 
-TIG docker images are hosted on [Github Packages](https://github.com/orgs/tig-foundation/packages):
+TIG docker images are hosted on [Github Packages](https://github.com/orgs/tig-foundation/packages), supporting `linux/arm64` and `linux/amd64` platforms.
 
-* [dev](https://github.com/orgs/tig-foundation/packages/container/package/tig-monorepo%2Fdev) - environment for Innovators who are developing algorithms
-* [runtime](https://github.com/orgs/tig-foundation/packages/container/package/tig-monorepo%2Fruntime) - environment for Benchmarkers who are running slaves
+For Innovators who are developing & compiling algorithms, there is a `dev` image for each challenge, containing the development environment:
 
-## Useful Scripts
+* [satisfiability/dev](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fsatisfiability%2Fdev)
+* [vehicle_routing/dev](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fvehicle_routing%2Fdev)
+* [knapsack/dev](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fknapsack%2Fdev)
+* [vector_search/dev](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fvector_search%2Fdev)
+* [hypergraph/dev](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%hypergraph%2Fdev)
 
-Under `scripts/` folder is a bunch of useful scripts:
+For Benchmarkers to spin up slaves, there is a `benchmarker\slave` image along with a `runtime` image for each challenge. It is intended that these images are spun up as part of [`docker-compose-slave.yml`](tig-benchmarker/docker-compose-slave.yml) (see [this README](tig-benchmarker/README.md) for more details):
 
-* `download_algorithm`
+* [benchmarker/slave](https://github.com/orgs/tig-foundation/packages/container/package/tig-monorepo%2Fbenchmarker%2Fslave)
+* [satisfiability/runtime](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fsatisfiability%2Fruntime)
+* [vehicle_routing/runtime](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fvehicle_routing%2Fruntime)
+* [knapsack/runtime](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fknapsack%2Fruntime)
+* [vector_search/runtime](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fvector_search%2Fruntime)
+* [hypergraph/runtime](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%hypergraph%2Fruntime)
+
+For Benchmarkers to spin up a master, there is a series of images that are spun up as part of [`docker-compose-master.yml`](tig-benchmarker/docker-compose-master.yml) (see [this README](tig-benchmarker/README.md) for more details):
+
+* [benchmarker/master](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fbenchmarker%2Fmaster)
+* [benchmarker/ui](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fbenchmarker%2Fui)
+* [benchmarker/postgres](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fbenchmarker%2Fpostgres)
+* [benchmarker/nginx](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fbenchmarker%2Fnginx)
+
+### Useful Scripts
+
+As part of the `runtime` and `dev` images, there are a bunch of useful scripts available on `PATH`:
+
 * `list_algorithms`
-* `list_challenges`
-* `test_algorithms`
+* `download_algorithm <algorithm_name_or_id>`
+* `test_algorithm <algorithm_name> <difficulty>`
 
-These are available on `PATH` in the `dev` and `runtime` docker images
+Notes:
+* The docker will automatically set a CHALLENGE environment variable used by these scripts
+  * e.g. `knapsack/runtime` docker will set `CHALLENGE=knapsack`
+* Use `--testnet` option to target testnet
 
 ## License
 

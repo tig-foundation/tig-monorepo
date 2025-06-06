@@ -4,50 +4,36 @@ A Rust crate that verifies a single solution or Merkle proof.
 
 # Getting Started
 
-Users who don't intend to customise `tig-verifier` are recommended to download pre-compiled version available in [TIG's runtime docker images](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fruntime).
+Users who don't intend to customise `tig-verifier` are recommended to download pre-compiled version available in [TIG's runtime docker images](../README.md#docker-images).
+
+Note there is a different `tig-verifier` for each challenge.
 
 **Example:**
 ```
-docker run -it ghcr.io/tig-foundation/tig-monorepo/runtime:0.0.1-aarch64
-# tig-verifier is already on PATH
+CHALLENGE=knapsack
+VERSION=0.0.1
+docker run -it ghcr.io/tig-foundation/tig-monorepo/$CHALLENGE/runtime:$VERSION
+
+# inside docker
+tig-verifier --help
 ```
 
-## Compiling (using dev docker image)
+## Compiling
 
-The required rust environment for development are available via [TIG's development docker images](https://github.com/tig-foundation/tig-monorepo/pkgs/container/tig-monorepo%2Fdev).
+The required rust environment for development are available via [TIG's development docker images](../README.md#docker-images).
 
+You will need to add `--features <CHALLENGE>` to compile for a specific challenge.
 
 **Example:**
 ```
-docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/dev:0.0.1-aarch64
-# cargo build -p tig-verifier --release
-```
+# clone this repo
+cd tig-monorepo
+CHALLENGE=knapsack
+VERSION=0.0.1
+docker run -it -v $(pwd):/app ghcr.io/tig-foundation/tig-monorepo/$CHALLENGE/dev:$VERSION
 
-## Compiling (local setup)
-
-Users who intend to customise `tig-verifier` need to install a specific version of rust:
-
-1. Install rust version `nightly-2025-02-10`
-```
-ARCH=$(uname -m)
-RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    echo "aarch64-unknown-linux-gnu";
-else
-    echo "x86_64-unknown-linux-gnu";
-fi)
-rustup install nightly-2025-02-10
-rustup default nightly-2025-02-10
-rustup component add rust-src
-rustup target add $RUST_TARGET
-RUST_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
-ln -s $RUST_LIBDIR /usr/local/lib/rust
-echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}:/usr/local/lib/rust\"" >> ~/.bashrc
-```
-
-2. Compile `tig-verifier`
-```
-# for cuda version, add --features cuda
-cargo build -p tig-verifier --release --target $RUST_TARGET
+# inside docker
+cargo build -p tig-verifier --release --features knapsack
 ```
 
 # Usage
@@ -71,6 +57,11 @@ Options:
 
 **Example:**
 ```
+CHALLENGE=satisfiability
+VERSION=0.0.1
+docker run -it ghcr.io/tig-foundation/tig-monorepo/$CHALLENGE/runtime:$VERSION
+
+# inside docker
 SETTINGS='{"challenge_id":"c001","difficulty":[50,300],"algorithm_id":"","player_id":"","block_id":""}'
 RANDHASH='rand_hash'
 NONCE=1337
