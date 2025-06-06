@@ -174,11 +174,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
 
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        let prev_solution_ratio = active_challenges_prev_block_data
-            .get(challenge_id)
-            .map(|x| x.average_solution_ratio)
-            .unwrap_or_default();
-        let min_solution_ratio = prev_solution_ratio * config.opow.min_solution_ratio_factor;
         let min_num_nonces = config.opow.min_num_nonces as u64;
         let mut player_algorithm_solutions = HashMap::<String, HashMap<String, u32>>::new();
         let mut player_solutions = HashMap::<String, u32>::new();
@@ -239,9 +234,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|player_id| {
                     (
                         player_id.clone(),
-                        if player_nonces[player_id] >= min_num_nonces
-                            && player_solution_ratio[player_id] >= min_solution_ratio
-                        {
+                        if player_nonces[player_id] >= min_num_nonces {
                             max_qualifiers_by_player[player_id].min(player_solutions[player_id])
                         } else {
                             0
@@ -407,19 +400,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             challenge_factors.push(if challenge_data.num_qualifiers == 0 {
                 zero.clone()
             } else {
-                let fraction_qualifiers = PreciseNumber::from(
+                PreciseNumber::from(
                     *opow_data
                         .num_qualifiers_by_challenge
                         .get(challenge_id)
                         .unwrap_or(&0),
-                ) / PreciseNumber::from(challenge_data.num_qualifiers);
-                let reliability = *opow_data
-                    .solution_ratio_by_challenge
-                    .get(challenge_id)
-                    .unwrap_or(&0.0)
-                    / challenge_data.average_solution_ratio;
-                fraction_qualifiers
-                    * PreciseNumber::from_f64(reliability.min(config.opow.max_reliability))
+                ) / PreciseNumber::from(challenge_data.num_qualifiers)
             });
         }
 

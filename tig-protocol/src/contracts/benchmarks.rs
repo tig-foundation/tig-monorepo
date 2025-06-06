@@ -258,11 +258,30 @@ pub async fn submit_proof<T: Context>(
     }
 
     // verify merkle_proofs
-    let hash_threshold = ctx
+    let ChallengeBlockData {
+        mut hash_threshold,
+        average_solution_ratio,
+        ..
+    } = ctx
         .get_challenge_block_data(&settings.challenge_id, &settings.block_id)
         .await
-        .ok_or_else(|| anyhow!("Block too old"))?
-        .hash_threshold;
+        .ok_or_else(|| anyhow!("Block too old"))?;
+
+    // use reliability to adjust hash threshold
+    let solution_ratio =
+        (solution_nonces.len() + discarded_solution_nonces.len()) as f64 / num_nonces as f64;
+    let reliability = if average_solution_ratio == 0.0 {
+        1.0
+    } else if solution_ratio == 0.0 {
+        0.0
+    } else {
+        (solution_ratio / average_solution_ratio).min(1.0)
+    };
+    let denominator = 1000u64;
+    let numerator = (reliability * denominator as f64) as u64;
+    (U256::from(hash_threshold.clone().0) / U256::from(denominator) * U256::from(numerator))
+        .to_big_endian(&mut hash_threshold.0);
+
     let mut verification_result = Ok(());
     let max_branch_len = (64 - (num_nonces - 1).leading_zeros()) as usize;
     for merkle_proof in merkle_proofs.iter() {

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS job (
     algorithm TEXT NOT NULL,
     download_url TEXT NOT NULL,
     hash_threshold TEXT NOT NULL,
+    average_solution_ratio FLOAT NOT NULL,
     block_started INTEGER NOT NULL,
     sampled_nonces JSONB,
     benchmark_submit_time BIGINT,

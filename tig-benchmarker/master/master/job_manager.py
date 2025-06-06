@@ -15,6 +15,7 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 class JobManager:
     def __init__(self):
         self.hash_thresholds = {}
+        self.average_solution_ratio = {}
 
     def on_new_block(
         self,
@@ -62,11 +63,17 @@ class JobManager:
 
             if x.details.block_started not in self.hash_thresholds:
                 logger.info(f"fetching hash threshold for block {x.details.block_started}")
+                d = requests.get(f"{api_url}/get-challenges?block_id={x.settings.block_id}").json()
                 self.hash_thresholds[x.details.block_started] = {
                     c['id']: c['block_data']['hash_threshold']
-                    for c in requests.get(f"{api_url}/get-challenges?block_id={x.settings.block_id}").json()["challenges"]
+                    for c in d["challenges"]
+                }
+                self.average_solution_ratio[x.details.block_started] = {
+                    c['id']: c['block_data']['average_solution_ratio']
+                    for c in d["challenges"]
                 }
             hash_threshold = self.hash_thresholds[x.details.block_started][x.settings.challenge_id]
+            average_solution_ratio = self.average_solution_ratio[x.details.block_started][x.settings.challenge_id]
 
             bin = binarys.get(x.settings.algorithm_id, None)
             if bin is None:
@@ -100,9 +107,10 @@ class JobManager:
                         download_url,
                         block_started,
                         hash_threshold,
+                        average_solution_ratio,
                         start_time
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
                     ON CONFLICT (benchmark_id) DO NOTHING;
                     """,
                     (
@@ -117,7 +125,8 @@ class JobManager:
                         a_name,
                         bin.details.download_url,
                         x.details.block_started,
-                        hash_threshold.lower()
+                        hash_threshold.lower(),
+                        average_solution_ratio,
                     )
                 ),
                 (
@@ -233,25 +242,34 @@ class JobManager:
         rows = get_db_conn().fetch_all(
             """
             WITH ready AS (
-                SELECT A.benchmark_id, B.hash_threshold
+                SELECT A.benchmark_id
                 FROM root_batch A
                 INNER JOIN job B
                     ON B.merkle_root_ready IS NULL
                     AND A.benchmark_id = B.benchmark_id
-                GROUP BY A.benchmark_id, B.hash_threshold
+                GROUP BY A.benchmark_id
                 HAVING COUNT(*) = COUNT(A.ready)
+            ),
+            agg_batches AS (
+                SELECT 
+                    A.benchmark_id, 
+                    JSONB_AGG(B.merkle_root ORDER BY B.batch_idx) AS batch_merkle_roots,
+                    JSONB_AGG(B.solution_nonces) AS solution_nonces,
+                    JSONB_AGG(B.discarded_solution_nonces) AS discarded_solution_nonces,
+                    JSONB_AGG(B.hashes) AS hashes
+                FROM ready A
+                INNER JOIN batch_data B
+                    ON A.benchmark_id = B.benchmark_id
+                GROUP BY A.benchmark_id
             )
-            SELECT 
-                A.benchmark_id, 
-                A.hash_threshold,
-                JSONB_AGG(B.merkle_root ORDER BY B.batch_idx) AS batch_merkle_roots,
-                JSONB_AGG(B.solution_nonces) AS solution_nonces,
-                JSONB_AGG(B.discarded_solution_nonces) AS discarded_solution_nonces,
-                JSONB_AGG(B.hashes) AS hashes
-            FROM ready A
-            INNER JOIN batch_data B
+            SELECT
+                A.*,
+                B.hash_threshold,
+                B.average_solution_ratio,
+                B.num_nonces
+            FROM agg_batches A
+            INNER JOIN job B
                 ON A.benchmark_id = B.benchmark_id
-            GROUP BY A.benchmark_id, A.hash_threshold
             """
         )
 
@@ -261,8 +279,34 @@ class JobManager:
             solution_nonces = [x for y in row['solution_nonces'] for x in y]
             discarded_solution_nonces = [x for y in row['discarded_solution_nonces'] for x in y]
             hashes = [x for y in row['hashes'] for x in y]
-            hash_threshold = row["hash_threshold"]
-            assert len(hashes) == len(solution_nonces), "hashes and solution_nonces should be the same length"
+
+            # calc hash threshold based on reliability
+            num_solutions = len(solution_nonces) + len(discarded_solution_nonces)
+            num_nonces = row["num_nonces"]
+            solution_ratio = num_solutions / num_nonces if num_nonces > 0 else 0
+            average_solution_ratio = row["average_solution_ratio"]
+            if average_solution_ratio == 0:
+                reliability = 1.0
+            elif solution_ratio == 0:
+                reliability = 0.0
+            else:
+                reliability = min(1.0, solution_ratio / average_solution_ratio)
+            # FIXME floating point representation may result in very very minor differences..
+            assert 0 <= reliability <= 1.0
+            denominator = 1000
+            numerator = int(reliability * denominator)
+            hash_threshold = (
+                int(row["hash_threshold"], 16) // denominator * numerator
+            ).to_bytes(32, 'big').hex()
+            assert hash_threshold <= row["hash_threshold"]
+
+            # discard solutions
+            discarded_solution_nonces = set(discarded_solution_nonces)
+            for n, h in zip(solution_nonces, hashes):
+                if h > hash_threshold:
+                    discarded_solution_nonces.add(n)
+            solution_nonces = list(set(solution_nonces) - discarded_solution_nonces)
+            discarded_solution_nonces = list(discarded_solution_nonces)
 
             batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
             num_batches = len(batch_merkle_roots)
