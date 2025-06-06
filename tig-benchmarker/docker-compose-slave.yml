@@ -23,6 +23,7 @@ services:
       - MASTER_PORT=${MASTER_PORT}
       - MASTER_IP=${MASTER_IP}
       - TTL=${TTL}
+      - NUM_WORKERS=${NUM_WORKERS}
 
   satisfiability:
     <<: *common
