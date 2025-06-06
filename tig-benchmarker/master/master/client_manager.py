@@ -123,6 +123,7 @@ class ClientManager:
                                 B.num_nonces - B.batch_size * C.batch_idx
                             ),
                             'num_solutions', JSONB_ARRAY_LENGTH(D.solution_nonces),
+                            'num_discarded_solutions', JSONB_ARRAY_LENGTH(D.discarded_solution_nonces),
                             'status', CASE
                                 WHEN B.stopped IS NOT NULL THEN 'STOPPED'
                                 WHEN E.batch_idx IS NOT NULL THEN (
@@ -165,7 +166,8 @@ class ClientManager:
                     SELECT 
                         benchmark_id,
                         JSONB_AGG(batch_data ORDER BY batch_idx) AS batches,
-                        SUM((batch_data->>'num_solutions')::INTEGER) AS num_solutions
+                        SUM((batch_data->>'num_solutions')::INTEGER) AS num_solutions,
+                        SUM((batch_data->>'num_discarded_solutions')::INTEGER) AS num_discarded_solutions
                     FROM recent_batches
                     GROUP BY benchmark_id
                 )
@@ -176,7 +178,8 @@ class ClientManager:
                     B.settings->'difficulty' AS difficulty,
                     B.batch_size,
                     B.num_nonces,
-                    A.num_solutions,
+                    COALESCE(JSONB_ARRAY_LENGTH(C.solution_nonces), A.num_solutions) AS num_solutions,
+                    COALESCE(JSONB_ARRAY_LENGTH(C.discarded_solution_nonces), A.num_discarded_solutions) AS num_discarded_solutions,
                     CASE
                         WHEN B.end_time IS NOT NULL THEN 'COMPLETED'
                         WHEN B.stopped IS NOT NULL THEN 'STOPPED'
@@ -192,6 +195,8 @@ class ClientManager:
                 FROM grouped_batches A
                 INNER JOIN job B
                     ON A.benchmark_id = B.benchmark_id
+                LEFT JOIN job_data C
+                    ON A.benchmark_id = C.benchmark_id
                 ORDER BY 
                     B.block_started DESC,
                     B.benchmark_id DESC
@@ -225,6 +230,7 @@ class ClientManager:
                     ) AS batch,
                     C.merkle_root,
                     C.solution_nonces,
+                    C.discarded_solution_nonces,
                     C.merkle_proofs
                 FROM root_batch A
                 INNER JOIN job B

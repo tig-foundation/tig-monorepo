@@ -97,7 +97,7 @@
 
         <th pSortableColumn="nonces" class="tig-dark text-center">#NONCES</th>
         <th pSortableColumn="solutions" class="tig-dark text-center">
-          #SOLUTIONS
+          #SOLUTIONS (KEPT/DISCARDED)
         </th>
 
         <th pSortableColumn="status" class="tig-dark text-center">STATUS</th>
@@ -157,7 +157,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
-            {{ benchmark.num_solutions }}
+            {{ benchmark.num_solutions != null ? benchmark.num_solutions + ' / ' + benchmark.num_discarded_solutions : '' }}
           </div>
         </td>
 
@@ -217,7 +217,7 @@
                   </th>
 
                   <th pSortableColumn="amount" class="tig-dark text-center">
-                    #SOLUTIONS
+                    #SOLUTIONS (KEPT/DISCARDED)
                   </th>
                   <th pSortableColumn="status" class="tig-dark text-center">
                     STATUS
@@ -255,7 +255,7 @@
                     <div
                       class="flex justify-content-center align-items-center tig-dark"
                     >
-                      {{ batch.end_time ? batch.num_solutions : "" }}
+                      {{ batch.end_time ? batch.num_solutions + ' / ' + batch.num_discarded_solutions : "" }}
                     </div>
                   </td>
                   <td>
