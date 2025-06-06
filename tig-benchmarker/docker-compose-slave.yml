@@ -7,13 +7,7 @@ x-common: &common
   command: ["sleep", "infinity"]
 
 x-common-gpu: &common-gpu
-  deploy:
-    resources:
-      reservations:
-        devices:
-          - driver: nvidia
-            count: all
-            capabilities: [gpu]
+  runtime: nvidia
 
 services:
   slave:
