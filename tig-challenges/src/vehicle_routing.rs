@@ -187,9 +187,7 @@ impl SubInstance {
         let average_demand = demands.iter().sum::<i32>() as f64 / num_nodes as f64;
         let average_route_size = max_capacity as f64 / average_demand;
         let average_distance = (1000.0 / 4.0) * 0.5214;
-        let furthest_node = (1..num_nodes)
-            .max_by_key(|&node| distance_matrix[0][node])
-            .unwrap();
+        let furthest_node = (1..num_nodes).max_by_key(|&node| distance_matrix[0][node])?;
 
         let service_time = 10;
         let mut ready_times = vec![0; num_nodes];

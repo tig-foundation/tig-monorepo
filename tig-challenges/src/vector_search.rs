@@ -79,14 +79,12 @@ impl Challenge {
 
         let block_size = MAX_THREADS_PER_BLOCK;
 
-        let d_seed = stream.memcpy_stod(seed).unwrap();
-        let mut d_cluster_means = stream
-            .alloc_zeros::<f32>((num_clusters * vector_dims) as usize)
-            .unwrap();
-        let mut d_cluster_weights = stream.alloc_zeros::<f32>(num_clusters as usize).unwrap();
-        let mut d_cluster_stds = stream
-            .alloc_zeros::<f32>((num_clusters * vector_dims) as usize)
-            .unwrap();
+        let d_seed = stream.memcpy_stod(seed)?;
+        let mut d_cluster_means =
+            stream.alloc_zeros::<f32>((num_clusters * vector_dims) as usize)?;
+        let mut d_cluster_weights = stream.alloc_zeros::<f32>(num_clusters as usize)?;
+        let mut d_cluster_stds =
+            stream.alloc_zeros::<f32>((num_clusters * vector_dims) as usize)?;
 
         unsafe {
             stream
@@ -104,12 +102,11 @@ impl Challenge {
                     grid_dim: ((num_clusters + block_size - 1) / block_size, 1, 1),
                     block_dim: (block_size, 1, 1),
                     shared_mem_bytes: 0,
-                })
-                .unwrap();
+                })?;
         }
-        stream.synchronize().unwrap();
+        stream.synchronize()?;
 
-        let cluster_weights = stream.memcpy_dtov(&d_cluster_weights).unwrap();
+        let cluster_weights = stream.memcpy_dtov(&d_cluster_weights)?;
         let total_weight: f32 = cluster_weights.iter().sum();
         let mut cluster_cum_prob = cluster_weights
             .iter()
@@ -121,13 +118,11 @@ impl Challenge {
             .collect::<Vec<_>>();
         cluster_cum_prob.push(1.0);
 
-        let d_cluster_cum_prob = stream.memcpy_stod(&cluster_cum_prob).unwrap();
-        let mut d_database_vectors = stream
-            .alloc_zeros::<f32>((database_size * vector_dims) as usize)
-            .unwrap();
-        let mut d_query_vectors = stream
-            .alloc_zeros::<f32>((difficulty.num_queries * vector_dims) as usize)
-            .unwrap();
+        let d_cluster_cum_prob = stream.memcpy_stod(&cluster_cum_prob)?;
+        let mut d_database_vectors =
+            stream.alloc_zeros::<f32>((database_size * vector_dims) as usize)?;
+        let mut d_query_vectors =
+            stream.alloc_zeros::<f32>((difficulty.num_queries * vector_dims) as usize)?;
 
         unsafe {
             stream
@@ -146,10 +141,9 @@ impl Challenge {
                     grid_dim: ((database_size + block_size - 1) / block_size, 1, 1),
                     block_dim: (block_size, 1, 1),
                     shared_mem_bytes: 0,
-                })
-                .unwrap();
+                })?;
         }
-        stream.synchronize().unwrap();
+        stream.synchronize()?;
 
         return Ok(Self {
             seed: seed.clone(),
