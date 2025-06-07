@@ -220,13 +220,11 @@ This example means that up to 10 satisfiability (c001) algorithms can be ran con
     "algorithms": [
         {
             "id_regex": "c001.*",
-            "cpu_cost": 1.0,
-            "gpu_cost": 0.0
+            "cost": 1.0
         },
         {
             "id_regex": "c002.*",
-            "cpu_cost": 2.0,
-            "gpu_cost": 0.0
+            "cost": 2.0
         }
     ]
 }
