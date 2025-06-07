@@ -119,7 +119,7 @@ def compute_merkle_roots(results_dir):
         start = job["start"]
         q = job["q"]
 
-        num_processing = q.qsize()
+        num_processing = batch["num_nonces"] - len(job["finished"])
         if num_processing > 0:
             logger.debug(f"batch {batch['id']} still processing {num_processing} nonces")
             time.sleep(1.5)
@@ -424,7 +424,7 @@ def main():
     print(f"  Algorithms Dir: {algorithms_dir}")
     print(f"  Results Dir: {results_dir}")
     print(f"  TTL: {ttl}")
-    print(f"  WORKERS: {num_workers}")
+    print(f"  Workers: {num_workers}")
     print(f"  Config: {json.dumps(config, indent=2)}")
 
     os.makedirs(algorithms_dir, exist_ok=True)

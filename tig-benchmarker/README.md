@@ -16,7 +16,7 @@ Benchmarker for TIG. Designed to run with a single master and multiple slaves di
 
 # Quick Start
 
-1. Obtain a Testnet API Key (see last section)
+1. Obtain a Testnet API Key ([instructions here](#finding-your-api-key))
    * Each new address on testnet gets 10 TIG balance
    * For more tokens, use testnet faucet at https://tigstats.com/faucet
 
