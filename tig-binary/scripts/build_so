@@ -192,6 +192,7 @@ clang "${object_files[@]}" \
     -O3 \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
+    -lm \
     -lstd \
     -Wl,--gc-sections \
     -ffunction-sections \
