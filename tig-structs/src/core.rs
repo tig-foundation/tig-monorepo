@@ -309,9 +309,16 @@ serializable_struct_with_getters! {
 }
 
 // Challenge child structs
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum ChallengeType {
+    CPU,
+    GPU,
+}
 serializable_struct_with_getters! {
     ChallengeDetails {
         name: String,
+        r#type: ChallengeType,
     }
 }
 serializable_struct_with_getters! {

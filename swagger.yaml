@@ -1045,6 +1045,9 @@ components:
       properties:
         name:
           type: string
+        type:
+          type: string
+          enum: [cpu, gpu]
     ChallengeId:
           type: string
           pattern: ^c[0-9]{3}$
@@ -1210,6 +1213,9 @@ components:
           type: object
           additionalProperties:
             type: string
+        cpu_arch:
+          type: string
+          enum: [amd64, arm64]
     Player:
       type: object
       properties:
