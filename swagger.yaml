@@ -1620,7 +1620,13 @@ components:
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
         code:
-          type: string
+          type: object
+          properties:
+            rust:
+              type: string
+            cuda:
+              type: string
+              nullable: true
     SubmitAlgorithmResponse:
       type: object
       properties:
