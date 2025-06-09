@@ -69,7 +69,7 @@ if __name__ == "__main__":
         print(
 f"""Library not found at {so_path}:
     * To download: use download_algorithm
-    * To build: use build_so and/or build_ptx
+    * To build: use build_algorithm
     * To set the lib folder: set --lib-dir <path_to_folder>
 """)
         sys.exit(1)
@@ -155,8 +155,8 @@ f"""Library not found at {so_path}:
             out = f"computing nonce {nonce}: took {elapsed}ms, "
             if ret.returncode == 0:
                 out += "found solution"
-            elif ret.returncode == 1:
-                out += f"error: {ret.stderr.strip()}"
+            elif ret.returncode == 84:
+                out += f"runtime error: {ret.stderr.strip()}"
             elif ret.returncode == 85:
                 out += "no solution found"
             elif ret.returncode == 86:
@@ -164,7 +164,7 @@ f"""Library not found at {so_path}:
             elif ret.returncode == 87:
                 out += "out of fuel"
             else:
-                out += f"unknown exit code {ret.returncode}"
+                out += f"unhandled exit code {ret.returncode}: {ret.stderr.strip()}"
             print(out)
 
     nonces = list(range(args.start, args.start + args.nonces))
