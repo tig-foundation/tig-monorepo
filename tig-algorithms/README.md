@@ -55,6 +55,7 @@ Each submissions is committed to their own branch with the naming pattern:
 5. Submitting your algorithm to Testnet:
     * Add and edit the following license header to `my_algo.rs`:
     ```
+    /*!
     Copyright [year copyright work created] [name of copyright owner]
 
     Identity of Submitter [name of person or entity that submits the Work to TIG]
@@ -71,6 +72,7 @@ Each submissions is committed to their own branch with the naming pattern:
     under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
     CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
     language governing permissions and limitations under the License.
+    */
     ```
 
     * See [Attributing Breakthroughs](#attributing-breakthroughs) for how to set UAI field
