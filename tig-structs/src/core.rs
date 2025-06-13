@@ -112,12 +112,6 @@ serializable_struct_with_getters! {
 }
 
 // Algorithm child structs
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum AlgorithmType {
-    CPU,
-    GPU,
-}
 serializable_struct_with_getters! {
     AlgorithmCode {
         rust: String,
@@ -130,7 +124,6 @@ serializable_struct_with_getters! {
         player_id: String,
         challenge_id: String,
         breakthrough_id: Option<String>,
-        r#type: AlgorithmType,
         fee_paid: PreciseNumber,
     }
 }

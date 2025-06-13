@@ -46,10 +46,6 @@ pub async fn submit_algorithm<T: Context>(
                 challenge_id,
                 player_id,
                 breakthrough_id,
-                r#type: match code.cuda {
-                    Some(_) => AlgorithmType::GPU,
-                    None => AlgorithmType::CPU,
-                },
                 fee_paid: config.algorithms.submission_fee,
             },
             code,
