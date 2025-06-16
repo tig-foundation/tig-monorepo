@@ -252,6 +252,7 @@ pub enum EmissionsType {
     Delegator,
     Bootstrap,
     Vault,
+    ChallengeOwner,
 }
 serializable_struct_with_getters! {
     BlockDetails {
@@ -262,6 +263,7 @@ serializable_struct_with_getters! {
         num_active: HashMap<ActiveType, u32>,
         timestamp: u64,
         emissions: HashMap<EmissionsType, PreciseNumber>,
+        gamma_value: f64,
     }
 }
 serializable_struct_with_getters! {

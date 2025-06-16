@@ -142,6 +142,7 @@ serializable_struct_with_getters! {
         opow: f64,
         algorithms: f64,
         breakthroughs: f64,
+        challenge_owners: f64,
     }
 }
 serializable_struct_with_getters! {

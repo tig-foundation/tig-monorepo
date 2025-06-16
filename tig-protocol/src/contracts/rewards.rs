@@ -26,7 +26,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
 
     let zero = PreciseNumber::from(0);
-    let gamma = 1.0258 * (1.0 - 0.8730 * (-0.0354 * active_challenge_ids.len() as f64).exp());
+    block_details.gamma_value =
+        1.0258 * (1.0 - 0.8730 * (-0.0354 * active_challenge_ids.len() as f64).exp());
     let block_reward = PreciseNumber::from_f64(
         config
             .rewards
@@ -42,7 +43,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             })
             .block_reward,
     );
-    let scaled_reward = block_reward * PreciseNumber::from_f64(gamma);
+    let scaled_reward = block_reward * PreciseNumber::from_f64(block_details.gamma_value.clone());
 
     // update algorithm rewards
     let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
@@ -200,6 +201,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
     }
 
+    let challenge_owners_reward_pool =
+        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.challenge_owners);
+
     block_details.emissions.insert(
         EmissionsType::Bootstrap,
         breakthroughs_reward_pool - total_breakthroughs_reward,
@@ -224,4 +228,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     block_details
         .emissions
         .insert(EmissionsType::Delegator, total_delegators_reward);
+    block_details
+        .emissions
+        .insert(EmissionsType::ChallengeOwner, challenge_owners_reward_pool);
 }
