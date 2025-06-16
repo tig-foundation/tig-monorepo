@@ -244,7 +244,7 @@ pub enum ActiveType {
     Player,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum EmissionsType {
     Benchmarker,
     Algorithm,
