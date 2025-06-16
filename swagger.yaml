@@ -849,18 +849,23 @@ components:
         emissions:
           type: object
           properties:
-              algorithms:
+              algorithm:
                 $ref: '#/components/schemas/PreciseNumber'
-              breakthroughs:
+              breakthrough:
                 $ref: '#/components/schemas/PreciseNumber'
-              benchmarkers:
+              benchmarker:
                 $ref: '#/components/schemas/PreciseNumber'
-              delegators:
+              delegator:
                 $ref: '#/components/schemas/PreciseNumber'
               bootstrap:
                 $ref: '#/components/schemas/PreciseNumber'
               vault:
                 $ref: '#/components/schemas/PreciseNumber'
+              challenge_owner:
+                $ref: '#/components/schemas/PreciseNumber'
+        gamma_value:
+          type: number
+          format: double
     BlockData:
       type: object
       properties:
@@ -1537,17 +1542,19 @@ components:
        totals:
          type: object
          properties:
-            algorithms:
+            algorithm:
               $ref: '#/components/schemas/PreciseNumber'
-            breakthroughs:
+            breakthrough:
               $ref: '#/components/schemas/PreciseNumber'
-            benchmarkers:
+            benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
-            delegators:
+            delegator:
               $ref: '#/components/schemas/PreciseNumber'
             bootstrap:
               $ref: '#/components/schemas/PreciseNumber'
             vault:
+              $ref: '#/components/schemas/PreciseNumber'
+            challenge_owner:
               $ref: '#/components/schemas/PreciseNumber'
     RequestApiKeyRequest:
       type: object
