@@ -20,7 +20,13 @@ pub async fn submit_algorithm<T: Context>(
     if !ctx
         .get_challenge_state(&challenge_id)
         .await
-        .is_some_and(|s| s.round_active <= latest_block_details.round)
+        .is_some_and(|s| {
+            s.round_active
+                <= latest_block_details.round
+                    + config.breakthroughs.vote_start_delay
+                    + config.breakthroughs.vote_period
+                    + config.algorithms.push_delay_period
+        })
     {
         return Err(anyhow!("Invalid challenge '{}'", challenge_id));
     }
