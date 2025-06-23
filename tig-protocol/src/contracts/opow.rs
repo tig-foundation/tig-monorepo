@@ -331,15 +331,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         return;
     }
 
-    for player_id in active_opow_ids.iter() {
-        let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-        opow_data.deposit = active_players_block_data[player_id]
-            .deposit_by_locked_period
-            .iter()
-            .cloned()
-            .sum();
-    }
-
     for player_id in active_player_ids.iter() {
         let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
@@ -359,21 +350,21 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let opow_data = active_opow_block_data.get_mut(delegatee).unwrap();
             if player_id == delegatee {
                 // self deposit
-                opow_data.self_weighted_deposit += player_data.weighted_deposit * fraction;
+                opow_data.weighted_self_deposit += player_data.weighted_deposit * fraction;
             } else {
                 // delegated deposit
                 opow_data.delegators.insert(player_id.clone());
-                opow_data.delegated_weighted_deposit += player_data.weighted_deposit * fraction;
+                opow_data.weighted_delegated_deposit += player_data.weighted_deposit * fraction;
             }
         }
     }
-    let total_delegated_deposit = active_opow_block_data
+    let total_weighted_delegated_deposit = active_opow_block_data
         .values()
-        .map(|d| d.delegated_weighted_deposit)
+        .map(|d| d.weighted_delegated_deposit)
         .sum::<PreciseNumber>();
-    let total_self_deposit = active_opow_block_data
+    let total_weighted_self_deposit = active_opow_block_data
         .values()
-        .map(|d| d.self_weighted_deposit)
+        .map(|d| d.weighted_self_deposit)
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
@@ -404,10 +395,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             PreciseNumber::from_f64(config.opow.max_deposit_to_qualifier_ratio);
 
         // delegated deposit factor
-        let mut delegated_deposit_factor = if total_delegated_deposit == zero {
+        let mut delegated_deposit_factor = if total_weighted_delegated_deposit == zero {
             zero.clone()
         } else {
-            opow_data.delegated_weighted_deposit / total_delegated_deposit
+            opow_data.weighted_delegated_deposit / total_weighted_delegated_deposit
         };
         if mean_challenge_factor == zero {
             delegated_deposit_factor = zero.clone();
@@ -417,10 +408,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
 
         // self deposit factor
-        let mut self_deposit_factor = if total_self_deposit == zero {
+        let mut self_deposit_factor = if total_weighted_self_deposit == zero {
             zero.clone()
         } else {
-            opow_data.self_weighted_deposit / total_self_deposit
+            opow_data.weighted_self_deposit / total_weighted_self_deposit
         };
         if mean_challenge_factor == zero {
             self_deposit_factor = zero.clone();
