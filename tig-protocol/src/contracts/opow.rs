@@ -29,20 +29,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_opow_ids = &block_data.active_ids[&ActiveType::OPoW];
 
     // update cutoffs
-    let self_deposit = active_player_ids
-        .iter()
-        .map(|player_id| {
-            (
-                player_id.clone(),
-                active_players_block_data[player_id]
-                    .deposit_by_locked_period
-                    .iter()
-                    .cloned()
-                    .sum(),
-            )
-        })
-        .collect::<HashMap<String, PreciseNumber>>();
-
     let mut phase_in_challenge_ids: HashSet<String> = active_challenge_ids.clone();
     for algorithm_id in active_algorithm_ids.iter() {
         if active_algorithms_state[algorithm_id]
@@ -62,20 +48,17 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .entry(settings.challenge_id.clone())
             .or_default() += *num_solutions;
     }
-    let deposit_to_cutoff_cap_ratio = PreciseNumber::from_f64(config.opow.deposit_to_cutoff_ratio);
     for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
         let phase_in_start = (block_details.round - 1) * config.rounds.blocks_per_round;
         let phase_in_period = config.opow.cutoff_phase_in_period;
         let phase_in_end = phase_in_start + phase_in_period;
-        let cutoff_cap = (self_deposit[player_id] / deposit_to_cutoff_cap_ratio).to_f64() as u32;
         let min_num_solutions = active_challenge_ids
             .iter()
             .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
             .min()
             .unwrap();
-        let mut cutoff = cutoff_cap
-            .min((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32);
+        let mut cutoff = (min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32;
         if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
             let phase_in_min_num_solutions = active_challenge_ids
                 .iter()
@@ -83,9 +66,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
                 .min()
                 .unwrap();
-            let phase_in_cutoff = cutoff_cap.min(
-                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
-            );
+            let phase_in_cutoff =
+                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32;
             let phase_in_weight =
                 (phase_in_end - block_details.height) as f64 / phase_in_period as f64;
             cutoff = (phase_in_cutoff as f64 * phase_in_weight
@@ -351,23 +333,21 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     for player_id in active_opow_ids.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-        opow_data.self_deposit = self_deposit[player_id].clone();
+        opow_data.deposit = active_players_block_data[player_id]
+            .deposit_by_locked_period
+            .iter()
+            .cloned()
+            .sum();
     }
 
     for player_id in active_player_ids.iter() {
         let player_data = active_players_block_data.get_mut(player_id).unwrap();
         let player_state = &active_players_state[player_id];
-        if active_opow_ids.contains(player_id) {
-            // benchmarkers self-delegate 100% to themselves
-            player_data.delegatees = HashMap::from([(player_id.clone(), 1.0)]);
-        } else if let Some(delegatees) = &player_state.delegatees {
+        if let Some(delegatees) = &player_state.delegatees {
             player_data.delegatees = delegatees
                 .value
                 .iter()
-                .filter(|(delegatee, _)| {
-                    active_opow_ids.contains(delegatee.as_str())
-                        && self_deposit[delegatee.as_str()] >= config.deposits.delegatee_min_deposit
-                })
+                .filter(|(delegatee, _)| active_opow_ids.contains(delegatee.as_str()))
                 .map(|(delegatee, fraction)| (delegatee.clone(), *fraction))
                 .collect();
         } else {
@@ -377,13 +357,23 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         for (delegatee, fraction) in player_data.delegatees.iter() {
             let fraction = PreciseNumber::from_f64(*fraction);
             let opow_data = active_opow_block_data.get_mut(delegatee).unwrap();
-            opow_data.delegators.insert(player_id.clone());
-            opow_data.delegated_weighted_deposit += player_data.weighted_deposit * fraction;
+            if player_id == delegatee {
+                // self deposit
+                opow_data.self_weighted_deposit += player_data.weighted_deposit * fraction;
+            } else {
+                // delegated deposit
+                opow_data.delegators.insert(player_id.clone());
+                opow_data.delegated_weighted_deposit += player_data.weighted_deposit * fraction;
+            }
         }
     }
-    let total_deposit = active_opow_block_data
+    let total_delegated_deposit = active_opow_block_data
         .values()
         .map(|d| d.delegated_weighted_deposit)
+        .sum::<PreciseNumber>();
+    let total_self_deposit = active_opow_block_data
+        .values()
+        .map(|d| d.self_weighted_deposit)
         .sum::<PreciseNumber>();
 
     let zero = PreciseNumber::from(0);
@@ -409,28 +399,45 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             });
         }
 
-        let mut deposit_factor = if total_deposit == zero {
-            zero.clone()
-        } else {
-            opow_data.delegated_weighted_deposit / total_deposit
-        };
         let mean_challenge_factor = challenge_factors.arithmetic_mean();
         let max_deposit_to_qualifier_ratio =
             PreciseNumber::from_f64(config.opow.max_deposit_to_qualifier_ratio);
+
+        // delegated deposit factor
+        let mut delegated_deposit_factor = if total_delegated_deposit == zero {
+            zero.clone()
+        } else {
+            opow_data.delegated_weighted_deposit / total_delegated_deposit
+        };
         if mean_challenge_factor == zero {
-            deposit_factor = zero.clone();
-        } else if deposit_factor / mean_challenge_factor > max_deposit_to_qualifier_ratio {
-            deposit_factor = mean_challenge_factor * max_deposit_to_qualifier_ratio;
+            delegated_deposit_factor = zero.clone();
+        } else if delegated_deposit_factor / mean_challenge_factor > max_deposit_to_qualifier_ratio
+        {
+            delegated_deposit_factor = mean_challenge_factor * max_deposit_to_qualifier_ratio;
         }
 
+        // self deposit factor
+        let mut self_deposit_factor = if total_self_deposit == zero {
+            zero.clone()
+        } else {
+            opow_data.self_weighted_deposit / total_self_deposit
+        };
+        if mean_challenge_factor == zero {
+            self_deposit_factor = zero.clone();
+        } else if self_deposit_factor / mean_challenge_factor > max_deposit_to_qualifier_ratio {
+            self_deposit_factor = mean_challenge_factor * max_deposit_to_qualifier_ratio;
+        }
+
+        let deposit_multiplier = PreciseNumber::from_f64(config.opow.deposit_multiplier);
         let sum_challenge_factors: PreciseNumber = challenge_factors.iter().cloned().sum();
         let weighted_mean = (sum_challenge_factors
-            + deposit_factor * PreciseNumber::from_f64(config.opow.deposit_multiplier))
+            + (delegated_deposit_factor + self_deposit_factor) * deposit_multiplier)
             / PreciseNumber::from_f64(
-                active_challenge_ids.len() as f64 + config.opow.deposit_multiplier,
+                active_challenge_ids.len() as f64 + config.opow.deposit_multiplier * 2.0,
             );
         let mut all_factors = challenge_factors;
-        all_factors.push(deposit_factor);
+        all_factors.push(self_deposit_factor);
+        all_factors.push(delegated_deposit_factor);
         let mean = all_factors.arithmetic_mean();
         let variance = all_factors.variance();
         let cv_sqr = if mean == zero {

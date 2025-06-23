@@ -374,7 +374,8 @@ serializable_struct_with_getters! {
     OPoWBlockData {
         num_qualifiers_by_challenge: HashMap<String, u32>,
         cutoff: u32,
-        self_deposit: PreciseNumber,
+        deposit: PreciseNumber,
+        self_weighted_deposit: PreciseNumber,
         delegated_weighted_deposit: PreciseNumber,
         delegators: HashSet<String>,
         reward_share: PreciseNumber,

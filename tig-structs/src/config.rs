@@ -48,7 +48,6 @@ serializable_struct_with_getters! {
         default_reward_share: f64,
         reward_share_update_period: u32,
         delegatees_update_period: u32,
-        delegatee_min_deposit: PreciseNumber,
         max_delegations: usize,
         token_locker_weight: u32,
     }
@@ -111,7 +110,6 @@ serializable_struct_with_getters! {
         total_qualifiers_threshold: u32,
         max_deposit_to_qualifier_ratio: f64,
         deposit_multiplier: f64,
-        deposit_to_cutoff_ratio: f64,
         max_coinbase_outputs: usize,
         coinbase_update_period: u32,
         min_num_nonces: u32,
