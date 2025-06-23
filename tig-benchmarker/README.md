@@ -20,9 +20,9 @@ Benchmarker for TIG. Designed to run with a single master and multiple slaves di
    * Each new address on testnet gets 10 TIG balance
    * For more tokens, use testnet faucet at https://tigstats.com/faucet
 
-2. Clone this repo
+2. Clone this repo (`blank_slate` branch)
     ```
-    git clone https://github.com/tig-foundation/tig-monorepo
+    git clone https://github.com/tig-foundation/tig-monorepo -b blank_slate
     cd tig-monorepo/tig-benchmarker
     ```
 
