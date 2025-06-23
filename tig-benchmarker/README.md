@@ -92,7 +92,7 @@ Benchmarker for TIG. Designed to run with a single master and multiple slaves di
   ```
   docker-compose -f slave.yml up slave [challenge] .. [challenge]
   ```
-  * CPU challenges include: `satisfiability`, `vehicle_routing`, and `knapsack`U
+  * CPU challenges include: `satisfiability`, `vehicle_routing`, and `knapsack`
   * GPU challenges (requires CUDA 12.6.3+) include: `vector_search`, and `hypergraph`
   * `slave/config.json` controls how many algorithms are ran concurrently
 

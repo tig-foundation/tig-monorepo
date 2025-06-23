@@ -142,7 +142,7 @@ class DifficultySampler:
             c_name = self.challenge_id_2_name[c_id]
 
             if len(selected_difficulties := config["selected_difficulties"]) > 0:
-                valid_difficulties = set(tuple(d) for d in self.valid_difficulties[c_name])
+                valid_difficulties = set(tuple(d) for d in self.valid_difficulties[c_id])
                 selected_difficulties = [tuple(d) for d in selected_difficulties]
                 selected_difficulties = [
                     d for d in selected_difficulties if d in valid_difficulties
