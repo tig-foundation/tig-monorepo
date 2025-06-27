@@ -442,6 +442,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     ProofState {
         block_confirmed: u32,
+        block_verifying: Option<u32>,
     }
 }
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]

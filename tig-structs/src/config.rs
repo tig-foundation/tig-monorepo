@@ -69,6 +69,7 @@ serializable_struct_with_getters! {
         runtime_config: RuntimeConfig,
         target_solution_rate: u32,
         hash_threshold_max_percent_delta: f64,
+        prune_unverified_proof_period: u32,
     }
 }
 serializable_struct_with_getters! {
