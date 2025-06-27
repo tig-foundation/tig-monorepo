@@ -55,7 +55,11 @@ class DataFetcher:
         benchmarks = {b["id"]: Benchmark.from_dict(b) for b in benchmarks_data["benchmarks"]}
         proofs = {p["benchmark_id"]: Proof.from_dict(p) for p in benchmarks_data["proofs"]}
         frauds = {f["benchmark_id"]: Fraud.from_dict(f) for f in benchmarks_data["frauds"]}        
-        challenges = {c["id"]: Challenge.from_dict(c) for c in challenges_data["challenges"]}
+        challenges = {
+            c["id"]: Challenge.from_dict(c) 
+            for c in challenges_data["challenges"]
+            if c["state"]["round_active"] <= block.details.round
+        }
         
         # Fetch difficulty data for each challenge
         difficulty_urls = [
