@@ -195,25 +195,26 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             Some(ids) => ids,
         };
 
-        let mut weights = Vec::<PreciseNumber>::new();
+        let mut raw_adoptions = Vec::<PreciseNumber>::new();
         for algorithm_id in algorithm_ids.iter() {
-            let mut weight = PreciseNumber::from(0);
-            for (player_id, &num_qualifiers) in active_algorithms_block_data[algorithm_id]
-                .num_qualifiers_by_player
+            let mut raw_adoption = PreciseNumber::from(0);
+            for (player_id, &num_solutions) in active_algorithms_block_data[algorithm_id]
+                .num_solutions_by_player
                 .iter()
             {
-                let num_qualifiers = PreciseNumber::from(num_qualifiers);
+                let num_solutions = PreciseNumber::from(num_solutions);
                 let opow_data = &active_opow_block_data[player_id];
-                let player_num_qualifiers =
+                let player_num_solutions =
                     PreciseNumber::from(opow_data.num_qualifiers_by_challenge[challenge_id]);
 
-                weight = weight + opow_data.influence * num_qualifiers / player_num_qualifiers;
+                raw_adoption =
+                    raw_adoption + opow_data.influence * num_solutions / player_num_solutions;
             }
-            weights.push(weight);
+            raw_adoptions.push(raw_adoption);
         }
 
-        let adoption = weights.normalise();
-        for (algorithm_id, adoption) in algorithm_ids.iter().zip(adoption) {
+        let adoptions = raw_adoptions.normalise();
+        for (algorithm_id, adoption) in algorithm_ids.iter().zip(adoptions) {
             active_algorithms_block_data
                 .get_mut(algorithm_id)
                 .unwrap()

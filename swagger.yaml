@@ -627,7 +627,7 @@ components:
     AlgorithmBlockData:
       type: object
       properties:
-        num_qualifiers_by_player:
+        num_solutions_by_player:
           type: object
           additionalProperties:
             type: integer
@@ -1169,6 +1169,12 @@ components:
             type: integer
             format: uint32
           example: {"c001": 5, "c002": 3}
+        num_solutions_by_challenge:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint32
+          example: {"c001": 5, "c002": 3}
         solution_ratio_by_challenge:
           type: object
           additionalProperties:
@@ -1176,11 +1182,17 @@ components:
             format: number
           example: {"c001": 0.001, "c002": 0.5}
         cutoff:
-          type: integer
-          format: uint32
-        self_deposit:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint32
+          example: {"c001": 10, "c002": 50}
+        ema_percent_qualifiers:
+          type: number
+          format: double
+        weighted_self_deposit:
           $ref: '#/components/schemas/PreciseNumber'
-        delegated_weighted_deposit:
+        weighted_delegated_deposit:
           $ref: '#/components/schemas/PreciseNumber'
         delegators:
           type: array

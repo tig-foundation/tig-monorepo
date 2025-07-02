@@ -139,7 +139,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     AlgorithmBlockData {
-        num_qualifiers_by_player: HashMap<String, u32>,
+        num_solutions_by_player: HashMap<String, u32>,
         adoption: PreciseNumber,
         merge_points: u32,
         reward: PreciseNumber,
@@ -230,7 +230,7 @@ pub enum TxType {
     Precommit,
     Proof,
     TopUp,
-    Verified,
+    Verifying,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -373,7 +373,9 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     OPoWBlockData {
         num_qualifiers_by_challenge: HashMap<String, u32>,
-        cutoff: u32,
+        num_solutions_by_challenge: HashMap<String, u32>,
+        cutoff: HashMap<String, u32>,
+        ema_percent_qualifiers: f64,
         weighted_self_deposit: PreciseNumber,
         weighted_delegated_deposit: PreciseNumber,
         delegators: HashSet<String>,

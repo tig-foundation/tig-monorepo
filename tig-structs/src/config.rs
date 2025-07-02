@@ -106,8 +106,10 @@ impl MinMaxDifficulty for Vec<DifficultyParameter> {
 serializable_struct_with_getters! {
     OPoWConfig {
         imbalance_multiplier: f64,
-        cutoff_phase_in_period: u32,
+        challenge_phase_in_period: u32,
+        min_solutions_and_cutoff: u32,
         cutoff_multiplier: f64,
+        ema_decay: f64,
         total_qualifiers_threshold: u32,
         max_deposit_to_qualifier_ratio: f64,
         deposit_multiplier: f64,
