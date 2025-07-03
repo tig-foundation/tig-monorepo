@@ -77,17 +77,17 @@ class JobManager:
 
             bin = binarys.get(x.settings.algorithm_id, None)
             if bin is None:
-                logger.error(f"batch {x.id}: no binary-blob found for {x.settings.algorithm_id}. skipping job")
+                logger.error(f"batch {x.benchmark_id}: no binary-blob found for {x.settings.algorithm_id}. skipping job")
                 continue
             if bin.details.download_url is None:
-                logger.error(f"batch {x.id}: no download_url found for {bin.algorithm_id}. skipping job")
+                logger.error(f"batch {x.benchmark_id}: no download_url found for {bin.algorithm_id}. skipping job")
                 continue
             batch_size = next(
                 (s["batch_size"] for s in algo_selection if s["algorithm_id"] == x.settings.algorithm_id),
                 None
             )
             if batch_size is None:
-                logger.error(f"batch {x.id}: no batch size found for {x.settings.algorithm_id}. skipping job")
+                logger.error(f"batch {x.benchmark_id}: no batch size found for {x.settings.algorithm_id}. skipping job")
                 continue
             num_batches = math.ceil(x.details.num_nonces / batch_size)
             atomic_inserts = [
