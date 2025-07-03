@@ -149,15 +149,18 @@ class DifficultySampler:
                 ]
             
             if len(selected_difficulties) > 0:
-                random.shuffle(selected_difficulties)
-                samples[c_name] = selected_difficulties[0]
-                logger.debug(f"Selected difficulty {samples[c_name]} for challenge {c_name}")
+                samples[a_id] = random.choice(selected_difficulties)
+                logger.debug(f"Selected difficulty {samples[a_id]} for algorithm {a_id} in challenge {c_name}")
                 found_valid = True
             else:
-                logger.debug(f"No valid difficulties found for {c_name} - skipping selected difficulties")
+                logger.debug(f"No selected difficulties in valid range for algorithm {a_id}")
 
             if not found_valid:
-                if config["difficulty_range"] is None:
+                if (
+                    config["difficulty_range"] is None or
+                    len(config["difficulty_range"]) == 0
+                ):
+                    logger.debug(f"difficulty_range not set for algorithm {a_id} - picking random difficulty from entire range")
                     valid_difficulties = self.valid_difficulties[c_id]
                     difficulty = random.choice(valid_difficulties)
                 else:
