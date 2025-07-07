@@ -53,6 +53,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             phase_in_challenge_ids.remove(&active_algorithms_details[algorithm_id].challenge_id);
         }
     }
+    phase_in_challenge_ids.insert("c004".to_string());
 
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
     for (settings, num_solutions, _, _) in active_solutions.iter() {
