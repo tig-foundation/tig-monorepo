@@ -122,17 +122,17 @@ pub fn compute_solution(
                 let runtime_signature =
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
                 let (solution, invalid_reason) = match result {
-                    Some(s) => (
-                        serde_json::to_value(&s)
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .to_owned(),
-                        match challenge.verify_solution(&s) {
-                            Ok(_) => None,
-                            Err(e) => Some(e.to_string()),
-                        },
-                    ),
+                    Some(s) => match challenge.verify_solution(&s) {
+                        Ok(_) => (
+                            serde_json::to_value(&s)
+                                .unwrap()
+                                .as_object()
+                                .unwrap()
+                                .to_owned(),
+                            None,
+                        ),
+                        Err(e) => (Solution::new(), Some(e.to_string())),
+                    },
                     None => (Solution::new(), None),
                 };
 
@@ -242,17 +242,19 @@ pub fn compute_solution(
                     ^ unsafe { **library.get::<*const u64>(b"__runtime_signature")? });
 
                 let (solution, invalid_reason) = match result {
-                    Some(s) => (
-                        serde_json::to_value(&s)
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .to_owned(),
+                    Some(s) => {
                         match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
-                            Ok(_) => None,
-                            Err(e) => Some(e.to_string()),
-                        },
-                    ),
+                            Ok(_) => (
+                                serde_json::to_value(&s)
+                                    .unwrap()
+                                    .as_object()
+                                    .unwrap()
+                                    .to_owned(),
+                                None,
+                            ),
+                            Err(e) => (Solution::new(), Some(e.to_string())),
+                        }
+                    }
                     None => (Solution::new(), None),
                 };
 
