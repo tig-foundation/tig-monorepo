@@ -9,7 +9,7 @@ Benchmarker for TIG. Designed to run with a single master and multiple slaves di
 3. [Configuration Details](#configuration-details)
    * [.env file](#env-file)
    * [Master Config](#master-config)
-   * [Slave Config](#slave-config)
+   * [Tips](#tips)
 4. [Hard Resetting](#hard-resetting)
 5. [Finding your API Key](#finding-your-api-key)
 6. [License](#license)
@@ -188,47 +188,65 @@ The master config defines how benchmarking jobs are selected, scheduled, and dis
   * `weight`: Selection weight. An algorithm is chosen proportionally to `weight / total_weight`
   * `batch_size`: Number of nonces per batch. Must be a power of 2. For example, if num_nonces = 40 and batch_size = 8, the benchmark is split into 5 batches
 
-## Slave Config
+## Tips
 
-The slave config lives under `slave/config.json`. It controls concurrency for algorithms using cost limits:
+When benchmarking, you’ll likely want to run CPU and GPU algorithms on different servers. Below are examples for each case:
 
-```json
-{
-    "max_cost": 100,
-    "algorithms": [
-        {
-            "id_regex": ".*",
-            "cost": 1.0
-        }
-    ]
-}
+### Running a Slave with CPU Challenges
+
+```bash
+docker-compose -f slave.yml up slave satisfiability vehicle_routing knapsack
 ```
 
-**Explanation:**
-* `max_cost`: maximum total "cost" of running algorithms.
-* `algorithms`: rules for matching algorithms based on `id_regex`.
-    * Regex matches algorithm ids (e.g., `c004_a[\d3]` matches all vector_search algorithms).
-    * An algorithm only starts running if the total cost is below the limit
-
-**Example:**
-
-This example means that up to 10 satisfiability (c001) algorithms can be ran concurrently, or up to 5 vehicle_routing (c002) algorithms, or some combination of both:
-
-```json
-{
-    "max_cost": 10,
-    "algorithms": [
-        {
-            "id_regex": "c001.*",
-            "cost": 1.0
-        },
-        {
-            "id_regex": "c002.*",
-            "cost": 2.0
-        }
-    ]
-}
+### Running a Slave with GPU Challenges
 ```
+docker-compose -f slave.yml up slave vector_search hypergraph
+```
+> Note: GPU challenges require CUDA 12.6.3+ installed on the host.
+
+### Configuring the Master to Route Batches
+
+In your master config, you can route algorithms to different slaves based on their names and algorithm_ids. The example below routes CPU challenges to slaves with name starting with `cpu-`, and GPU challenges to slaves with name starting with `gpu-`:
+```
+"slaves": [
+  {
+    "name_regex": "cpu-.*",
+    "algorithm_id_regex": "c00[123].*",
+    "max_concurrent_batches": 1
+  },
+  {
+    "name_regex": "gpu-.*",
+    "algorithm_id_regex": "c00[45].*",
+    "max_concurrent_batches": 1
+  }
+]
+```
+
+For this to work, names of slaves must match the regex by editing the `.env` file. Example:
+```
+SLAVE_NAME=cpu-server-01 
+```
+
+### Listing Available Algorithms
+
+After launching a slave, you can list the available algorithms (and their ids) using:
+```
+docker exec <challenge_container_name> list_algorithms
+```
+
+Example output:
+```
+# docker exec satisfiability list_algorithms
+...
+id: c001_a056    name: sat_maximize_high    status: active with 0 merge points
+id: c001_a057    name: sat_separate_vav     status: active with 0 merge points
+id: c001_a058    name: sat_hybrid_vav       status: active with 0 merge points
+id: c001_a059    name: sat_unified          status: merged @ round 62
+id: c001_a060    name: sat_unified_opt      status: merged @ round 71
+id: c001_a061    name: better_sat           status: merged @ round 65
+id: c001_a062    name: even_better_sat      status: active with 0 merge points
+```
+This is helpful when updating the `algorithm_id_regex` field in your master config.
 
 # Hard Resetting
 
