@@ -26,7 +26,6 @@ PENDING_BATCH_IDS = set()
 PROCESSING_BATCH_IDS = {}
 READY_BATCH_IDS = set()
 FINISHED_BATCH_IDS = {}
-TOTAL_COST = [0]
 if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
     CPU_ARCH = "amd64"
 elif CPU_ARCH in ["arm64", "aarch64"]:
@@ -272,7 +271,7 @@ def send_results(headers, master_ip, master_port, results_dir):
             time.sleep(2)
 
 
-def process_batch(algorithms_dir, config, results_dir):
+def process_batch(algorithms_dir, results_dir):
     try:
         batch_id = PENDING_BATCH_IDS.pop()
     except KeyError:
@@ -299,17 +298,6 @@ def process_batch(algorithms_dir, config, results_dir):
         logger.error(f"Error processing batch {batch_id}: Challenge container {batch['challenge']} not found. Did you start it with 'docker-compose up {batch['challenge']}'?")
         return
     
-    c = next(
-        (
-            x for x in config["algorithms"]
-            if re.match(x["id_regex"], batch["settings"]["algorithm_id"])
-        ),
-        None
-    )
-    if c is None:
-        logger.error(f"Error processing batch {batch_id}: Algorithm {batch['settings']['algorithm_id']} does not match any regex in the config")
-        return
-    
     q = Queue()
     for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
         q.put(n)
@@ -321,37 +309,32 @@ def process_batch(algorithms_dir, config, results_dir):
         "ptx_path": ptx_path,
         "q": q,
         "finished": set(),
-        "cost": c["cost"],
         "start": now(),
     }
 
     
-def process_nonces(config, results_dir):
+def process_nonces(results_dir):
     for batch_id in list(PROCESSING_BATCH_IDS):
         job = PROCESSING_BATCH_IDS[batch_id]        
         q = job["q"]
         batch = job["batch"]
         so_path = job["so_path"]
         ptx_path = job["ptx_path"]
-        cost = job["cost"]
-        if TOTAL_COST[0] + cost <= config["max_cost"]:
-            try:
-                nonce = q.get_nowait()
-                break
-            except:
-                continue
+        try:
+            nonce = q.get_nowait()
+            break
+        except:
+            continue
     else:
         time.sleep(1)
         return
     
-    TOTAL_COST[0] += cost
-    logger.debug(f"batch {batch_id}, nonce {nonce} started: (cost {cost})")
+    logger.debug(f"batch {batch_id}, nonce {nonce} started")
     try:
         run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir)
     except Exception as e:
         logger.error(f"batch {batch_id}, nonce {nonce}, runtime error: {e}")
     finally:
-        TOTAL_COST[0] -= cost
         job["finished"].add(nonce)
 
 
@@ -393,18 +376,7 @@ def wrap_thread(func, *args):
             time.sleep(5)
 
 
-def main():
-    config_path = "config.json"
-    if not os.path.exists(config_path):
-        logger.error(f"Config file not found at path: {config_path}")
-        sys.exit(1)
-    try:
-        with open(config_path) as f:
-            config = json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading config file: {e}")
-        sys.exit(1)
-    
+def main():    
     slave_name = os.getenv("SLAVE_NAME") or randomname.get_name()
     master_ip = os.getenv("MASTER_IP") or "0.0.0.0"
     if (master_port := os.getenv("MASTER_PORT")) is None:
@@ -425,7 +397,6 @@ def main():
     print(f"  Results Dir: {results_dir}")
     print(f"  TTL: {ttl}")
     print(f"  Workers: {num_workers}")
-    print(f"  Config: {json.dumps(config, indent=2)}")
 
     os.makedirs(algorithms_dir, exist_ok=True)
 
@@ -435,13 +406,13 @@ def main():
 
     Thread(
         target=wrap_thread,
-        args=(process_batch, algorithms_dir, config, results_dir)
+        args=(process_batch, algorithms_dir, results_dir)
     ).start()
 
     for _ in range(num_workers):
         Thread(
             target=wrap_thread, 
-            args=(process_nonces, config, results_dir)
+            args=(process_nonces, results_dir)
         ).start()
 
     Thread(

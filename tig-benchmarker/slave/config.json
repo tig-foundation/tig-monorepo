@@ -1,9 +1,0 @@
-{
-    "max_cost": 8.0,
-    "algorithms": [
-        {
-            "id_regex": ".*",
-            "cost": 1.0
-        }
-    ]
-}
