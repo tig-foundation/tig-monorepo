@@ -119,8 +119,6 @@ MASTER_PORT=5115
 # This is used by slave to connect to master. Set to 172.17.0.1 if master and slave are running on same server
 MASTER_IP=172.17.0.1
 
-# Path to config file for slave. Mounts to /app/config.json inside slave container
-SLAVE_CONFIG=./slave/config.json
 # Directory for slave to download algorithms. Mounts to /app/algorithms inside slave containers
 ALGORITHMS_DIR=./algorithms
 # Directory for slave to store results. Mounts to /app/results inside slave containers

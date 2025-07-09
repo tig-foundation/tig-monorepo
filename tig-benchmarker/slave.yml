@@ -16,7 +16,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${ALGORITHMS_DIR}:/app/algorithms
       - ${RESULTS_DIR}:/app/results
-      - ${SLAVE_CONFIG}:/app/config.json
     environment:
       - VERBOSE=${VERBOSE}
       - SLAVE_NAME=${SLAVE_NAME}
