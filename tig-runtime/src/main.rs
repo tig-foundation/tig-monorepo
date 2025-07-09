@@ -231,20 +231,18 @@ pub fn compute_solution(
                     break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
                 }
                 let gpu_fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
-                // let cpu_fuel_consumed =
-                //     max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
-                // let fuel_consumed = gpu_fuel_consumed + cpu_fuel_consumed;
-                let fuel_consumed = gpu_fuel_consumed;
+                let cpu_fuel_consumed =
+                    max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                let fuel_consumed = gpu_fuel_consumed + cpu_fuel_consumed;
 
                 if fuel_consumed > max_fuel {
                     break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
                 }
 
                 let gpu_runtime_signature = stream.memcpy_dtov(&signature)?[0];
-                // let cpu_runtime_signature =
-                //     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-                // let runtime_signature = gpu_runtime_signature ^ cpu_runtime_signature;
-                let runtime_signature = gpu_runtime_signature;
+                let cpu_runtime_signature =
+                    unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                let runtime_signature = gpu_runtime_signature ^ cpu_runtime_signature;
 
                 let (solution, invalid_reason) = match result {
                     Some(s) => {

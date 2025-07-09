@@ -54,23 +54,60 @@ pid_files=()
 pid_objs=()
 max_jobs=$(nproc)
 
+cuda_whitelist_files=(
+    "std-"
+    "tig_challenges"
+    "tig_binary"
+    "tig_algorithms"
+)
+
 # Process a single file
 process_file() {
     local ll_file="$1"
     local is_first=$2
     local temp_obj="$3"
-    
+    local is_cuda=$4
+
+    if [ $is_cuda -eq 1 ]; then
+        file_in_whitelist=0
+        for whitelist_file in "${cuda_whitelist_files[@]}"; do
+            if [[ "$ll_file" == *"$whitelist_file"* ]]; then
+                file_in_whitelist=1
+                break
+            fi
+        done
+        
+        if [ $file_in_whitelist -eq 0 ]; then
+            echo "Skipping $ll_file (not in whitelist)"
+
+            cat "$ll_file" | \
+            llc -relocation-model=pic -o - | \
+            clang -fPIC -c -x assembler - -o "$temp_obj"
+            
+            return 0
+        fi
+    fi
+
     echo "Processing $ll_file"
-    
+
     cat "$ll_file" | \
     IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
-        -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
-        -passes="fuel-rt-sig" -S -o - | \
+            -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
+            -passes="fuel-rt-sig" -S -o - | \
     llc -relocation-model=pic -o - | \
     clang -fPIC -c -x assembler - -o "$temp_obj"
     
     return $?
 }
+
+is_cuda=0
+for ll_file in "${ll_files[@]}"
+do
+    if [[ "$ll_file" == *"cudarc"* ]]; then
+        is_cuda=1
+        break
+    fi
+done
 
 # Launch processes up to max_jobs
 for ll_file in "${ll_files[@]}"
@@ -79,7 +116,7 @@ do
     temp_objs+=("$temp_obj")
     
     # Set IS_FIRST_SRC flag - first file gets 1, all others get 0
-    if [ "$ll_file" = "${ll_files[0]}" ]
+    if [[ "$ll_file" == *"tig_challenges-"* ]]
     then
         is_first=1
     else
@@ -87,7 +124,7 @@ do
     fi
     
     # Launch in background
-    process_file "$ll_file" $is_first "$temp_obj" &
+    process_file "$ll_file" $is_first "$temp_obj" $is_cuda &
     pid=$!
     
     # Store associations
