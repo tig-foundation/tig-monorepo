@@ -312,7 +312,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 }
                 _ => 1.0,
             };
-            let scaled_frontier = base_frontier.clone();
+            let mut scaled_frontier = scale_frontier(
+                &base_frontier,
+                &min_difficulty,
+                &max_difficulty,
+                scaling_factor,
+            );
+            scaled_frontier = extend_frontier(&scaled_frontier, &min_difficulty, &max_difficulty);
             (base_frontier, scaling_factor, scaled_frontier)
         } else {
             let mut base_frontier = pareto_algorithm(&points, true)
