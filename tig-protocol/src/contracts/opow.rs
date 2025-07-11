@@ -302,7 +302,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .collect::<Frontier>();
         let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 {
             let base_frontier: Frontier = vec![min_difficulty.clone()].into_iter().collect();
-            let scaling_factor = 1.0;
+            let scaling_factor = match challenge_id.as_str() {
+                "c002" | "c003" => config.challenges.max_scaling_factor,
+                _ => 1.0,
+            };
             let scaled_frontier = base_frontier.clone();
             (base_frontier, scaling_factor, scaled_frontier)
         } else {
@@ -326,7 +329,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     scaling_factor,
                 );
                 base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
-                scaling_factor = (1.0 / scaling_factor).min(config.challenges.max_scaling_factor);
+                scaling_factor = match challenge_id.as_str() {
+                    "c002" | "c003" => config.challenges.max_scaling_factor,
+                    _ => (1.0 / scaling_factor).min(config.challenges.max_scaling_factor),
+                };
             }
 
             let mut scaled_frontier = scale_frontier(
