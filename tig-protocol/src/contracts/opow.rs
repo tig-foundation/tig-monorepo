@@ -303,7 +303,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 {
             let base_frontier: Frontier = vec![min_difficulty.clone()].into_iter().collect();
             let scaling_factor = match challenge_id.as_str() {
-                "c002" | "c003" => config.challenges.max_scaling_factor,
+                "c002" | "c003" => {
+                    if block_details.height <= 737280 {
+                        config.challenges.max_scaling_factor
+                    } else {
+                        1.0
+                    }
+                }
                 _ => 1.0,
             };
             let scaled_frontier = base_frontier.clone();
@@ -330,7 +336,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 );
                 base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
                 scaling_factor = match challenge_id.as_str() {
-                    "c002" | "c003" => config.challenges.max_scaling_factor,
+                    "c002" | "c003" => {
+                        if block_details.height <= 737280 {
+                            config.challenges.max_scaling_factor
+                        } else {
+                            (1.0 / scaling_factor).min(config.challenges.max_scaling_factor)
+                        }
+                    }
                     _ => (1.0 / scaling_factor).min(config.challenges.max_scaling_factor),
                 };
             }
