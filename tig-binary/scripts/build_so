@@ -88,10 +88,13 @@ process_file() {
         fi
     fi
 
+
+    local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
+    
     echo "Processing $ll_file"
 
     cat "$ll_file" | \
-    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
+    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
             -passes="fuel-rt-sig" -S -o - | \
     llc -relocation-model=pic -o - | \
@@ -230,7 +233,6 @@ EOF
 clang "${object_files[@]}" \
     -shared \
     -fPIC \
-    -O3 \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
     -lm \
