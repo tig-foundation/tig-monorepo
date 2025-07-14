@@ -220,6 +220,10 @@ cat > export_symbols.map << 'EOF'
     entry_point;
     __fuel_remaining;
     __runtime_signature;
+    __curr_memory_usage;
+    __total_memory_usage;
+    __max_memory_usage;
+    __max_allowed_memory_usage;
   local: *;
 };
 EOF
