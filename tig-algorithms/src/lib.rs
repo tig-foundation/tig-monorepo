@@ -31,3 +31,7 @@ pub use vector_search as c004;
 pub mod hypergraph;
 #[cfg(feature = "c005")]
 pub use hypergraph as c005;
+#[cfg(feature = "c006")]
+pub mod nn_training;
+#[cfg(feature = "c006")]
+pub use nn_training as c006;

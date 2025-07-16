@@ -237,6 +237,7 @@ $NORMAL_EXIT:
 def main():
     parser = argparse.ArgumentParser(description='Compile PTX with injected runtime signature')
     parser.add_argument('algorithm', help='Algorithm name')
+    parser.add_argument('--extra-cu-files', nargs='*', default=[], help='Additional .cu files to include in the compilation')
     
     args = parser.parse_args()
 
@@ -272,6 +273,11 @@ def main():
             code = f.read() + "\n"
         with open(challenge_cu, 'r') as f:
             code += f.read() + "\n"
+        for extra_cu in args.extra_cu_files:
+            if not os.path.exists(extra_cu):
+                raise FileNotFoundError(f"Extra .cu file does not exist: {extra_cu}")
+            with open(extra_cu, 'r') as f:
+                code += f.read() + "\n"
         kernel_regex = r'(?:extern\s+"C"\s+__global__|__device__)\s+\w+\s+(?P<func>\w+)\s*\('
         kernels_to_ignore = [match.group('func') for match in re.finditer(kernel_regex, code)]
         with open(algorithm_cu, 'r') as f:
