@@ -95,7 +95,7 @@ f"""Library not found at {so_path}:
         "knapsack": "c003",
         "vector_search": "c004",
         "hypergraph": "c005",
-        "optimiser": "c006",
+        "nn_training": "c006",
     }
     challenge_id = challenge_ids[CHALLENGE]
 
