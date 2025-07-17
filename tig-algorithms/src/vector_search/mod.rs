@@ -4,7 +4,8 @@
 
 // c004_a003
 
-// c004_a004
+pub mod inbound;
+pub use inbound as c004_a004;
 
 // c004_a005
 
