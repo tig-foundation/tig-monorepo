@@ -143,7 +143,7 @@ pub fn compute_solution(
     let mut background_thread: Option<std::thread::JoinHandle<()>> = None;
     #[cfg(feature = "cuda")]
     {
-        let current_memory_usage = unsafe { *library.get::<*mut u64>(b"__current_memory_usage")? };
+        let current_memory_usage = unsafe { *library.get::<*mut u64>(b"__curr_memory_usage")? };
         let max_host_memory = memory_limit.unwrap_or(0xffffffffffffffff);
         let max_device_memory = max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff);
 
