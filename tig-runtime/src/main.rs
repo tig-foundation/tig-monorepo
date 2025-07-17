@@ -50,8 +50,16 @@ fn cli() -> Command {
             .action(ArgAction::SetTrue)
         )
         .arg(
+            arg!(--memory_limit [MEMORY_LIMIT] "Optional maximum memory parameter (host)")
+                .value_parser(clap::value_parser!(u64)),
+        )
+        .arg(
             arg!(--gpu [GPU] "Which GPU device to use")
                 .value_parser(clap::value_parser!(usize)),
+        )
+        .arg(   
+            arg!(--max_allowed_gpu_memory [MAX_ALLOWED_GPU_MEMORY] "Optional maximum GPU memory parameter")
+                .value_parser(clap::value_parser!(u64)),
         )
 }
 
