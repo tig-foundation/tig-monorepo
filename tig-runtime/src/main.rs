@@ -67,7 +67,9 @@ fn main() {
         *matches.get_one::<u64>("fuel").unwrap(),
         matches.get_one::<PathBuf>("output").cloned(),
         matches.get_one::<bool>("compress").unwrap().clone(),
+        matches.get_one::<u64>("memory_limit").cloned(),
         matches.get_one::<usize>("gpu").cloned(),
+        matches.get_one::<u64>("max_allowed_gpu_memory").cloned(),
     ) {
         eprintln!("Runtime Error: {}", e);
         std::process::exit(84);
@@ -115,6 +117,7 @@ pub fn compute_solution(
     max_fuel: u64,
     output_file: Option<PathBuf>,
     compress: bool,
+    memory_limit: Option<u64>,
     gpu_device: Option<usize>,
     max_allowed_gpu_memory: Option<u64>,
 ) -> Result<()> {
@@ -130,9 +133,12 @@ pub fn compute_solution(
     #[cfg(feature = "cuda")]
     {
         let current_memory_usage = unsafe { *library.get::<*mut u64>(b"__current_memory_usage")? };
-        let max_host_memory = unsafe { *library.get::<*mut u64>(b"__max_allowed_memory_usage")? };
+        let max_host_memory = memory_limit.unwrap_or(0xffffffffffffffff);
         let max_device_memory = max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff);
-        let background_thread = std::thread::spawn(move || background_check(fuel_remaining_ptr, current_memory_usage, max_fuel, max_host_memory, max_device_memory));
+
+        let background_thread = std::thread::spawn(move || 
+            background_check(fuel_remaining_ptr, current_memory_usage, max_fuel, max_host_memory, max_device_memory)
+        );
     }
 
     let (fuel_consumed, runtime_signature, solution, invalid_reason): (
