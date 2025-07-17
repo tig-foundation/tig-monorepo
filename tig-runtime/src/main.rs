@@ -82,7 +82,7 @@ fn background_check(fuel_remaining_ptr: *const u64, current_memory_usage: *const
         {
             let curr_fuel_used = max_fuel.saturating_sub(unsafe { *fuel_remaining_ptr });
             let curr_cuda_fuel_used = cudarc::RTSigFuel::get_total_fuel_used();
-            let total_memory_usage = curr_host_memory_usage + curr_cuda_host_memory_usage;
+            let total_memory_usage = curr_fuel_used + curr_cuda_fuel_used;
             if total_memory_usage > max_fuel {
                 std::process::exit(87);
             }
@@ -130,15 +130,16 @@ pub fn compute_solution(
     let runtime_signature_ptr = unsafe { *library.get::<*mut u64>(b"__runtime_signature")? };
     unsafe { *runtime_signature_ptr = u64::from_be_bytes(seed[0..8].try_into().unwrap()) };
 
+    let mut background_thread: Option<std::thread::JoinHandle<()>> = None;
     #[cfg(feature = "cuda")]
     {
         let current_memory_usage = unsafe { *library.get::<*mut u64>(b"__current_memory_usage")? };
         let max_host_memory = memory_limit.unwrap_or(0xffffffffffffffff);
         let max_device_memory = max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff);
 
-        let background_thread = std::thread::spawn(move || 
-            background_check(fuel_remaining_ptr, current_memory_usage, max_fuel, max_host_memory, max_device_memory)
-        );
+        background_thread = unsafe { Some(std::thread::spawn(move || 
+            background_check(fuel_remaining_ptr as *const u64, current_memory_usage as *const u64, max_fuel, max_host_memory, max_device_memory)
+        )) };
     }
 
     let (fuel_consumed, runtime_signature, solution, invalid_reason): (
