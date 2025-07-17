@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Map, Value};
 use std::{any::Any, sync::Arc};
 
-use crate::nn::MLP;
+use crate::neuralnet::MLP;
 
 const THREADS_PER_BLOCK: u32 = 1024;
 
