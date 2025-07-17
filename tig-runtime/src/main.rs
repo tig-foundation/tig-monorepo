@@ -74,6 +74,38 @@ fn main() {
     }
 }
 
+#[cfg(feature = "cuda")]
+fn background_check(fuel_remaining_ptr: *const u64, current_memory_usage: *const u64, max_fuel: u64, max_host_memory: u64, max_device_memory: u64) {
+    loop {
+        {
+            let curr_fuel_used = max_fuel.saturating_sub(unsafe { *fuel_remaining_ptr });
+            let curr_cuda_fuel_used = cudarc::RTSigFuel::get_total_fuel_used();
+            let total_memory_usage = curr_host_memory_usage + curr_cuda_host_memory_usage;
+            if total_memory_usage > max_fuel {
+                std::process::exit(87);
+            }
+        }
+
+        {
+            let curr_cuda_device_memory_usage = cudarc::RTSigFuel::get_device_memory_used();
+            if curr_cuda_device_memory_usage > max_device_memory {
+                std::process::exit(82);
+            }
+        }
+
+        {
+            let curr_host_memory_usage = unsafe { *current_memory_usage };
+            let curr_cuda_host_memory_usage = cudarc::RTSigFuel::get_host_memory_used();
+            let total_memory_usage = curr_host_memory_usage + curr_cuda_host_memory_usage;
+            if total_memory_usage > max_host_memory {
+                std::process::exit(83);
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
 pub fn compute_solution(
     settings: String,
     rand_hash: String,
@@ -84,6 +116,7 @@ pub fn compute_solution(
     output_file: Option<PathBuf>,
     compress: bool,
     gpu_device: Option<usize>,
+    max_allowed_gpu_memory: Option<u64>,
 ) -> Result<()> {
     let settings = load_settings(&settings);
     let seed = settings.calc_seed(&rand_hash, nonce);
@@ -93,6 +126,14 @@ pub fn compute_solution(
     unsafe { *fuel_remaining_ptr = max_fuel };
     let runtime_signature_ptr = unsafe { *library.get::<*mut u64>(b"__runtime_signature")? };
     unsafe { *runtime_signature_ptr = u64::from_be_bytes(seed[0..8].try_into().unwrap()) };
+
+    #[cfg(feature = "cuda")]
+    {
+        let current_memory_usage = unsafe { *library.get::<*mut u64>(b"__current_memory_usage")? };
+        let max_host_memory = unsafe { *library.get::<*mut u64>(b"__max_allowed_memory_usage")? };
+        let max_device_memory = max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff);
+        let background_thread = std::thread::spawn(move || background_check(fuel_remaining_ptr, current_memory_usage, max_fuel, max_host_memory, max_device_memory));
+    }
 
     let (fuel_consumed, runtime_signature, solution, invalid_reason): (
         u64,
