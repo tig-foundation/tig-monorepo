@@ -129,6 +129,8 @@ pub fn compute_solution(
     unsafe { *fuel_remaining_ptr = max_fuel };
     let runtime_signature_ptr = unsafe { *library.get::<*mut u64>(b"__runtime_signature")? };
     unsafe { *runtime_signature_ptr = u64::from_be_bytes(seed[0..8].try_into().unwrap()) };
+    let max_allowed_memory_ptr = unsafe { *library.get::<*mut u64>(b"__max_allowed_memory_usage")? };
+    unsafe { *max_allowed_memory_ptr = memory_limit.unwrap_or(0xffffffffffffffff) };
 
     let mut background_thread: Option<std::thread::JoinHandle<()>> = None;
     #[cfg(feature = "cuda")]
