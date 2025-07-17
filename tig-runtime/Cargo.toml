@@ -10,7 +10,7 @@ edition.workspace = true
 [dependencies]
 anyhow = "1.0.81"
 clap = { version = "4.5.4" }
-cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "memory-limit", features = [
+cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "runtime-fuel/cudnn-cublas", features = [
     "cuda-version-from-build-system",
 ], optional = true }
 libloading = "0.8.6"
