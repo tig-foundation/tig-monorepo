@@ -46,6 +46,20 @@ while IFS= read -r line; do
     fi
 done < <(find "target/$RUST_TARGET/release/deps" -name "*.ll")
 
+echo "Linking all LLVM IR files into a single module..."
+combined_ll="combined_module.ll"
+llvm-link "${ll_files[@]}" -o "$combined_ll"
+
+echo "Applying LTO optimizations..."
+optimized_ll="optimized_module.ll"
+
+cat "$combined_ll" | \
+opt -passes="globalopt,globaldce" -S -o - | \
+opt -passes="inline" -S -o - | \
+opt -passes="function(dce),globalopt,globaldce" -S -o "$optimized_ll"
+
+ll_files=("$optimized_ll")
+
 object_files=()
 temp_objs=()
 pids=()
@@ -67,6 +81,8 @@ process_file() {
     local is_first=$2
     local temp_obj="$3"
     local is_cuda=$4
+
+    local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
 
     if [ $is_cuda -eq 1 ]; then
         file_in_whitelist=0
@@ -91,7 +107,7 @@ process_file() {
     echo "Processing $ll_file"
 
     cat "$ll_file" | \
-    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
+	IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
             -passes="fuel-rt-sig" -S -o - | \
     llc -relocation-model=pic -o - | \
@@ -109,6 +125,12 @@ do
     fi
 done
 
+is_single_file=0
+if [ ${#ll_files[@]} -eq 1 ]
+then
+    is_single_file=1
+fi
+
 # Launch processes up to max_jobs
 for ll_file in "${ll_files[@]}"
 do
@@ -117,6 +139,9 @@ do
     
     # Set IS_FIRST_SRC flag - first file gets 1, all others get 0
     if [[ "$ll_file" == *"tig_challenges-"* ]]
+    then
+        is_first=1
+    elif  [ $is_single_file -eq 1 ]
     then
         is_first=1
     else
@@ -220,13 +245,16 @@ cat > export_symbols.map << 'EOF'
     entry_point;
     __fuel_remaining;
     __runtime_signature;
+    __curr_memory_usage;
+    __total_memory_usage;
+    __max_memory_usage;
+    __max_allowed_memory_usage;
   local: *;
 };
 EOF
 clang "${object_files[@]}" \
     -shared \
     -fPIC \
-    -O3 \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
     -lm \
