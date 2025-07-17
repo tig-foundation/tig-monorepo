@@ -99,20 +99,18 @@ fn background_check(
         {
             let curr_fuel_used = max_fuel.saturating_sub(unsafe { *fuel_remaining_ptr });
             let curr_cuda_fuel_used = cudarc::RTSigFuel::get_total_fuel_used();
-            //let library_cudarc_runtime_signature = unsafe { *library.get::<*mut u64>(b"__cudarc_runtime_signature")? };
-
-            let total_memory_usage = curr_fuel_used + curr_cuda_fuel_used + unsafe { *library_cudarc_fuel_used };
-            if total_memory_usage > max_fuel {
+            let total_fuel_used = curr_fuel_used + curr_cuda_fuel_used + unsafe { *library_cudarc_fuel_used };
+            if total_fuel_used >= max_fuel {
                 std::process::exit(87);
             }
         }
 
-        /*{
-            let curr_cuda_device_memory_usage = cudarc::RTSigFuel::get_device_memory_used();
+        {
+            let curr_cuda_device_memory_usage = cudarc::RTSigFuel::get_device_memory_used() + unsafe { *library_cudarc_device_memory_used };
             if curr_cuda_device_memory_usage > max_device_memory {
                 std::process::exit(82);
             }
-        }*/
+        }
 
         {
             let curr_host_memory_usage = unsafe { *current_memory_usage };
