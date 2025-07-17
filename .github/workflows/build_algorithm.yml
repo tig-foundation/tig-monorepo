@@ -8,13 +8,13 @@ on:
       - 'knapsack/*'
       - 'vector_search/*'
       - 'hypergraph/*'
-      - 'nn_training/*'
+      - 'neuralnet_optimizer/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
       - 'test/vector_search/*'
       - 'test/hypergraph/*'
-      - 'test/nn_training/*'
+      - 'test/neuralnet_optimizer/*'
 
 jobs:
   init:
