@@ -100,7 +100,7 @@ process_file() {
             llc -relocation-model=pic -o - | \
             clang -fPIC -c -x assembler - -o "$temp_obj"
             
-           return 0
+            return 0
         fi
     fi
 
@@ -125,6 +125,12 @@ do
     fi
 done
 
+is_single_file=0
+if [ ${#ll_files[@]} -eq 1 ]
+then
+    is_single_file=1
+fi
+
 # Launch processes up to max_jobs
 for ll_file in "${ll_files[@]}"
 do
@@ -133,6 +139,9 @@ do
     
     # Set IS_FIRST_SRC flag - first file gets 1, all others get 0
     if [[ "$ll_file" == *"tig_challenges-"* ]]
+    then
+        is_first=1
+    elif  [ $is_single_file -eq 1 ]
     then
         is_first=1
     else
