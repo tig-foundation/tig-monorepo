@@ -9,7 +9,7 @@ readme.workspace = true
 [dependencies]
 anyhow = "1.0.81"
 clap = { version = "4.5.4" }
-cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "automatic-fuel-check", features = [
+cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "memory-limit", features = [
     "cuda-version-from-build-system",
 ], optional = true }
 serde = { version = "1.0.196", features = ["derive"] }

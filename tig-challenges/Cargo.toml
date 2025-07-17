@@ -9,7 +9,7 @@ edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.81"
-cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "automatic-fuel-check", features = [
+cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "memory-limit", features = [
     "cuda-version-from-build-system",
 ], optional = true }
 ndarray = "0.15.6"
