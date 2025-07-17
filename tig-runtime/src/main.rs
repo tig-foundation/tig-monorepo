@@ -137,13 +137,13 @@ pub fn compute_solution(
         let max_host_memory = memory_limit.unwrap_or(0xffffffffffffffff);
         let max_device_memory = max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff);
 
-        let fuel_ptr_addr = unsafe { fuel_remaining_ptr as usize };
-        let memory_ptr_addr = unsafe { current_memory_usage as usize };
+        let fuel_ptr_addr = fuel_remaining_ptr as usize;
+        let memory_ptr_addr = current_memory_usage as usize;
 
         background_thread = Some(std::thread::spawn(move || 
             background_check(
-                unsafe { fuel_ptr_addr as *const u64 }, 
-                unsafe { memory_ptr_addr as *const u64 }, 
+                fuel_ptr_addr as *const u64, 
+                memory_ptr_addr as *const u64, 
                 max_fuel, 
                 max_host_memory, 
                 max_device_memory
