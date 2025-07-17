@@ -227,6 +227,10 @@ cat > export_symbols.map << 'EOF'
     __total_memory_usage;
     __max_memory_usage;
     __max_allowed_memory_usage;
+    __cudarc_fuel_used;
+    __cudarc_host_memory_used;
+    __cudarc_device_memory_used;
+    __cudarc_runtime_signature;
   local: *;
 };
 EOF
