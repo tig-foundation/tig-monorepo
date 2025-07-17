@@ -237,7 +237,7 @@ pub fn compute_solution(
                     &prop,
                 )?;
 
-                ctx.enable_memory_tracking(max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff));
+                ctx.enable_memory_tracking(max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff) as usize);
 
                 let initialize_kernel = module.load_function("initialize_kernel")?;
 
