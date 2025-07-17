@@ -41,13 +41,13 @@ case "$CHALLENGE" in
     build_so $ALGORITHM
     build_ptx $ALGORITHM
     ;;
-  nn_training)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'nn_training'"
+  neuralnet_optimizer)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'neuralnet_optimizer'"
     build_so $ALGORITHM
     build_ptx $ALGORITHM --extra-cu-files tig-challenges/src/nn/kernels.cu
     ;;
   *)
-    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, knapsack, vehicle_routing, vector_search, hypergraph, nn_training"
+    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, knapsack, vehicle_routing, vector_search, hypergraph, neuralnet_optimizer"
     exit 1
     ;;
 esac
