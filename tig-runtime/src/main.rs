@@ -85,12 +85,23 @@ fn main() {
 }
 
 #[cfg(feature = "cuda")]
-fn background_check(fuel_remaining_ptr: *const u64, current_memory_usage: *const u64, max_fuel: u64, max_host_memory: u64, max_device_memory: u64) {
+fn background_check(
+    fuel_remaining_ptr: *const u64, 
+    current_memory_usage: *const u64, 
+    max_fuel: u64, 
+    max_host_memory: u64, 
+    max_device_memory: u64,
+    library_cudarc_fuel_used: *const u64,
+    library_cudarc_host_memory_used: *const u64,
+    library_cudarc_device_memory_used: *const u64,
+) {
     loop {
         {
             let curr_fuel_used = max_fuel.saturating_sub(unsafe { *fuel_remaining_ptr });
             let curr_cuda_fuel_used = cudarc::RTSigFuel::get_total_fuel_used();
-            let total_memory_usage = curr_fuel_used + curr_cuda_fuel_used;
+            //let library_cudarc_runtime_signature = unsafe { *library.get::<*mut u64>(b"__cudarc_runtime_signature")? };
+
+            let total_memory_usage = curr_fuel_used + curr_cuda_fuel_used + unsafe { *library_cudarc_fuel_used };
             if total_memory_usage > max_fuel {
                 std::process::exit(87);
             }
@@ -106,7 +117,7 @@ fn background_check(fuel_remaining_ptr: *const u64, current_memory_usage: *const
         {
             let curr_host_memory_usage = unsafe { *current_memory_usage };
             let curr_cuda_host_memory_usage = cudarc::RTSigFuel::get_host_memory_used();
-            let total_memory_usage = curr_host_memory_usage + curr_cuda_host_memory_usage;
+            let total_memory_usage = curr_host_memory_usage + curr_cuda_host_memory_usage + unsafe { *library_cudarc_host_memory_used };
             if total_memory_usage > max_host_memory {
                 std::process::exit(83);
             }
@@ -143,12 +154,16 @@ pub fn compute_solution(
     let mut background_thread: Option<std::thread::JoinHandle<()>> = None;
     #[cfg(feature = "cuda")]
     {
-        let current_memory_usage = unsafe { *library.get::<*mut u64>(b"__curr_memory_usage")? };
+        let current_memory_usage = unsafe { *library.get::<*const u64>(b"__curr_memory_usage")? };
         let max_host_memory = memory_limit.unwrap_or(0xffffffffffffffff);
         let max_device_memory = max_allowed_gpu_memory.unwrap_or(0xffffffffffffffff);
 
         let fuel_ptr_addr = fuel_remaining_ptr as usize;
         let memory_ptr_addr = current_memory_usage as usize;
+
+        let library_cudarc_fuel_used_addr = unsafe { *library.get::<*const u64>(b"__cudarc_fuel_used")? } as usize;
+        let library_cudarc_host_memory_used_addr = unsafe { *library.get::<*const u64>(b"__cudarc_host_memory_used")? } as usize;
+        let library_cudarc_device_memory_used_addr = unsafe { *library.get::<*const u64>(b"__cudarc_device_memory_used")? } as usize;
 
         background_thread = Some(std::thread::spawn(move || 
             background_check(
@@ -156,7 +171,10 @@ pub fn compute_solution(
                 memory_ptr_addr as *const u64, 
                 max_fuel, 
                 max_host_memory, 
-                max_device_memory
+                max_device_memory,
+                library_cudarc_fuel_used_addr as *const u64,
+                library_cudarc_host_memory_used_addr as *const u64,
+                library_cudarc_device_memory_used_addr as *const u64,
             )
         ));
     }
