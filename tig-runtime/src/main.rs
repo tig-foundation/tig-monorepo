@@ -96,12 +96,12 @@ fn background_check(fuel_remaining_ptr: *const u64, current_memory_usage: *const
             }
         }
 
-        {
+        /*{
             let curr_cuda_device_memory_usage = cudarc::RTSigFuel::get_device_memory_used();
             if curr_cuda_device_memory_usage > max_device_memory {
                 std::process::exit(82);
             }
-        }
+        }*/
 
         {
             let curr_host_memory_usage = unsafe { *current_memory_usage };
