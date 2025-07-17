@@ -300,46 +300,49 @@ impl Challenge {
     }
 }
 
-pub trait CudaOptimizerState: Any + Send + Sync {
+pub trait OptimizerStateTrait: Any + Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
-    fn box_clone(&self) -> Box<dyn CudaOptimizerState>;
+    fn box_clone(&self) -> Box<dyn OptimizerStateTrait>;
 }
 
-impl Clone for Box<dyn CudaOptimizerState> {
+impl Clone for Box<dyn OptimizerStateTrait> {
     fn clone(&self) -> Self {
         self.box_clone()
     }
 }
 
 /// Function type for initializing optimizer state
-pub type CudaOptimizerInitStateFn = fn(
-    seed: &[u8; 32],
+pub type OptimizerInitStateFn = fn(
+    seed: [u8; 32],
     param_sizes: &[usize], // Sizes of all parameter tensors
     stream: Arc<CudaStream>,
-) -> Result<Box<dyn CudaOptimizerState>>;
+    module: Arc<CudaModule>,
+    prop: &cudaDeviceProp,
+) -> Result<Box<dyn OptimizerStateTrait>>;
 
 /// Function type for querying optimizer at specific parameters (like parameter prediction)
-pub type CudaOptimizerQueryAtParamsFn = fn(
-    optimizer_state: &dyn CudaOptimizerState,
-    model_params: &[CudaSlice<f32>],
-    gradients: Option<&[CudaSlice<f32>]>,
+pub type OptimizerQueryAtParamsFn = fn(
+    optimizer_state: &dyn OptimizerStateTrait,
+    model_params: &[CudaSlice<f32>], // FIXME pass in model map instead
     epoch: usize,
     train_loss: Option<f32>,
     val_loss: Option<f32>,
     stream: Arc<CudaStream>,
     module: Arc<CudaModule>,
+    prop: &cudaDeviceProp,
 ) -> Result<Option<Vec<CudaSlice<f32>>>>;
 
 /// Function type for optimizer step (computes parameter updates)
-pub type CudaOptimizerStepFn = fn(
-    optimizer_state: &mut dyn CudaOptimizerState,
-    gradients: &[CudaSlice<f32>],
+pub type OptimizerStepFn = fn(
+    optimizer_state: &mut dyn OptimizerStateTrait,
+    gradients: &[CudaSlice<f32>], // FIXME pass in model map instead
     epoch: usize,
     train_loss: Option<f32>,
     val_loss: Option<f32>,
     stream: Arc<CudaStream>,
     module: Arc<CudaModule>,
+    prop: &cudaDeviceProp,
 ) -> Result<Vec<CudaSlice<f32>>>;
 
 pub fn training_loop(
@@ -347,9 +350,9 @@ pub fn training_loop(
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
-    optimizer_init_state: CudaOptimizerInitStateFn,
-    optimizer_query_at_params: CudaOptimizerQueryAtParamsFn,
-    optimizer_step: CudaOptimizerStepFn,
+    optimizer_init_state: OptimizerInitStateFn,
+    optimizer_query_at_params: OptimizerQueryAtParamsFn,
+    optimizer_step: OptimizerStepFn,
 ) -> Result<(Solution, Vec<f32>, Vec<f32>)> {
     let Challenge {
         batch_size,
@@ -374,13 +377,13 @@ pub fn training_loop(
         challenge.num_frozen_layers,
         stream.clone(),
     )?;
-    model.init_weights(&challenge.seed, stream.clone(), module.clone())?;
+    model.init_weights(challenge.seed.clone(), stream.clone(), module.clone())?;
 
     // Initialize optimizer
     let param_sizes = model.get_parameter_sizes();
     let mut optimizer_state = optimizer_init_state(
-        challenge.seed,
-        &param_sizes,
+        challenge.seed.clone(),
+        &param_sizes, // FIXME pass model instead?
         stream.clone(),
         module.clone(),
         prop,
@@ -458,7 +461,6 @@ pub fn training_loop(
             let original_params = if let Some(modified_params) = optimizer_query_at_params(
                 optimizer_state.as_ref(),
                 &model_params,
-                None,
                 epoch,
                 prev_train_loss,
                 prev_validation_loss,
@@ -558,9 +560,8 @@ pub fn training_loop(
                     module.clone(),
                 )?;
 
-                let mut batch_loss_h = vec![0.0; 1];
-                stream.memcpy_dtoh(&loss, &mut batch_loss_h)?;
-                epoch_val_loss_sum += batch_loss_h[0] * current_batch_size as f32;
+                let batch_loss = stream.memcpy_dtov(&loss)?[0];
+                epoch_val_loss_sum += batch_loss * current_batch_size as f32;
             }
         }
         stream.synchronize()?;
@@ -615,13 +616,11 @@ pub fn to_solution(mlp: &MLP, epochs_used: usize, stream: Arc<CudaStream>) -> Re
     let mut weights = Vec::new();
     let mut biases = Vec::new();
     for layer in &mlp.lin {
-        let mut w_h = vec![0.0; layer.weight.len()];
-        stream.memcpy_dtoh(&layer.weight, &mut w_h)?;
-        let mut b_h = vec![0.0; layer.bias.len()];
-        stream.memcpy_dtoh(&layer.bias, &mut b_h)?;
+        let w = stream.memcpy_dtov(&layer.weight)?;
+        let b = stream.memcpy_dtov(&layer.bias)?;
 
-        weights.push(w_h.chunks(layer.in_features).map(|c| c.to_vec()).collect());
-        biases.push(b_h);
+        weights.push(w.chunks(layer.in_features).map(|c| c.to_vec()).collect());
+        biases.push(b);
     }
 
     let mut bn_weights = Vec::new();

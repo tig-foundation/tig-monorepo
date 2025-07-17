@@ -158,23 +158,6 @@ impl BatchNorm1d {
             }
         };
 
-        // Debug: Check saved_mean and saved_inv_variance after forward pass if training
-        if training {
-            let mut saved_mean_sample = vec![0.0f32; 5.min(self.saved_mean.len())];
-            let mut saved_inv_variance_sample = vec![0.0f32; 5.min(self.saved_inv_variance.len())];
-            stream.memcpy_dtoh(
-                &self.saved_mean.slice(0..5.min(self.saved_mean.len())),
-                &mut saved_mean_sample,
-            )?;
-            stream.memcpy_dtoh(
-                &self
-                    .saved_inv_variance
-                    .slice(0..5.min(self.saved_inv_variance.len())),
-                &mut saved_inv_variance_sample,
-            )?;
-            stream.synchronize()?;
-        }
-
         if status == cudnnStatus_t::CUDNN_STATUS_SUCCESS {
             Ok(output)
         } else {
