@@ -7,7 +7,6 @@ use cudarc::{
 };
 use rand::{prelude::*, rngs::StdRng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Map, Value};
 use std::{any::Any, sync::Arc};
 
 use crate::neuralnet::MLP;
@@ -43,13 +42,6 @@ pub struct Solution {
     pub bn_biases: Vec<Vec<f32>>,
     pub bn_running_means: Vec<Vec<f32>>,
     pub bn_running_vars: Vec<Vec<f32>>,
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
-    }
 }
 
 pub struct Dataset {

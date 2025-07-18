@@ -8,20 +8,18 @@ fn test_calc_solution_signature() {
         "data_x": 42,
         "data_y": "test"
     })
-    .as_object()
-    .unwrap()
-    .clone();
+    .to_string();
 
     let output_data = OutputData {
         nonce: 123,
         runtime_signature: 456,
         fuel_consumed: 789,
-        solution: solution.clone(),
+        solution,
         cpu_arch: CPUArchitecture::AMD64,
     };
 
     // Assert same as Python version: tig-benchmarker/tests/core.rs
-    assert_eq!(output_data.calc_solution_signature(), 11549591319018095145);
+    assert_eq!(output_data.calc_solution_signature(), 674077392108059587);
 }
 
 #[test]
@@ -53,15 +51,13 @@ fn test_outputdata_to_merklehash() {
         "data_x": 42,
         "data_y": "test"
     })
-    .as_object()
-    .unwrap()
-    .clone();
+    .to_string();
 
     let output_data = OutputData {
         nonce: 123,
         runtime_signature: 456,
         fuel_consumed: 789,
-        solution: solution.clone(),
+        solution,
         cpu_arch: CPUArchitecture::AMD64,
     };
 
@@ -71,8 +67,8 @@ fn test_outputdata_to_merklehash() {
     assert_eq!(
         merkle_hash,
         MerkleHash([
-            207, 29, 184, 163, 158, 22, 137, 73, 72, 58, 24, 246, 67, 9, 44, 20, 32, 22, 86, 206,
-            191, 5, 52, 241, 41, 113, 198, 85, 11, 53, 190, 57
+            66, 150, 47, 232, 46, 44, 181, 85, 114, 124, 143, 222, 149, 86, 176, 193, 37, 178, 184,
+            214, 242, 240, 64, 97, 8, 0, 89, 105, 229, 37, 195, 95
         ])
     );
 }

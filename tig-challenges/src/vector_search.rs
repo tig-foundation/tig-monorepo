@@ -5,7 +5,6 @@ use cudarc::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Map, Value};
 use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -31,14 +30,6 @@ impl Into<Vec<i32>> for Difficulty {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Solution {
     pub indexes: Vec<usize>,
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
-    }
 }
 
 pub struct Challenge {
