@@ -3,8 +3,8 @@ use clap::{arg, ArgAction, Command};
 use libloading::Library;
 use std::{fs, panic, path::PathBuf};
 use tig_challenges::*;
-use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData, Solution};
-use tig_utils::{compress_obj, dejsonify, jsonify};
+use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData};
+use tig_utils::{base64_compress_obj, dejsonify, jsonify};
 #[cfg(feature = "cuda")]
 use {
     cudarc::{
@@ -66,7 +66,6 @@ fn main() {
         matches.get_one::<PathBuf>("ptx").cloned(),
         *matches.get_one::<u64>("fuel").unwrap(),
         matches.get_one::<PathBuf>("output").cloned(),
-        matches.get_one::<bool>("compress").unwrap().clone(),
         matches.get_one::<usize>("gpu").cloned(),
     ) {
         eprintln!("Runtime Error: {}", e);
@@ -82,7 +81,6 @@ pub fn compute_solution(
     ptx_path: Option<PathBuf>,
     max_fuel: u64,
     output_file: Option<PathBuf>,
-    compress: bool,
     gpu_device: Option<usize>,
 ) -> Result<()> {
     let settings = load_settings(&settings);
@@ -97,7 +95,7 @@ pub fn compute_solution(
     let (fuel_consumed, runtime_signature, solution, invalid_reason): (
         u64,
         u64,
-        Solution,
+        String,
         Option<String>,
     ) = 'out_of_fuel: {
         macro_rules! dispatch_challenge {
@@ -116,24 +114,17 @@ pub fn compute_solution(
                 let fuel_consumed =
                     max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
                 if fuel_consumed > max_fuel {
-                    break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    break 'out_of_fuel (max_fuel + 1, 0, "".to_string(), None);
                 }
 
                 let runtime_signature =
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
                 let (solution, invalid_reason) = match result {
                     Some(s) => match challenge.verify_solution(&s) {
-                        Ok(_) => (
-                            serde_json::to_value(&s)
-                                .unwrap()
-                                .as_object()
-                                .unwrap()
-                                .to_owned(),
-                            None,
-                        ),
-                        Err(e) => (Solution::new(), Some(e.to_string())),
+                        Ok(_) => (base64_compress_obj(&s)?, None),
+                        Err(e) => ("".to_string(), Some(e.to_string())),
                     },
-                    None => (Solution::new(), None),
+                    None => ("".to_string(), None),
                 };
 
                 (fuel_consumed, runtime_signature, solution, invalid_reason)
@@ -200,7 +191,7 @@ pub fn compute_solution(
                     .as_ref()
                     .is_err_and(|e| e.contains("ran out of fuel"))
                 {
-                    break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    break 'out_of_fuel (max_fuel + 1, 0, "".to_string(), None);
                 }
                 let result = result.map_err(|e| anyhow!("{}", e))?;
                 stream.synchronize()?;
@@ -228,7 +219,7 @@ pub fn compute_solution(
                 }
 
                 if stream.memcpy_dtov(&error_stat)?[0] != 0 {
-                    break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    break 'out_of_fuel (max_fuel + 1, 0, "".to_string(), None);
                 }
                 let gpu_fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
                 let cpu_fuel_consumed =
@@ -236,7 +227,7 @@ pub fn compute_solution(
                 let fuel_consumed = gpu_fuel_consumed + cpu_fuel_consumed;
 
                 if fuel_consumed > max_fuel {
-                    break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
+                    break 'out_of_fuel (max_fuel + 1, 0, "".to_string(), None);
                 }
 
                 let gpu_runtime_signature = stream.memcpy_dtov(&signature)?[0];
@@ -247,18 +238,11 @@ pub fn compute_solution(
                 let (solution, invalid_reason) = match result {
                     Some(s) => {
                         match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
-                            Ok(_) => (
-                                serde_json::to_value(&s)
-                                    .unwrap()
-                                    .as_object()
-                                    .unwrap()
-                                    .to_owned(),
-                                None,
-                            ),
-                            Err(e) => (Solution::new(), Some(e.to_string())),
+                            Ok(_) => (base64_compress_obj(&s)?, None),
+                            Err(e) => ("".to_string(), Some(e.to_string())),
                         }
                     }
-                    None => (Solution::new(), None),
+                    None => ("".to_string(), None),
                 };
 
                 (fuel_consumed, runtime_signature, solution, invalid_reason)
@@ -317,11 +301,7 @@ pub fn compute_solution(
         cpu_arch: CPUArchitecture::ARM64,
     };
     if let Some(path) = output_file {
-        if compress {
-            fs::write(&path, compress_obj(&output_data))?;
-        } else {
-            fs::write(&path, jsonify(&output_data))?;
-        }
+        fs::write(&path, jsonify(&output_data))?;
         println!("output_data written to: {:?}", path);
     } else {
         println!("{}", jsonify(&output_data));

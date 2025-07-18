@@ -1,6 +1,5 @@
 use crate::{config::ProtocolConfig, serializable_struct_with_getters};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tig_utils::{jsonify, u64s_from_str, u8s_from_str};
 pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, U256};
@@ -450,13 +449,12 @@ pub enum CPUArchitecture {
     AMD64,
     ARM64,
 }
-pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     OutputData {
         nonce: u64,
         runtime_signature: u64,
         fuel_consumed: u64,
-        solution: Solution,
+        solution: String,
         cpu_arch: CPUArchitecture,
     }
 }

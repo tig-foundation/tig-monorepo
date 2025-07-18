@@ -1,3 +1,6 @@
+use anyhow::Result;
+use base64::{engine::general_purpose, Engine as _};
+use bincode;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{to_string, to_value, Map, Value};
@@ -6,11 +9,11 @@ use std::{
     str,
 };
 
-pub fn dejsonify<'a, T>(json_str: &'a str) -> serde_json::Result<T>
+pub fn dejsonify<'a, T>(json_str: &'a str) -> Result<T>
 where
     T: Deserialize<'a>,
 {
-    serde_json::from_str::<T>(json_str)
+    Ok(serde_json::from_str::<T>(json_str)?)
 }
 
 pub fn jsonify<T>(obj: &T) -> String
@@ -40,21 +43,28 @@ pub fn jsonify_internal(json_value: &Value) -> Value {
     }
 }
 
-pub fn decompress_obj<T>(input: &[u8]) -> anyhow::Result<T>
-where
-    T: DeserializeOwned,
-{
-    let mut decoder = ZlibDecoder::new(input);
-    let mut decompressed = String::new();
-    decoder.read_to_string(&mut decompressed)?;
-    Ok(dejsonify(&decompressed)?)
-}
-
-pub fn compress_obj<T>(input: T) -> Vec<u8>
+pub fn base64_compress_obj<T>(input: T) -> Result<String>
 where
     T: Serialize,
 {
+    let bin = bincode::serialize(&input)?;
+
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(jsonify(&input).as_bytes()).unwrap();
-    encoder.finish().unwrap()
+    encoder.write_all(&bin)?;
+    let compressed = encoder.finish()?;
+
+    Ok(general_purpose::STANDARD.encode(compressed))
+}
+
+pub fn base64_decompress_obj<T>(input: &str) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let compressed = general_purpose::STANDARD.decode(input)?;
+
+    let mut decoder = ZlibDecoder::new(&compressed[..]);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+
+    Ok(bincode::deserialize(&decompressed[..])?)
 }
