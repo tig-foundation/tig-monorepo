@@ -460,7 +460,7 @@ serializable_struct_with_getters! {
 }
 impl OutputData {
     pub fn calc_solution_signature(&self) -> u64 {
-        u64s_from_str(&jsonify(&self.solution))[0]
+        u64s_from_str(&self.solution)[0]
     }
 }
 
