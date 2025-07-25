@@ -130,7 +130,8 @@
 
 // c004_a066
 
-// c004_a067
+pub mod is_floatfour;
+pub use is_floatfour as c004_a067;
 
 // c004_a068
 
