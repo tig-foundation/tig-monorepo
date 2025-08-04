@@ -47,10 +47,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update algorithm rewards
     let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
-    let mut eligible_algorithms_by_challenge = HashMap::<String, Vec<String>>::new();
+    let algorithms_reward_pool =
+        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.algorithms);
+    let reward_pool_per_challenge =
+        algorithms_reward_pool / PreciseNumber::from(active_challenge_ids.len());
+    let mut total_algorithms_reward = zero.clone();
     for algorithm_id in active_algorithm_ids.iter() {
         let algorithm_state = &active_algorithms_state[algorithm_id];
-        let algorithm_data = &active_algorithms_block_data[algorithm_id];
+        let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
         let algorithm_details = &active_algorithms_details[algorithm_id];
 
         let is_merged = algorithm_state.round_merged.is_some();
@@ -58,47 +62,24 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             continue;
         }
 
-        active_players_block_data
+        let player_data = active_players_block_data
             .get_mut(&algorithm_details.player_id)
-            .unwrap()
+            .unwrap();
+        player_data
             .reward_by_type
             .insert(EmissionsType::Algorithm, zero.clone());
 
         if algorithm_data.adoption >= adoption_threshold
             || (is_merged && algorithm_data.adoption > zero)
         {
-            eligible_algorithms_by_challenge
-                .entry(algorithm_details.challenge_id.clone())
-                .or_default()
-                .push(algorithm_id.clone());
-        }
-    }
-    let algorithms_reward_pool =
-        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.algorithms);
-    let mut total_algorithms_reward = zero.clone();
-    if eligible_algorithms_by_challenge.len() > 0 {
-        let reward_pool_per_challenge =
-            algorithms_reward_pool / PreciseNumber::from(eligible_algorithms_by_challenge.len());
+            let reward = reward_pool_per_challenge * algorithm_data.adoption;
+            algorithm_data.reward = reward;
+            total_algorithms_reward += reward;
 
-        for algorithm_ids in eligible_algorithms_by_challenge.values() {
-            let total_adoption: PreciseNumber = algorithm_ids
-                .iter()
-                .map(|id| active_algorithms_block_data[id].adoption.clone())
-                .sum();
-            for algorithm_id in algorithm_ids.iter() {
-                let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
-                let reward = reward_pool_per_challenge * algorithm_data.adoption / total_adoption;
-                algorithm_data.reward = reward;
-                total_algorithms_reward += reward;
-
-                let algorithm_details = &active_algorithms_details[algorithm_id];
-                *active_players_block_data
-                    .get_mut(&algorithm_details.player_id)
-                    .unwrap()
-                    .reward_by_type
-                    .get_mut(&EmissionsType::Algorithm)
-                    .unwrap() += algorithm_data.reward;
-            }
+            *player_data
+                .reward_by_type
+                .get_mut(&EmissionsType::Algorithm)
+                .unwrap() += algorithm_data.reward;
         }
     }
 
@@ -112,32 +93,32 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for advance_id in active_advance_ids.iter() {
         let advance_state = &active_advances_state[advance_id];
         let advance_details = &active_advances_details[advance_id];
-        let advance_data = &active_advances_block_data[advance_id];
+        let advance_data = active_advances_block_data.get_mut(advance_id).unwrap();
 
         let is_merged = advance_state.round_merged.is_some();
         if advance_state.banned {
             continue;
         }
 
-        let reward = if advance_data.adoption >= adoption_threshold
+        let player_data = active_players_block_data
+            .get_mut(&advance_details.player_id)
+            .unwrap();
+        player_data
+            .reward_by_type
+            .insert(EmissionsType::Advance, zero.clone());
+
+        if advance_data.adoption >= adoption_threshold
             || (is_merged && advance_data.adoption > zero)
         {
-            reward_pool_per_challenge * advance_data.adoption
-        } else {
-            zero.clone()
-        };
+            let reward = reward_pool_per_challenge * advance_data.adoption;
+            advance_data.reward = reward;
+            total_advances_reward += reward;
 
-        *active_players_block_data
-            .get_mut(&advance_details.player_id)
-            .unwrap()
-            .reward_by_type
-            .entry(EmissionsType::Advance)
-            .or_insert(zero.clone()) += reward;
-        active_advances_block_data
-            .get_mut(advance_id)
-            .unwrap()
-            .reward = reward;
-        total_advances_reward += reward;
+            *player_data
+                .reward_by_type
+                .get_mut(&EmissionsType::Advance)
+                .unwrap() += advance_data.reward;
+        }
     }
 
     // update benchmark rewards
@@ -206,12 +187,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     block_details.emissions.insert(
         EmissionsType::Bootstrap,
-        advances_reward_pool - total_advances_reward,
+        (advances_reward_pool - total_advances_reward)
+            + (algorithms_reward_pool - total_algorithms_reward),
     );
     block_details.emissions.insert(
         EmissionsType::Vault,
         block_reward
-            - total_algorithms_reward
+            - algorithms_reward_pool
             - advances_reward_pool
             - total_benchmarkers_reward
             - total_delegators_reward
