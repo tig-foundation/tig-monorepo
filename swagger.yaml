@@ -292,12 +292,12 @@ paths:
     get:
       tags:
         - GET
-      summary: Get round emissions for a specific round (algorithms, breakthroughs, opow, players, and totals)
+      summary: Get round emissions for a specific round (algorithms, advances, opow, players, and totals)
       description: |-
         # Notes
+        * `advances` is a map of `<advance_id>` to `uint256`
+
         * `algorithms` is a map of `<algorithm_id>` to `uint256`
-        
-        * `breakthroughs` is a map of `<breakthrough_id>` to `uint256`
         
         * `opow` is a map of `<player_id>` to a dict:
         
@@ -307,7 +307,7 @@ paths:
           
           * `coinbase` is the total reward distributed by the Benchmarker with pool members this round
           
-        * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, breakthroughs, delegator)
+        * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, advance, delegator)
         
         * `names` is a map of `<player_id>` to ENS name (only if one exists)
 
@@ -450,7 +450,7 @@ paths:
     post:
       tags:
         - POST
-      summary: Cast vote on breakthrough
+      summary: Cast vote on advance
       description: |-
         # Notes
         * Votes are immutable. Once set, cannot change
@@ -461,9 +461,9 @@ paths:
 
         * Signature must be from signing the following message:
           
-          * If voting yes: `I hereby confirm my vote that '<breakthrough_name>' IS A BREAKTHROUGH`
+          * If voting yes: `I hereby confirm my vote that '<advance_name>' IS AN ADVANCE`
           
-          * If voting no: `I hereby confirm my vote that '<breakthrough_name>' IS INELIGIBLE AS A BREAKTHROUGH`
+          * If voting no: `I hereby confirm my vote that '<advance_name>' IS INELIGIBLE AS AN ADVANCE`
       requestBody:
         content:
           application/json:
@@ -649,7 +649,7 @@ components:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-        breakthrough_id:
+        advance_id:
           $ref: '#/components/schemas/MD5'
         type:
           $ref: '#/components/schemas/AlgorithmType'
@@ -798,7 +798,7 @@ components:
            binary:
              type: integer
              format: uint32
-           breakthrough:
+           advance:
              type: integer
              format: uint32
            challenge:
@@ -828,7 +828,7 @@ components:
            benchmark:
              type: integer 
              format: uint32
-           breakthrough:
+           advance:
              type: integer
              format: uint32
            challenge:
@@ -851,7 +851,7 @@ components:
           properties:
               algorithm:
                 $ref: '#/components/schemas/PreciseNumber'
-              breakthrough:
+              advance:
                 $ref: '#/components/schemas/PreciseNumber'
               benchmarker:
                 $ref: '#/components/schemas/PreciseNumber'
@@ -884,10 +884,10 @@ components:
              type: array 
              items:
                 $ref: '#/components/schemas/AlgorithmId'
-           breakthrough:
+           advance:
              type: array 
              items:
-                $ref: '#/components/schemas/BreakthroughId'
+                $ref: '#/components/schemas/AdvanceId'
            challenge:
              type: array 
              items:
@@ -923,10 +923,10 @@ components:
              type: array 
              items:
                 $ref: '#/components/schemas/MD5'
-            breakthrough:
+            advance:
              type: array 
              items:
-                $ref: '#/components/schemas/BreakthroughId'
+                $ref: '#/components/schemas/AdvanceId'
             challenge:
              type: array 
              items:
@@ -943,18 +943,18 @@ components:
              type: array 
              items:
                 $ref: '#/components/schemas/Address'
-    Breakthrough:
+    Advance:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/BreakthroughId'
+          $ref: '#/components/schemas/AdvanceId'
         details:
-          $ref: '#/components/schemas/BreakthroughDetails'
+          $ref: '#/components/schemas/AdvanceDetails'
         state:
-          $ref: '#/components/schemas/BreakthroughState'
+          $ref: '#/components/schemas/AdvanceState'
         block_data:
-          $ref: '#/components/schemas/BreakthroughBlockData'
-    BreakthroughBlockData:
+          $ref: '#/components/schemas/AdvanceBlockData'
+    AdvanceBlockData:
       type: object
       properties:
         adoption:
@@ -964,7 +964,7 @@ components:
           format: uint32
         reward:
           $ref: '#/components/schemas/PreciseNumber'
-    BreakthroughDetails:
+    AdvanceDetails:
       type: object
       properties:
         name:
@@ -973,11 +973,11 @@ components:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-    BreakthroughId:
+    AdvanceId:
       type: string
       pattern: ^c[0-9]{3}_b[0-9]{3}$
       example: c002_b001
-    BreakthroughState:
+    AdvanceState:
       type: object
       properties:
         block_confirmed:
@@ -1245,7 +1245,7 @@ components:
               $ref: '#/components/schemas/PreciseNumber'
             benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
-            breakthrough:
+            advance:
               $ref: '#/components/schemas/PreciseNumber'
             delegator:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1394,10 +1394,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Algorithm'
-        breakthroughs:
+        advances:
           type: array
           items:
-            $ref: '#/components/schemas/Breakthrough'
+            $ref: '#/components/schemas/Advance'
         binaries:
           type: array
           items:
@@ -1505,7 +1505,7 @@ components:
          type: object
          additionalProperties:
           $ref: '#/components/schemas/PreciseNumber'
-       breakthroughs:
+       advances:
          type: object
          additionalProperties:
           $ref: '#/components/schemas/PreciseNumber'
@@ -1531,7 +1531,7 @@ components:
               $ref: '#/components/schemas/PreciseNumber'
              benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
-             breakthrough:
+             advance:
               $ref: '#/components/schemas/PreciseNumber'
              delegator:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1544,7 +1544,7 @@ components:
          properties:
             algorithm:
               $ref: '#/components/schemas/PreciseNumber'
-            breakthrough:
+            advance:
               $ref: '#/components/schemas/PreciseNumber'
             benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1608,7 +1608,7 @@ components:
     SetVoteRequest:
       type: object
       properties:
-        breakthrough_id:
+        advance_id:
           type: string
         yes:
           type: boolean
