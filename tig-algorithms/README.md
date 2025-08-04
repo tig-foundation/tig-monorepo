@@ -12,7 +12,7 @@ Each submissions is committed to their own branch with the naming pattern:
 2. [Developer Environment](#developer-environment)
 3. [Improving Algorithms](#improving-algorithms)
 4. [GPU Algorithms](#gpu-algorithms)
-5. [Attributing Breakthroughs](#attributing-breakthroughs)
+5. [Attributing Advances](#attributing-advances)
 6. [License](#license)
 
 # Quick Start
@@ -75,7 +75,7 @@ Each submissions is committed to their own branch with the naming pattern:
     */
     ```
 
-    * See [Attributing Breakthroughs](#attributing-breakthroughs) for how to set UAI field
+    * See [Attributing Advances](#attributing-advances) for how to set UAI field
     * Visit https://test.tig.foundation/innovation/submission and follow the instructions
     * Each new address on testnet gets 10 TIG balance
     * Algorithms on testnet can be used straight away after they are successfully compiled
@@ -140,12 +140,12 @@ nvidia-smi
 
 To be competitive in these challenges, you should develop cuda kernels in a `.cu` file which can be launched from your rust `.rs` code.
 
-# Attributing Breakthroughs
+# Attributing Advances
 
-Innovators in TIG can also [submit breakthroughs](../tig-breakthroughs/README.md) (algorithmic methods).
+Innovators in TIG can also [submit advances](../tig-advances/README.md) (algorithmic methods).
 
-If your implementation is based on breakthrough that has been submitted to TIG, you must attribute your implementation to it (example UAI: `c001_b001`)
-* UAI of a method is detailed inside `tig-breakthroughs/<challenge_name>/<method_name>.md`
+If your implementation is based on an advance that has been submitted to TIG, you must attribute your implementation to it (example UAI: `c001_b001`)
+* UAI of a method is detailed inside `tig-advances/<challenge_name>/<method_name>.md`
 * If your implementation is based on an algorithmic method outside of TIG, set UAI to `null`
 
 # License

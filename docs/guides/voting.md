@@ -1,9 +1,9 @@
 
-# Breakthrough Rewards Guide for Token Holders
+# Advance Rewards Guide for Token Holders
 
 ## SUMMARY
 
-- **Vote on whether an algorithmic method is eligible to earn potential Breakthrough Rewards.**
+- **Vote on whether an algorithmic method is eligible to earn potential Advance Rewards.**
 
 - **One token one vote.**
 
@@ -23,9 +23,9 @@
 
   - **Assessing the impact of your voting decision on token value**
 
-## What are Breakthrough Rewards and why does TIG offer them ?
+## What are Advance Rewards and why does TIG offer them ?
 
-- Breakthrough Rewards are a notional class of TIG token reward that is reserved for rewarding ONLY innovation in algorithmic methods.
+- Advance Rewards are a notional class of TIG token reward that is reserved for rewarding ONLY innovation in algorithmic methods.
 
 - The efficiency gains from improved algorithmic methods versus code optimizations in implementations can differ greatly in impact and scale.
 
@@ -33,7 +33,7 @@
 
 - Generally, improvements in algorithmic methods tend to yield exponential or order-of-magnitude efficiency gains by changing the problem-solving approach, while code optimizations tend to provide incremental improvements by refining an existing algorithm's implementation [*For illustrative examples see Appendix 1*]. It is important therefore, that TIG places emphasis on incentivising the submission of innovative algorithmic methods. TIG intends to do that by introducing a process for identifying algorithmic methods that may be eligible for higher rewards.
 
-- To reflect the difference in impact and scale that improvements in algorithmic methods can have compared with code optimisations, TIG seeks to offer higher rewards for innovation in algorithmic methods. These higher rewards, so called “**Breakthrough Rewards”**, are made available through both**; (i)** a proportion of rewards in each Round being available to reward innovative algorithmic methods; and **(ii)** the design of the protocol enabling the rewards for innovative algorithmic methods to persist for multiple Rounds where they continue to provide the basis of algorithm implementations adopted by Benchmarkers.
+- To reflect the difference in impact and scale that improvements in algorithmic methods can have compared with code optimisations, TIG seeks to offer higher rewards for innovation in algorithmic methods. These higher rewards, so called “**Advance Rewards”**, are made available through both**; (i)** a proportion of rewards in each Round being available to reward innovative algorithmic methods; and **(ii)** the design of the protocol enabling the rewards for innovative algorithmic methods to persist for multiple Rounds where they continue to provide the basis of algorithm implementations adopted by Benchmarkers.
 
 **Intellectual Property**
 
@@ -42,15 +42,15 @@
 
 ## What is a Token Holder Vote ?
 
-- TIG believes that the determination of whether an algorithmic method is eligible for Breakthrough Rewards should be done by a token weighted vote.
+- TIG believes that the determination of whether an algorithmic method is eligible for Advance Rewards should be done by a token weighted vote.
 
-- Because the value of TIG tokens should correlate with the acquisition, by TIG, of innovative algorithmic methods and associated valuable intellectual property and because both of these are incentivised by the offer of Breakthrough Rewards, TIG believes that the interests of TIG token holders are very well aligned with the objective of correctly determining when eligibility for potential Breakthrough Rewards is appropriate.
+- Because the value of TIG tokens should correlate with the acquisition, by TIG, of innovative algorithmic methods and associated valuable intellectual property and because both of these are incentivised by the offer of Advance Rewards, TIG believes that the interests of TIG token holders are very well aligned with the objective of correctly determining when eligibility for potential Advance Rewards is appropriate.
 
 - Only votes cast will be counted for the purposes of determining the result of the Token Holder Vote. Abstentions and uncast votes will not be counted.
 
 - Delegation of token votes will not be enabled initially but may be introduced at some point in the future.
 
-- If 50% or more of the votes cast vote affirmatively, then the subject algorithmic method will be eligible for potential Breakthrough Rewards from the beginning of the Round in which it is made available for benchmarking. Whether an algorithmic method with the potential to earn Breakthrough Rewards does earn those rewards will depend on adoption by Benchmarkers sufficient to reach the threshold for merger.
+- If 50% or more of the votes cast vote affirmatively, then the subject algorithmic method will be eligible for potential Advance Rewards from the beginning of the Round in which it is made available for benchmarking. Whether an algorithmic method with the potential to earn Advance Rewards does earn those rewards will depend on adoption by Benchmarkers sufficient to reach the threshold for merger.
 
 - Algorithmic methods which are the subject of the vote will be made public for review at the beginning of the Round commencing one Round after the Round in which the algorithmic method was submitted to TIG.
 
@@ -60,7 +60,7 @@
 
 ## When does a Token Holder Vote occur ?
 
-- A Token Holder Vote will be called by TIG each time an innovator requests a determination of whether their submitted algorithmic method is eligible for potential Breakthrough Rewards.
+- A Token Holder Vote will be called by TIG each time an innovator requests a determination of whether their submitted algorithmic method is eligible for potential Advance Rewards.
 
 ## Do you qualify to vote ?
 
@@ -72,7 +72,7 @@
 
 ## What are you voting on ?
 
-- **You are voting on whether you think the algorithmic method subject to review is eligible for potential Breakthrough Rewards.**
+- **You are voting on whether you think the algorithmic method subject to review is eligible for potential Advance Rewards.**
 
 ## What should you consider when exercising your vote ?
 
@@ -80,7 +80,7 @@
 
 - **How you vote is entirely up to you.**
 
-- When voting; assuming you wish to enhance the value of the TIG tokens that you hold, it is important that you are equipped to recognise the kind of innovation that Breakthrough Rewards are intended to incentivise.
+- When voting; assuming you wish to enhance the value of the TIG tokens that you hold, it is important that you are equipped to recognise the kind of innovation that Advance Rewards are intended to incentivise.
 
 - Where an algorithmic method is submitted to the game embodied in a code implementation, first you should distinguish the algorithmic method embodied in the algorithm implementation from the way the algorithmic method is expressed in the code implementation. [***See Appendix 2***].
 
@@ -94,9 +94,9 @@
 
 - TIG anticipates that the contributor of the incumbent algorithmic method will advocate **against** the novelty and inventiveness of the challenger algorithmic method where appropriate, and the challenger will advocate **for** its novelty and inventiveness. We will establish a discord channel for each Token Holder Vote so that these arguments on each side can be put, examined, and challenged. This should provide a rich, case specific, body of knowledge to help with the assessment that you will be making.
 
-- TIG accepts that not all TIG token holders will have the necessary skills or experience to make an informed decision on whether eligibility for potential Breakthrough Rewards is appropriate in every specific case, but we hope that sufficient people with the requisite skill, knowledge and experience will engage, advocate and vote in such a way that eligibility is appropriately awarded. In the future we may introduce delegation of votes so that token holders can delegate analysis to experts that they trust to vote in a way that maximises token value.
+- TIG accepts that not all TIG token holders will have the necessary skills or experience to make an informed decision on whether eligibility for potential Advance Rewards is appropriate in every specific case, but we hope that sufficient people with the requisite skill, knowledge and experience will engage, advocate and vote in such a way that eligibility is appropriately awarded. In the future we may introduce delegation of votes so that token holders can delegate analysis to experts that they trust to vote in a way that maximises token value.
 
-- Essentially, we expect a rational token holder when voting in the Token Holder Vote to be assessing the novelty and inventiveness of a contributed algorithmic method, and by so doing, its patentability. To maximise the likelihood that an innovative algorithmic method will be ratified by Token Holder Vote as eligible for potential Breakthrough Rewards, contributors seeking Breakthrough Rewards have been advised to disclose the following information so that it may be assessed by token holders:
+- Essentially, we expect a rational token holder when voting in the Token Holder Vote to be assessing the novelty and inventiveness of a contributed algorithmic method, and by so doing, its patentability. To maximise the likelihood that an innovative algorithmic method will be ratified by Token Holder Vote as eligible for potential Advance Rewards, contributors seeking Advance Rewards have been advised to disclose the following information so that it may be assessed by token holders:
 
   - **Novelty:** Results of a prior art search to identify any existing disclosures that might affect the novelty of your algorithmic method.
 
@@ -107,25 +107,25 @@
 
 ## The implications of the outcome of the token holder vote for the TIG protocol
 
-To further assist you in exercising your vote in an informed way, we have set out below some of the implications of affirming an algorithmic method as being eligible for potential Breakthrough Rewards.
+To further assist you in exercising your vote in an informed way, we have set out below some of the implications of affirming an algorithmic method as being eligible for potential Advance Rewards.
 
 ### Impact on Innovator Incentives
 
-- A voter may be tempted to default to voting affirmatively on each Token Holder Vote with the intent of making an algorithmic method eligible for Breakthrough Rewards to ensure that there is at least an option for TIG to capture intellectual property with respect to the algorithmic method. This might seem the safe option to ensure that TIG can capture innovation presented to it. But you should note that TIG has the right to apply for patents based on all algorithmic methods contributed to the game with an associated request for a Token Holder Vote regardless of the outcome of the vote.
+- A voter may be tempted to default to voting affirmatively on each Token Holder Vote with the intent of making an algorithmic method eligible for Advance Rewards to ensure that there is at least an option for TIG to capture intellectual property with respect to the algorithmic method. This might seem the safe option to ensure that TIG can capture innovation presented to it. But you should note that TIG has the right to apply for patents based on all algorithmic methods contributed to the game with an associated request for a Token Holder Vote regardless of the outcome of the vote.
 
-  You should endeavour to avoid affirming eligibility for potential Breakthrough Rewards for algorithmic methods that are not, novel and inventive because this can have serious consequences by prejudicing and stifling innovation that does satisfy those criteria.
+  You should endeavour to avoid affirming eligibility for potential Advance Rewards for algorithmic methods that are not, novel and inventive because this can have serious consequences by prejudicing and stifling innovation that does satisfy those criteria.
 
-  An algorithmic method that is incorrectly made eligible for potential Breakthrough Rewards may, if sufficiently adopted by benchmarkers, either; **(i)** deprive an innovator of their continuing Breakthrough Rewards thus disincentivising future innovation from that innovator and other observers; or **(ii)** deprive the TIG Treasury of bootstrap rewards (see below). Bootstrap Rewards should be used to fund/incentivise research towards an algorithmic breakthrough corresponding to challenges featured in TIG.
+  An algorithmic method that is incorrectly made eligible for potential Advance Rewards may, if sufficiently adopted by benchmarkers, either; **(i)** deprive an innovator of their continuing Advance Rewards thus disincentivising future innovation from that innovator and other observers; or **(ii)** deprive the TIG Treasury of bootstrap rewards (see below). Bootstrap Rewards should be used to fund/incentivise research towards an algorithmic breakthrough corresponding to challenges featured in TIG.
 
 ### Bootstrap Rewards
 
-- It is possible, particularly in the early phases of TIG, that certain challenges will **not** be addressed in the Game by algorithmic methods that are eligible for Breakthrough Rewards because the algorithmic methods lack novelty or inventiveness or because no relevant algorithmic method has reached the threshold to be merged. In this situation those TIG token rewards ordinarily available for innovators as Breakthrough Rewards will be unallocated (we call these unallocated rewards, “**Bootstrap Rewards**”).
+- It is possible, particularly in the early phases of TIG, that certain challenges will **not** be addressed in the Game by algorithmic methods that are eligible for Advance Rewards because the algorithmic methods lack novelty or inventiveness or because no relevant algorithmic method has reached the threshold to be merged. In this situation those TIG token rewards ordinarily available for innovators as Advance Rewards will be unallocated (we call these unallocated rewards, “**Bootstrap Rewards**”).
 
-- Bootstrap Rewards will be allocated to the TIG Treasury. Bootstrap Rewards will be “ringfenced” and used very specifically by TIG (through distribution of bounty rewards) to incentivise the development of algorithmic methods which address challenges for which there are not presently algorithmic methods in the TIG Game which are eligible for potential Breakthrough Rewards or not merged. This should help algorithmic methods in the Game reach state of the art more quickly and this will accelerate the capture of meaningful value by TIG. This form of “centralised” allocation should only persist for as long as there are challenges in the game which are not solved by algorithmic methods that are earning Breakthrough Rewards.
+- Bootstrap Rewards will be allocated to the TIG Treasury. Bootstrap Rewards will be “ringfenced” and used very specifically by TIG (through distribution of bounty rewards) to incentivise the development of algorithmic methods which address challenges for which there are not presently algorithmic methods in the TIG Game which are eligible for potential Advance Rewards or not merged. This should help algorithmic methods in the Game reach state of the art more quickly and this will accelerate the capture of meaningful value by TIG. This form of “centralised” allocation should only persist for as long as there are challenges in the game which are not solved by algorithmic methods that are earning Advance Rewards.
 
 ## Intellectual Property
 
-- TIG will only have the rights to file patent applications based on algorithmic methods where the contributor has sought Breakthrough Rewards by making a request for a Token Holder Vote. Innovators will only request Token Holder Votes if they have reasonable confidence that the process is fair and consistent allowing them to assess their chances of success in the vote with reasonable certainty.
+- TIG will only have the rights to file patent applications based on algorithmic methods where the contributor has sought Advance Rewards by making a request for a Token Holder Vote. Innovators will only request Token Holder Votes if they have reasonable confidence that the process is fair and consistent allowing them to assess their chances of success in the vote with reasonable certainty.
 
 ## Commercial Value
 

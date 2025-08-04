@@ -151,7 +151,7 @@ Notwithstanding that the copyright will afford significant value in the optimise
 
 To help nurture and sustain open collaboration it is important that there is a disincentive to escape the “copyleft effect” sought by the TIG Open Data Licence with respect to the innovation incentivised and captured by The Innovation Game. Therefore, in addition to any copyright assigned to TIG in code submitted to The Innovation Game (which may be evaded by re-implementation), TIG wishes to seek patents on the technical effects of certain algorithmic advances embodied in submitted code.
 
-TIG will provide enhanced rewards for code submissions which embody an algorithmic advance. To be considered for such enhanced rewards the Innovator must**: (i)** submit a claim which meets certain minimum disclosure criteria; and **(ii)** provide a fixed deposit. Whether the submitted code meets the standard to be classified as an algorithmic advance will be determined by a vote which will be open to all TIG token holders.
+TIG will provide advance rewards for code submissions which embody an algorithmic advance. To be considered for such advance rewards the Innovator must**: (i)** submit a claim which meets certain minimum disclosure criteria; and **(ii)** provide a fixed deposit. Whether the submitted code meets the standard to be classified as an algorithmic advance will be determined by a vote which will be open to all TIG token holders.
 
 TIG will file a provisional patent application (taking advantage of the twelve month grace period for disclosure available in the US) in relation to algorithmic advances prior to publication of such advances in The Innovation Game.
 
@@ -165,7 +165,7 @@ The license fees will be adjustable to respond to demand and the growth of value
 
 ### What assurance does a licensee have that the licensed algorithm implementations do not infringe third party intellectual property rights ?**
 
-The TIG Inbound Game License secures license rights for TIG with scope that is sufficient to support onward licensing of a contributors IP under any of the downstream TIG licenses. With respect to code that is not the original work of a contributor the level of exposure to third party IP infringement is the same as it would be under the license under which it was contributed (e.g. MIT, BSD, Apache). For IP that is assigned to TIG in return for enhanced rewards any patent granted related to that IP will only be granted by an examiner if it is novel which would be a firm indication that it is an original invention.
+The TIG Inbound Game License secures license rights for TIG with scope that is sufficient to support onward licensing of a contributors IP under any of the downstream TIG licenses. With respect to code that is not the original work of a contributor the level of exposure to third party IP infringement is the same as it would be under the license under which it was contributed (e.g. MIT, BSD, Apache). For IP that is assigned to TIG in return for advance rewards any patent granted related to that IP will only be granted by an examiner if it is novel which would be a firm indication that it is an original invention.
 
 ## TIG Open Data License
 
@@ -201,7 +201,7 @@ The TIG Open Data License only requires disclosure pf data that does not retain 
 
 ### Am I obliged to assign the IP in my algorithm improvement to TIG ?
 
-No. The assignment of intellectual property related to algorithmic breakthroughs will be an important contributor to driving the value of the innovator incentives (TIG Tokens) over time but there is no obligation to assign ownership of any intellectual property to TIG. It is the intention of TIG to introduce enhanced rewards for algorithmic breakthroughs that are submitted to the game should the innovator wish to claim them. Assignment of ownership of inventions will only be necessary if an innovator wishes to claim enhanced rewards.
+No. The assignment of intellectual property related to algorithmic advances will be an important contributor to driving the value of the innovator incentives (TIG Tokens) over time but there is no obligation to assign ownership of any intellectual property to TIG. It is the intention of TIG to introduce advance rewards for algorithmic advances that are submitted to the game should the innovator wish to claim them. Assignment of ownership of inventions will only be necessary if an innovator wishes to claim advance rewards.
 
 ## TIG Benchmarker Game License
 

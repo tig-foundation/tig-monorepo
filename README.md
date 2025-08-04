@@ -9,15 +9,15 @@ This repository contains the implementation of The Innovation Game (TIG).
 * [TIG Documentation](https://docs.tig.foundation/)
 * [TIG Whitepaper](docs/whitepaper.pdf)
 * [TIG Licensing Explainer](docs/guides/anatomy.md)
-* [Implementations vs Breakthroughs](docs/guides/breakthroughs.md)
+* [Implementations vs Advances](docs/guides/advances.md)
 * [Voting Guidelines for Token Holders](docs/guides/voting.md)
 
 ## Repo Contents
 
+* [tig-advances](./tig-advances/README.md) - A folder that hosts submissions of algorithmic methods made by Innovators in TIG.
 * [tig-algorithms](./tig-algorithms/README.md) - A Rust crate that hosts algorithm submissions made by Innovators in TIG
 * [tig-benchmarker](./tig-benchmarker/README.md) - Python scripts for running TIG's benchmarker in master/slave configuration
 * [tig-binary](./tig-binary/README.md) - A Rust crate that wraps an algorithm from [`tig-algorithm`](./tig-algorithms/README.md) for compilation into a shared object.
-* [tig-breakthroughs](./tig-breakthroughs/README.md) - A folder that hosts submissions of algorithmic methods made by Innovators in TIG.
 * [tig-challenges](./tig-challenges/README.md) - A Rust crate that contains the implementation of TIG's challenges (computational problems adapted for proof-of-work)
 * [tig-protocol](./tig-protocol/README.md) - A Rust crate that contains the implementation of TIG's core protocol logic.
 * [tig-runtime](./tig-runtime/README.md) - A Rust crate that execute an algorithm (compiled from [`tig-binary`](./tig-binary/README.md)) for a single nonce, generating runtime signature and fuel consumed for verification.
