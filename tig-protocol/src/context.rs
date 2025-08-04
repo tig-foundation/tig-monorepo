@@ -4,6 +4,12 @@ use tig_structs::{config::*, core::*};
 
 #[allow(async_fn_in_trait)]
 pub trait Context {
+    async fn get_advance_state(&self, advance_id: &String) -> Option<AdvanceState>;
+    async fn add_advance_to_mempool(
+        &self,
+        details: AdvanceDetails,
+        evidence: String,
+    ) -> Result<String>;
     async fn get_algorithm_state(&self, algorithm_id: &String) -> Option<AlgorithmState>;
     async fn add_algorithm_to_mempool(
         &self,
@@ -30,12 +36,6 @@ pub trait Context {
     ) -> Result<()>;
     async fn get_latest_block_id(&self) -> String;
     async fn get_block_details(&self, block_id: &String) -> Option<BlockDetails>;
-    async fn get_breakthrough_state(&self, breakthrough_id: &String) -> Option<BreakthroughState>;
-    async fn add_breakthrough_to_mempool(
-        &self,
-        details: BreakthroughDetails,
-        evidence: String,
-    ) -> Result<String>;
     async fn get_challenge_state(&self, challenge_id: &String) -> Option<ChallengeState>;
     async fn get_challenge_block_data(
         &self,
@@ -62,12 +62,8 @@ pub trait Context {
         player_id: String,
         coinbase: HashMap<String, f64>,
     ) -> Result<()>;
-    async fn set_player_vote(
-        &self,
-        player_id: String,
-        breakthrough_id: String,
-        yes: bool,
-    ) -> Result<()>;
+    async fn set_player_vote(&self, player_id: String, advance_id: String, yes: bool)
+        -> Result<()>;
     async fn get_precommit_settings(&self, benchmark_id: &String) -> Option<BenchmarkSettings>;
     async fn get_precommit_details(&self, benchmark_id: &String) -> Option<PrecommitDetails>;
     async fn add_precommit_to_mempool(
@@ -102,10 +98,10 @@ pub struct AddBlockCache {
     pub active_algorithms_state: HashMap<String, AlgorithmState>,
     pub active_algorithms_details: HashMap<String, AlgorithmDetails>,
     pub active_algorithms_block_data: HashMap<String, AlgorithmBlockData>,
-    pub voting_breakthroughs_state: HashMap<String, BreakthroughState>,
-    pub active_breakthroughs_state: HashMap<String, BreakthroughState>,
-    pub active_breakthroughs_details: HashMap<String, BreakthroughDetails>,
-    pub active_breakthroughs_block_data: HashMap<String, BreakthroughBlockData>,
+    pub voting_advances_state: HashMap<String, AdvanceState>,
+    pub active_advances_state: HashMap<String, AdvanceState>,
+    pub active_advances_details: HashMap<String, AdvanceDetails>,
+    pub active_advances_block_data: HashMap<String, AdvanceBlockData>,
     pub active_solutions: Vec<(BenchmarkSettings, u32, u32, u32)>,
     pub confirmed_num_solutions: HashMap<String, u32>,
 }

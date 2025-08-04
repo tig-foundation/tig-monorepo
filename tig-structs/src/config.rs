@@ -6,9 +6,9 @@ use tig_utils::PreciseNumber;
 
 serializable_struct_with_getters! {
     ProtocolConfig {
+        advances: AdvancesConfig,
         algorithms: AlgorithmsConfig,
         benchmarks: BenchmarksConfig,
-        breakthroughs: BreakthroughsConfig,
         challenges: ChallengesConfig,
         deposits: DepositsConfig,
         erc20: ERC20Config,
@@ -20,7 +20,7 @@ serializable_struct_with_getters! {
 }
 
 serializable_struct_with_getters! {
-    BreakthroughsConfig {
+    AdvancesConfig {
         bootstrap_address: String,
         min_percent_yes_votes: f64,
         vote_start_delay: u32,
@@ -141,7 +141,7 @@ serializable_struct_with_getters! {
     DistributionConfig {
         opow: f64,
         algorithms: f64,
-        breakthroughs: f64,
+        advances: f64,
         challenge_owners: f64,
     }
 }

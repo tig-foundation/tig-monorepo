@@ -150,7 +150,7 @@ pub async fn set_reward_share<T: Context>(
 pub async fn set_vote<T: Context>(
     ctx: &T,
     player_id: String,
-    breakthrough_id: String,
+    advance_id: String,
     yes: bool,
 ) -> Result<()> {
     let config = ctx.get_config().await;
@@ -158,28 +158,28 @@ pub async fn set_vote<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
-    let breakthrough_state = ctx
-        .get_breakthrough_state(&breakthrough_id)
+    let advance_state = ctx
+        .get_advance_state(&advance_id)
         .await
-        .ok_or_else(|| anyhow!("Invalid breakthrough '{}'", breakthrough_id))?;
-    if latest_block_details.round < breakthrough_state.round_voting_starts
-        || latest_block_details.round >= breakthrough_state.round_votes_tallied
+        .ok_or_else(|| anyhow!("Invalid advance '{}'", advance_id))?;
+    if latest_block_details.round < advance_state.round_voting_starts
+        || latest_block_details.round >= advance_state.round_votes_tallied
     {
-        return Err(anyhow!("Cannot vote on breakthrough '{}'", breakthrough_id));
+        return Err(anyhow!("Cannot vote on advance '{}'", advance_id));
     }
 
-    if player_state.votes.contains_key(&breakthrough_id) {
+    if player_state.votes.contains_key(&advance_id) {
         return Err(anyhow!(
-            "You have already voted on breakthrough '{}'",
-            breakthrough_id
+            "You have already voted on advance '{}'",
+            advance_id
         ));
     }
 
     let player_data = ctx
         .get_player_block_data(&player_id, &latest_block_id)
         .await;
-    let n = breakthrough_state.round_votes_tallied - latest_block_details.round
-        + config.breakthroughs.min_lock_period_to_vote;
+    let n = advance_state.round_votes_tallied - latest_block_details.round
+        + config.advances.min_lock_period_to_vote;
     let zero = PreciseNumber::from(0);
     if !player_data.is_some_and(|d| {
         d.deposit_by_locked_period
@@ -193,7 +193,7 @@ pub async fn set_vote<T: Context>(
         ));
     }
 
-    ctx.set_player_vote(player_id, breakthrough_id, yes).await?;
+    ctx.set_player_vote(player_id, advance_id, yes).await?;
     Ok(())
 }
 

@@ -38,11 +38,11 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    Breakthrough {
+    Advance {
         id: String,
-        details: BreakthroughDetails,
-        state: BreakthroughState,
-        block_data: Option<BreakthroughBlockData>,
+        details: AdvanceDetails,
+        state: AdvanceState,
+        block_data: Option<AdvanceBlockData>,
     }
 }
 serializable_struct_with_getters! {
@@ -111,6 +111,36 @@ serializable_struct_with_getters! {
     }
 }
 
+// Advance child structs
+serializable_struct_with_getters! {
+    AdvanceDetails {
+        name: String,
+        player_id: String,
+        challenge_id: String,
+        fee_paid: PreciseNumber,
+    }
+}
+serializable_struct_with_getters! {
+    AdvanceState {
+        block_confirmed: u32,
+        round_submitted: u32,
+        round_pushed: u32,
+        round_voting_starts: u32,
+        round_votes_tallied: u32,
+        votes_tally: HashMap<bool, PreciseNumber>,
+        round_active: Option<u32>,
+        round_merged: Option<u32>,
+        banned: bool,
+    }
+}
+serializable_struct_with_getters! {
+    AdvanceBlockData {
+        adoption: PreciseNumber,
+        merge_points: u32,
+        reward: PreciseNumber,
+    }
+}
+
 // Algorithm child structs
 serializable_struct_with_getters! {
     AlgorithmCode {
@@ -123,7 +153,7 @@ serializable_struct_with_getters! {
         name: String,
         player_id: String,
         challenge_id: String,
-        breakthrough_id: Option<String>,
+        advance_id: Option<String>,
         fee_paid: PreciseNumber,
     }
 }
@@ -220,10 +250,10 @@ serializable_struct_with_getters! {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum TxType {
+    Advance,
     Algorithm,
     Benchmark,
     Binary,
-    Breakthrough,
     Challenge,
     Deposit,
     Fraud,
@@ -235,9 +265,9 @@ pub enum TxType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum ActiveType {
+    Advance,
     Algorithm,
     Benchmark,
-    Breakthrough,
     Challenge,
     Deposit,
     OPoW,
@@ -246,13 +276,13 @@ pub enum ActiveType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum EmissionsType {
-    Benchmarker,
+    Advance,
     Algorithm,
-    Breakthrough,
-    Delegator,
+    Benchmarker,
     Bootstrap,
-    Vault,
     ChallengeOwner,
+    Delegator,
+    Vault,
 }
 serializable_struct_with_getters! {
     BlockDetails {
@@ -270,36 +300,6 @@ serializable_struct_with_getters! {
     BlockData {
         confirmed_ids: HashMap<TxType, HashSet<String>>,
         active_ids: HashMap<ActiveType, HashSet<String>>,
-    }
-}
-
-// Breakthrough child structs
-serializable_struct_with_getters! {
-    BreakthroughDetails {
-        name: String,
-        player_id: String,
-        challenge_id: String,
-        fee_paid: PreciseNumber,
-    }
-}
-serializable_struct_with_getters! {
-    BreakthroughState {
-        block_confirmed: u32,
-        round_submitted: u32,
-        round_pushed: u32,
-        round_voting_starts: u32,
-        round_votes_tallied: u32,
-        votes_tally: HashMap<bool, PreciseNumber>,
-        round_active: Option<u32>,
-        round_merged: Option<u32>,
-        banned: bool,
-    }
-}
-serializable_struct_with_getters! {
-    BreakthroughBlockData {
-        adoption: PreciseNumber,
-        merge_points: u32,
-        reward: PreciseNumber,
     }
 }
 

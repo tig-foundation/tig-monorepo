@@ -11,7 +11,7 @@ class AlgorithmDetails(FromDict):
     name: str
     player_id: str
     challenge_id: str
-    breakthrough_id: Optional[str]
+    advance_id: Optional[str]
     fee_paid: PreciseNumber
 
 @dataclass
