@@ -61,7 +61,9 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
     output_file = f"{results_dir}/{batch['id']}/{nonce}.json"
     start = now()
     cmd = [
-        "docker", "exec", batch["challenge"], "tig-runtime",
+        "docker", "exec", batch["challenge"], 
+        "setarch", platform.machine(), "-R",
+        "tig-runtime",
         json.dumps(batch["settings"], separators=(',',':')),
         batch["rand_hash"],
         str(nonce),
@@ -75,7 +77,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         ]
     logger.debug(f"computing batch: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
     process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
     while True:
         ret = process.poll()

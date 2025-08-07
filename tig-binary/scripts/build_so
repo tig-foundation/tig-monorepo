@@ -81,8 +81,8 @@ process_file() {
             echo "Skipping $ll_file (not in whitelist)"
 
             cat "$ll_file" | \
-            llc -relocation-model=pic -o - | \
-            clang -fPIC -c -x assembler - -o "$temp_obj"
+            llc -o - | \
+            clang -c -x assembler - -o "$temp_obj"
             
             return 0
         fi
@@ -97,8 +97,8 @@ process_file() {
     IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
             -passes="fuel-rt-sig" -S -o - | \
-    llc -relocation-model=pic -o - | \
-    clang -fPIC -c -x assembler - -o "$temp_obj"
+    llc -o - | \
+    clang -c -x assembler - -o "$temp_obj"
     
     return $?
 }
@@ -234,9 +234,12 @@ cat > export_symbols.map << 'EOF'
   local: *;
 };
 EOF
+
+# add libmalloc.o to the list of files
+object_files+=("/opt/llvm/lib/libmalloc.o")
+
 clang "${object_files[@]}" \
     -shared \
-    -no-pie -fno-pic -fno-pie  \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
     -lm \
@@ -248,7 +251,8 @@ clang "${object_files[@]}" \
     -Wl,--build-id=none \
     -Wl,--eh-frame-hdr \
     -Wl,--version-script=export_symbols.map \
-    -Wl,-Map=output.map
+    -Wl,-Map=output.map \
+    # -no-pie -fno-pic -fno-pie
 
 strip --strip-debug $output
 
