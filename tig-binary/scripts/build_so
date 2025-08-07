@@ -30,7 +30,7 @@ RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
 else
     echo "x86_64-unknown-linux-gnu";
 fi)
-RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C opt-level=3 -C lto=no -C debuginfo=2 -C relocation-model=pic" \
+RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C opt-level=3 -C lto=no -C debuginfo=2 -C relocation-model=static" \
 cargo +nightly-2025-02-10 build \
     -p tig-binary \
     --target=$RUST_TARGET \
@@ -236,7 +236,7 @@ cat > export_symbols.map << 'EOF'
 EOF
 clang "${object_files[@]}" \
     -shared \
-    -fPIC \
+    -no-pie -fno-pic -fno-pie  \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
     -lm \
