@@ -84,7 +84,7 @@ process_file() {
             llc -relocation-model=static -o - | \
             clang -c -x assembler - -o "$temp_obj"
             
-            return 0
+            return $?
         fi
     fi
 
@@ -201,12 +201,12 @@ done
 echo "Successfully processed all files"
 
 RUST_TARGET_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
+LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
 
-#LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
-# if [ ! -L "$RUST_TARGET_LIBDIR/libstd.so" ]
-# then
-#     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
-# fi
+if [ ! -L "$RUST_TARGET_LIBDIR/libstd.so" ]
+then
+    ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
+fi
 
 ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ] || [ "$(arch 2>/dev/null || echo "")" = "aarch64" ] || [ "$(arch 2>/dev/null || echo "")" = "arm64" ]; then
     echo "arm64"
@@ -252,6 +252,11 @@ clang "${object_files[@]}" \
     -Wl,--version-script=export_symbols.map \
     -Wl,-Map=output.map \
     -no-pie
+
+if [ $? -ne 0 ]; then
+    echo "Failed to link binary"
+    exit 1
+fi
 
 strip --strip-debug $output
 
