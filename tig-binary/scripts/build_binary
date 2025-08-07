@@ -17,7 +17,7 @@ fi
 
 ALGORITHM="$1"
 
-echo "Compiling .so for $CHALLENGE/$ALGORITHM"
+echo "Compiling binary for $CHALLENGE/$ALGORITHM"
 cp tig-binary/src/entry_point_template.rs tig-binary/src/entry_point.rs
 sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-binary/src/entry_point.rs
 sed -i "s/{ALGORITHM}/$ALGORITHM/g" tig-binary/src/entry_point.rs
@@ -201,22 +201,22 @@ done
 echo "Successfully processed all files"
 
 RUST_TARGET_LIBDIR=$(rustc --print target-libdir --target=$RUST_TARGET)
-LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
 
-if [ ! -L "$RUST_TARGET_LIBDIR/libstd.so" ]
-then
-    ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
-fi
+#LIBSTD_HASH=$(find "$RUST_TARGET_LIBDIR" -name "libstd-*.rlib" -exec basename {} \; | head -n1 | sed -E 's/libstd-(.*)\..*$/\1/')
+# if [ ! -L "$RUST_TARGET_LIBDIR/libstd.so" ]
+# then
+#     ln -sf "$RUST_TARGET_LIBDIR/libstd-$LIBSTD_HASH.so" "$RUST_TARGET_LIBDIR/libstd.so"
+# fi
 
 ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ] || [ "$(arch 2>/dev/null || echo "")" = "aarch64" ] || [ "$(arch 2>/dev/null || echo "")" = "arm64" ]; then
     echo "arm64"
 else
     echo "amd64"
 fi)
-output=tig-algorithms/lib/$CHALLENGE/$ARCH/$ALGORITHM.so
+output=tig-algorithms/lib/$CHALLENGE/$ARCH/$ALGORITHM
 mkdir -p $(dirname $output)
 
-echo "Linking into shared library '$output'"
+echo "Linking binary '$output'"
 cat > export_symbols.map << 'EOF'
 {
   global:
@@ -252,12 +252,10 @@ clang "${object_files[@]}" \
     -Wl,--version-script=export_symbols.map \
     -Wl,-Map=output.map \
     -no-pie
-    # -no-pie -fno-pic -fno-pie
-    # -shared
 
 strip --strip-debug $output
 
 # Clean up temp files
-rm -f /tmp/*.o.path
+rm -f /tmp/*.o
 
 echo "Done"
