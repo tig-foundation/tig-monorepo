@@ -250,7 +250,8 @@ clang "${object_files[@]}" \
     -Wl,--build-id=none \
     -Wl,--eh-frame-hdr \
     -Wl,--version-script=export_symbols.map \
-    -Wl,-Map=output.map
+    -Wl,-Map=output.map \
+    -no-pie
     # -no-pie -fno-pic -fno-pie
     # -shared
 
