@@ -239,7 +239,6 @@ EOF
 object_files+=("/opt/llvm/lib/libmalloc.o")
 
 clang "${object_files[@]}" \
-    -shared \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
     -lm \
@@ -253,6 +252,7 @@ clang "${object_files[@]}" \
     -Wl,--version-script=export_symbols.map \
     -Wl,-Map=output.map \
     # -no-pie -fno-pic -fno-pie
+    # -shared
 
 strip --strip-debug $output
 
