@@ -16,7 +16,7 @@ Each submissions is committed to their own branch with the naming pattern:
 2. Email the following to `advances@tig.foundation` with subject "Advance Submission (`<advance_name>`)":
     * **Evidence form**: copy & fill in [`evidence.md`](./evidence.md). Of particular importance is Section 1 which describes your advance
 
-    * **Invention assignment**: copy & replace [invention_assignment.doc](../docs/agreements/invention_assignment.doc) the highlighted parts. Inventor and witness must sign.
+    * **Invention assignment**: copy & replace [invention_assignment.docx](../docs/agreements/invention_assignment.docx) the highlighted parts. Inventor and witness must sign.
 
     * **Address Signature**: use [etherscan](https://etherscan.io/verifiedSignatures#) to sign a message `I am signing this message to confirm my submission of advance <advance_name>`. Use your player_id that is making the submission. Send the verified etherscan link with message and signature.
 
