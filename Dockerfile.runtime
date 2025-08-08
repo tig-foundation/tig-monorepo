@@ -25,6 +25,6 @@ RUN chmod +x /usr/local/bin/tig-runtime && \
     chmod +x /usr/local/bin/tig-verifier
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib/rust"
 
-RUN for f in /usr/lib/*-linux-gnu/libcudnn*.so.[0-9]; do ln -sf "$(basename "$f")" "${f%.*.*}.so"; done
+RUN if ls /usr/lib/*-linux-gnu/libcudnn*.so.[0-9] 1>/dev/null 2>&1; then for f in /usr/lib/*-linux-gnu/libcudnn*.so.[0-9]; do ln -sf "$(basename "$f")" "${f%.*.*}.so"; done; fi
 
 WORKDIR /app
