@@ -188,7 +188,8 @@
 
 // c003_a095
 
-// c003_a096
+pub mod resonance_knapsack;
+pub use resonance_knapsack as c003_a096;
 
 // c003_a097
 
