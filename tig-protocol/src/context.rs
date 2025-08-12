@@ -14,7 +14,11 @@ pub trait Context {
     async fn get_benchmark_data(
         &self,
         benchmark_id: &String,
-    ) -> Option<(HashSet<u64>, HashSet<u64>)>;
+    ) -> Option<(
+        Option<HashSet<u64>>,
+        Option<HashSet<u64>>,
+        Option<HashSet<u64>>,
+    )>;
     async fn add_benchmark_to_mempool(
         &self,
         benchmark_id: String,
