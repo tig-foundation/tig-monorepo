@@ -81,6 +81,8 @@ class Benchmark(FromDict):
     id: str
     details: BenchmarkDetails
     state: BenchmarkState
+    non_solution_nonces: Optional[Set[int]]
+    discarded_solution_nonces: Optional[Set[int]]
     solution_nonces: Optional[Set[int]]
 
 @dataclass

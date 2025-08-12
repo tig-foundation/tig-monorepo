@@ -19,8 +19,9 @@ pub trait Context {
         &self,
         benchmark_id: String,
         details: BenchmarkDetails,
-        solution_nonces: HashSet<u64>,
-        discarded_solution_nonces: HashSet<u64>,
+        non_solution_nonces: Option<HashSet<u64>>,
+        solution_nonces: Option<HashSet<u64>>,
+        discarded_solution_nonces: Option<HashSet<u64>>,
     ) -> Result<()>;
     async fn get_binary_details(&self, code_id: &String) -> Option<BinaryDetails>;
     async fn add_binary_to_mempool(&self, code_id: String, details: BinaryDetails) -> Result<()>;
