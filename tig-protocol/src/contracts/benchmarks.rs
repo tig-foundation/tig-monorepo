@@ -1,6 +1,5 @@
 use crate::context::*;
 use anyhow::{anyhow, Result};
-use core::num;
 use logging_timer::time;
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use std::collections::HashSet;
@@ -238,8 +237,21 @@ pub async fn submit_proof<T: Context>(
         .get_benchmark_details(&benchmark_id)
         .await
         .ok_or_else(|| anyhow!("Benchmark needs to be submitted first."))?;
-    let (solution_nonces, discarded_solution_nonces) =
+    let (solution_nonces, discarded_solution_nonces, non_solution_nonces) =
         ctx.get_benchmark_data(&benchmark_id).await.unwrap();
+    // expect that exactly 2 sets of nonces are provided
+    let mut nonces_sets = vec![
+        &solution_nonces,
+        &discarded_solution_nonces,
+        &non_solution_nonces,
+    ];
+    nonces_sets.sort_by_key(|x| x.is_none());
+    let set_x = nonces_sets[0]
+        .as_ref()
+        .unwrap()
+        .union(nonces_sets[1].as_ref().unwrap())
+        .cloned()
+        .collect::<HashSet<u64>>();
 
     // check player owns benchmark
     let settings = ctx.get_precommit_settings(&benchmark_id).await.unwrap();
@@ -273,8 +285,9 @@ pub async fn submit_proof<T: Context>(
         .ok_or_else(|| anyhow!("Block too old"))?;
 
     // use reliability to adjust hash threshold
-    let solution_ratio =
-        (solution_nonces.len() + discarded_solution_nonces.len()) as f64 / num_nonces as f64;
+    let solution_ratio = (benchmark_details.num_solutions
+        + benchmark_details.num_discarded_solutions) as f64
+        / num_nonces as f64;
     let reliability = if average_solution_ratio == 0.0 {
         1.0
     } else if solution_ratio == 0.0 {
@@ -305,20 +318,33 @@ pub async fn submit_proof<T: Context>(
         }
         let output_meta_data = OutputMetaData::from(merkle_proof.leaf.clone());
         let hash = MerkleHash::from(output_meta_data);
-        if solution_nonces.contains(&merkle_proof.leaf.nonce) && hash.0 > hash_threshold.0 {
-            verification_result = Err(anyhow!(
-                "Invalid merkle hash for solution @ nonce {} does not meet threshold",
-                merkle_proof.leaf.nonce
-            ));
-            break;
-        } else if discarded_solution_nonces.contains(&merkle_proof.leaf.nonce)
-            && hash.0 <= hash_threshold.0
-        {
-            verification_result = Err(anyhow!(
-                "Invalid merkle hash for discarded solution @ nonce {} meets threshold",
-                merkle_proof.leaf.nonce
-            ));
-            break;
+        if hash.0 > hash_threshold.0 {
+            // if nonce is a solution, it must be below hash_threshold
+            if solution_nonces
+                .as_ref()
+                .is_some_and(|x| x.contains(&merkle_proof.leaf.nonce))
+                || (solution_nonces.is_none() && !set_x.contains(&merkle_proof.leaf.nonce))
+            {
+                verification_result = Err(anyhow!(
+                    "Invalid merkle hash for solution @ nonce {} does not meet threshold",
+                    merkle_proof.leaf.nonce
+                ));
+                break;
+            }
+        } else {
+            // if nonce is a discarded solution, it must be above hash_threshold
+            if discarded_solution_nonces
+                .as_ref()
+                .is_some_and(|x| x.contains(&merkle_proof.leaf.nonce))
+                || (discarded_solution_nonces.is_none()
+                    && !set_x.contains(&merkle_proof.leaf.nonce))
+            {
+                verification_result = Err(anyhow!(
+                    "Invalid merkle hash for discarded solution @ nonce {} meets threshold",
+                    merkle_proof.leaf.nonce
+                ));
+                break;
+            }
         }
         let result = merkle_proof
             .branch
