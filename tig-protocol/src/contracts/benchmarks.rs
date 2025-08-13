@@ -137,7 +137,6 @@ pub async fn submit_benchmark<T: Context>(
     // check at least 2 sets of nonces are provided
     let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
     let num_nonces = precommit_details.num_nonces as u64;
-    let max_set_size = ((num_nonces + 2) / 3) as usize;
 
     let mut nonces_sets = vec![
         &solution_nonces,
@@ -153,7 +152,8 @@ pub async fn submit_benchmark<T: Context>(
     if !set_a.is_disjoint(set_b) {
         return Err(anyhow!("Nonces sets must be disjoint.",));
     }
-    if set_a.len() > max_set_size || set_b.len() > max_set_size {
+    let set_c_size = num_nonces as usize - set_a.len() - set_b.len();
+    if set_a.len() > set_c_size || set_b.len() > set_c_size {
         return Err(anyhow!("The 2 smaller sets of nonces must be submitted"));
     }
     if !set_a.iter().all(|n| *n < num_nonces) || !set_b.iter().all(|n| *n < num_nonces) {

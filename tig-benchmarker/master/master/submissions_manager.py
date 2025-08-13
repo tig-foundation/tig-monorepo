@@ -144,10 +144,10 @@ class SubmissionsManager:
             solution_nonces = benchmark_to_submit["solution_nonces"]
             discarded_solution_nonces = benchmark_to_submit["discarded_solution_nonces"]
 
-            max_size = (num_nonces + 2) // 3
-            if len(solution_nonces) > max_size:
+            max_size = max(len(non_solution_nonces), len(solution_nonces), len(discarded_solution_nonces))
+            if len(solution_nonces) == max_size:
                 solution_nonces = None
-            elif len(discarded_solution_nonces) > max_size:
+            elif len(discarded_solution_nonces) == max_size:
                 discarded_solution_nonces = None
             else:
                 non_solution_nonces = None
