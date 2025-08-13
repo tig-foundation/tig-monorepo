@@ -180,6 +180,8 @@ pub fn compute_solution(
                     &prop,
                 )?;
 
+                ctx.enable_memory_tracking(1024 * 1024);
+
                 let initialize_kernel = module.load_function("initialize_kernel")?;
 
                 let cfg = LaunchConfig {
