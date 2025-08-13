@@ -204,9 +204,14 @@ fn main() {
         },
         None => i64::MAX,
     };
-    __max_fuel.store(max_fuel, std::sync::atomic::Ordering::Relaxed);
-    __fuel_remaining.store(max_fuel, std::sync::atomic::Ordering::Relaxed);
-    //__max_allowed_memory_usage.store(settings.max_memory_usage as u64, std::sync::atomic::Ordering::Relaxed);
+    
+    _flush_tls(); 
+    {
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        __max_fuel.store(max_fuel, std::sync::atomic::Ordering::Relaxed);
+        __fuel_remaining.store(max_fuel, std::sync::atomic::Ordering::Relaxed);
+        //__max_allowed_memory_usage.store(settings.max_memory_usage as u64, std::sync::atomic::Ordering::Relaxed);
+    }
 
     unsafe {
         __switch_stack_and_call(
@@ -225,8 +230,6 @@ extern "C" fn _flush_tls() {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
-    _flush_tls(); // flush thread local fuel & rtsig
-
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
