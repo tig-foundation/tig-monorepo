@@ -1,4 +1,4 @@
-use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+//use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{to_string, to_value, Map, Value};
 use std::{
@@ -44,17 +44,19 @@ pub fn decompress_obj<T>(input: &[u8]) -> anyhow::Result<T>
 where
     T: DeserializeOwned,
 {
-    let mut decoder = ZlibDecoder::new(input);
+    /*let mut decoder = ZlibDecoder::new(input);
     let mut decompressed = String::new();
     decoder.read_to_string(&mut decompressed)?;
-    Ok(dejsonify(&decompressed)?)
+    Ok(dejsonify(&decompressed)?)*/
+    Err(anyhow::anyhow!("Not implemented"))
 }
 
 pub fn compress_obj<T>(input: T) -> Vec<u8>
 where
     T: Serialize,
 {
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    /*let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(jsonify(&input).as_bytes()).unwrap();
-    encoder.finish().unwrap()
+    encoder.finish().unwrap()*/
+    vec![]
 }
