@@ -2,7 +2,7 @@ extern crate tig_algorithms;
 extern crate tig_challenges;
 
 #[cfg(feature = "entry_point")]
-use std::sync::atomic::AtomicI64;
+use std::sync::atomic::{AtomicI64, AtomicU64};
 
 #[cfg(feature = "entry_point")]
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData, Solution};
@@ -117,6 +117,10 @@ fn load_settings(settings: &str) -> BenchmarkSettings {
 pub static __max_fuel: AtomicI64 = AtomicI64::new(i64::MAX);
 
 #[cfg(feature = "entry_point")]
+#[no_mangle]
+pub static __nonce: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(feature = "entry_point")]
 fn main() {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let mut opts = Options::new(args.iter().map(String::as_str));
@@ -172,7 +176,8 @@ fn main() {
     }
 
     let settings = load_settings(&settings.expect("Settings not provided"));
-    let seed = settings.calc_seed(&rand_hash.expect("Rand hash not provided"), nonce.expect("Nonce not provided"));
+    let nonce = nonce.expect("Nonce not provided");
+    let seed = settings.calc_seed(&rand_hash.expect("Rand hash not provided"), nonce);
 
     println!("Settings: {:?}", settings);
     println!("Seed: {:?}", seed);
@@ -183,6 +188,7 @@ fn main() {
     let challenge = Box::new(Challenge::generate_instance(&seed, &settings.difficulty.into()).expect("Failed to generate challenge"));
     let ptr_to_challenge = Box::into_raw(challenge) as *const _ as *const core::ffi::c_void;
     
+    __nonce.store(nonce, std::sync::atomic::Ordering::Relaxed);
     __runtime_signature.store(u64::from_le_bytes(seed[0..8].try_into().unwrap()), std::sync::atomic::Ordering::Relaxed);
     let max_fuel = match fuel {
         Some(fuel) => match fuel.expect("Fuel not provided").parse::<i64>() {
@@ -287,7 +293,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     }
 
     let output_data = OutputData {
-        nonce: challenge.nonce,
+        nonce: __nonce.load(std::sync::atomic::Ordering::Relaxed),
         runtime_signature,
         fuel_consumed,
         solution,
@@ -304,9 +310,6 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 
     std::process::exit(0);
 }
-
-#[cfg(feature = "entry_point")]
-use std::sync::atomic::{AtomicU64};
 
 #[cfg(feature = "entry_point")]
 #[no_mangle]
