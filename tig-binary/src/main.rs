@@ -31,7 +31,7 @@ unsafe fn __switch_stack_and_call(
     #[cfg(target_arch = "x86_64")]
     {
         std::arch::asm!(
-            "mov r11, rsp", // backup old stack pointer
+            "mov r12, rsp", // backup old stack pointer
 
             "mov rsp, {stack_top}", // switch to new stack
             "and rsp, -16", // align stack to 16 bytes
@@ -39,7 +39,7 @@ unsafe fn __switch_stack_and_call(
             "mov rdi, {arg}", // set first argument
             "call {func}",
             
-            "mov rsp, r11", // restore original stack
+            "mov rsp, r12", // restore original stack
             
             stack_top = in(reg) stack_top_ptr,
             func = in(reg) func_to_call,
@@ -226,31 +226,6 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
     
-    /*{
-        unsafe {
-            #[cfg(target_arch = "x86_64")]
-            std::arch::asm!(
-                "mov {}, rsp",
-                out(reg) stack_ptr,
-            );
-            
-            #[cfg(target_arch = "aarch64")]
-            std::arch::asm!(
-                "mov {}, sp",
-                out(reg) stack_ptr,
-            );
-        }
-        
-        println!("solve() called with new stack!");
-        println!("Current stack pointer: 0x{:x}", stack_ptr);
-        println!("Current challenge pointer: 0x{:x}", ptr_to_challenge as usize);
-        for instance in &challenge.sub_instances {
-            println!("Instance: {} {}", instance.max_weight, instance.baseline_value);
-        }
-
-        println!("Challenge: {}", challenge.difficulty.num_items);
-    }*/
-
     let(solution, fuel_consumed, runtime_signature) = { 
         let result = crate::entry_point::entry_point(&challenge);
         if let Err(e) = result {
