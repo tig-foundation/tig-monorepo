@@ -306,7 +306,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 }
 
 #[cfg(feature = "entry_point")]
-use std::sync::atomic::{AtomicU64},
+use std::sync::atomic::{AtomicU64};
 
 #[cfg(feature = "entry_point")]
 #[no_mangle]
