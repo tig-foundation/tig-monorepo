@@ -269,7 +269,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
         std::process::exit(87);
     }
 
-    let (solution, invalid_reason) = match result {
+    let (solution, invalid_reason) = match solution {
         Some(s) => match challenge.verify_solution(&s) {
             Ok(_) => (
                 serde_json::to_value(&s)
