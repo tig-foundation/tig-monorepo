@@ -218,7 +218,15 @@ fn main() {
 }
 
 #[cfg(feature = "entry_point")]
+#[inline(never)]
+extern "C" fn _flush_tls() {
+    std::hint::black_box(());
+}
+
+#[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
+    _flush_tls(); // flush thread local fuel & rtsig
+
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
