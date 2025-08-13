@@ -16,6 +16,7 @@ use entry_point::{Challenge};
 
 #[cfg(feature = "entry_point")]
 #[inline(never)]
+#[no_mangle]
 unsafe fn __switch_stack_and_call(
     stack_top_ptr: *mut u8,
     func_to_call: *const core::ffi::c_void,
