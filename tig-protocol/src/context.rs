@@ -99,6 +99,6 @@ pub struct AddBlockCache {
     pub active_advances_state: HashMap<String, AdvanceState>,
     pub active_advances_details: HashMap<String, AdvanceDetails>,
     pub active_advances_block_data: HashMap<String, AdvanceBlockData>,
-    pub active_solutions: Vec<(BenchmarkSettings, u32, u32, u32)>,
-    pub confirmed_num_solutions: HashMap<String, u32>,
+    pub active_solutions: Vec<(BenchmarkSettings, u64, u64, u64)>,
+    pub confirmed_num_solutions: HashMap<String, u64>,
 }
