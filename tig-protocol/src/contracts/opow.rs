@@ -54,7 +54,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
     }
 
-    let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u32>>::new();
+    let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u64>>::new();
     for (settings, num_solutions, _, _) in active_solutions.iter() {
         *num_solutions_by_player_by_challenge
             .entry(settings.player_id.clone())
@@ -68,14 +68,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let phase_in_start = (block_details.round - 1) * config.rounds.blocks_per_round;
         let phase_in_period = config.opow.cutoff_phase_in_period;
         let phase_in_end = phase_in_start + phase_in_period;
-        let cutoff_cap = (self_deposit[player_id] / deposit_to_cutoff_cap_ratio).to_f64() as u32;
+        let cutoff_cap = (self_deposit[player_id] / deposit_to_cutoff_cap_ratio).to_f64() as u64;
         let min_num_solutions = active_challenge_ids
             .iter()
             .map(|id| num_solutions_by_challenge.get(id).unwrap_or(&0).clone())
             .min()
             .unwrap();
         let mut cutoff = cutoff_cap
-            .min((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32);
+            .min((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u64);
         if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
             let phase_in_min_num_solutions = active_challenge_ids
                 .iter()
@@ -84,12 +84,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .min()
                 .unwrap();
             let phase_in_cutoff = cutoff_cap.min(
-                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u32,
+                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u64,
             );
             let phase_in_weight =
                 (phase_in_end - block_details.height) as f64 / phase_in_period as f64;
             cutoff = (phase_in_cutoff as f64 * phase_in_weight
-                + cutoff as f64 * (1.0 - phase_in_weight)) as u32;
+                + cutoff as f64 * (1.0 - phase_in_weight)) as u64;
         }
         opow_data.cutoff = cutoff;
     }
@@ -127,7 +127,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update qualifiers
     let mut solutions_by_challenge =
-        HashMap::<String, Vec<(&BenchmarkSettings, &u32, &u32, &u32)>>::new();
+        HashMap::<String, Vec<(&BenchmarkSettings, &u64, &u64, &u64)>>::new();
     for (settings, num_solutions, num_discarded_solutions, num_nonces) in active_solutions.iter() {
         solutions_by_challenge
             .entry(settings.challenge_id.clone())
@@ -143,7 +143,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 active_opow_block_data[player_id].cutoff.clone(),
             )
         })
-        .collect::<HashMap<String, u32>>();
+        .collect::<HashMap<String, u64>>();
 
     for challenge_id in active_challenge_ids.iter() {
         if !solutions_by_challenge.contains_key(challenge_id) {
@@ -162,7 +162,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             }
         }
         let mut solutions_by_frontier_idx =
-            HashMap::<usize, Vec<(&BenchmarkSettings, &u32, &u32, &u32)>>::new();
+            HashMap::<usize, Vec<(&BenchmarkSettings, &u64, &u64, &u64)>>::new();
         for &x in solutions.iter() {
             if !points.contains(&x.0.difficulty) {
                 continue;
@@ -174,10 +174,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
 
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        let min_num_nonces = config.opow.min_num_nonces as u64;
-        let mut player_algorithm_solutions = HashMap::<String, HashMap<String, u32>>::new();
-        let mut player_solutions = HashMap::<String, u32>::new();
-        let mut player_discarded_solutions = HashMap::<String, u32>::new();
+        let min_num_nonces = config.opow.min_num_nonces;
+        let mut player_algorithm_solutions = HashMap::<String, HashMap<String, u64>>::new();
+        let mut player_solutions = HashMap::<String, u64>::new();
+        let mut player_discarded_solutions = HashMap::<String, u64>::new();
         let mut player_nonces = HashMap::<String, u64>::new();
 
         for frontier_idx in 0..solutions_by_frontier_idx.len() {
@@ -229,7 +229,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     )
                 })
                 .collect();
-            let player_qualifiers: HashMap<String, u32> = player_solution_ratio
+            let player_qualifiers: HashMap<String, u64> = player_solution_ratio
                 .keys()
                 .map(|player_id| {
                     (
@@ -243,7 +243,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 })
                 .collect();
 
-            let num_qualifiers = player_qualifiers.values().sum::<u32>();
+            let num_qualifiers = player_qualifiers.values().sum::<u64>();
             if num_qualifiers >= config.opow.total_qualifiers_threshold
                 || frontier_idx == solutions_by_frontier_idx.len() - 1
             {
@@ -270,7 +270,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                                 (player_qualifiers[player_id] as f64
                                     * player_algorithm_solutions[player_id][algorithm_id] as f64
                                     / player_solutions[player_id] as f64)
-                                    .ceil() as u32,
+                                    .ceil() as u64,
                             );
                         }
                     }

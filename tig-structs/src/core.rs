@@ -20,6 +20,7 @@ serializable_struct_with_getters! {
         state: BenchmarkState,
         solution_nonces: Option<HashSet<u64>>,
         discarded_solution_nonces: Option<HashSet<u64>>,
+        non_solution_nonces: Option<HashSet<u64>>,
     }
 }
 serializable_struct_with_getters! {
@@ -139,7 +140,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     AlgorithmBlockData {
-        num_qualifiers_by_player: HashMap<String, u32>,
+        num_qualifiers_by_player: HashMap<String, u64>,
         adoption: PreciseNumber,
         merge_points: u32,
         reward: PreciseNumber,
@@ -163,8 +164,9 @@ impl BenchmarkSettings {
 }
 serializable_struct_with_getters! {
     BenchmarkDetails {
-        num_solutions: u32,
-        num_discarded_solutions: u32,
+        num_solutions: u64,
+        num_discarded_solutions: u64,
+        num_non_solutions: u64,
         merkle_root: MerkleHash,
         sampled_nonces: HashSet<u64>,
     }
@@ -323,7 +325,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ChallengeBlockData {
-        num_qualifiers: u32,
+        num_qualifiers: u64,
         qualifier_difficulties: HashSet<Point>,
         average_solution_ratio: f64,
         base_frontier: Frontier,
@@ -372,8 +374,8 @@ serializable_struct_with_getters! {
 // OPoW child structs
 serializable_struct_with_getters! {
     OPoWBlockData {
-        num_qualifiers_by_challenge: HashMap<String, u32>,
-        cutoff: u32,
+        num_qualifiers_by_challenge: HashMap<String, u64>,
+        cutoff: u64,
         self_deposit: PreciseNumber,
         delegated_weighted_deposit: PreciseNumber,
         delegators: HashSet<String>,
@@ -421,7 +423,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
-        num_nonces: u32,
+        num_nonces: u64,
         rand_hash: String,
         fee_paid: PreciseNumber,
     }

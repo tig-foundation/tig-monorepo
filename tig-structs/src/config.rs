@@ -61,14 +61,14 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     BenchmarksConfig {
-        min_num_solutions: u32,
+        min_num_solutions: u64,
         submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
         runtime_config: RuntimeConfig,
-        target_solution_rate: u32,
+        target_solution_rate: u64,
         hash_threshold_max_percent_delta: f64,
     }
 }
@@ -108,13 +108,13 @@ serializable_struct_with_getters! {
         imbalance_multiplier: f64,
         cutoff_phase_in_period: u32,
         cutoff_multiplier: f64,
-        total_qualifiers_threshold: u32,
+        total_qualifiers_threshold: u64,
         max_deposit_to_qualifier_ratio: f64,
         deposit_multiplier: f64,
         deposit_to_cutoff_ratio: f64,
         max_coinbase_outputs: usize,
         coinbase_update_period: u32,
-        min_num_nonces: u32,
+        min_num_nonces: u64,
     }
 }
 serializable_struct_with_getters! {

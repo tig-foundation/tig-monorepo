@@ -11,7 +11,7 @@ pub async fn submit_precommit<T: Context>(
     ctx: &T,
     player_id: String,
     settings: BenchmarkSettings,
-    num_nonces: u32,
+    num_nonces: u64,
     seed: u64,
 ) -> Result<String> {
     if player_id != settings.player_id {
@@ -192,23 +192,26 @@ pub async fn submit_benchmark<T: Context>(
             }
         }
     }
+    let num_other_nonces = (set_a.len() + set_b.len()) as u64;
     let num_solutions = if let Some(solution_nonces) = &solution_nonces {
-        solution_nonces.len()
+        solution_nonces.len() as u64
     } else {
-        num_nonces as usize - set_a.len() - set_b.len()
-    } as u32;
+        num_nonces - num_other_nonces
+    };
     let num_discarded_solutions =
         if let Some(discarded_solution_nonces) = &discarded_solution_nonces {
-            discarded_solution_nonces.len()
+            discarded_solution_nonces.len() as u64
         } else {
-            num_nonces as usize - set_a.len() - set_b.len()
-        } as u32;
+            num_nonces - num_other_nonces
+        };
+    let num_non_solutions = num_nonces - num_solutions - num_discarded_solutions;
 
     ctx.add_benchmark_to_mempool(
         benchmark_id,
         BenchmarkDetails {
             num_solutions,
             num_discarded_solutions,
+            num_non_solutions,
             merkle_root,
             sampled_nonces,
         },

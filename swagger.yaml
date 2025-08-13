@@ -631,7 +631,7 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: uint32
+            format: uint64
           example: {"0x1234...": 5, "0x5678...": 3}
         adoption:
           $ref: '#/components/schemas/PreciseNumber'
@@ -720,10 +720,13 @@ components:
       properties:
         num_solutions:
           type: integer
-          format: uint32
+          format: uint64
         num_discarded_solutions:
           type: integer
-          format: uint32
+          format: uint64
+        num_discarded_solutions:
+          type: integer
+          format: uint64
         merkle_root:
           $ref: '#/components/schemas/MerkleHash'
         sampled_nonces:
@@ -1032,7 +1035,7 @@ components:
       properties:
         num_qualifiers:
           type: integer
-          format: uint32
+          format: uint64
         average_solution_ratio:
           type: number
           format: double
@@ -1176,7 +1179,7 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: uint32
+            format: uint64
           example: {"c001": 5, "c002": 3}
         solution_ratio_by_challenge:
           type: object
@@ -1186,7 +1189,7 @@ components:
           example: {"c001": 0.001, "c002": 0.5}
         cutoff:
           type: integer
-          format: uint32
+          format: uint64
         self_deposit:
           $ref: '#/components/schemas/PreciseNumber'
         delegated_weighted_deposit:

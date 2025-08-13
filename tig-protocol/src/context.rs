@@ -111,6 +111,6 @@ pub struct AddBlockCache {
     pub active_breakthroughs_state: HashMap<String, BreakthroughState>,
     pub active_breakthroughs_details: HashMap<String, BreakthroughDetails>,
     pub active_breakthroughs_block_data: HashMap<String, BreakthroughBlockData>,
-    pub active_solutions: Vec<(BenchmarkSettings, u32, u32, u32)>,
-    pub confirmed_num_solutions: HashMap<String, u32>,
+    pub active_solutions: Vec<(BenchmarkSettings, u64, u64, u64)>,
+    pub confirmed_num_solutions: HashMap<String, u64>,
 }
