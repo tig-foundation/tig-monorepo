@@ -36,7 +36,7 @@ unsafe fn __switch_stack_and_call(
             "mov rsp, {stack_top}", // switch to new stack
             "and rsp, -16", // align stack to 16 bytes
             
-            "mov rdi, {arg}", // set first argument
+            "mov rdi, {arg}",
             "call {func}",
             
             "mov rsp, r12", // restore original stack
@@ -58,8 +58,8 @@ unsafe fn __switch_stack_and_call(
             "bic x10, x10, #15", // clear lowest 4 bits to ensure alignment
             "mov sp, x10", // move aligned value to sp
             
-            "mov x0, {arg}", // set first argument
-            "blr {func}", // branch with link register, effectively a call.
+            "mov x0, {arg}",
+            "blr {func}",
             
             "mov sp, x19", // restore original stack
             
@@ -185,9 +185,6 @@ fn main() {
     let settings = load_settings(&settings.expect("Settings not provided"));
     let nonce = nonce.expect("Nonce not provided");
     let seed = settings.calc_seed(&rand_hash.expect("Rand hash not provided"), nonce);
-
-    println!("Settings: {:?}", settings);
-    println!("Seed: {:?}", seed);
 
     let solve_addr = solve as *const core::ffi::c_void;
     let stack_top = alloc_stack(0x30000000000 as *mut u8, 0x100000); // 1mb stack
