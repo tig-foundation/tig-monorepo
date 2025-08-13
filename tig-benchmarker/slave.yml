@@ -11,6 +11,9 @@ x-common-gpu: &common-gpu
 
 services:
   slave:
+    build:
+      context: .
+      dockerfile: slave/Dockerfile
     image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/slave:${VERSION}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
