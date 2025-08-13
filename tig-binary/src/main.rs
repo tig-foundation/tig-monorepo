@@ -295,7 +295,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let output_data = OutputData {
         nonce: __nonce.load(std::sync::atomic::Ordering::Relaxed),
         runtime_signature,
-        fuel_consumed,
+        fuel_consumed: fuel_consumed as u64,
         solution,
         #[cfg(target_arch = "x86_64")]
         cpu_arch: CPUArchitecture::AMD64,
