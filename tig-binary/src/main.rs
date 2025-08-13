@@ -265,7 +265,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     };
 
     if fuel_consumed >= __max_fuel.load(std::sync::atomic::Ordering::Relaxed) {
-        println!("Out of fuel");
+        eprintln!("Out of fuel");
         std::process::exit(87);
     }
 
@@ -302,6 +302,8 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
         #[cfg(target_arch = "aarch64")]
         cpu_arch: CPUArchitecture::ARM64,
     };
+
+    println!("{}", tig_utils::jsonify(&output_data));
 
     if output_data.solution.len() == 0 {
         eprintln!("No solution found");
