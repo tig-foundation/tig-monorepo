@@ -1,6 +1,12 @@
 extern crate tig_algorithms;
 extern crate tig_challenges;
 
+#[cfg(not(feature = "entry_point"))]
+fn main() {
+    eprintln!("This binary has not been compiled with tig-binary/scripts/build_binary. Please use the build_binary script to compile it.");
+    std::process::exit(1);
+}
+
 #[cfg(feature = "entry_point")]
 use std::sync::atomic::{AtomicI64, AtomicU64};
 
