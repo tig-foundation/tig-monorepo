@@ -20,6 +20,7 @@ libc = "0.2.175"
 getargs = "0.5.0"
 tig-structs = { path = "../tig-structs" }
 tig-utils = { path = "../tig-utils" }
+serde_json = { version = "1.0.113" }
 
 [features]
 entry_point = []
