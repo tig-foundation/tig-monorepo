@@ -229,6 +229,21 @@ output=tig-algorithms/lib/$CHALLENGE/$ARCH/$ALGORITHM
 mkdir -p $(dirname $output)
 
 echo "Linking binary '$output'"
+cat > export_symbols.map << 'EOF'
+{
+  global:
+    entry_point;
+    __curr_memory_usage;
+    __total_memory_usage;
+    __max_memory_usage;
+    __cudarc_fuel_used;
+    __cudarc_host_memory_used;
+    __cudarc_device_memory_used;
+    __cudarc_runtime_signature;
+    __switch_stack_and_call;
+  local: *;
+};
+EOF
 
 # add libmalloc.o to the list of files
 object_files+=("/opt/llvm/lib/libmalloc.o")
@@ -251,6 +266,7 @@ clang "${object_files[@]}" "${build_script_libs[@]}" \
     -Wl,-z,noexecstack \
     -Wl,--build-id=none \
     -Wl,--eh-frame-hdr \
+    -Wl,--version-script=export_symbols.map \
     -Wl,-Map=output.map \
     -no-pie
 
