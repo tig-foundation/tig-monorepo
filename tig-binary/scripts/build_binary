@@ -5,6 +5,13 @@
 # sudo sysctl -w vm.overcommit_memory=1 to allow overcommitting memory
 # run with setarch -R <binary> to disable ASLR
 
+#...
+#stmdb r13!,{r5}
+#...temporarily use r5 for something else...
+#ldmia r13!,{r5}
+#...
+#stm is store multiple you can save more than one register at a time, up to all of them in one instruction
+
 set -e
 
 # Check if CHALLENGE environment variable is set
@@ -240,7 +247,7 @@ EOF
 
 # add libmalloc.o to the list of files
 object_files+=("/opt/llvm/lib/libmalloc.o")
-object_files+=("/opt/llvm/lib/libstack.o")
+#object_files+=("/opt/llvm/lib/libstack.o")
 
 build_script_libs=()
 while IFS= read -r line; do
