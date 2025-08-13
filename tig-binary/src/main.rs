@@ -1,5 +1,7 @@
 extern crate tig_algorithms;
 extern crate tig_challenges;
+
+#[cfg(feature = "entry_point")]
 use std::sync::atomic::AtomicI64;
 
 #[cfg(feature = "entry_point")]
@@ -304,9 +306,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 }
 
 #[cfg(feature = "entry_point")]
-use {
-    std::sync::atomic::{AtomicU64, AtomicI64},
-};
+use std::sync::atomic::{AtomicU64},
 
 #[cfg(feature = "entry_point")]
 #[no_mangle]
