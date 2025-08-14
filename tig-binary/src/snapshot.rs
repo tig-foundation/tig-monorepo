@@ -295,6 +295,7 @@ impl DeltaSnapshot {
                         }
                     }
                 }
+                _ => {}
             }
         }
 
