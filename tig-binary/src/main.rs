@@ -57,19 +57,19 @@ unsafe fn __switch_stack_and_call(
         std::arch::asm!(
             "mov x19, sp", // backup original stack pointer
             
-            "mov x10, {stack_top}", // move to general-purpose register first
+            "mov x10, {stack_top_ptr}", // move to general-purpose register first
             
             "bic x10, x10, #15", // clear lowest 4 bits to ensure alignment
             "mov sp, x10", // move aligned value to sp
             
             "mov x0, {arg}",
-            "blr {func}",
+            "blr {func_to_call}",
             
             "mov sp, x19", // restore original stack
             
-            stack_top = in("x2") stack_top_ptr,
-            func = in("x1") func_to_call,
-            arg = in("x0") arg,
+            in("x0") arg,
+            in("x1") func_to_call,
+            in("x2") stack_top_ptr,
             clobber_abi("C"),
         );
     }
