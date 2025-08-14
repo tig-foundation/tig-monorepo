@@ -121,7 +121,7 @@ unsafe fn __switch_stack_and_call(
                 "msr fpcr, xzr",
                 "msr fpsr, xzr",
 
-                "pfalse p0.b",
+                /*"pfalse p0.b",
                 "pfalse p1.b", 
                 "pfalse p2.b",
                 "pfalse p3.b",
@@ -138,7 +138,7 @@ unsafe fn __switch_stack_and_call(
                 "pfalse p14.b",
                 "pfalse p15.b",
 
-                "setffr",
+                "setffr",*/
             );
         }
 
