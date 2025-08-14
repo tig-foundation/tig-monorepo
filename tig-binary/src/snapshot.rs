@@ -257,7 +257,7 @@ impl DeltaSnapshot {
             match x {
                 Registers::X(x, value) => {
                     if *value == 0 {
-                        code.extend_from_slice((0xAA1F03E0 | (x as u32)).to_le_bytes());  // mov x<n>, xzr
+                        code.extend_from_slice(&((0xAA1F03E0 | (x as u32)).to_le_bytes()));  // mov x<n>, xzr
                     } else if *value <= 0xFFFF {
                         // movz x{x}, #{value}
                         let instr = 0xD2800000 | ((*value as u32 & 0xFFFF) << 5) | (*x as u32);
