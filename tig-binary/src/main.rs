@@ -326,3 +326,6 @@ static __total_memory_usage: AtomicU64 = AtomicU64::new(0);
 #[cfg(feature = "entry_point")]
 #[no_mangle]
 static __curr_memory_usage: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(feature = "entry_point")]
+mod snapshot;
