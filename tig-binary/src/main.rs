@@ -314,3 +314,15 @@ static __fuel_remaining: AtomicI64 = AtomicI64::new(i64::MAX);
 #[cfg(feature = "entry_point")]
 #[no_mangle]
 static __max_allowed_memory_usage: AtomicU64 = AtomicU64::new(u64::MAX);
+
+#[cfg(feature = "entry_point")]
+#[no_mangle]
+static __max_memory_usage: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(feature = "entry_point")]
+#[no_mangle]
+static __total_memory_usage: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(feature = "entry_point")]
+#[no_mangle]
+static __curr_memory_usage: AtomicU64 = AtomicU64::new(0);
