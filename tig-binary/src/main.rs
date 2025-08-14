@@ -67,9 +67,9 @@ unsafe fn __switch_stack_and_call(
             
             "mov sp, x19", // restore original stack
             
-            stack_top = in(reg) stack_top_ptr,
-            func = in(reg) func_to_call,
-            arg = in(reg) arg,
+            stack_top = in(reg("x2")) stack_top_ptr,
+            func = in(reg("x1")) func_to_call,
+            arg = in(reg("x0")) arg,
             clobber_abi("C"),
         );
     }
