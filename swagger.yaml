@@ -724,7 +724,7 @@ components:
         num_discarded_solutions:
           type: integer
           format: uint64
-        num_discarded_solutions:
+        num_non_solutions:
           type: integer
           format: uint64
         merkle_root:
