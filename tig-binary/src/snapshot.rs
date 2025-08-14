@@ -4,15 +4,19 @@ use {
     crate::{__total_memory_usage, __max_memory_usage, __max_allowed_memory_usage, __curr_memory_usage},
 };
 
+#[cfg(feature = "entry_point")]
+#[repr(C)]
 pub struct Snapshot {
     pub total_memory_usage: u64,
     pub max_memory_usage: u64,
     pub max_allowed_memory_usage: u64,
     pub curr_memory_usage: u64,
+    pub registers: RegisterSnapshot,
 }
 
 #[cfg(target_arch = "aarch64")]
 #[repr(C)]
+#[derive(Debug)]
 pub struct RegisterSnapshot {
     pub gprs: [u64; 31], // x0-x30
 
@@ -162,15 +166,7 @@ impl Snapshot {
             max_memory_usage: 0,
             max_allowed_memory_usage: 0,
             curr_memory_usage: 0,
-        }
-    }
-
-    pub fn snap() -> Self {
-        Self {
-            total_memory_usage: __total_memory_usage.load(Ordering::Relaxed),
-            max_memory_usage: __max_memory_usage.load(Ordering::Relaxed),
-            max_allowed_memory_usage: __max_allowed_memory_usage.load(Ordering::Relaxed),
-            curr_memory_usage: __curr_memory_usage.load(Ordering::Relaxed),
+            registers: RegisterSnapshot::snap(),
         }
     }
 }

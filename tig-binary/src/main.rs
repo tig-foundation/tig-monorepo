@@ -213,6 +213,9 @@ fn main() {
         //__max_allowed_memory_usage.store(settings.max_memory_usage as u64, std::sync::atomic::Ordering::Relaxed);
     }
 
+    let snapshot = snapshot::RegisterSnapshot::snap();
+    println!("Snapshot: {:?}", snapshot);
+
     unsafe {
         __switch_stack_and_call(
             stack_top,
