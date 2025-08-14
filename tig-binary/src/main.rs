@@ -308,7 +308,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot = snapshot::RegisterSnapshot::snap();
     println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
 
-    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot::RegisterSnapshot::snap());
+    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot::new());
     println!("Delta: {:?}", delta);
     
     let stack_ptr: usize;
