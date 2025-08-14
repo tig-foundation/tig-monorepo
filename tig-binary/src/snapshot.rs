@@ -30,7 +30,7 @@ pub struct RegisterSnapshot {
 
     pub tpidr_el0: u64,
     pub tpidrro_el0: u64,
-    pub cntvct_el0: u64,
+    //pub cntvct_el0: u64,
     pub cntfrq_el0: u64,
 
     pub vregs: [u128; 32], // v0-v31
@@ -109,8 +109,8 @@ impl RegisterSnapshot {
                 "str x0, [{base}, #{tpidrro_el0_offset}]",
 
                 // Save timer registers
-                "mrs x0, cntvct_el0",
-                "str x0, [{base}, #{cntvct_el0_offset}]",
+                //"mrs x0, cntvct_el0",
+                //"str x0, [{base}, #{cntvct_el0_offset}]",
                 "mrs x0, cntfrq_el0", 
                 "str x0, [{base}, #{cntfrq_el0_offset}]",
 
