@@ -142,7 +142,7 @@ impl RegisterSnapshot {
                 fpsr_offset = const offset_of!(RegisterSnapshot, fpsr),
                 tpidr_el0_offset = const offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const offset_of!(RegisterSnapshot, tpidrro_el0),
-                cntvct_el0_offset = const offset_of!(RegisterSnapshot, cntvct_el0),
+                //cntvct_el0_offset = const offset_of!(RegisterSnapshot, cntvct_el0),
                 cntfrq_el0_offset = const offset_of!(RegisterSnapshot, cntfrq_el0),
                 vregs_offset = const offset_of!(RegisterSnapshot, vregs),
                 out("x0") _,
