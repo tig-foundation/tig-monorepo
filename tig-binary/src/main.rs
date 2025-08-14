@@ -48,6 +48,7 @@ unsafe fn __switch_stack_and_call(
         );
     }
 
+    // clear all registers to ensure deterministic execution
     #[cfg(target_arch = "aarch64")]
     unsafe {
         std::arch::asm!(
@@ -306,6 +307,9 @@ extern "C" fn _flush_tls() {
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot = snapshot::RegisterSnapshot::snap();
     println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
+
+    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot::RegisterSnapshot::snap());
+    println!("Delta: {:?}", delta);
     
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
