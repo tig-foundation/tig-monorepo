@@ -54,7 +54,7 @@ impl RegisterSnapshot {
             fpsr: 0,
             tpidr_el0: 0,
             tpidrro_el0: 0,
-            cntvct_el0: 0,
+            //cntvct_el0: 0,
             cntfrq_el0: 0,
             vregs: [0; 32],
             predicates: [0; 16],
