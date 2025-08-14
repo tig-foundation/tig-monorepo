@@ -230,6 +230,10 @@ extern "C" fn _flush_tls() {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
+    std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+    snapshot::clear_registers();
+    std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+
     let snapshot = snapshot::RegisterSnapshot::snap();
     println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
     
