@@ -214,7 +214,7 @@ fn main() {
     }
 
     let snapshot = snapshot::RegisterSnapshot::snap();
-    println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::hash::u64s_from_str(&format!("{:?}", snapshot))[0]);
+    println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
 
     unsafe {
         __switch_stack_and_call(
