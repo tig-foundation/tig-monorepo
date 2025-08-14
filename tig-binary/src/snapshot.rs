@@ -172,12 +172,13 @@ impl Snapshot {
 }
 
 #[cfg(target_arch = "aarch64")]
+#[inline(never)]
 pub fn clear_registers() {
     unsafe {
         std::arch::asm!(
-            //"mov x0, xzr", // do not clear first argument
-            "mov x1, xzr",
-            "mov x2, xzr",
+            //"mov x0, xzr", ; arg0
+            //"mov x1, xzr", ; func_to_call
+            //"mov x2, xzr", ; stack_top 
             "mov x3, xzr",
             "mov x4, xzr",
             "mov x5, xzr",
@@ -207,7 +208,7 @@ pub fn clear_registers() {
             "mov x29, xzr",
             "mov x30, xzr",
 
-            "movi v0.16b, #0",
+            /*"movi v0.16b, #0",
             "movi v1.16b, #0",
             "movi v2.16b, #0",
             "movi v3.16b, #0",
@@ -238,10 +239,10 @@ pub fn clear_registers() {
             "movi v28.16b, #0",
             "movi v29.16b, #0",
             "movi v30.16b, #0",
-            "movi v31.16b, #0",
+            "movi v31.16b, #0",*/
 
-            "msr fpcr, xzr",
-            "msr fpsr, xzr",
+            //"msr fpcr, xzr",
+            //"msr fpsr, xzr",
         );
     }
 }

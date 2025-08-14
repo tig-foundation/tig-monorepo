@@ -47,7 +47,11 @@ unsafe fn __switch_stack_and_call(
             clobber_abi("C"),
         );
     }
-    
+
+    std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+    snapshot::clear_registers();
+    std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+
     #[cfg(target_arch = "aarch64")]
     {
         std::arch::asm!(
