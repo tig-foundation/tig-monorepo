@@ -23,10 +23,10 @@ pub struct RegisterSnapshot {
     pub sp: u64,
     pub lr: u64,
     pub pc: u64,
-    pub pstate: u32,
+    pub nzcv: u64,
 
-    pub fpcr: u32,
-    pub fpsr: u32,
+    pub fpcr: u64,
+    pub fpsr: u64,
 
     pub tpidr_el0: u64,
     pub tpidrro_el0: u64,
@@ -94,13 +94,13 @@ impl RegisterSnapshot {
 
                 // Save PSTATE
                 "mrs x0, nzcv",
-                "str w0, [{base}, #{pstate_offset}]",
+                "str x0, [{base}, #{nzcv_offset}]",
 
                 // Save floating-point control/status
                 "mrs x0, fpcr",
-                "str w0, [{base}, #{fpcr_offset}]",
+                "str x0, [{base}, #{fpcr_offset}]",
                 "mrs x0, fpsr",
-                "str w0, [{base}, #{fpsr_offset}]",
+                "str x0, [{base}, #{fpsr_offset}]",
 
                 // Save thread pointers
                 "mrs x0, tpidr_el0",
@@ -137,7 +137,7 @@ impl RegisterSnapshot {
                 sp_offset = const offset_of!(RegisterSnapshot, sp),
                 lr_offset = const offset_of!(RegisterSnapshot, lr),
                 pc_offset = const offset_of!(RegisterSnapshot, pc),
-                pstate_offset = const offset_of!(RegisterSnapshot, pstate),
+                nzcv_offset = const offset_of!(RegisterSnapshot, nzcv),
                 fpcr_offset = const offset_of!(RegisterSnapshot, fpcr),
                 fpsr_offset = const offset_of!(RegisterSnapshot, fpsr),
                 tpidr_el0_offset = const offset_of!(RegisterSnapshot, tpidr_el0),
