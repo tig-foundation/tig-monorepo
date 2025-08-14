@@ -5,6 +5,7 @@ use {
 };
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Snapshot {
     pub total_memory_usage: u64,
     pub max_memory_usage: u64,
