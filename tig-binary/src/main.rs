@@ -305,7 +305,7 @@ extern "C" fn _flush_tls() {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
-    let snapshot = snapshot::Snapshot::snap();
+    let snapshot = snapshot::Snapshot::new();
     println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
 
     let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot::Snapshot::new());
