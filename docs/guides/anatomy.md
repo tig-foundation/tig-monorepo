@@ -38,6 +38,8 @@ The Innovation Game must achieve two objectives simultaneously; **(i)** the prov
 
 1. **_The TIG Commercial Licence:_** A licence which will allow closed use of the implementation and Relevant Data in return for the payment of a fee (non-discriminatory, means tested and rate card based) which will be used to underpin value in The Innovation Game incentives. In contrast with the _TIG Open Data License_, _The TIG Commercial License_ will provide greater freedom with respect to downstream licensing and will not impose an obligation to make Relevant Data available.
 
+1. **_The TIG THV Licence:_** A limited licence which will facilitate the evaluation of algorithms for Advance Rewards eligibility by TIG Token holders.
+
 # GAME LICENSES (Outbound)
 
 ## TIG Innovator Outbound Game License
