@@ -16,7 +16,7 @@ pub struct Snapshot {
 
 #[cfg(target_arch = "aarch64")]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RegisterSnapshot {
     pub gprs: [u64; 31], // x0-x30
 
@@ -44,23 +44,7 @@ impl RegisterSnapshot {
     pub fn snap() -> Self {
         use std::mem::offset_of;
         
-        let mut snapshot = RegisterSnapshot {
-            gprs: [0; 31],
-            sp: 0,
-            lr: 0,
-            pc: 0,
-            nzcv: 0,
-            fpcr: 0,
-            fpsr: 0,
-            tpidr_el0: 0,
-            tpidrro_el0: 0,
-            //cntvct_el0: 0,
-            cntfrq_el0: 0,
-            vregs: [0; 32],
-            predicates: [0; 16],
-            ffr: 0,
-            vg: 0,
-        };
+        let mut snapshot = RegisterSnapshot::default();
 
         let base_ptr = &mut snapshot as *mut RegisterSnapshot as *mut u8;
         unsafe {
@@ -131,6 +115,24 @@ impl RegisterSnapshot {
                 "stp q28, q29, [{base}, #{vregs_offset} + 448]",
                 "stp q30, q31, [{base}, #{vregs_offset} + 480]",
 
+                // Save predicates
+                /*"str p0, [{base}, #{predicates_offset}]",
+                "str p1, [{base}, #{predicates_offset} + 16]",
+                "str p2, [{base}, #{predicates_offset} + 32]",
+                "str p3, [{base}, #{predicates_offset} + 48]",
+                "str p4, [{base}, #{predicates_offset} + 64]",
+                "str p5, [{base}, #{predicates_offset} + 80]",
+                "str p6, [{base}, #{predicates_offset} + 96]",
+                "str p7, [{base}, #{predicates_offset} + 112]",
+                "str p8, [{base}, #{predicates_offset} + 128]",
+                "str p9, [{base}, #{predicates_offset} + 144]",
+                "str p10, [{base}, #{predicates_offset} + 160]",
+                "str p11, [{base}, #{predicates_offset} + 176]",
+                "str p12, [{base}, #{predicates_offset} + 192]",
+                "str p13, [{base}, #{predicates_offset} + 208]",
+                "str p14, [{base}, #{predicates_offset} + 224]",
+                "str p15, [{base}, #{predicates_offset} + 240]",*/
+
                 base = in(reg) base_ptr,
                 gprs_offset = const offset_of!(RegisterSnapshot, gprs),
                 sp_offset = const offset_of!(RegisterSnapshot, sp),
@@ -144,6 +146,7 @@ impl RegisterSnapshot {
                 //cntvct_el0_offset = const offset_of!(RegisterSnapshot, cntvct_el0),
                 cntfrq_el0_offset = const offset_of!(RegisterSnapshot, cntfrq_el0),
                 vregs_offset = const offset_of!(RegisterSnapshot, vregs),
+                //predicates_offset = const offset_of!(RegisterSnapshot, predicates),
                 out("x0") _,
                 options(nostack)
             );
@@ -246,14 +249,63 @@ impl DeltaSnapshot {
 
         delta
     }
+
+    pub fn generate_restore_chunk(&self) -> Vec<u8> {
+        let mut code = Vec::with_capacity(128 * 4);
+
+        for x in self.changed_regs.iter() {
+            match x {
+                Registers::X(x, value) => {
+                    if *value == 0 {
+                        code.extend_from_slice((0xAA1F03E0 | (x as u32)).to_le_bytes());  // mov x<n>, xzr
+                    } else if *value <= 0xFFFF {
+                        // movz x{x}, #{value}
+                        let instr = 0xD2800000 | ((*value as u32 & 0xFFFF) << 5) | (*x as u32);
+                        code.extend_from_slice(&instr.to_le_bytes());
+                    } else if *value <= 0xFFFFFFFF && (*value & 0xFFFF) == 0 {
+                        // movz x{x}, #{value >> 16}, lsl #16 (clears lower 16 bits)
+                        let instr = 0xD2A00000 | (((*value >> 16) as u32 & 0xFFFF) << 5) | (*x as u32);
+                        code.extend_from_slice(&instr.to_le_bytes());
+                    } else if *value <= 0xFFFFFFFF && (*value & 0xFFFF0000) == 0 {
+                        // movz x{x}, #{value >> 32}, lsl #32 (clears lower 32 bits)
+                        let instr = 0xD2C00000 | (((*value >> 32) as u32 & 0xFFFF) << 5) | (*x as u32);
+                        code.extend_from_slice(&instr.to_le_bytes());
+                    } else {
+                        // For complex values, use movz + movk sequence
+                        // Always start with movz to clear the register
+                        let instr1 = 0xD2800000 | ((*value as u32 & 0xFFFF) << 5) | (*x as u32);
+                        code.extend_from_slice(&instr1.to_le_bytes());
+                        
+                        if (*value >> 16) & 0xFFFF != 0 {
+                            // movk x{x}, #{(value >> 16) & 0xFFFF}, lsl #16
+                            let instr2 = 0xF2A00000 | ((((*value >> 16) as u32) & 0xFFFF) << 5) | (*x as u32);
+                            code.extend_from_slice(&instr2.to_le_bytes());
+                        }
+                        
+                        if (*value >> 32) & 0xFFFF != 0 {
+                            // movk x{x}, #{(value >> 32) & 0xFFFF}, lsl #32
+                            let instr3 = 0xF2C00000 | ((((*value >> 32) as u32) & 0xFFFF) << 5) | (*x as u32);
+                            code.extend_from_slice(&instr3.to_le_bytes());
+                        }
+                        
+                        if (*value >> 48) & 0xFFFF != 0 {
+                            // movk x{x}, #{(value >> 48) & 0xFFFF}, lsl #48
+                            let instr4 = 0xF2E00000 | ((((*value >> 48) as u32) & 0xFFFF) << 5) | (*x as u32);
+                            code.extend_from_slice(&instr4.to_le_bytes());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
 #[repr(u8)]
 #[derive(Debug)]
 pub enum Registers {
-    X(u8, u64) = 0, // x<n>, value
-    SP(u64) = 31,
+    X(u8, u64) = 0, // x<n>, value, x0-x30
+    SP(u64) = 31, // sp
     LR(u64) = 32,
     PC(u64) = 33,
     NZCV(u64) = 34,
@@ -263,8 +315,8 @@ pub enum Registers {
     TPIDRRO_EL0(u64) = 38,
     CNTVCT_EL0(u64) = 39,
     CNTFRQ_EL0(u64) = 40,
-    V(u8, u128) = 41, // v<n>, value
-    P(u8, u128) = 73, // p<n>, value
+    V(u8, u128) = 41, // v<n>, value, v0-v31
+    P(u8, u128) = 73, // p<n>, value, p0-p15
     FFR(u128) = 89,
     VG(u32) = 90,
 }
