@@ -175,7 +175,7 @@ impl Snapshot {
 pub fn clear_registers() {
     unsafe {
         std::arch::asm!(
-            "mov x0, xzr",
+            //"mov x0, xzr", // do not clear first argument
             "mov x1, xzr",
             "mov x2, xzr",
             "mov x3, xzr",
