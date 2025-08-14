@@ -49,7 +49,7 @@ impl RegisterSnapshot {
             sp: 0,
             lr: 0,
             pc: 0,
-            pstate: 0,
+            nzcv: 0,
             fpcr: 0,
             fpsr: 0,
             tpidr_el0: 0,
@@ -92,7 +92,7 @@ impl RegisterSnapshot {
                 "str x0, [{base}, #{pc_offset}]",
                 "1:",
 
-                // Save PSTATE
+                // Save NZCV
                 "mrs x0, nzcv",
                 "str x0, [{base}, #{nzcv_offset}]",
 
