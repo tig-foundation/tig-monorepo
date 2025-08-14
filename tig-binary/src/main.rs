@@ -83,7 +83,7 @@ unsafe fn __switch_stack_and_call(
             "mov x29, xzr",
             "mov x30, xzr",
 
-            /*"movi v0.16b, #0",
+            "movi v0.16b, #0",
             "movi v1.16b, #0",
             "movi v2.16b, #0",
             "movi v3.16b, #0",
@@ -114,10 +114,10 @@ unsafe fn __switch_stack_and_call(
             "movi v28.16b, #0",
             "movi v29.16b, #0",
             "movi v30.16b, #0",
-            "movi v31.16b, #0",*/
+            "movi v31.16b, #0",
 
-            //"msr fpcr, xzr",
-            //"msr fpsr, xzr",
+            "msr fpcr, xzr",
+            "msr fpsr, xzr",
         );
     }
 
