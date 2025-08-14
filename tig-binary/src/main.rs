@@ -70,7 +70,6 @@ unsafe fn __switch_stack_and_call(
             in("x0") arg,
             in("x1") func_to_call,
             in("x2") stack_top_ptr,
-            out("x19") _,
             out("x10") _,
             clobber_abi("C"),
         );
