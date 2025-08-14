@@ -250,6 +250,7 @@ impl DeltaSnapshot {
         delta
     }
 
+    #[cfg(target_arch = "aarch64")]
     pub fn generate_restore_chunk(&self) -> Vec<u8> {
         let mut code = Vec::with_capacity(128 * 4);
 
@@ -333,4 +334,9 @@ pub enum Registers {
     P(u8, u128) = 73, // p<n>, value, p0-p15
     FFR(u128) = 89,
     VG(u32) = 90,
+}
+
+#[no_mangle]
+extern "C" fn __create_snapshot() -> Snapshot {
+    Snapshot::new()
 }
