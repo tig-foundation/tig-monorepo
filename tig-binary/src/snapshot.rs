@@ -297,6 +297,8 @@ impl DeltaSnapshot {
                 }
             }
         }
+
+        code
     }
 }
 
