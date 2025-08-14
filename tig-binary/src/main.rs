@@ -213,9 +213,6 @@ fn main() {
         //__max_allowed_memory_usage.store(settings.max_memory_usage as u64, std::sync::atomic::Ordering::Relaxed);
     }
 
-    let snapshot = snapshot::RegisterSnapshot::snap();
-    println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
-
     unsafe {
         __switch_stack_and_call(
             stack_top,
@@ -233,6 +230,9 @@ extern "C" fn _flush_tls() {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
+    let snapshot = snapshot::RegisterSnapshot::snap();
+    println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
+    
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
