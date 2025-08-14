@@ -314,7 +314,7 @@ pub async fn submit_proof<T: Context>(
                 .any(|(d, _)| *d as usize > max_branch_len)
         {
             verification_result = Err(anyhow!(
-                "Invalid merkle proof for nonce {}",
+                "Invalid merkle proof for nonce {}. Branch too long",
                 merkle_proof.leaf.nonce
             ));
             break;
@@ -356,7 +356,7 @@ pub async fn submit_proof<T: Context>(
             .is_ok_and(|actual_merkle_root| actual_merkle_root == benchmark_details.merkle_root)
         {
             verification_result = Err(anyhow!(
-                "Invalid merkle proof for nonce {}",
+                "Invalid merkle proof for nonce {}. Merkle root does not match",
                 merkle_proof.leaf.nonce
             ));
             break;
