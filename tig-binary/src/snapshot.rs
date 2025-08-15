@@ -634,9 +634,13 @@ pub struct TlsEntry {
 
 impl TlsEntry {
     pub fn name(&self) -> &str {
-        unsafe { std::ffi::CStr::from_ptr(self.name) }
+        unsafe { 
+            std::ffi::CStr::from_ptr(self.name)
+                .to_str()
+                .unwrap_or("<invalid_utf8>")
+        }
     }
-
+    
     pub fn address(&self) -> *mut u8 {
         self.address
     }
