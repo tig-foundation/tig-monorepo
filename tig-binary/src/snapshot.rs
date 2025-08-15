@@ -627,9 +627,29 @@ macro_rules! clear_registers {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct TlsEntry {
-    pub name: *const std::ffi::c_char, // Variable name (null-terminated string)
+    pub name: *const std::ffi::c_char,
     pub address: *mut u8,
     pub size: usize,
+}
+
+impl TlsEntry {
+    pub fn name(&self) -> &str {
+        unsafe { std::ffi::CStr::from_ptr(self.name) }
+    }
+
+    pub fn address(&self) -> *mut u8 {
+        self.address
+    }
+
+    pub fn read(&self) -> Vec<u8> {
+        let mut value = vec![0; self.size];
+        std::ptr::copy_nonoverlapping(self.address, value.as_mut_ptr(), self.size);
+        value
+    }
+
+    pub fn write(&self, value: &[u8]) {
+        std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size);
+    }
 }
 
 extern "C" {
