@@ -67,10 +67,12 @@ class JobManager:
                 self.hash_thresholds[x.details.block_started] = {
                     c['id']: c['block_data']['hash_threshold']
                     for c in d["challenges"]
+                    if c['state']['round_active'] <= block.details.round
                 }
                 self.average_solution_ratio[x.details.block_started] = {
                     c['id']: c['block_data']['average_solution_ratio']
                     for c in d["challenges"]
+                    if c['state']['round_active'] <= block.details.round
                 }
             hash_threshold = self.hash_thresholds[x.details.block_started][x.settings.challenge_id]
             average_solution_ratio = self.average_solution_ratio[x.details.block_started][x.settings.challenge_id]
