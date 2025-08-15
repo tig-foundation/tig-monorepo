@@ -322,6 +322,18 @@ extern "C" fn _flush_tls() {
 }
 
 #[cfg(feature = "entry_point")]
+#[no_mangle]
+#[inline(never)]
+fn __copy_to_restore_region(restore_chunk: &[u8]) -> *mut u8 {
+    unsafe {
+        let restore_arena = __restore_region.load(std::sync::atomic::Ordering::Relaxed);
+        let restore_arena_ptr = restore_arena as *mut u8;
+        std::ptr::copy_nonoverlapping(restore_chunk.as_ptr(), restore_arena_ptr, restore_chunk.len());
+        restore_arena_ptr
+    }
+}
+
+#[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot = snapshot::Snapshot::new();
     println!("Snapshot: {:?}, hash: {}", snapshot, tig_utils::u64s_from_str(&format!("{:?}", snapshot))[0]);
@@ -330,11 +342,9 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     println!("Delta: {:?}", delta);
 
     let restore_chunk = delta.generate_restore_chunk();
-    for i in (0..restore_chunk.len()).step_by(4) {
-        print!("{:02x}{:02x}{:02x}{:02x} ", restore_chunk[i], restore_chunk[i + 1], restore_chunk[i + 2], restore_chunk[i + 3]);
-    }
-    println!();
-    
+    let restore_region = __copy_to_restore_region(&restore_chunk);
+    println!("Restore region: {:?}", restore_region);
+
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
@@ -431,6 +441,10 @@ static __total_memory_usage: AtomicU64 = AtomicU64::new(0);
 #[cfg(feature = "entry_point")]
 #[no_mangle]
 static __curr_memory_usage: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(feature = "entry_point")]
+#[no_mangle]
+static __restore_region: AtomicU64 = AtomicU64::new(0x60000000000);
 
 #[cfg(feature = "entry_point")]
 mod snapshot;
