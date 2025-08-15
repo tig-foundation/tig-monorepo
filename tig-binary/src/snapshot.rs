@@ -527,6 +527,8 @@ extern "C" fn __create_snapshot() -> Snapshot {
     Snapshot::new()
 }
 
+#[cfg(target_arch = "aarch64")]
+#[macro_export]
 macro_rules! clear_registers {
     () => {
         unsafe {

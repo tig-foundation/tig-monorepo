@@ -21,7 +21,7 @@ mod entry_point;
 use entry_point::{Challenge};
 
 #[cfg(feature = "entry_point")]
-use snapshot::clear_registers;
+use crate::clear_registers;
 
 #[cfg(feature = "entry_point")]
 #[inline(never)]
