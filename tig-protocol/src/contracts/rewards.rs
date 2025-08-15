@@ -214,7 +214,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             - total_algorithms_reward
             - breakthroughs_reward_pool
             - total_benchmarkers_reward
-            - total_delegators_reward,
+            - total_delegators_reward
+            - challenge_owners_reward_pool,
     );
     block_details
         .emissions
