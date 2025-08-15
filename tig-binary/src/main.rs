@@ -328,6 +328,12 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 
     let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot::Snapshot::new());
     println!("Delta: {:?}", delta);
+
+    let restore_chunk = delta.generate_restore_chunk();
+    for i in (0..restore_chunk.len()).step_by(4) {
+        print!("{:02x}{:02x}{:02x}{:02x} ", restore_chunk[i], restore_chunk[i + 1], restore_chunk[i + 2], restore_chunk[i + 3]);
+    }
+    println!();
     
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };

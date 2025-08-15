@@ -252,66 +252,19 @@ impl DeltaSnapshot {
 
     #[cfg(target_arch = "aarch64")]
     pub fn generate_restore_chunk(&self) -> Vec<u8> {
-        let mut code = Vec::with_capacity(128 * 4);
+        let mut restore_chunk = Vec::with_capacity(128 * 4);
 
         for x in self.changed_regs.iter() {
             match x {
                 Registers::X(x, value) => {
-                    if *value == 0 {
-                        // mov x{x}, xzr
-                        let instr = 0xAA1F03E0 | (*x as u32);
-                        code.extend_from_slice(&instr.to_le_bytes());
-                    } else if *value <= 0xFFFF {
-                        // movz x{x}, #{value}
-                        let instr = 0xD2800000 | ((*value as u32 & 0xFFFF) << 5) | (*x as u32);
-                        code.extend_from_slice(&instr.to_le_bytes());
-                    } else if *value <= 0xFFFFFFFF {
-                        // 32-bit value, choose optimal encoding
-                        if (*value & 0xFFFF) == 0 {
-                            // movz x{x}, #{value >> 16}, lsl #16 (value is 0x????0000)
-                            let instr = 0xD2A00000 | (((*value >> 16) as u32 & 0xFFFF) << 5) | (*x as u32);
-                            code.extend_from_slice(&instr.to_le_bytes());
-                        } else {
-                            // movz + movk sequence for 32-bit values with lower bits set
-                            let instr1 = 0xD2800000 | ((*value as u32 & 0xFFFF) << 5) | (*x as u32);
-                            code.extend_from_slice(&instr1.to_le_bytes());
-                            
-                            if (*value >> 16) & 0xFFFF != 0 {
-                                // movk x{x}, #{(value >> 16) & 0xFFFF}, lsl #16
-                                let instr2 = 0xF2A00000 | ((((*value >> 16) as u32) & 0xFFFF) << 5) | (*x as u32);
-                                code.extend_from_slice(&instr2.to_le_bytes());
-                            }
-                        }
-                    } else {
-                        // 64-bit value, use movz + movk sequence
-                        // Always start with movz to clear the register
-                        let instr1 = 0xD2800000 | ((*value as u32 & 0xFFFF) << 5) | (*x as u32);
-                        code.extend_from_slice(&instr1.to_le_bytes());
-                        
-                        if (*value >> 16) & 0xFFFF != 0 {
-                            // movk x{x}, #{(value >> 16) & 0xFFFF}, lsl #16
-                            let instr2 = 0xF2A00000 | ((((*value >> 16) as u32) & 0xFFFF) << 5) | (*x as u32);
-                            code.extend_from_slice(&instr2.to_le_bytes());
-                        }
-                        
-                        if (*value >> 32) & 0xFFFF != 0 {
-                            // movk x{x}, #{(value >> 32) & 0xFFFF}, lsl #32
-                            let instr3 = 0xF2C00000 | ((((*value >> 32) as u32) & 0xFFFF) << 5) | (*x as u32);
-                            code.extend_from_slice(&instr3.to_le_bytes());
-                        }
-                        
-                        if (*value >> 48) & 0xFFFF != 0 {
-                            // movk x{x}, #{(value >> 48) & 0xFFFF}, lsl #48
-                            let instr4 = 0xF2E00000 | ((((*value >> 48) as u32) & 0xFFFF) << 5) | (*x as u32);
-                            code.extend_from_slice(&instr4.to_le_bytes());
-                        }
-                    }
+                    let (code, size) = self.mov_GPR_IMM64(*x, *value);
+                    restore_chunk.extend_from_slice(&code[..size]);
                 }
                 _ => {}
             }
         }
 
-        code
+        restore_chunk
     }
 }
 
