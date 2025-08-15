@@ -711,12 +711,28 @@ pub enum EntityType {
 #[repr(C)]
 pub struct EntityChange {
     pub entity_type: EntityType,
-    pub entity_ptr: *const u8,           // Points to GlobalEntry, TlsEntry, etc.
-    pub offset: u32,                     // Offset within the entity
-    pub old_value: u64,
-    pub new_value: u64,
-    pub size: u8,                        // 1, 2, 4, 8 bytes
-    pub instruction_offset: u16,         // Which instruction in BB
+    pub entity_ptr: *const u8,
+    pub offset_in_entity: u32,
+    pub old_value_ptr: *const u8,
+    pub new_value_ptr: *const u8,
+    pub size: u32,
+    pub value_type: ValueType,
+}
+
+#[repr(C)]
+pub enum ValueType {
+    U8 = 0,
+    U16 = 1,
+    U32 = 2,
+    U64 = 3,
+    I8 = 4,
+    I16 = 5,
+    I32 = 6,
+    I64 = 7,
+    F32 = 8,
+    F64 = 9,
+    Ptr = 10,
+    Bytes = 11,
 }
 
 #[repr(C)]
