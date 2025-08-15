@@ -698,3 +698,43 @@ impl GlobalEntry {
         unsafe { std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size); }
     }
 }
+
+#[repr(C)]
+pub enum EntityType {
+    Global = 0,
+    ThreadLocal = 1,
+    StackVar = 2,
+    HeapAllocation = 3,
+    Register = 4,
+}
+
+#[repr(C)]
+pub struct EntityChange {
+    pub entity_type: EntityType,
+    pub entity_ptr: *const u8,           // Points to GlobalEntry, TlsEntry, etc.
+    pub offset: u32,                     // Offset within the entity
+    pub old_value: u64,
+    pub new_value: u64,
+    pub size: u8,                        // 1, 2, 4, 8 bytes
+    pub instruction_offset: u16,         // Which instruction in BB
+}
+
+#[repr(C)]
+pub struct BasicBlockEntry {
+    pub id: u32,
+    pub function_name: *const std::ffi::c_char,
+    pub start_address: *mut u8,
+    pub end_address: *mut u8,
+    pub instruction_count: u32,
+    pub execution_count: u64,
+    pub fuel_cost: u32,
+    pub entity_changes_offset: u32,      // Offset into entity changes array
+    pub entity_changes_count: u32,       // Number of entity changes
+}
+
+extern "C" {
+    static __basic_blocks_registry: *const BasicBlockEntry;
+    static __basic_blocks_count: usize;
+    static __entity_changes_registry: *const EntityChange;
+    static __entity_changes_count: usize;
+}
