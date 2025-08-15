@@ -640,19 +640,19 @@ impl TlsEntry {
                 .unwrap_or("<invalid_utf8>")
         }
     }
-    
+
     pub fn address(&self) -> *mut u8 {
         self.address
     }
 
     pub fn read(&self) -> Vec<u8> {
         let mut value = vec![0; self.size];
-        std::ptr::copy_nonoverlapping(self.address, value.as_mut_ptr(), self.size);
+        unsafe { std::ptr::copy_nonoverlapping(self.address, value.as_mut_ptr(), self.size); }
         value
     }
 
     pub fn write(&self, value: &[u8]) {
-        std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size);
+       unsafe { std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size); }
     }
 }
 
