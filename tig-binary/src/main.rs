@@ -21,9 +21,6 @@ mod entry_point;
 use entry_point::{Challenge};
 
 #[cfg(feature = "entry_point")]
-use crate::clear_registers;
-
-#[cfg(feature = "entry_point")]
 #[inline(never)]
 #[no_mangle]
 unsafe fn __switch_stack_and_call(
@@ -54,7 +51,7 @@ unsafe fn __switch_stack_and_call(
     // clear all registers to ensure deterministic execution
     #[cfg(target_arch = "aarch64")]
     {
-        clear_registers!();
+        crate::clear_registers!();
 
         std::arch::asm!(
             "mov x19, sp", // backup original stack pointer
