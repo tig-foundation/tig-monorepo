@@ -623,3 +623,8 @@ macro_rules! clear_registers {
         }
     };
 }
+
+extern "C" {
+    static __tls_registry: *const TlsEntry;
+    static __tls_registry_size: usize;
+}
