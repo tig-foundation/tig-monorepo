@@ -316,6 +316,239 @@ impl DeltaSnapshot {
 }
 
 #[cfg(target_arch = "aarch64")]
+impl DeltaSnapshot {
+    /// Encodes the EOR X_dst, X_dst, X_src instruction.
+    /// This is the AArch64 equivalent of xor reg_dst, reg_src.
+    fn xor_GPR_GPR(&self, reg_dst: u8, reg_src: u8) -> ([u8; 4], usize) {
+        let mut code = [0; 4];
+
+        // EOR Xd, Xn, Xm instruction encoding for 64-bit registers.
+        // Operation: Xd = Xn EOR Xm
+        // To match `xor dst, src`, we use: EOR X_dst, X_dst, X_src
+        // Rd = reg_dst, Rn = reg_dst, Rm = reg_src
+        let instr: u32 = 0xCA000000 
+                       | ((reg_src as u32 & 0x1F) << 16) 
+                       | ((reg_dst as u32 & 0x1F) << 5) 
+                       | (reg_dst as u32 & 0x1F);
+        
+        code.copy_from_slice(&instr.to_le_bytes());
+        (code, 4)
+    }
+
+    /// Encodes loading an 8-bit immediate into a register using MOVZ.
+    fn mov_GPR_IMM8(&self, reg: u8, value: u8) -> ([u8; 4], usize) {
+        let mut code = [0; 4];
+        
+        // MOVZ Xd, #imm, LSL 0
+        // The register is zero-extended to 64 bits.
+        let instr: u32 = 0xD2800000 | ((value as u32) << 5) | (reg as u32 & 0x1F);
+        
+        code.copy_from_slice(&instr.to_le_bytes());
+        (code, 4)
+    }
+
+    /// Encodes loading a 16-bit immediate into a register using MOVZ.
+    fn mov_GPR_IMM16(&self, reg: u8, value: u16) -> ([u8; 4], usize) {
+        let mut code = [0; 4];
+        
+        // MOVZ Xd, #imm, LSL 0
+        // The register is zero-extended to 64 bits.
+        let instr: u32 = 0xD2800000 | ((value as u32) << 5) | (reg as u32 & 0x1F);
+
+        code.copy_from_slice(&instr.to_le_bytes());
+        (code, 4)
+    }
+
+    /// Encodes loading a 32-bit immediate using a MOVZ/MOVK sequence.
+    fn mov_GPR_IMM32(&self, reg: u8, value: u32) -> ([u8; 8], usize) {
+        let mut code = [0; 8];
+        let mut size = 0;
+        let reg = reg as u32 & 0x1F;
+
+        let chunk0 = (value & 0xFFFF) as u32;
+        let chunk1 = ((value >> 16) & 0xFFFF) as u32;
+
+        // Helper to write an instruction to the buffer
+        let mut write_instr = |instr: u32| {
+            let bytes = instr.to_le_bytes();
+            code[size..size + 4].copy_from_slice(&bytes);
+            size += 4;
+        };
+        
+        if chunk0 == 0 && chunk1 != 0 {
+            // If lower 16 bits are zero, we can load the upper bits in one go.
+            // MOVZ Xd, #chunk1, LSL 16
+            write_instr(0xD2A00000 | (chunk1 << 5) | reg);
+        } else {
+            // Load lower 16 bits, zeroing the register.
+            // MOVZ Xd, #chunk0, LSL 0
+            write_instr(0xD2800000 | (chunk0 << 5) | reg);
+            
+            if chunk1 != 0 {
+                // Keep the lower bits and insert the upper 16 bits.
+                // MOVK Xd, #chunk1, LSL 16
+                write_instr(0xF2A00000 | (chunk1 << 5) | reg);
+            }
+        }
+        
+        (code, size)
+    }
+
+    /// Encodes loading a 64-bit immediate using a MOVZ/MOVK sequence.
+    fn mov_GPR_IMM64(&self, reg: u8, value: u64) -> ([u8; 16], usize) {
+        let mut code = [0; 16];
+        let mut size = 0;
+        let reg = reg as u32 & 0x1F;
+
+        let chunks = [
+            (value & 0xFFFF) as u32,
+            ((value >> 16) & 0xFFFF) as u32,
+            ((value >> 32) & 0xFFFF) as u32,
+            ((value >> 48) & 0xFFFF) as u32,
+        ];
+
+        // Helper to write an instruction to the buffer
+        let mut write_instr = |instr: u32| {
+            let bytes = instr.to_le_bytes();
+            code[size..size + 4].copy_from_slice(&bytes);
+            size += 4;
+        };
+
+        // Always start with MOVZ to clear the upper bits of the register.
+        // MOVZ Xd, #chunk0, LSL 0
+        write_instr(0xD2800000 | (chunks[0] << 5) | reg);
+
+        // MOVK for any subsequent non-zero chunks
+        if chunks[1] != 0 {
+            // MOVK Xd, #chunk1, LSL 16
+            write_instr(0xF2A00000 | (chunks[1] << 5) | reg);
+        }
+        if chunks[2] != 0 {
+            // MOVK Xd, #chunk2, LSL 32
+            write_instr(0xF2C00000 | (chunks[2] << 5) | reg);
+        }
+        if chunks[3] != 0 {
+            // MOVK Xd, #chunk3, LSL 48
+            write_instr(0xF2E00000 | (chunks[3] << 5) | reg);
+        }
+
+        (code, size)
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl DeltaSnapshot {
+    fn xor_GPR_GPR(&self, reg_dst: u8, reg_src: u8) -> ([u8; 3], usize) {
+        let mut code = [0; 3];
+        let mut size = 0;
+    
+        // REX prefix is always needed for 64-bit operations.
+        let mut rex = 0x48;  // Start with REX.W (64-bit)
+        if reg_src >= 8 { rex |= 0x04; }  // R bit extends the ModR/M reg field
+        if reg_dst >= 8 { rex |= 0x01; }  // B bit extends the ModR/M r/m field
+        code[size] = rex;
+        size += 1;
+    
+        // XOR opcode
+        code[size] = 0x31;
+        size += 1;
+    
+        // ModR/M byte
+        let modrm = 0xC0 | ((reg_src & 0x7) << 3) | (reg_dst & 0x7);
+        code[size] = modrm;
+        size += 1;
+    
+        (code, size)
+    }
+
+    fn mov_GPR_IMM8(&self, reg: u8, value: u8) -> ([u8; 3], usize) {
+        let mut code = [0; 3];
+        let mut size = 0;
+        
+        if reg >= 8 {
+            code[size] = 0x41;  // REX.B for extended registers
+            size += 1;
+        }
+
+        // MOV r8, imm8 (0xB0 + reg)
+        code[size] = 0xB0 + (reg & 0x7);
+        code[size + 1] = value;
+        size += 2;
+
+        (code, size)
+    }
+
+    fn mov_GPR_IMM16(&self, reg: u8, value: u16) -> ([u8; 5], usize) {
+        let mut code = [0; 5];
+        let mut size = 0;
+        
+        // 16-bit operand size prefix
+        code[size] = 0x66;
+        size += 1;
+        
+        if reg >= 8 {
+            code[size] = 0x41;  // REX.B for extended registers
+            size += 1;
+        }
+
+        // MOV r16, imm16 (0xB8 + reg)
+        code[size] = 0xB8 + (reg & 0x7);
+        code[size + 1] = value as u8;
+        code[size + 2] = (value >> 8) as u8;
+        size += 3;
+
+        (code, size)
+    }
+
+    fn mov_GPR_IMM32(&self, reg: u8, value: u32) -> ([u8; 6], usize) {
+        let mut code = [0; 6];
+        let mut size = 0;
+    
+        if reg >= 8 {
+            code[size] = 0x41;  // REX.B for extended registers
+            size += 1;
+        }
+        
+        // MOV r32, imm32 (0xB8 + reg)
+        code[size] = 0xB8 + (reg & 0x7);
+        code[size + 1] = value as u8;
+        code[size + 2] = (value >> 8) as u8;
+        code[size + 3] = (value >> 16) as u8;
+        code[size + 4] = (value >> 24) as u8;
+        size += 5;
+
+        (code, size)
+    }
+
+    fn mov_GPR_IMM64(&self, reg: u8, value: u64) -> ([u8; 10], usize) {
+        let mut code = [0; 10];
+        let mut size = 0;
+
+        if reg >= 8 {
+            code[size] = 0x49;  // REX.W (64-bit operation) for extended registers
+            size += 1;
+        } else {
+            code[size] = 0x48;  // REX.W (64-bit operation)
+            size += 1;
+        }
+
+        // MOV r64, imm64 (0xB8 + reg)
+        code[size] = 0xB8 + (reg & 0x7);
+        code[size + 1] = value as u8;
+        code[size + 2] = (value >> 8) as u8;
+        code[size + 3] = (value >> 16) as u8;
+        code[size + 4] = (value >> 24) as u8;
+        code[size + 5] = (value >> 32) as u8;
+        code[size + 6] = (value >> 40) as u8;
+        code[size + 7] = (value >> 48) as u8;
+        code[size + 8] = (value >> 56) as u8;
+        size += 9;
+
+        (code, size)
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
 #[repr(u8)]
 #[derive(Debug)]
 pub enum Registers {
