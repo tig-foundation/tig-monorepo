@@ -624,6 +624,14 @@ macro_rules! clear_registers {
     };
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct TlsEntry {
+    pub name: *const c_char, // Variable name (null-terminated string)
+    pub address: *mut u8,
+    pub size: usize,
+}
+
 extern "C" {
     static __tls_registry: *const TlsEntry;
     static __tls_registry_size: usize;
