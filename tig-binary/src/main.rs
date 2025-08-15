@@ -18,7 +18,10 @@ use getargs::{Options, Opt};
 #[cfg(feature = "entry_point")]
 mod entry_point;
 #[cfg(feature = "entry_point")]
-use entry_point::{clear_registers, Challenge};
+use entry_point::{Challenge};
+
+#[cfg(feature = "entry_point")]
+use snapshot::clear_registers;
 
 #[cfg(feature = "entry_point")]
 #[inline(never)]
