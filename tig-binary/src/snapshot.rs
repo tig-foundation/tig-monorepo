@@ -660,3 +660,41 @@ extern "C" {
     static __tls_registry: *const TlsEntry;
     static __tls_registry_size: usize;
 }
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct GlobalEntry {
+    pub name: *const c_char,
+    pub address: *mut u8,
+    pub size: usize,
+    pub is_const: bool,
+    pub is_atomic: bool,
+}
+
+extern "C" {
+    static __globals_registry: *const GlobalEntry;
+    static __globals_registry_size: usize;
+}
+
+impl GlobalEntry {
+    pub fn name(&self) -> &str {
+        unsafe { std::ffi::CStr::from_ptr(self.name)
+            .to_str()
+            .unwrap_or("<invalid_utf8>")
+        }
+    }
+
+    pub fn address(&self) -> *mut u8 {
+        self.address
+    }
+
+    pub fn read(&self) -> Vec<u8> {
+        let mut value = vec![0; self.size];
+        unsafe { std::ptr::copy_nonoverlapping(self.address, value.as_mut_ptr(), self.size); }
+        value
+    }
+
+    pub fn write(&self, value: &[u8]) {
+        unsafe { std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size); }
+    }
+}
