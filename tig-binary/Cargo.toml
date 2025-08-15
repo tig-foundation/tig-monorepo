@@ -7,15 +7,20 @@ authors.workspace = true
 repository.workspace = true
 edition.workspace = true
 
-[lib]
-crate-type = ["cdylib", "staticlib", "rlib"]
+#[lib]
+#crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "automatic-fuel-check", features = [
+cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "runtime-fuel/cudnn-cublas", features = [
     "cuda-version-from-build-system",
 ], optional = true }
 tig-challenges = { path = "../tig-challenges" }
 tig-algorithms = { path = "../tig-algorithms" }
+libc = "0.2.175"
+getargs = "0.5.0"
+tig-structs = { path = "../tig-structs" }
+tig-utils = { path = "../tig-utils" }
+serde_json = { version = "1.0.113" }
 
 [features]
 entry_point = []

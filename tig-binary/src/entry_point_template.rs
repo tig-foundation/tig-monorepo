@@ -1,6 +1,8 @@
-use std::panic::catch_unwind;
 use tig_algorithms::{CHALLENGE}::{ALGORITHM};
 use tig_challenges::{CHALLENGE}::*;
+
+pub type Challenge = tig_challenges::{CHALLENGE}::Challenge;
+//pub type Solution = tig_algorithms::{CHALLENGE}::Solution;
 
 #[cfg(feature = "cuda")]
 use cudarc::{
@@ -15,11 +17,11 @@ use std::sync::Arc;
 #[unsafe(no_mangle)]
 pub extern "C" fn entry_point(challenge: &Challenge) -> Result<Option<Solution>, String>
 {
-    return catch_unwind(|| {
+    std::panic::catch_unwind(|| {
         {ALGORITHM}::solve_challenge(challenge).map_err(|e| e.to_string())
     }).unwrap_or_else(|_| {
         Err("Panic occurred calling solve_challenge".to_string())
-    });
+    })
 }
 
 
@@ -32,9 +34,9 @@ pub extern "C" fn entry_point(
     prop: &cudaDeviceProp,
 ) -> Result<Option<Solution>, String>
 {
-    return catch_unwind(|| {
+    std::panic::catch_unwind(|| {
         {ALGORITHM}::solve_challenge(challenge, module, stream, prop).map_err(|e| e.to_string())
     }).unwrap_or_else(|_| {
         Err("Panic occurred calling solve_challenge".to_string())
-    });
+    })
 }
