@@ -343,7 +343,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 
     let restore_chunk = delta.generate_restore_chunk();
     let restore_region = __copy_to_restore_region(&restore_chunk);
-    println!("Restore region: {:?}", restore_region);
+    println!("Restore region: {:?}, written: {}", restore_region, restore_chunk.len());
 
     let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
