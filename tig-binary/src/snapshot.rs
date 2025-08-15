@@ -724,7 +724,7 @@ pub struct BasicBlockEntry {
     pub id: u32,
     pub function_name: *const std::ffi::c_char,
     pub start_address: *mut u8,
-    pub end_address: *mut u8,
+    pub size: u32,
     pub instruction_count: u32,
     pub execution_count: u64,
     pub fuel_cost: u32,
