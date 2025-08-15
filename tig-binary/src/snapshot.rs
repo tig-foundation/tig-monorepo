@@ -627,7 +627,7 @@ macro_rules! clear_registers {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct TlsEntry {
-    pub name: *const c_char, // Variable name (null-terminated string)
+    pub name: *const std::ffi::c_char, // Variable name (null-terminated string)
     pub address: *mut u8,
     pub size: usize,
 }
