@@ -664,7 +664,7 @@ extern "C" {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct GlobalEntry {
-    pub name: *const c_char,
+    pub name: *const std::ffi::c_char,
     pub address: *mut u8,
     pub size: usize,
     pub is_const: bool,
