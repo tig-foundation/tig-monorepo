@@ -291,11 +291,17 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     //let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
+
+    let flush_buffers = || {
+        std::io::stdout().flush().unwrap();
+        std::io::stderr().flush().unwrap();
+    };
     
     let(solution, fuel_consumed, runtime_signature) = { 
         let result = crate::entry_point::entry_point(&challenge);
         if let Err(e) = result {
             eprintln!("Runtime error: {}", e);
+            flush_buffers();
             std::process::exit(84);
         }
 
@@ -314,6 +320,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 
     if fuel_consumed >= __max_fuel.load(std::sync::atomic::Ordering::Relaxed) {
         eprintln!("Out of fuel");
+        flush_buffers();
         std::process::exit(87);
     }
 
@@ -335,6 +342,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     match invalid_reason {
         Some(e) => {
             eprintln!("Invalid solution: {}", e);
+            flush_buffers();
             std::process::exit(86);
         }
         None => {}
@@ -355,8 +363,11 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 
     if output_data.solution.len() == 0 {
         eprintln!("No solution found");
+        flush_buffers();
         std::process::exit(85);
     }
+
+    flush_buffers();
 
     std::process::exit(0);
 }
