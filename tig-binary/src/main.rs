@@ -248,25 +248,37 @@ fn __copy_to_restore_region(restore_chunk: &[u8]) -> *mut u8 {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
-    let snapshot = snapshot::Snapshot::capture_pristine();
-    println!("Snapshot: {:?}", snapshot);
+    // --- First Snapshot ---
+    // Get the pointer to the snapshot data
+    let snapshot_ptr = snapshot::Snapshot::capture_pristine() as *const snapshot::Snapshot;
 
-    // Cast to actual struct type and clone the VALUE
-    let snapshot_bkup = unsafe { &*(snapshot as *const snapshot::Snapshot) }.clone();
+    // Allocate memory on the stack for our own independent copy
+    let mut snapshot_bkup_storage = MaybeUninit::<snapshot::Snapshot>::uninit();
+
+    // Perform a deep copy of the bytes from the source pointer to our new storage
+    // This creates a truly independent copy.
+    unsafe {
+        ptr::copy_nonoverlapping(snapshot_ptr, snapshot_bkup_storage.as_mut_ptr(), 1);
+    }
+    let snapshot_bkup = unsafe { snapshot_bkup_storage.assume_init() };
     println!("Snapshot: {:?}, hash: {}", &snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
 
-    let snapshot2 = snapshot::Snapshot::capture_pristine();
-    println!("Snapshot2: {:?}", snapshot2);
 
-    // Same correction here
-    let snapshot_bkup2 = unsafe { &*(snapshot2 as *const snapshot::Snapshot) }.clone();
+    // --- Second Snapshot ---
+    // Now, taking the second snapshot can't harm our backup
+    let snapshot_ptr2 = snapshot::Snapshot::capture_pristine() as *const snapshot::Snapshot;
+    // We can just clone this one since we're done taking snapshots
+    let snapshot_bkup2 = unsafe { &*snapshot_ptr2 }.clone();
     println!("Snapshot2: {:?}, hash: {}", &snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
+
+    // --- Delta Calculation ---
+    // The delta should now be calculated correctly
     let delta = snapshot::DeltaSnapshot::delta_from(&snapshot_bkup, &snapshot_bkup2);
     println!("Delta: {:?}", delta);
 
-    println!("Snapshot: {:?}, hash: {}", snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
-    println!("Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
+    println!("Final Snapshot1: {:?}, hash: {}", snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
+    println!("Final Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
     //let restore_chunk = delta.generate_restore_chunk();
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
