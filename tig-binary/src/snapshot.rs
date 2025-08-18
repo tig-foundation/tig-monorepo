@@ -171,7 +171,7 @@ impl Snapshot {
         let registers = unsafe { ptr.read() }; // Copy the data
 
         unsafe {
-            std::arch::asm!(
+            std::arch::naked_asm!(
                 "add sp, sp, #{size}",
                 size = const std::mem::size_of::<RegisterSnapshot>(),
             );
