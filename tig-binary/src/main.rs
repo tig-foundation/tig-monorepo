@@ -252,7 +252,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     println!("Snapshot: {:?}", snapshot);
 
     let snapshot_ = unsafe { &*snapshot };
-    println!("Snapshot: {:?}", snapshot_);
+    println!("Snapshot: {:?}, hash: {}", snapshot_, tig_utils::u64s_from_str(&format!("{:?}", snapshot_))[0]);
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     //println!("Delta: {:?}", delta);
 
