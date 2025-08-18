@@ -168,9 +168,22 @@ impl Snapshot {
     #[inline(always)]
     pub fn new() -> Self {
         let ptr = RegisterSnapshot::snap();
-        let snapshot = ptr.read(); // Copy the data
+        let registers = unsafe { ptr.read() }; // Copy the data
 
-        std::arch::asm!("add sp, sp, #0x400");
+        unsafe {
+            std::arch::asm!(
+                "add sp, sp, #{size}",
+                size = const std::mem::size_of::<RegisterSnapshot>(),
+            );
+        }
+
+        Snapshot {
+            total_memory_usage: unsafe { __total_memory_usage.load(Ordering::Relaxed) },
+            max_memory_usage: unsafe { __max_memory_usage.load(Ordering::Relaxed) },
+            max_allowed_memory_usage: unsafe { __max_allowed_memory_usage.load(Ordering::Relaxed) },
+            curr_memory_usage: unsafe { __curr_memory_usage.load(Ordering::Relaxed) },
+            registers,
+        }
     }
 }
 
