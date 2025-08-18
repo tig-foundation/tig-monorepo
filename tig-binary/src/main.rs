@@ -11,6 +11,8 @@ fn main() {
 
 #[cfg(feature = "entry_point")]
 use std::sync::atomic::{AtomicI64, AtomicU64};
+#[cfg(feature = "entry_point")]
+use std::io::Write;
 
 #[cfg(feature = "entry_point")]
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData, Solution};
