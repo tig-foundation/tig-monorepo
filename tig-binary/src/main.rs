@@ -263,6 +263,9 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let delta = snapshot::DeltaSnapshot::delta_from(&snapshot_bkup, &snapshot_bkup2);
     println!("Delta: {:?}", delta);
 
+    println!("Snapshot: {:?}", snapshot_bkup);
+    println!("Snapshot2: {:?}", snapshot_bkup2);
+
     //let restore_chunk = delta.generate_restore_chunk();
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     //println!("Delta: {:?}", delta);
