@@ -168,6 +168,9 @@ impl Snapshot {
                 "ldr x27, [x28]",
                 "str x27, [x30, #{curr_memory_offset}]",
                 
+                // Store snapshot address in x0 before restoring working registers
+                "mov x0, x30",
+                
                 // Restore all working registers from stack
                 "ldp x27, x28, [sp, #0]",
                 "ldp x29, x30, [sp, #16]",
@@ -175,8 +178,7 @@ impl Snapshot {
                 // Restore stack pointer
                 "add sp, sp, #32",
                 
-                // Return pointer to the snapshot we just stored
-                "mov x0, x30",  // x30 still contains the snapshot address
+                // Return (x0 already contains the snapshot address)
                 "ret",
                 
                 registry_ptr = sym __snapshot_registry,
