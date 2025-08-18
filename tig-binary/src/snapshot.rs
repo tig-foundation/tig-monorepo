@@ -778,7 +778,7 @@ extern "C" {
 }
 
 #[no_mangle]
-static __snapshot_registry: *const std::ffi::c_void = std::ptr::null();
+static __snapshot_registry: *const u8 = std::ptr::null();
 
 #[no_mangle]
 static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
