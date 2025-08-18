@@ -48,7 +48,7 @@ pub struct RegisterSnapshot {
     pub gprs: [u64; 16], // rax-r15 + rsp + rbp
 }
 
-static mut PRISTINE_SNAPSHOT_BUFFER: [u8; 2048] = [0; 2048];
+static mut PRISTINE_SNAPSHOT_BUFFER: [u8; std::mem::size_of::<Snapshot>()] = [0; std::mem::size_of::<Snapshot>()];
 
 impl Snapshot {
     /// Captures ALL registers in their pristine state with zero interference
