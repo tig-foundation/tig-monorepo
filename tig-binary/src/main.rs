@@ -259,7 +259,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
         std::arch::asm!("mov x0, sp", out("x0") sp2);
     }
 
-    let snapshot2 = snapshot::Snapshot::new();
+    //let snapshot2 = snapshot::Snapshot::new();
 
     unsafe {
         std::arch::asm!("mov x0, sp", out("x0") sp3);
