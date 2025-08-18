@@ -3,7 +3,7 @@ mod contracts;
 use context::*;
 
 pub use contracts::{
-    algorithms::{submit_advance, submit_algorithm, submit_binary},
+    algorithms::{submit_advance, submit_binary, submit_code},
     benchmarks::{submit_benchmark, submit_precommit, submit_proof},
     players::{set_coinbase, set_delegatees, set_reward_share, set_vote},
 };

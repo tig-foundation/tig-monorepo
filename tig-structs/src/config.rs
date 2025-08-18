@@ -7,9 +7,9 @@ use tig_utils::PreciseNumber;
 serializable_struct_with_getters! {
     ProtocolConfig {
         advances: AdvancesConfig,
-        algorithms: AlgorithmsConfig,
         benchmarks: BenchmarksConfig,
         challenges: ChallengesConfig,
+        codes: CodesConfig,
         deposits: DepositsConfig,
         erc20: ERC20Config,
         opow: OPoWConfig,
@@ -124,7 +124,7 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    AlgorithmsConfig {
+    CodesConfig {
         submission_fee: PreciseNumber,
         adoption_threshold: f64,
         merge_points_threshold: u32,
@@ -140,7 +140,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     DistributionConfig {
         opow: f64,
-        algorithms: f64,
+        codes: f64,
         advances: f64,
         challenge_owners: f64,
     }

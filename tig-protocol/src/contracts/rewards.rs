@@ -9,9 +9,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         config,
         block_details,
         block_data,
-        active_algorithms_state,
-        active_algorithms_block_data,
-        active_algorithms_details,
+        active_codes_state,
+        active_codes_block_data,
+        active_codes_details,
         active_opow_block_data,
         active_players_block_data,
         active_players_state,
@@ -21,7 +21,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         ..
     } = cache;
 
-    let active_algorithm_ids = &block_data.active_ids[&ActiveType::Algorithm];
+    let active_code_ids = &block_data.active_ids[&ActiveType::Code];
     let active_advance_ids = &block_data.active_ids[&ActiveType::Advance];
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
 
@@ -45,41 +45,39 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     );
     let scaled_reward = block_reward * PreciseNumber::from_f64(block_details.gamma_value.clone());
 
-    // update algorithm rewards
-    let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
-    let algorithms_reward_pool =
-        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.algorithms);
+    // update code rewards
+    let adoption_threshold = PreciseNumber::from_f64(config.codes.adoption_threshold);
+    let codes_reward_pool =
+        scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.codes);
     let reward_pool_per_challenge =
-        algorithms_reward_pool / PreciseNumber::from(active_challenge_ids.len());
-    let mut total_algorithms_reward = zero.clone();
-    for algorithm_id in active_algorithm_ids.iter() {
-        let algorithm_state = &active_algorithms_state[algorithm_id];
-        let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
-        let algorithm_details = &active_algorithms_details[algorithm_id];
+        codes_reward_pool / PreciseNumber::from(active_challenge_ids.len());
+    let mut total_codes_reward = zero.clone();
+    for algorithm_id in active_code_ids.iter() {
+        let code_state = &active_codes_state[algorithm_id];
+        let code_data = active_codes_block_data.get_mut(algorithm_id).unwrap();
+        let code_details = &active_codes_details[algorithm_id];
 
-        let is_merged = algorithm_state.round_merged.is_some();
-        if algorithm_state.banned {
+        let is_merged = code_state.round_merged.is_some();
+        if code_state.banned {
             continue;
         }
 
         let player_data = active_players_block_data
-            .get_mut(&algorithm_details.player_id)
+            .get_mut(&code_details.player_id)
             .unwrap();
         player_data
             .reward_by_type
-            .insert(EmissionsType::Algorithm, zero.clone());
+            .insert(EmissionsType::Code, zero.clone());
 
-        if algorithm_data.adoption >= adoption_threshold
-            || (is_merged && algorithm_data.adoption > zero)
-        {
-            let reward = reward_pool_per_challenge * algorithm_data.adoption;
-            algorithm_data.reward = reward;
-            total_algorithms_reward += reward;
+        if code_data.adoption >= adoption_threshold || (is_merged && code_data.adoption > zero) {
+            let reward = reward_pool_per_challenge * code_data.adoption;
+            code_data.reward = reward;
+            total_codes_reward += reward;
 
             *player_data
                 .reward_by_type
-                .get_mut(&EmissionsType::Algorithm)
-                .unwrap() += algorithm_data.reward;
+                .get_mut(&EmissionsType::Code)
+                .unwrap() += code_data.reward;
         }
     }
 
@@ -187,13 +185,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     block_details.emissions.insert(
         EmissionsType::Bootstrap,
-        (advances_reward_pool - total_advances_reward)
-            + (algorithms_reward_pool - total_algorithms_reward),
+        (advances_reward_pool - total_advances_reward) + (codes_reward_pool - total_codes_reward),
     );
     block_details.emissions.insert(
         EmissionsType::Vault,
         block_reward
-            - algorithms_reward_pool
+            - codes_reward_pool
             - advances_reward_pool
             - total_benchmarkers_reward
             - total_delegators_reward
@@ -201,7 +198,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     );
     block_details
         .emissions
-        .insert(EmissionsType::Algorithm, total_algorithms_reward);
+        .insert(EmissionsType::Code, total_codes_reward);
     block_details
         .emissions
         .insert(EmissionsType::Advance, total_advances_reward);

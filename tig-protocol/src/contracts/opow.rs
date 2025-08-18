@@ -12,9 +12,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         block_data,
         active_challenges_block_data,
         active_challenges_prev_block_data,
-        active_algorithms_state,
-        active_algorithms_details,
-        active_algorithms_block_data,
+        active_codes_state,
+        active_codes_details,
+        active_codes_block_data,
         active_solutions,
         active_players_state,
         active_players_block_data,
@@ -23,7 +23,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         ..
     } = cache;
 
-    let active_algorithm_ids = &block_data.active_ids[&ActiveType::Algorithm];
+    let active_code_ids = &block_data.active_ids[&ActiveType::Code];
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
     let active_player_ids = &block_data.active_ids[&ActiveType::Player];
     let active_opow_ids = &block_data.active_ids[&ActiveType::OPoW];
@@ -44,13 +44,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         .collect::<HashMap<String, PreciseNumber>>();
 
     let mut phase_in_challenge_ids: HashSet<String> = active_challenge_ids.clone();
-    for algorithm_id in active_algorithm_ids.iter() {
-        if active_algorithms_state[algorithm_id]
+    for algorithm_id in active_code_ids.iter() {
+        if active_codes_state[algorithm_id]
             .round_active
             .as_ref()
             .is_some_and(|r| *r + 1 <= block_details.round)
         {
-            phase_in_challenge_ids.remove(&active_algorithms_details[algorithm_id].challenge_id);
+            phase_in_challenge_ids.remove(&active_codes_details[algorithm_id].challenge_id);
         }
     }
 
@@ -175,7 +175,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
         let min_num_nonces = config.opow.min_num_nonces as u64;
-        let mut player_algorithm_solutions = HashMap::<String, HashMap<String, u32>>::new();
+        let mut player_code_solutions = HashMap::<String, HashMap<String, u32>>::new();
         let mut player_solutions = HashMap::<String, u32>::new();
         let mut player_discarded_solutions = HashMap::<String, u32>::new();
         let mut player_nonces = HashMap::<String, u64>::new();
@@ -201,7 +201,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 {
                     continue;
                 }
-                *player_algorithm_solutions
+                *player_code_solutions
                     .entry(player_id.clone())
                     .or_default()
                     .entry(algorithm_id.clone())
@@ -261,14 +261,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                         player_solution_ratio[player_id] * player_qualifiers[player_id] as f64;
 
                     if player_qualifiers[player_id] > 0 {
-                        for algorithm_id in player_algorithm_solutions[player_id].keys() {
-                            let algorithm_data =
-                                active_algorithms_block_data.get_mut(algorithm_id).unwrap();
+                        for algorithm_id in player_code_solutions[player_id].keys() {
+                            let code_data = active_codes_block_data.get_mut(algorithm_id).unwrap();
 
-                            algorithm_data.num_qualifiers_by_player.insert(
+                            code_data.num_qualifiers_by_player.insert(
                                 player_id.clone(),
                                 (player_qualifiers[player_id] as f64
-                                    * player_algorithm_solutions[player_id][algorithm_id] as f64
+                                    * player_code_solutions[player_id][algorithm_id] as f64
                                     / player_solutions[player_id] as f64)
                                     .ceil() as u32,
                             );

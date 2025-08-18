@@ -6,14 +6,6 @@ use tig_utils::{jsonify, u64s_from_str, u8s_from_str};
 pub use tig_utils::{Frontier, MerkleBranch, MerkleHash, Point, PreciseNumber, U256};
 
 serializable_struct_with_getters! {
-    Algorithm {
-        id: String,
-        details: AlgorithmDetails,
-        state: AlgorithmState,
-        block_data: Option<AlgorithmBlockData>,
-    }
-}
-serializable_struct_with_getters! {
     Benchmark {
         id: String,
         details: BenchmarkDetails,
@@ -51,6 +43,14 @@ serializable_struct_with_getters! {
         details: ChallengeDetails,
         state: ChallengeState,
         block_data: Option<ChallengeBlockData>,
+    }
+}
+serializable_struct_with_getters! {
+    Code {
+        id: String,
+        details: CodeDetails,
+        state: CodeState,
+        block_data: Option<CodeBlockData>,
     }
 }
 serializable_struct_with_getters! {
@@ -141,41 +141,6 @@ serializable_struct_with_getters! {
     }
 }
 
-// Algorithm child structs
-serializable_struct_with_getters! {
-    AlgorithmCode {
-        rust: String,
-        cuda: Option<String>,
-    }
-}
-serializable_struct_with_getters! {
-    AlgorithmDetails {
-        name: String,
-        player_id: String,
-        challenge_id: String,
-        advance_id: Option<String>,
-        fee_paid: PreciseNumber,
-    }
-}
-serializable_struct_with_getters! {
-    AlgorithmState {
-        block_confirmed: u32,
-        round_submitted: u32,
-        round_pushed: Option<u32>,
-        round_active: Option<u32>,
-        round_merged: Option<u32>,
-        banned: bool,
-    }
-}
-serializable_struct_with_getters! {
-    AlgorithmBlockData {
-        num_qualifiers_by_player: HashMap<String, u32>,
-        adoption: PreciseNumber,
-        merge_points: u32,
-        reward: PreciseNumber,
-    }
-}
-
 // Benchmark child structs
 serializable_struct_with_getters! {
     BenchmarkSettings {
@@ -251,10 +216,10 @@ serializable_struct_with_getters! {
 #[serde(rename_all = "lowercase")]
 pub enum TxType {
     Advance,
-    Algorithm,
     Benchmark,
     Binary,
     Challenge,
+    Code,
     Deposit,
     Fraud,
     Precommit,
@@ -266,9 +231,9 @@ pub enum TxType {
 #[serde(rename_all = "lowercase")]
 pub enum ActiveType {
     Advance,
-    Algorithm,
     Benchmark,
     Challenge,
+    Code,
     Deposit,
     OPoW,
     Player,
@@ -277,10 +242,10 @@ pub enum ActiveType {
 #[serde(rename_all = "snake_case")]
 pub enum EmissionsType {
     Advance,
-    Algorithm,
     Benchmarker,
     Bootstrap,
     ChallengeOwner,
+    Code,
     Delegator,
     Vault,
 }
@@ -332,6 +297,41 @@ serializable_struct_with_getters! {
         base_fee: PreciseNumber,
         per_nonce_fee: PreciseNumber,
         hash_threshold: MerkleHash,
+    }
+}
+
+// Code child structs
+serializable_struct_with_getters! {
+    SourceCode {
+        rust: String,
+        cuda: Option<String>,
+    }
+}
+serializable_struct_with_getters! {
+    CodeDetails {
+        name: String,
+        player_id: String,
+        challenge_id: String,
+        algorithm_id: Option<String>,
+        fee_paid: PreciseNumber,
+    }
+}
+serializable_struct_with_getters! {
+    CodeState {
+        block_confirmed: u32,
+        round_submitted: u32,
+        round_pushed: Option<u32>,
+        round_active: Option<u32>,
+        round_merged: Option<u32>,
+        banned: bool,
+    }
+}
+serializable_struct_with_getters! {
+    CodeBlockData {
+        num_qualifiers_by_player: HashMap<String, u32>,
+        adoption: PreciseNumber,
+        merge_points: u32,
+        reward: PreciseNumber,
     }
 }
 

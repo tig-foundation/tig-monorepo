@@ -42,7 +42,7 @@ pub async fn submit_precommit<T: Context>(
 
     // verify algorithm is active
     if !ctx
-        .get_algorithm_state(&settings.algorithm_id)
+        .get_code_state(&settings.algorithm_id)
         .await
         .is_some_and(|s| !s.banned && s.round_active.is_some_and(|r| r <= block_details.round))
     {

@@ -10,12 +10,6 @@ pub trait Context {
         details: AdvanceDetails,
         evidence: String,
     ) -> Result<String>;
-    async fn get_algorithm_state(&self, algorithm_id: &String) -> Option<AlgorithmState>;
-    async fn add_algorithm_to_mempool(
-        &self,
-        details: AlgorithmDetails,
-        code: AlgorithmCode,
-    ) -> Result<String>;
     async fn get_benchmark_details(&self, benchmark_id: &String) -> Option<BenchmarkDetails>;
     async fn get_benchmark_data(
         &self,
@@ -28,12 +22,8 @@ pub trait Context {
         solution_nonces: HashSet<u64>,
         discarded_solution_nonces: HashSet<u64>,
     ) -> Result<()>;
-    async fn get_binary_details(&self, algorithm_id: &String) -> Option<BinaryDetails>;
-    async fn add_binary_to_mempool(
-        &self,
-        algorithm_id: String,
-        details: BinaryDetails,
-    ) -> Result<()>;
+    async fn get_binary_details(&self, code_id: &String) -> Option<BinaryDetails>;
+    async fn add_binary_to_mempool(&self, code_id: String, details: BinaryDetails) -> Result<()>;
     async fn get_latest_block_id(&self) -> String;
     async fn get_block_details(&self, block_id: &String) -> Option<BlockDetails>;
     async fn get_challenge_state(&self, challenge_id: &String) -> Option<ChallengeState>;
@@ -42,6 +32,8 @@ pub trait Context {
         challenge_id: &String,
         block_id: &String,
     ) -> Option<ChallengeBlockData>;
+    async fn get_code_state(&self, code_id: &String) -> Option<CodeState>;
+    async fn add_code_to_mempool(&self, details: CodeDetails, code: SourceCode) -> Result<String>;
     async fn get_config(&self) -> ProtocolConfig;
     async fn add_deposit_to_mempool(&self, details: DepositDetails) -> Result<String>;
     async fn get_player_details(&self, player_id: &String) -> Option<PlayerDetails>;
@@ -95,9 +87,9 @@ pub struct AddBlockCache {
     pub active_opow_block_data: HashMap<String, OPoWBlockData>,
     pub active_challenges_block_data: HashMap<String, ChallengeBlockData>,
     pub active_challenges_prev_block_data: HashMap<String, ChallengeBlockData>,
-    pub active_algorithms_state: HashMap<String, AlgorithmState>,
-    pub active_algorithms_details: HashMap<String, AlgorithmDetails>,
-    pub active_algorithms_block_data: HashMap<String, AlgorithmBlockData>,
+    pub active_codes_state: HashMap<String, CodeState>,
+    pub active_codes_details: HashMap<String, CodeDetails>,
+    pub active_codes_block_data: HashMap<String, CodeBlockData>,
     pub voting_advances_state: HashMap<String, AdvanceState>,
     pub active_advances_state: HashMap<String, AdvanceState>,
     pub active_advances_details: HashMap<String, AdvanceDetails>,
