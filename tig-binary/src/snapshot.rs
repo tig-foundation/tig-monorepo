@@ -276,7 +276,7 @@ impl DeltaSnapshot {
             }
         }
 
-        for i in 0..16 {
+        /*for i in 0..16 {
             if old.registers.predicates[i] != new.registers.predicates[i] {
                 delta.changed_regs.push(Registers::P(i as u8, new.registers.predicates[i]));
             }
@@ -288,7 +288,7 @@ impl DeltaSnapshot {
 
         if old.registers.vg != new.registers.vg {
             delta.changed_regs.push(Registers::VG(new.registers.vg));
-        }
+        }*/
 
         delta
     }
