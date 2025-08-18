@@ -273,15 +273,14 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot_bkup2 = unsafe { &*snapshot_ptr2 }.clone();
     println!("Snapshot2: {:?}, hash: {}", &snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
-
-    // --- Delta Calculation ---
-    // The delta should now be calculated correctly
-    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot_bkup, &snapshot_bkup2);
-    println!("Delta: {:?}", delta);
-
     println!("Final Snapshot1: {:?}, hash: {}", snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
     println!("Final Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
+
+    // --- Delta Calculation ---    // --- Delta Calculation ---
+    // The delta should now be calculated correctly
+    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot_bkup, &snapshot_bkup2);
+    println!("Delta: {:?}", delta);
     //let restore_chunk = delta.generate_restore_chunk();
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     //println!("Delta: {:?}", delta);
