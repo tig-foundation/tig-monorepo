@@ -152,8 +152,8 @@ impl RegisterSnapshot {
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
                 //predicates_offset = const offset_of!(RegisterSnapshot, predicates),
                 //out("x0") _,
-                options(nostack),
-                options(noreturn)
+                //options(nostack),
+                //options(noreturn)
             );
         }
     }
