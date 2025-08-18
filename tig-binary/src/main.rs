@@ -252,14 +252,14 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
    println!("Snapshot: {:?}", snapshot);
 
    // Cast to actual struct type and clone the VALUE
-   let snapshot_bkup = unsafe { &*(snapshot as *const Snapshot) }.clone();
+   let snapshot_bkup = unsafe { &*(snapshot as *const snapshot::Snapshot) }.clone();
    println!("Snapshot: {:?}, hash: {}", &snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
 
    let snapshot2 = snapshot::Snapshot::capture_pristine();
    println!("Snapshot: {:?}", snapshot2);
 
    // Same correction here
-   let snapshot_bkup2 = unsafe { &*(snapshot2 as *const Snapshot) }.clone();
+   let snapshot_bkup2 = unsafe { &*(snapshot2 as *const snapshot::Snapshot) }.clone();
    println!("Snapshot: {:?}, hash: {}", &snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
     let delta = snapshot::DeltaSnapshot::delta_from(&snapshot_bkup, &snapshot_bkup2);
