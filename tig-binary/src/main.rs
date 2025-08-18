@@ -250,6 +250,9 @@ fn __copy_to_restore_region(restore_chunk: &[u8]) -> *mut u8 {
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot = snapshot::Snapshot::capture_pristine();
     println!("Snapshot: {:?}", snapshot);
+
+    let snapshot_ = &*snapshot;
+    println!("Snapshot: {:?}", snapshot_);
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     //println!("Delta: {:?}", delta);
 
