@@ -164,25 +164,169 @@ pub struct RegisterSnapshot {
     pub gprs: [u64; 16], // rax-r15 + rsp + rbp
 }
 
-impl Snapshot {
-    #[inline(always)]
-    pub fn new() -> Self {
-        let ptr = RegisterSnapshot::snap();
-        let registers = unsafe { ptr.read() }; // Copy the data
+static mut PRISTINE_SNAPSHOT_BUFFER: [u8; 2048] = [0; 2048];
 
+impl Snapshot {
+    /// Captures ALL registers in their pristine state with zero interference
+    /// Uses stack to preserve working registers
+    #[naked]
+    pub fn capture_pristine() -> *const Snapshot {
         unsafe {
             std::arch::naked_asm!(
-                "add sp, sp, #{size}",
-                size = const std::mem::size_of::<RegisterSnapshot>(),
+                // Reserve stack space for 4 registers (32 bytes)
+                "sub sp, sp, #32",
+                
+                // Save the 4 registers we need to use for work
+                "stp x27, x28, [sp, #0]",
+                "stp x29, x30, [sp, #16]",
+                
+                // Load pre-allocated buffer address
+                "adrp x30, {buffer}",
+                "add x30, x30, :lo12:{buffer}",
+                
+                // Calculate offset to registers field within Snapshot
+                "add x29, x30, #{registers_offset}",
+                
+                // Save ALL GPRs x0-x26 (pristine values)
+                "stp x0, x1, [x29, #{gprs_offset}]",
+                "stp x2, x3, [x29, #{gprs_offset} + 16]", 
+                "stp x4, x5, [x29, #{gprs_offset} + 32]",
+                "stp x6, x7, [x29, #{gprs_offset} + 48]",
+                "stp x8, x9, [x29, #{gprs_offset} + 64]",
+                "stp x10, x11, [x29, #{gprs_offset} + 80]",
+                "stp x12, x13, [x29, #{gprs_offset} + 96]",
+                "stp x14, x15, [x29, #{gprs_offset} + 112]",
+                "stp x16, x17, [x29, #{gprs_offset} + 128]",
+                "stp x18, x19, [x29, #{gprs_offset} + 144]",
+                "stp x20, x21, [x29, #{gprs_offset} + 160]",
+                "stp x22, x23, [x29, #{gprs_offset} + 176]",
+                "stp x24, x25, [x29, #{gprs_offset} + 192]",
+                "str x26, [x29, #{gprs_offset} + 208]",
+                
+                // Restore original x27, x28, x29, x30 from stack and save them
+                "ldp x27, x28, [sp, #0]",
+                "stp x27, x28, [x29, #{gprs_offset} + 216]",
+                "ldp x27, x28, [sp, #16]",         // x27=orig_x29, x28=orig_x30
+                "stp x27, x28, [x29, #{gprs_offset} + 232]",
+                
+                // Save SP (original stack pointer + 32 for our reserved space)
+                "mov x28, sp",
+                "add x28, x28, #32",
+                "str x28, [x29, #{sp_offset}]",
+                
+                // Save LR and PC (x30 from stack contains original LR)
+                "ldr x28, [sp, #24]",             // Get original x30 (LR)
+                "str x28, [x29, #{lr_offset}]",
+                "str x28, [x29, #{pc_offset}]",
+                
+                // Save NZCV (condition flags)
+                "mrs x28, nzcv",
+                "str x28, [x29, #{nzcv_offset}]",
+                
+                // Save floating-point control/status
+                "mrs x28, fpcr",
+                "str x28, [x29, #{fpcr_offset}]",
+                "mrs x28, fpsr", 
+                "str x28, [x29, #{fpsr_offset}]",
+                
+                // Save thread pointers
+                "mrs x28, tpidr_el0",
+                "str x28, [x29, #{tpidr_el0_offset}]",
+                "mrs x28, tpidrro_el0",
+                "str x28, [x29, #{tpidrro_el0_offset}]",
+                
+                // Zero out cntfrq_el0 (can't easily read)
+                "str xzr, [x29, #{cntfrq_el0_offset}]",
+                
+                // Save ALL vector registers v0-v31 (all pristine)
+                "add x28, x29, #{vregs_offset}",
+                "stp q0, q1, [x28, #0]",
+                "stp q2, q3, [x28, #32]",
+                "stp q4, q5, [x28, #64]",
+                "stp q6, q7, [x28, #96]",
+                "stp q8, q9, [x28, #128]",
+                "stp q10, q11, [x28, #160]",
+                "stp q12, q13, [x28, #192]",
+                "stp q14, q15, [x28, #224]",
+                "stp q16, q17, [x28, #256]",
+                "stp q18, q19, [x28, #288]",
+                "stp q20, q21, [x28, #320]",
+                "stp q22, q23, [x28, #352]",
+                "stp q24, q25, [x28, #384]",
+                "stp q26, q27, [x28, #416]",
+                "stp q28, q29, [x28, #448]",
+                "stp q30, q31, [x28, #480]",
+                
+                // Zero out predicates and SVE registers (not easily accessible)
+                "add x28, x29, #{predicates_offset}",
+                "mov x27, #256",              // 256 bytes to clear
+                "2:",
+                "str xzr, [x28], #8",         // Clear 8 bytes, post-increment
+                "subs x27, x27, #8",
+                "b.ne 2b",
+                
+                // Zero out ffr and vg
+                "str xzr, [x29, #{ffr_offset}]",
+                "str wzr, [x29, #{vg_offset}]",
+                
+                // Save memory usage values from globals
+                "adrp x28, {total_memory}",
+                "add x28, x28, :lo12:{total_memory}",
+                "ldr x27, [x28]",
+                "str x27, [x30, #{total_memory_offset}]",
+                
+                "adrp x28, {max_memory}",
+                "add x28, x28, :lo12:{max_memory}",
+                "ldr x27, [x28]",
+                "str x27, [x30, #{max_memory_offset}]",
+                
+                "adrp x28, {max_allowed_memory}",
+                "add x28, x28, :lo12:{max_allowed_memory}",
+                "ldr x27, [x28]",
+                "str x27, [x30, #{max_allowed_memory_offset}]",
+                
+                "adrp x28, {curr_memory}",
+                "add x28, x28, :lo12:{curr_memory}",
+                "ldr x27, [x28]",
+                "str x27, [x30, #{curr_memory_offset}]",
+                
+                // Restore all working registers from stack
+                "ldp x27, x28, [sp, #0]",
+                "ldp x29, x30, [sp, #16]",
+                
+                // Restore stack pointer
+                "add sp, sp, #32",
+                
+                // Return snapshot buffer address (need to reload it)
+                "adrp x0, {buffer}",
+                "add x0, x0, :lo12:{buffer}",
+                "ret",
+                
+                buffer = sym PRISTINE_SNAPSHOT_BUFFER,
+                total_memory = sym __total_memory_usage,
+                max_memory = sym __max_memory_usage,
+                max_allowed_memory = sym __max_allowed_memory_usage,
+                curr_memory = sym __curr_memory_usage,
+                registers_offset = const std::mem::offset_of!(Snapshot, registers),
+                total_memory_offset = const std::mem::offset_of!(Snapshot, total_memory_usage),
+                max_memory_offset = const std::mem::offset_of!(Snapshot, max_memory_usage),
+                max_allowed_memory_offset = const std::mem::offset_of!(Snapshot, max_allowed_memory_usage),
+                curr_memory_offset = const std::mem::offset_of!(Snapshot, curr_memory_usage),
+                gprs_offset = const std::mem::offset_of!(RegisterSnapshot, gprs),
+                sp_offset = const std::mem::offset_of!(RegisterSnapshot, sp),
+                lr_offset = const std::mem::offset_of!(RegisterSnapshot, lr),
+                pc_offset = const std::mem::offset_of!(RegisterSnapshot, pc),
+                nzcv_offset = const std::mem::offset_of!(RegisterSnapshot, nzcv),
+                fpcr_offset = const std::mem::offset_of!(RegisterSnapshot, fpcr),
+                fpsr_offset = const std::mem::offset_of!(RegisterSnapshot, fpsr),
+                tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
+                tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
+                cntfrq_el0_offset = const std::mem::offset_of!(RegisterSnapshot, cntfrq_el0),
+                vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
+                predicates_offset = const std::mem::offset_of!(RegisterSnapshot, predicates),
+                ffr_offset = const std::mem::offset_of!(RegisterSnapshot, ffr),
+                vg_offset = const std::mem::offset_of!(RegisterSnapshot, vg),
             );
-        }
-
-        Snapshot {
-            total_memory_usage: unsafe { __total_memory_usage.load(Ordering::Relaxed) },
-            max_memory_usage: unsafe { __max_memory_usage.load(Ordering::Relaxed) },
-            max_allowed_memory_usage: unsafe { __max_allowed_memory_usage.load(Ordering::Relaxed) },
-            curr_memory_usage: unsafe { __curr_memory_usage.load(Ordering::Relaxed) },
-            registers,
         }
     }
 }
