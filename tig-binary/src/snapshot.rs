@@ -777,7 +777,8 @@ extern "C" {
     static __entity_changes_count: usize;
 }
 
-extern "C" {
-    static __snapshot_registry: *const Snapshot;
-    static __snapshot_count: usize;
-}
+#[no_mangle]
+static __snapshot_registry: *const Snapshot = std::ptr::null();
+
+#[no_mangle]
+static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
