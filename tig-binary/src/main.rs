@@ -1,3 +1,5 @@
+#![feature(naked_functions)]
+
 extern crate tig_algorithms;
 extern crate tig_challenges;
 
