@@ -262,7 +262,10 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     }
     println!("SP: {:?}", sp);
 
-    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot::Snapshot::new());
+    let snapshot2 = snapshot::Snapshot::new();
+    println!("Snapshot2: {:?}, hash: {}", snapshot2, tig_utils::u64s_from_str(&format!("{:?}", snapshot2))[0]);
+
+    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     println!("Delta: {:?}", delta);
 
     let restore_chunk = delta.generate_restore_chunk();
