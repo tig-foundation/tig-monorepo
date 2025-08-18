@@ -23,8 +23,6 @@ pub struct RegisterSnapshot {
     pub gprs: [u64; 31], // x0-x30
 
     pub sp: u64,
-    pub lr: u64,
-    pub pc: u64,
     pub nzcv: u64,
 
     pub fpcr: u64,
@@ -33,7 +31,7 @@ pub struct RegisterSnapshot {
     pub tpidr_el0: u64,
     pub tpidrro_el0: u64,
     //pub cntvct_el0: u64,
-    pub cntfrq_el0: u64,
+    //pub cntfrq_el0: u64,
 
     pub vregs: [u128; 32], // v0-v31
     pub predicates: [u128; 16],
@@ -43,120 +41,6 @@ pub struct RegisterSnapshot {
 
 #[cfg(target_arch = "aarch64")]
 impl RegisterSnapshot {
-    #[naked]
-    pub fn snap() -> *const RegisterSnapshot {
-        unsafe {
-            std::arch::naked_asm!(
-                "sub sp, sp, #{size}",
-
-                // Save GPRs x0-x30 using calculated offsets
-                "stp x0, x1, [sp, #{gprs_offset}]",
-                "stp x2, x3, [sp, #{gprs_offset} + 16]",
-                "stp x4, x5, [sp, #{gprs_offset} + 32]",
-                "stp x6, x7, [sp, #{gprs_offset} + 48]",
-                "stp x8, x9, [sp, #{gprs_offset} + 64]",
-                "stp x10, x11, [sp, #{gprs_offset} + 80]",
-                "stp x12, x13, [sp, #{gprs_offset} + 96]",
-                "stp x14, x15, [sp, #{gprs_offset} + 112]",
-                "stp x16, x17, [sp, #{gprs_offset} + 128]",
-                "stp x18, x19, [sp, #{gprs_offset} + 144]",
-                "stp x20, x21, [sp, #{gprs_offset} + 160]",
-                "stp x22, x23, [sp, #{gprs_offset} + 176]",
-                "stp x24, x25, [sp, #{gprs_offset} + 192]",
-                "stp x26, x27, [sp, #{gprs_offset} + 208]",
-                "stp x28, x29, [sp, #{gprs_offset} + 224]",
-                "str x30, [sp, #{gprs_offset} + 240]",
-
-                // Save SP, LR, PC
-                "mov x0, sp",
-                "add x0, x0, #{size}",
-                "str x0, [sp, #{sp_offset}]",
-                "str x30, [sp, #{lr_offset}]",
-                // Use LR as PC since it contains the return address to caller
-                "str x30, [sp, #{pc_offset}]",
-
-                // Save NZCV
-                "mrs x0, nzcv",
-                "str x0, [sp, #{nzcv_offset}]",
-
-                // Save floating-point control/status
-                "mrs x0, fpcr",
-                "str x0, [sp, #{fpcr_offset}]",
-                "mrs x0, fpsr",
-                "str x0, [sp, #{fpsr_offset}]",
-
-                // Save thread pointers
-                "mrs x0, tpidr_el0",
-                "str x0, [sp, #{tpidr_el0_offset}]",
-                "mrs x0, tpidrro_el0",
-                "str x0, [sp, #{tpidrro_el0_offset}]",
-
-                // Save timer registers
-                //"mrs x0, cntvct_el0",
-                //"str x0, [{base}, #{cntvct_el0_offset}]",
-                //"mrs x0, cntfrq_el0", 
-                //"str x0, [{base}, #{cntfrq_el0_offset}]",
-
-                // Save vector registers v0-v31
-                "stp q0, q1, [sp, #{vregs_offset}]",
-                "stp q2, q3, [sp, #{vregs_offset} + 32]",
-                "stp q4, q5, [sp, #{vregs_offset} + 64]",
-                "stp q6, q7, [sp, #{vregs_offset} + 96]",
-                "stp q8, q9, [sp, #{vregs_offset} + 128]",
-                "stp q10, q11, [sp, #{vregs_offset} + 160]",
-                "stp q12, q13, [sp, #{vregs_offset} + 192]",
-                "stp q14, q15, [sp, #{vregs_offset} + 224]",
-                "stp q16, q17, [sp, #{vregs_offset} + 256]",
-                "stp q18, q19, [sp, #{vregs_offset} + 288]",
-                "stp q20, q21, [sp, #{vregs_offset} + 320]",
-                "stp q22, q23, [sp, #{vregs_offset} + 352]",
-                "stp q24, q25, [sp, #{vregs_offset} + 384]",
-                "stp q26, q27, [sp, #{vregs_offset} + 416]",
-                "stp q28, q29, [sp, #{vregs_offset} + 448]",
-                "stp q30, q31, [sp, #{vregs_offset} + 480]",
-
-                // Save predicates
-                /*"str p0, [{base}, #{predicates_offset}]",
-                "str p1, [{base}, #{predicates_offset} + 16]",
-                "str p2, [{base}, #{predicates_offset} + 32]",
-                "str p3, [{base}, #{predicates_offset} + 48]",
-                "str p4, [{base}, #{predicates_offset} + 64]",
-                "str p5, [{base}, #{predicates_offset} + 80]",
-                "str p6, [{base}, #{predicates_offset} + 96]",
-                "str p7, [{base}, #{predicates_offset} + 112]",
-                "str p8, [{base}, #{predicates_offset} + 128]",
-                "str p9, [{base}, #{predicates_offset} + 144]",
-                "str p10, [{base}, #{predicates_offset} + 160]",
-                "str p11, [{base}, #{predicates_offset} + 176]",
-                "str p12, [{base}, #{predicates_offset} + 192]",
-                "str p13, [{base}, #{predicates_offset} + 208]",
-                "str p14, [{base}, #{predicates_offset} + 224]",
-                "str p15, [{base}, #{predicates_offset} + 240]",*/
-
-                "mov x0, sp",
-                "ret",
-
-                //base = in(reg) base_ptr,
-                size = const std::mem::size_of::<RegisterSnapshot>(),
-                gprs_offset = const std::mem::offset_of!(RegisterSnapshot, gprs),
-                sp_offset = const std::mem::offset_of!(RegisterSnapshot, sp),
-                lr_offset = const std::mem::offset_of!(RegisterSnapshot, lr),
-                pc_offset = const std::mem::offset_of!(RegisterSnapshot, pc),
-                nzcv_offset = const std::mem::offset_of!(RegisterSnapshot, nzcv),
-                fpcr_offset = const std::mem::offset_of!(RegisterSnapshot, fpcr),
-                fpsr_offset = const std::mem::offset_of!(RegisterSnapshot, fpsr),
-                tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
-                tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
-                //cntvct_el0_offset = const offset_of!(RegisterSnapshot, cntvct_el0),
-                //cntfrq_el0_offset = const offset_of!(RegisterSnapshot, cntfrq_el0),
-                vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
-                //predicates_offset = const offset_of!(RegisterSnapshot, predicates),
-                //out("x0") _,
-                //options(nostack),
-                //options(noreturn)
-            );
-        }
-    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -215,9 +99,9 @@ impl Snapshot {
                 "str x28, [x29, #{sp_offset}]",
                 
                 // Save LR and PC (x30 from stack contains original LR)
-                "ldr x28, [sp, #24]",             // Get original x30 (LR)
-                "str x28, [x29, #{lr_offset}]",
-                "str x28, [x29, #{pc_offset}]",
+                //"ldr x28, [sp, #24]",             // Get original x30 (LR)
+                //"str x28, [x29, #{lr_offset}]",
+                //"str x28, [x29, #{pc_offset}]",
                 
                 // Save NZCV (condition flags)
                 "mrs x28, nzcv",
@@ -236,7 +120,7 @@ impl Snapshot {
                 "str x28, [x29, #{tpidrro_el0_offset}]",
                 
                 // Zero out cntfrq_el0 (can't easily read)
-                "str xzr, [x29, #{cntfrq_el0_offset}]",
+                //"str xzr, [x29, #{cntfrq_el0_offset}]",
                 
                 // Save ALL vector registers v0-v31 (all pristine)
                 "add x28, x29, #{vregs_offset}",
@@ -314,14 +198,14 @@ impl Snapshot {
                 curr_memory_offset = const std::mem::offset_of!(Snapshot, curr_memory_usage),
                 gprs_offset = const std::mem::offset_of!(RegisterSnapshot, gprs),
                 sp_offset = const std::mem::offset_of!(RegisterSnapshot, sp),
-                lr_offset = const std::mem::offset_of!(RegisterSnapshot, lr),
-                pc_offset = const std::mem::offset_of!(RegisterSnapshot, pc),
+                //lr_offset = const std::mem::offset_of!(RegisterSnapshot, lr),
+                //pc_offset = const std::mem::offset_of!(RegisterSnapshot, pc),
                 nzcv_offset = const std::mem::offset_of!(RegisterSnapshot, nzcv),
                 fpcr_offset = const std::mem::offset_of!(RegisterSnapshot, fpcr),
                 fpsr_offset = const std::mem::offset_of!(RegisterSnapshot, fpsr),
                 tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
-                cntfrq_el0_offset = const std::mem::offset_of!(RegisterSnapshot, cntfrq_el0),
+                //cntfrq_el0_offset = const std::mem::offset_of!(RegisterSnapshot, cntfrq_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
                 predicates_offset = const std::mem::offset_of!(RegisterSnapshot, predicates),
                 ffr_offset = const std::mem::offset_of!(RegisterSnapshot, ffr),
@@ -354,13 +238,13 @@ impl DeltaSnapshot {
             delta.changed_regs.push(Registers::SP(new.registers.sp));
         }
 
-        if old.registers.lr != new.registers.lr {
+        /*if old.registers.lr != new.registers.lr {
             delta.changed_regs.push(Registers::LR(new.registers.lr));
         }
 
         if old.registers.pc != new.registers.pc {
             delta.changed_regs.push(Registers::PC(new.registers.pc));
-        }
+        }*/
 
         if old.registers.nzcv != new.registers.nzcv {
             delta.changed_regs.push(Registers::NZCV(new.registers.nzcv));
@@ -382,9 +266,9 @@ impl DeltaSnapshot {
             delta.changed_regs.push(Registers::TPIDRRO_EL0(new.registers.tpidrro_el0));
         }
 
-        if old.registers.cntfrq_el0 != new.registers.cntfrq_el0 {
+        /*if old.registers.cntfrq_el0 != new.registers.cntfrq_el0 {
             delta.changed_regs.push(Registers::CNTFRQ_EL0(new.registers.cntfrq_el0));
-        }
+        }*/
 
         for i in 0..32 {
             if old.registers.vregs[i] != new.registers.vregs[i] {
@@ -665,19 +549,15 @@ impl DeltaSnapshot {
 pub enum Registers {
     X(u8, u64) = 0, // x<n>, value, x0-x30
     SP(u64) = 31, // sp
-    LR(u64) = 32,
-    PC(u64) = 33,
-    NZCV(u64) = 34,
-    FPCR(u64) = 35,
-    FPSR(u64) = 36,
-    TPIDR_EL0(u64) = 37,
-    TPIDRRO_EL0(u64) = 38,
-    CNTVCT_EL0(u64) = 39,
-    CNTFRQ_EL0(u64) = 40,
-    V(u8, u128) = 41, // v<n>, value, v0-v31
-    P(u8, u128) = 73, // p<n>, value, p0-p15
-    FFR(u128) = 89,
-    VG(u32) = 90,
+    NZCV(u64) = 32,
+    FPCR(u64) = 33,
+    FPSR(u64) = 34,
+    TPIDR_EL0(u64) = 35,
+    TPIDRRO_EL0(u64) = 36,
+    V(u8, u128) = 37, // v<n>, value, v0-v31
+    P(u8, u128) = 69, // p<n>, value, p0-p15
+    FFR(u128) = 84,
+    VG(u32) = 85
 }
 
 #[cfg(target_arch = "aarch64")]
