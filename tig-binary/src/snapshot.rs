@@ -34,9 +34,9 @@ pub struct RegisterSnapshot {
     //pub cntfrq_el0: u64,
 
     pub vregs: [u128; 32], // v0-v31
-    pub predicates: [u128; 16],
-    pub ffr: u128,
-    pub vg: u32
+    //pub predicates: [u128; 16],
+    //pub ffr: u128,
+    //pub vg: u32
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -142,16 +142,16 @@ impl Snapshot {
                 "stp q30, q31, [x28, #480]",
                 
                 // Zero out predicates and SVE registers (not easily accessible)
-                "add x28, x29, #{predicates_offset}",
-                "mov x27, #256",              // 256 bytes to clear
-                "2:",
-                "str xzr, [x28], #8",         // Clear 8 bytes, post-increment
-                "subs x27, x27, #8",
-                "b.ne 2b",
+                //"add x28, x29, #{predicates_offset}",
+                //"mov x27, #256",              // 256 bytes to clear
+                //"2:",
+                //"str xzr, [x28], #8",         // Clear 8 bytes, post-increment
+                //"subs x27, x27, #8",
+                //"b.ne 2b",
                 
                 // Zero out ffr and vg
-                "str xzr, [x29, #{ffr_offset}]",
-                "str wzr, [x29, #{vg_offset}]",
+                //"str xzr, [x29, #{ffr_offset}]",
+                //"str wzr, [x29, #{vg_offset}]",
                 
                 // Save memory usage values from globals
                 "adrp x28, {total_memory}",
@@ -207,9 +207,9 @@ impl Snapshot {
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
                 //cntfrq_el0_offset = const std::mem::offset_of!(RegisterSnapshot, cntfrq_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
-                predicates_offset = const std::mem::offset_of!(RegisterSnapshot, predicates),
-                ffr_offset = const std::mem::offset_of!(RegisterSnapshot, ffr),
-                vg_offset = const std::mem::offset_of!(RegisterSnapshot, vg),
+                //predicates_offset = const std::mem::offset_of!(RegisterSnapshot, predicates),
+                //ffr_offset = const std::mem::offset_of!(RegisterSnapshot, ffr),
+                //vg_offset = const std::mem::offset_of!(RegisterSnapshot, vg),
             );
         }
     }
