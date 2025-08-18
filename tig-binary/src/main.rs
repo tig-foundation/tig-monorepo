@@ -251,7 +251,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot = snapshot::Snapshot::capture_pristine();
     println!("Snapshot: {:?}", snapshot);
 
-    let snapshot_ = &*snapshot;
+    let snapshot_ = unsafe { &*snapshot };
     println!("Snapshot: {:?}", snapshot_);
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     //println!("Delta: {:?}", delta);
