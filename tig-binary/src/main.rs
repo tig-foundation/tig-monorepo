@@ -266,14 +266,14 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     }
     println!("SP1: {:?}, SP2: {:?}, SP3: {:?}", sp1, sp2, sp3);
 
-    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
-    println!("Delta: {:?}", delta);
+    //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
+    //println!("Delta: {:?}", delta);
 
-    let restore_chunk = delta.generate_restore_chunk();
-    let restore_region = __copy_to_restore_region(&restore_chunk);
-    println!("Restore region: {:?}, written: {}", restore_region, restore_chunk.len());
+    //let restore_chunk = delta.generate_restore_chunk();
+    //let restore_region = __copy_to_restore_region(&restore_chunk);
+    //println!("Restore region: {:?}, written: {}", restore_region, restore_chunk.len());
 
-    let stack_ptr: usize;
+    //let stack_ptr: usize;
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
     
