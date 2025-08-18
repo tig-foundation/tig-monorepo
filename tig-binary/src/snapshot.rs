@@ -46,7 +46,7 @@ impl RegisterSnapshot {
     #[naked]
     pub fn snap() -> *const RegisterSnapshot {
         unsafe {
-            std::arch::asm!(
+            std::arch::naked_asm!(
                 "sub sp, sp, #{size}",
 
                 // Save GPRs x0-x30 using calculated offsets
