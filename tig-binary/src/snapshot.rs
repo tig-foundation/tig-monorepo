@@ -680,11 +680,6 @@ pub enum Registers {
     VG(u32) = 90,
 }
 
-#[no_mangle]
-extern "C" fn __create_snapshot() -> Snapshot {
-    Snapshot::new()
-}
-
 #[cfg(target_arch = "aarch64")]
 #[macro_export]
 macro_rules! clear_registers {
