@@ -277,6 +277,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     //println!("Final Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
     println!("Snapshot1 {:p}, Snapshot2 {:p}", snapshot_ptr, snapshot_ptr2);
+    println!("{} {}", tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0], tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
 
     // --- Delta Calculation ---    // --- Delta Calculation ---
