@@ -263,7 +263,7 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
         std::ptr::copy_nonoverlapping(snapshot_ptr, snapshot_bkup_storage.as_mut_ptr(), 1);
     }
     let snapshot_bkup = unsafe { snapshot_bkup_storage.assume_init() };
-    println!("Snapshot: {:?}, hash: {}", &snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
+    //println!("Snapshot: {:?}, hash: {}", &snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
 
 
     // --- Second Snapshot ---
@@ -271,10 +271,12 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot_ptr2 = snapshot::Snapshot::capture_pristine() as *const snapshot::Snapshot;
     // We can just clone this one since we're done taking snapshots
     let snapshot_bkup2 = unsafe { &*snapshot_ptr2 }.clone();
-    println!("Snapshot2: {:?}, hash: {}", &snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
+    //println!("Snapshot2: {:?}, hash: {}", &snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
 
-    println!("Final Snapshot1: {:?}, hash: {}", snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
-    println!("Final Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
+    //println!("Final Snapshot1: {:?}, hash: {}", snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
+    //println!("Final Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
+
+    println!("Snapshot1 {:p}, Snapshot2 {:p}", snapshot_ptr, snapshot_ptr2);
 
 
     // --- Delta Calculation ---    // --- Delta Calculation ---
