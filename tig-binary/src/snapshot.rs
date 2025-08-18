@@ -48,10 +48,8 @@ pub struct RegisterSnapshot {
     pub gprs: [u64; 16], // rax-r15 + rsp + rbp
 }
 
-static mut PRISTINE_SNAPSHOT_BUFFER: [u8; std::mem::size_of::<Snapshot>()] = [0; std::mem::size_of::<Snapshot>()];
-
 impl Snapshot {
-    /// Captures ALL registers in their pristine state with zero interference
+    /// Captures ALL registers and stores in registry atomically
     /// Uses stack to preserve working registers
     #[naked]
     pub fn capture_pristine() -> *const Snapshot {
@@ -64,9 +62,25 @@ impl Snapshot {
                 "stp x27, x28, [sp, #0]",
                 "stp x29, x30, [sp, #16]",
                 
-                // Load pre-allocated buffer address
-                "adrp x30, {buffer}",
-                "add x30, x30, :lo12:{buffer}",
+                // Atomic increment of snapshot count and get index
+                "adrp x30, {snapshot_count}",
+                "add x30, x30, :lo12:{snapshot_count}",
+                "1:",
+                "ldaxr x29, [x30]",           // Load-acquire exclusive (current count)
+                "add x28, x29, #1",           // Increment for new count
+                "stlxr w27, x28, [x30]",      // Store-release exclusive (new count)
+                "cbnz w27, 1b",               // Retry if failed
+                
+                // Now x29 contains the index we should use (old count)
+                // Load registry pointer and calculate snapshot address
+                "adrp x30, {registry_ptr}",
+                "add x30, x30, :lo12:{registry_ptr}",
+                "ldr x30, [x30]",             // Dereference to get actual array address
+                
+                // Calculate offset: registry + (index * sizeof(Snapshot))
+                "mov x27, #{snapshot_size}",
+                "mul x29, x29, x27",          // index * sizeof(Snapshot)
+                "add x30, x30, x29",          // registry[index] address
                 
                 // Calculate offset to registers field within Snapshot
                 "add x29, x30, #{registers_offset}",
@@ -98,11 +112,6 @@ impl Snapshot {
                 "add x28, x28, #32",
                 "str x28, [x29, #{sp_offset}]",
                 
-                // Save LR and PC (x30 from stack contains original LR)
-                //"ldr x28, [sp, #24]",             // Get original x30 (LR)
-                //"str x28, [x29, #{lr_offset}]",
-                //"str x28, [x29, #{pc_offset}]",
-                
                 // Save NZCV (condition flags)
                 "mrs x28, nzcv",
                 "str x28, [x29, #{nzcv_offset}]",
@@ -118,9 +127,6 @@ impl Snapshot {
                 "str x28, [x29, #{tpidr_el0_offset}]",
                 "mrs x28, tpidrro_el0",
                 "str x28, [x29, #{tpidrro_el0_offset}]",
-                
-                // Zero out cntfrq_el0 (can't easily read)
-                //"str xzr, [x29, #{cntfrq_el0_offset}]",
                 
                 // Save ALL vector registers v0-v31 (all pristine)
                 "add x28, x29, #{vregs_offset}",
@@ -140,18 +146,6 @@ impl Snapshot {
                 "stp q26, q27, [x28, #416]",
                 "stp q28, q29, [x28, #448]",
                 "stp q30, q31, [x28, #480]",
-                
-                // Zero out predicates and SVE registers (not easily accessible)
-                //"add x28, x29, #{predicates_offset}",
-                //"mov x27, #256",              // 256 bytes to clear
-                //"2:",
-                //"str xzr, [x28], #8",         // Clear 8 bytes, post-increment
-                //"subs x27, x27, #8",
-                //"b.ne 2b",
-                
-                // Zero out ffr and vg
-                //"str xzr, [x29, #{ffr_offset}]",
-                //"str wzr, [x29, #{vg_offset}]",
                 
                 // Save memory usage values from globals
                 "adrp x28, {total_memory}",
@@ -181,16 +175,17 @@ impl Snapshot {
                 // Restore stack pointer
                 "add sp, sp, #32",
                 
-                // Return snapshot buffer address (need to reload it)
-                "adrp x0, {buffer}",
-                "add x0, x0, :lo12:{buffer}",
+                // Return pointer to the snapshot we just stored
+                "mov x0, x30",  // x30 still contains the snapshot address
                 "ret",
                 
-                buffer = sym PRISTINE_SNAPSHOT_BUFFER,
+                registry_ptr = sym __snapshot_registry,
+                snapshot_count = sym __snapshot_count,
                 total_memory = sym __total_memory_usage,
                 max_memory = sym __max_memory_usage,
                 max_allowed_memory = sym __max_allowed_memory_usage,
                 curr_memory = sym __curr_memory_usage,
+                snapshot_size = const std::mem::size_of::<Snapshot>(),
                 registers_offset = const std::mem::offset_of!(Snapshot, registers),
                 total_memory_offset = const std::mem::offset_of!(Snapshot, total_memory_usage),
                 max_memory_offset = const std::mem::offset_of!(Snapshot, max_memory_usage),
@@ -198,18 +193,12 @@ impl Snapshot {
                 curr_memory_offset = const std::mem::offset_of!(Snapshot, curr_memory_usage),
                 gprs_offset = const std::mem::offset_of!(RegisterSnapshot, gprs),
                 sp_offset = const std::mem::offset_of!(RegisterSnapshot, sp),
-                //lr_offset = const std::mem::offset_of!(RegisterSnapshot, lr),
-                //pc_offset = const std::mem::offset_of!(RegisterSnapshot, pc),
                 nzcv_offset = const std::mem::offset_of!(RegisterSnapshot, nzcv),
                 fpcr_offset = const std::mem::offset_of!(RegisterSnapshot, fpcr),
                 fpsr_offset = const std::mem::offset_of!(RegisterSnapshot, fpsr),
                 tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
-                //cntfrq_el0_offset = const std::mem::offset_of!(RegisterSnapshot, cntfrq_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
-                //predicates_offset = const std::mem::offset_of!(RegisterSnapshot, predicates),
-                //ffr_offset = const std::mem::offset_of!(RegisterSnapshot, ffr),
-                //vg_offset = const std::mem::offset_of!(RegisterSnapshot, vg),
             );
         }
     }
@@ -786,4 +775,9 @@ extern "C" {
     static __basic_blocks_count: usize;
     static __entity_changes_registry: *const EntityChange;
     static __entity_changes_count: usize;
+}
+
+extern "C" {
+    static __snapshot_registry: *const Snapshot;
+    static __snapshot_count: usize;
 }
