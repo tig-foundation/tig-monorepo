@@ -253,12 +253,12 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
     let snapshot_ptr = snapshot::Snapshot::capture_pristine() as *const snapshot::Snapshot;
 
     // Allocate memory on the stack for our own independent copy
-    let mut snapshot_bkup_storage = MaybeUninit::<snapshot::Snapshot>::uninit();
+    let mut snapshot_bkup_storage = std::mem::MaybeUninit::<snapshot::Snapshot>::uninit();
 
     // Perform a deep copy of the bytes from the source pointer to our new storage
     // This creates a truly independent copy.
     unsafe {
-        ptr::copy_nonoverlapping(snapshot_ptr, snapshot_bkup_storage.as_mut_ptr(), 1);
+        std::ptr::copy_nonoverlapping(snapshot_ptr, snapshot_bkup_storage.as_mut_ptr(), 1);
     }
     let snapshot_bkup = unsafe { snapshot_bkup_storage.assume_init() };
     println!("Snapshot: {:?}, hash: {}", &snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
