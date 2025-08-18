@@ -41,79 +41,79 @@ pub struct RegisterSnapshot {
 
 #[cfg(target_arch = "aarch64")]
 impl RegisterSnapshot {
-    pub fn snap() -> Self {
+    #[inline(never)]
+    #[naked]
+    pub fn snap() -> *const RegisterSnapshot {
         use std::mem::offset_of;
-        
-        let mut snapshot = RegisterSnapshot::default();
-
-        let base_ptr = &mut snapshot as *mut RegisterSnapshot as *mut u8;
         unsafe {
             std::arch::asm!(
+                "sub sp, sp, #{size}",
+
                 // Save GPRs x0-x30 using calculated offsets
-                "stp x0, x1, [{base}, #{gprs_offset}]",
-                "stp x2, x3, [{base}, #{gprs_offset} + 16]",
-                "stp x4, x5, [{base}, #{gprs_offset} + 32]",
-                "stp x6, x7, [{base}, #{gprs_offset} + 48]",
-                "stp x8, x9, [{base}, #{gprs_offset} + 64]",
-                "stp x10, x11, [{base}, #{gprs_offset} + 80]",
-                "stp x12, x13, [{base}, #{gprs_offset} + 96]",
-                "stp x14, x15, [{base}, #{gprs_offset} + 112]",
-                "stp x16, x17, [{base}, #{gprs_offset} + 128]",
-                "stp x18, x19, [{base}, #{gprs_offset} + 144]",
-                "stp x20, x21, [{base}, #{gprs_offset} + 160]",
-                "stp x22, x23, [{base}, #{gprs_offset} + 176]",
-                "stp x24, x25, [{base}, #{gprs_offset} + 192]",
-                "stp x26, x27, [{base}, #{gprs_offset} + 208]",
-                "stp x28, x29, [{base}, #{gprs_offset} + 224]",
-                "str x30, [{base}, #{gprs_offset} + 240]",
+                "stp x0, x1, [sp, #{gprs_offset}]",
+                "stp x2, x3, [sp, #{gprs_offset} + 16]",
+                "stp x4, x5, [sp, #{gprs_offset} + 32]",
+                "stp x6, x7, [sp, #{gprs_offset} + 48]",
+                "stp x8, x9, [sp, #{gprs_offset} + 64]",
+                "stp x10, x11, [sp, #{gprs_offset} + 80]",
+                "stp x12, x13, [sp, #{gprs_offset} + 96]",
+                "stp x14, x15, [sp, #{gprs_offset} + 112]",
+                "stp x16, x17, [sp, #{gprs_offset} + 128]",
+                "stp x18, x19, [sp, #{gprs_offset} + 144]",
+                "stp x20, x21, [sp, #{gprs_offset} + 160]",
+                "stp x22, x23, [sp, #{gprs_offset} + 176]",
+                "stp x24, x25, [sp, #{gprs_offset} + 192]",
+                "stp x26, x27, [sp, #{gprs_offset} + 208]",
+                "stp x28, x29, [sp, #{gprs_offset} + 224]",
+                "str x30, [sp, #{gprs_offset} + 240]",
 
                 // Save SP, LR, PC
                 "mov x0, sp",
-                "str x0, [{base}, #{sp_offset}]",
-                "str x30, [{base}, #{lr_offset}]",
-                "adr x0, 1f",
-                "str x0, [{base}, #{pc_offset}]",
-                "1:",
+                "add x0, x0, #{size}",
+                "str x0, [sp, #{sp_offset}]",
+                "str x30, [sp, #{lr_offset}]",
+                // Use LR as PC since it contains the return address to caller
+                "str x30, [sp, #{pc_offset}]",
 
                 // Save NZCV
                 "mrs x0, nzcv",
-                "str x0, [{base}, #{nzcv_offset}]",
+                "str x0, [sp, #{nzcv_offset}]",
 
                 // Save floating-point control/status
                 "mrs x0, fpcr",
-                "str x0, [{base}, #{fpcr_offset}]",
+                "str x0, [sp, #{fpcr_offset}]",
                 "mrs x0, fpsr",
-                "str x0, [{base}, #{fpsr_offset}]",
+                "str x0, [sp, #{fpsr_offset}]",
 
                 // Save thread pointers
                 "mrs x0, tpidr_el0",
-                "str x0, [{base}, #{tpidr_el0_offset}]",
+                "str x0, [sp, #{tpidr_el0_offset}]",
                 "mrs x0, tpidrro_el0",
-                "str x0, [{base}, #{tpidrro_el0_offset}]",
+                "str x0, [sp, #{tpidrro_el0_offset}]",
 
                 // Save timer registers
                 //"mrs x0, cntvct_el0",
                 //"str x0, [{base}, #{cntvct_el0_offset}]",
-                "mrs x0, cntfrq_el0", 
-                "str x0, [{base}, #{cntfrq_el0_offset}]",
+                //"mrs x0, cntfrq_el0", 
+                //"str x0, [{base}, #{cntfrq_el0_offset}]",
 
                 // Save vector registers v0-v31
-                "stp q0, q1, [{base}, #{vregs_offset}]",
-                "stp q2, q3, [{base}, #{vregs_offset} + 32]",
-                "stp q4, q5, [{base}, #{vregs_offset} + 64]",
-                "stp q6, q7, [{base}, #{vregs_offset} + 96]",
-                "stp q8, q9, [{base}, #{vregs_offset} + 128]",
-                "stp q10, q11, [{base}, #{vregs_offset} + 160]",
-                "stp q12, q13, [{base}, #{vregs_offset} + 192]",
-                "stp q14, q15, [{base}, #{vregs_offset} + 224]",
-                "stp q16, q17, [{base}, #{vregs_offset} + 256]",
-                "stp q18, q19, [{base}, #{vregs_offset} + 288]",
-                "stp q20, q21, [{base}, #{vregs_offset} + 320]",
-                "stp q22, q23, [{base}, #{vregs_offset} + 352]",
-                "stp q24, q25, [{base}, #{vregs_offset} + 384]",
-                "stp q26, q27, [{base}, #{vregs_offset} + 416]",
-                "stp q28, q29, [{base}, #{vregs_offset} + 448]",
-                "stp q30, q31, [{base}, #{vregs_offset} + 480]",
+                "stp q0, q1, [sp, #{vregs_offset}]",
+                "stp q2, q3, [sp, #{vregs_offset} + 32]",
+                "stp q4, q5, [sp, #{vregs_offset} + 64]",
+                "stp q6, q7, [sp, #{vregs_offset} + 96]",
+                "stp q8, q9, [sp, #{vregs_offset} + 128]",
+                "stp q10, q11, [sp, #{vregs_offset} + 160]",
+                "stp q12, q13, [sp, #{vregs_offset} + 192]",
+                "stp q14, q15, [sp, #{vregs_offset} + 224]",
+                "stp q16, q17, [sp, #{vregs_offset} + 256]",
+                "stp q18, q19, [sp, #{vregs_offset} + 288]",
+                "stp q20, q21, [sp, #{vregs_offset} + 320]",
+                "stp q22, q23, [sp, #{vregs_offset} + 352]",
+                "stp q24, q25, [sp, #{vregs_offset} + 384]",
+                "stp q26, q27, [sp, #{vregs_offset} + 416]",
+                "stp q28, q29, [sp, #{vregs_offset} + 448]",
+                "stp q30, q31, [sp, #{vregs_offset} + 480]",
 
                 // Save predicates
                 /*"str p0, [{base}, #{predicates_offset}]",
@@ -133,7 +133,11 @@ impl RegisterSnapshot {
                 "str p14, [{base}, #{predicates_offset} + 224]",
                 "str p15, [{base}, #{predicates_offset} + 240]",*/
 
-                base = in(reg) base_ptr,
+                "mov x0, sp",
+                "ret",
+
+                //base = in(reg) base_ptr,
+                size = const std::mem::size_of::<RegisterSnapshot>(),
                 gprs_offset = const offset_of!(RegisterSnapshot, gprs),
                 sp_offset = const offset_of!(RegisterSnapshot, sp),
                 lr_offset = const offset_of!(RegisterSnapshot, lr),
@@ -144,7 +148,7 @@ impl RegisterSnapshot {
                 tpidr_el0_offset = const offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const offset_of!(RegisterSnapshot, tpidrro_el0),
                 //cntvct_el0_offset = const offset_of!(RegisterSnapshot, cntvct_el0),
-                cntfrq_el0_offset = const offset_of!(RegisterSnapshot, cntfrq_el0),
+                //cntfrq_el0_offset = const offset_of!(RegisterSnapshot, cntfrq_el0),
                 vregs_offset = const offset_of!(RegisterSnapshot, vregs),
                 //predicates_offset = const offset_of!(RegisterSnapshot, predicates),
                 out("x0") _,
@@ -162,14 +166,12 @@ pub struct RegisterSnapshot {
 }
 
 impl Snapshot {
+    #[inline(always)]
     pub fn new() -> Self {
-        Self {
-            total_memory_usage: 0,
-            max_memory_usage: 0,
-            max_allowed_memory_usage: 0,
-            curr_memory_usage: 0,
-            registers: RegisterSnapshot::snap(),
-        }
+        let ptr = RegisterSnapshot::snap();
+        let snapshot = ptr.read(); // Copy the data
+
+        std::arch::asm!("add sp, sp, #0x400");
     }
 }
 
