@@ -248,24 +248,8 @@ fn __copy_to_restore_region(restore_chunk: &[u8]) -> *mut u8 {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
-    let (mut sp1, mut sp2, mut sp3): (u64, u64, u64);
-    unsafe {
-        std::arch::asm!("mov x0, sp", out("x0") sp1);
-    }
-
-    let snapshot = snapshot::Snapshot::new();
-
-    unsafe {
-        std::arch::asm!("mov x0, sp", out("x0") sp2);
-    }
-
-    //let snapshot2 = snapshot::Snapshot::new();
-
-    unsafe {
-        std::arch::asm!("mov x0, sp", out("x0") sp3);
-    }
-    println!("SP1: {:?}, SP2: {:?}, SP3: {:?}", sp1, sp2, sp3);
-
+    let snapshot = snapshot::Snapshot::capture_pristine();
+    println!("Snapshot: {:?}", snapshot);
     //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
     //println!("Delta: {:?}", delta);
 
