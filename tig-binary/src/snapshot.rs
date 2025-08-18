@@ -1,3 +1,5 @@
+#![feature(naked_functions)]
+
 use {
     std::sync::atomic::{AtomicU64, Ordering},
     std::sync::Arc,
@@ -41,10 +43,8 @@ pub struct RegisterSnapshot {
 
 #[cfg(target_arch = "aarch64")]
 impl RegisterSnapshot {
-    #[inline(never)]
     #[naked]
     pub fn snap() -> *const RegisterSnapshot {
-        use std::mem::offset_of;
         unsafe {
             std::arch::asm!(
                 "sub sp, sp, #{size}",
@@ -138,18 +138,18 @@ impl RegisterSnapshot {
 
                 //base = in(reg) base_ptr,
                 size = const std::mem::size_of::<RegisterSnapshot>(),
-                gprs_offset = const offset_of!(RegisterSnapshot, gprs),
-                sp_offset = const offset_of!(RegisterSnapshot, sp),
-                lr_offset = const offset_of!(RegisterSnapshot, lr),
-                pc_offset = const offset_of!(RegisterSnapshot, pc),
-                nzcv_offset = const offset_of!(RegisterSnapshot, nzcv),
-                fpcr_offset = const offset_of!(RegisterSnapshot, fpcr),
-                fpsr_offset = const offset_of!(RegisterSnapshot, fpsr),
-                tpidr_el0_offset = const offset_of!(RegisterSnapshot, tpidr_el0),
-                tpidrro_el0_offset = const offset_of!(RegisterSnapshot, tpidrro_el0),
+                gprs_offset = const std::mem::offset_of!(RegisterSnapshot, gprs),
+                sp_offset = const std::mem::offset_of!(RegisterSnapshot, sp),
+                lr_offset = const std::mem::offset_of!(RegisterSnapshot, lr),
+                pc_offset = const std::mem::offset_of!(RegisterSnapshot, pc),
+                nzcv_offset = const std::mem::offset_of!(RegisterSnapshot, nzcv),
+                fpcr_offset = const std::mem::offset_of!(RegisterSnapshot, fpcr),
+                fpsr_offset = const std::mem::offset_of!(RegisterSnapshot, fpsr),
+                tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
+                tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
                 //cntvct_el0_offset = const offset_of!(RegisterSnapshot, cntvct_el0),
                 //cntfrq_el0_offset = const offset_of!(RegisterSnapshot, cntfrq_el0),
-                vregs_offset = const offset_of!(RegisterSnapshot, vregs),
+                vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
                 //predicates_offset = const offset_of!(RegisterSnapshot, predicates),
                 //out("x0") _,
                 options(nostack),
