@@ -152,11 +152,10 @@ impl RegisterSnapshot {
                 vregs_offset = const offset_of!(RegisterSnapshot, vregs),
                 //predicates_offset = const offset_of!(RegisterSnapshot, predicates),
                 out("x0") _,
-                options(nostack)
+                options(nostack),
+                options(noreturn)
             );
         }
-
-        snapshot
     }
 }
 
