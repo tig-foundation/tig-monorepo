@@ -14,6 +14,7 @@ pub struct Snapshot {
     pub max_allowed_memory_usage: u64,
     pub curr_memory_usage: u64,
     pub registers: RegisterSnapshot,
+    pub memory: MemorySnapshot,
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -48,18 +49,75 @@ pub struct RegisterSnapshot {
     pub gprs: [u64; 16], // rax-r15 + rsp + rbp
 }
 
+#[repr(C)]
+pub struct MemorySnapshot {
+    pub dirty_region_count: u32,
+    pub dirty_regions: [(u64, [u8; 64]); 0], // region, value
+}
+
+impl MemorySnapshot {
+    pub fn dirty_regions(&self) -> *mut (u64, [u8; 64]) {
+        unsafe {
+            (self as *const Self as *mut u8)
+                .add(std::mem::size_of::<Self>()) as *mut (u64, [u8; 64])
+        }
+    }
+
+    pub fn get_dirty_region(&self, index: u32) -> (u64, &[u8]) {
+        unsafe {
+            let entry = &*self.dirty_regions().add(index as usize);
+            (entry.0, &entry.1[..__region_size])
+        }
+    }
+
+    pub fn get_dirty_region_mut(&mut self, index: u32) -> (u64, &mut [u8]) {
+        unsafe {
+            let entry = &mut *self.dirty_regions().add(index as usize);
+            (entry.0, &mut entry.1[..__region_size])
+        }
+    }
+
+    pub fn set_dirty_region(&mut self, index: u32, region_addr: u64, region_value: &[u8]) {
+        unsafe {
+            let entry = &mut *self.dirty_regions().add(index as usize);
+            entry.0 = region_addr;
+            entry.1[..region_value.len().min(__region_size)].copy_from_slice(
+                &region_value[..region_value.len().min(__region_size)]
+            );
+        }
+    }
+
+    pub fn add_dirty_region_if_not_exists(&mut self, region_addr: u64, region_value: &[u8]) {
+        for idx in 0..self.dirty_region_count {
+            let (existing_addr, _) = self.get_dirty_region(idx);
+            if existing_addr == region_addr {
+                return; // Already exists, don't add again
+            }
+        }
+        
+        self.set_dirty_region(self.dirty_region_count, region_addr, region_value);
+        self.dirty_region_count += 1;
+    }
+
+    pub fn contains_dirty_region(&self, region_addr: u64) -> bool {
+        for idx in 0..self.dirty_region_count {
+            let (existing_addr, _) = self.get_dirty_region(idx);
+            if existing_addr == region_addr {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 impl Snapshot {
-    /// Captures ALL registers and stores in registry atomically
-    /// Uses stack to preserve working registers
     #[naked]
-    pub fn capture_pristine() -> *const Snapshot {
+    pub fn capture() -> *const Snapshot {
         unsafe {
             std::arch::naked_asm!(
-                // Reserve stack space for 4 registers (32 bytes)
-                "sub sp, sp, #32",
-                
-                // Save the 4 registers we need to use for work
-                "stp x27, x28, [sp, #0]",
+                // FIRST: Capture pristine state immediately (before touching ANY registers)
+                "sub sp, sp, #40",            // Reserve stack space for work registers + snapshot ptr
+                "stp x27, x28, [sp, #0]",     // Save work registers
                 "stp x29, x30, [sp, #16]",
                 
                 // Atomic increment of snapshot count and get index
@@ -71,21 +129,21 @@ impl Snapshot {
                 "stlxr w27, x28, [x30]",      // Store-release exclusive (new count)
                 "cbnz w27, 1b",               // Retry if failed
                 
-                // Now x29 contains the index we should use (old count)
                 // Load registry pointer and calculate snapshot address
                 "adrp x30, {registry_ptr}",
                 "add x30, x30, :lo12:{registry_ptr}",
                 "ldr x30, [x30]",             // Dereference to get actual array address
-                
-                // Calculate offset: registry + (index * sizeof(Snapshot))
                 "mov x27, #{snapshot_size}",
                 "mul x29, x29, x27",          // index * sizeof(Snapshot)
                 "add x30, x30, x29",          // registry[index] address
                 
+                // Store snapshot address on stack for later use
+                "str x30, [sp, #32]",         // Store snapshot pointer on stack
+                
                 // Calculate offset to registers field within Snapshot
                 "add x29, x30, #{registers_offset}",
                 
-                // Save ALL GPRs x0-x26 (pristine values)
+                // Save ALL GPRs x0-x26 (pristine values - captured BEFORE any work)
                 "stp x0, x1, [x29, #{gprs_offset}]",
                 "stp x2, x3, [x29, #{gprs_offset} + 16]", 
                 "stp x4, x5, [x29, #{gprs_offset} + 32]",
@@ -104,12 +162,12 @@ impl Snapshot {
                 // Restore original x27, x28, x29, x30 from stack and save them
                 "ldp x27, x28, [sp, #0]",
                 "stp x27, x28, [x29, #{gprs_offset} + 216]",
-                "ldp x27, x28, [sp, #16]",         // x27=orig_x29, x28=orig_x30
+                "ldp x27, x28, [sp, #16]",
                 "stp x27, x28, [x29, #{gprs_offset} + 232]",
                 
-                // Save SP (original stack pointer + 32 for our reserved space)
+                // Save SP (original stack pointer + 40 for our reserved space)
                 "mov x28, sp",
-                "add x28, x28, #32",
+                "add x28, x28, #40",
                 "str x28, [x29, #{sp_offset}]",
                 
                 // Save NZCV (condition flags)
@@ -128,7 +186,7 @@ impl Snapshot {
                 "mrs x28, tpidrro_el0",
                 "str x28, [x29, #{tpidrro_el0_offset}]",
                 
-                // Save ALL vector registers v0-v31 (all pristine)
+                // Save ALL vector registers v0-v31
                 "add x28, x29, #{vregs_offset}",
                 "stp q0, q1, [x28, #0]",
                 "stp q2, q3, [x28, #32]",
@@ -147,7 +205,7 @@ impl Snapshot {
                 "stp q28, q29, [x28, #448]",
                 "stp q30, q31, [x28, #480]",
                 
-                // Save memory usage values from globals
+                // Save memory usage values
                 "adrp x28, {total_memory}",
                 "add x28, x28, :lo12:{total_memory}",
                 "ldr x27, [x28]",
@@ -168,17 +226,53 @@ impl Snapshot {
                 "ldr x27, [x28]",
                 "str x27, [x30, #{curr_memory_offset}]",
                 
-                // Store snapshot address in x0 before restoring working registers
-                "mov x0, x30",
-                
-                // Restore all working registers from stack
+                // Restore work registers from stack 
                 "ldp x27, x28, [sp, #0]",
                 "ldp x29, x30, [sp, #16]",
                 
-                // Restore stack pointer
-                "add sp, sp, #32",
+                // NOW do memory capture work (registers already captured pristine)
+                "sub sp, sp, #64",            // Reserve additional stack space for memory work
+                "stp x0, x1, [sp, #0]",       // Save registers for memory work
+                "stp x2, x3, [sp, #16]",
+                "stp x5, x6, [sp, #32]",
                 
-                // Return (x0 already contains the snapshot address)
+                // Memory capture loop
+                "adrp x0, {heap_size}",
+                "add x0, x0, :lo12:{heap_size}",
+                "ldr x0, [x0]",              // Load __heap_size
+                "adrp x1, {region_size}",  
+                "add x1, x1, :lo12:{region_size}",
+                "ldr x1, [x1]",              // Load __region_size
+                "udiv x5, x0, x1",           // x5 = __heap_size / __region_size
+                "mov x2, #0",                // region_idx = 0
+                
+                "2:", // Loop start
+                "cmp x2, x5",
+                "b.ge 3f",                   // Exit loop if region_idx >= max
+                
+                // Call is_region_dirty(region_idx)
+                "mov x0, x2",
+                "bl {is_region_dirty}",
+                "cbz x0, 4f",                // Skip if not dirty
+                
+                // Add dirty region logic here (placeholder for now)
+                // This would call the memory snapshot methods
+                
+                "4:", // Continue loop
+                "add x2, x2, #1",            // region_idx++
+                "b 2b",                      // Back to loop start
+                
+                "3:", // Loop end
+                
+                // Restore memory work registers and clean up memory work stack
+                "ldp x0, x1, [sp, #0]",
+                "ldp x2, x3, [sp, #16]",
+                "ldp x5, x6, [sp, #32]",
+                "add sp, sp, #64",           // Clean up memory work stack space
+                
+                // Get snapshot pointer from stack and set up return value  
+                "ldr x0, [sp, #32]",         // Load snapshot pointer from stack
+                "add sp, sp, #40",           // Clean up initial stack space
                 "ret",
                 
                 registry_ptr = sym __snapshot_registry,
@@ -187,6 +281,9 @@ impl Snapshot {
                 max_memory = sym __max_memory_usage,
                 max_allowed_memory = sym __max_allowed_memory_usage,
                 curr_memory = sym __curr_memory_usage,
+                is_region_dirty = sym is_region_dirty,
+                heap_size = sym __heap_size,
+                region_size = sym __region_size,
                 snapshot_size = const std::mem::size_of::<Snapshot>(),
                 registers_offset = const std::mem::offset_of!(Snapshot, registers),
                 total_memory_offset = const std::mem::offset_of!(Snapshot, total_memory_usage),
@@ -201,6 +298,7 @@ impl Snapshot {
                 tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
+                options(noreturn)
             );
         }
     }
@@ -978,10 +1076,26 @@ impl EntityChange {
     }
 }
 
+fn is_region_dirty(region: u32) -> bool {
+    unsafe {
+        *__dirty_regions.add(region as usize) != 0
+    }
+}
+
+fn mark_region_dirty(region: u32) {
+    unsafe {
+        *__dirty_regions.add(region as usize) = 1;
+    }
+}
+
 extern "C" {
     static __basic_blocks_registry: *const BasicBlockInfo;
     static __basic_blocks_count: usize;
     static __entity_changes_registry: *const EntityChange;
+    
+    static __dirty_regions: *mut u8;
+    static __region_size: usize;
+    static __heap_size: usize;
 }
 
 #[no_mangle]
