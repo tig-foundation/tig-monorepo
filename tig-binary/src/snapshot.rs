@@ -226,23 +226,33 @@ impl Snapshot {
                 "ldr x27, [x28]",
                 "str x27, [x30, #{curr_memory_offset}]",
                 
+                // Initialize memory snapshot dirty region count to 0
+                "add x29, x30, #{memory_offset}",
+                "str wzr, [x29]",             // dirty_region_count = 0
+                
                 // Restore work registers from stack 
                 "ldp x27, x28, [sp, #0]",
                 "ldp x29, x30, [sp, #16]",
                 
                 // NOW do memory capture work (registers already captured pristine)
-                "sub sp, sp, #64",            // Reserve additional stack space for memory work
+                "sub sp, sp, #80",            // Reserve additional stack space for memory work + more vars
                 "stp x0, x1, [sp, #0]",       // Save registers for memory work
                 "stp x2, x3, [sp, #16]",
                 "stp x5, x6, [sp, #32]",
+                "stp x7, x8, [sp, #48]",      // Extra registers for memory operations
+                "str x9, [sp, #64]",          // region_size, heap_base
                 
-                // Memory capture loop
+                // Memory capture loop preparation
                 "adrp x0, {heap_size}",
                 "add x0, x0, :lo12:{heap_size}",
                 "ldr x0, [x0]",              // Load __heap_size
                 "adrp x1, {region_size}",  
                 "add x1, x1, :lo12:{region_size}",
                 "ldr x1, [x1]",              // Load __region_size
+                "str x1, [sp, #72]",          // Store region_size on stack
+                "adrp x7, {heap_base}",
+                "add x7, x7, :lo12:{heap_base}",
+                "ldr x7, [x7]",              // Load __heap_base
                 "udiv x5, x0, x1",           // x5 = __heap_size / __region_size
                 "mov x2, #0",                // region_idx = 0
                 
@@ -255,8 +265,43 @@ impl Snapshot {
                 "bl {is_region_dirty}",
                 "cbz x0, 4f",                // Skip if not dirty
                 
-                // Add dirty region logic here (placeholder for now)
-                // This would call the memory snapshot methods
+                // DIRTY REGION CAPTURE LOGIC
+                // Calculate region address: heap_base + (region_idx * region_size)
+                "ldr x1, [sp, #72]",         // Load region_size from stack
+                "mul x8, x2, x1",            // x8 = region_idx * region_size
+                "add x8, x7, x8",            // x8 = heap_base + offset = region_address
+                
+                // Get snapshot pointer and memory snapshot
+                "ldr x0, [sp, #112]",        // Load snapshot pointer from original stack location (sp+80+32)
+                "add x0, x0, #{memory_offset}", // x0 = &snapshot.memory
+                
+                // Get current dirty_region_count
+                "ldr w3, [x0]",              // w3 = dirty_region_count
+                
+                // Get pointer to dirty regions array
+                "add x6, x0, #{memory_size}", // x6 = dirty_regions array start
+                
+                // Calculate entry address: dirty_regions + (count * sizeof(entry))
+                "mov x9, #{dirty_region_entry_size}",
+                "mul x9, x3, x9",            // x9 = count * entry_size
+                "add x6, x6, x9",            // x6 = &dirty_regions[count]
+                
+                // Store region address in entry
+                "str x8, [x6]",              // entry.0 = region_address
+                
+                // Copy region data to entry
+                "add x6, x6, #8",            // x6 = &entry.1 (data array)
+                "mov x9, x1",                // x9 = region_size (bytes to copy)
+                "mov x0, x6",                // dst = entry data
+                "mov x1, x8",                // src = region address
+                "bl {memcpy}",               // memcpy(dst, src, size)
+                
+                // Increment dirty_region_count
+                "ldr x0, [sp, #112]",        // Reload snapshot pointer
+                "add x0, x0, #{memory_offset}", // x0 = &snapshot.memory
+                "ldr w3, [x0]",              // w3 = dirty_region_count
+                "add w3, w3, #1",            // w3++
+                "str w3, [x0]",              // Store updated count
                 
                 "4:", // Continue loop
                 "add x2, x2, #1",            // region_idx++
@@ -268,7 +313,9 @@ impl Snapshot {
                 "ldp x0, x1, [sp, #0]",
                 "ldp x2, x3, [sp, #16]",
                 "ldp x5, x6, [sp, #32]",
-                "add sp, sp, #64",           // Clean up memory work stack space
+                "ldp x7, x8, [sp, #48]",
+                "ldr x9, [sp, #64]",
+                "add sp, sp, #80",           // Clean up memory work stack space
                 
                 // Get snapshot pointer from stack and set up return value  
                 "ldr x0, [sp, #32]",         // Load snapshot pointer from stack
@@ -284,8 +331,13 @@ impl Snapshot {
                 is_region_dirty = sym is_region_dirty,
                 heap_size = sym __heap_size,
                 region_size = sym __region_size,
+                heap_base = sym __heap_base,
+                memcpy = sym memcpy,
                 snapshot_size = const std::mem::size_of::<Snapshot>(),
                 registers_offset = const std::mem::offset_of!(Snapshot, registers),
+                memory_offset = const std::mem::offset_of!(Snapshot, memory),
+                memory_size = const std::mem::size_of::<MemorySnapshot>(),
+                dirty_region_entry_size = const std::mem::size_of::<(u64, [u8; 64])>(),
                 total_memory_offset = const std::mem::offset_of!(Snapshot, total_memory_usage),
                 max_memory_offset = const std::mem::offset_of!(Snapshot, max_memory_usage),
                 max_allowed_memory_offset = const std::mem::offset_of!(Snapshot, max_allowed_memory_usage),
@@ -1096,6 +1148,9 @@ extern "C" {
     static __dirty_regions: *mut u8;
     static __region_size: usize;
     static __heap_size: usize;
+    static __heap_base: *const u8;
+    
+    fn memcpy(dst: *mut u8, src: *const u8, size: usize) -> *mut u8;
 }
 
 #[no_mangle]
