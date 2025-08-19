@@ -1002,11 +1002,11 @@ static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::Ato
 // i think the cards one might be the best, at least for our heap
 // if we use cards, an each section gets 1 byte, we can definitely encode the offset/size within that region aswell, i think.... bits should be enough, i hope?
 
-// 0x1000000000, size 1024
-// byte dirt_regtions[8]
+// heap base 0x1000000000, size 1024
+// byte dirty_regions[size / 64] // 16 'cards'
 
 // write to 0x1000000048
-// 0x48 / 64 = 1
+// int(0x48 / 64) = 1
 // dirty_regions[1] = 1; // can also encode more info about offset, size, etc, maybe...
 
 // on snapshot:
