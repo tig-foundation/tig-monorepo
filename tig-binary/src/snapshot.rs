@@ -1000,3 +1000,21 @@ static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::Ato
 // then between snapshots just memsetting to 0 should be quite fast
 // i mean, i guess we dont need to use 'thread-locals' proper for writing, we can just sub something from the stack, allocate some scratch space for us to keep writing to
 // i think the cards one might be the best, at least for our heap
+// if we use cards, an each section gets 1 byte, we can definitely encode the offset/size within that region aswell, i think.... bits should be enough, i hope?
+
+// 0x1000000000, size 1024
+// byte dirt_regtions[8]
+
+// write to 0x1000000048
+// 0x48 / 64 = 1
+// dirty_regions[1] = 1; // can also encode more info about offset, size, etc, maybe...
+
+// on snapshot:
+// snap_registers()
+// for i in region_count {
+//     if dirty_regions[i] == 1 {
+//         copy_region(i)
+//     }
+// }
+
+// save snapshot
