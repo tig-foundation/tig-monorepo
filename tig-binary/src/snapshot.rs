@@ -623,6 +623,16 @@ impl EntityChange {
     }
 }
 
+impl DeltaSnapshot {
+    pub fn generate_restore_chunk(&self) -> Vec<u8> {
+        let mut code = Vec::new();
+
+        for change in self.changes.iter() {
+            change.generate_restore_chunk(&mut code);
+        }
+    }
+}
+
 #[cfg(target_arch = "aarch64")]
 impl EntityChange {
     pub fn apply_change(&self) {
@@ -979,3 +989,14 @@ static __snapshot_registry: std::sync::atomic::AtomicPtr<u8> = std::sync::atomic
 
 #[no_mangle]
 static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+
+// mprotect, fork
+// hybrid shadow copy of registers
+// alternatively handle registers and memory different
+// mprotect + fork we can leverage CoW
+// allocate region of memory that holds 'cards' (byte array tracking diry state of each like 128 bytes or something), each section of memory will get a bit set if its dirty and needs to be copied. 
+// setting cards dirty will probably be done from llvm machine pass, if electing to go this route
+// then between snapshots just memsetting to 0 should be quite fast
+// i mean, i guess we dont need to use 'thread-locals' proper for writing, we can just sub something from the stack, allocate some scratch space for us to keep writing to
+// i think the cards one might be the best, at least for our heap
