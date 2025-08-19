@@ -284,7 +284,7 @@ impl DeltaSnapshot {
         delta
     }
 
-    pub fn generate_restore_chunk(&self) -> Vec<u8> {
+    /*pub fn generate_restore_chunk(&self) -> Vec<u8> {
         let mut restore_chunk = Vec::with_capacity(128 * 4);
 
         for x in self.changed_regs.iter() {
@@ -298,6 +298,394 @@ impl DeltaSnapshot {
         }
 
         restore_chunk
+    }*/
+}
+
+#[cfg(target_arch = "aarch64")]
+#[repr(u8)]
+#[derive(Debug)]
+pub enum Registers {
+    X(u8, u64) = 0, // x<n>, value, x0-x30
+    SP(u64) = 31, // sp
+    NZCV(u64) = 32,
+    FPCR(u64) = 33,
+    FPSR(u64) = 34,
+    TPIDR_EL0(u64) = 35,
+    TPIDRRO_EL0(u64) = 36,
+    V(u8, u128) = 37, // v<n>, value, v0-v31
+    P(u8, u128) = 69, // p<n>, value, p0-p15
+    FFR(u128) = 84,
+    VG(u32) = 85
+}
+
+#[cfg(target_arch = "aarch64")]
+#[macro_export]
+macro_rules! clear_registers {
+    () => {
+        unsafe {
+            std::arch::asm!(
+                //"mov x0, xzr", ; arg0
+                //"mov x1, xzr", ; func_to_call
+                //"mov x2, xzr", ; stack_top 
+                "mov x3, xzr",
+                "mov x4, xzr",
+                "mov x5, xzr",
+                "mov x6, xzr",
+                "mov x7, xzr",
+                "mov x8, xzr",
+                "mov x9, xzr",
+                "mov x10, xzr",
+                "mov x11, xzr",
+                "mov x12, xzr",
+                "mov x13, xzr",
+                "mov x14, xzr",
+                "mov x15, xzr",
+                "mov x16, xzr",
+                "mov x17, xzr",
+                "mov x18, xzr",
+                "mov x19, xzr",
+                "mov x20, xzr",
+                "mov x21, xzr",
+                "mov x22, xzr",
+                "mov x23, xzr",
+                "mov x24, xzr",
+                "mov x25, xzr",
+                "mov x26, xzr",
+                "mov x27, xzr",
+                "mov x28, xzr",
+                "mov x29, xzr",
+                "mov x30, xzr",
+
+                "movi v0.16b, #0",
+                "movi v1.16b, #0",
+                "movi v2.16b, #0",
+                "movi v3.16b, #0",
+                "movi v4.16b, #0",
+                "movi v5.16b, #0",
+                "movi v6.16b, #0",
+                "movi v7.16b, #0",
+                "movi v8.16b, #0",
+                "movi v9.16b, #0",
+                "movi v10.16b, #0",
+                "movi v11.16b, #0",
+                "movi v12.16b, #0",
+                "movi v13.16b, #0",
+                "movi v14.16b, #0",
+                "movi v15.16b, #0",
+                "movi v16.16b, #0",
+                "movi v17.16b, #0",
+                "movi v18.16b, #0",
+                "movi v19.16b, #0",
+                "movi v20.16b, #0",
+                "movi v21.16b, #0",
+                "movi v22.16b, #0",
+                "movi v23.16b, #0",
+                "movi v24.16b, #0",
+                "movi v25.16b, #0",
+                "movi v26.16b, #0",
+                "movi v27.16b, #0",
+                "movi v28.16b, #0",
+                "movi v29.16b, #0",
+                "movi v30.16b, #0",
+                "movi v31.16b, #0",
+
+                "msr fpcr, xzr",
+                "msr fpsr, xzr",
+                "msr nzcv, xzr",
+
+                /*"pfalse p0.b",
+                "pfalse p1.b", 
+                "pfalse p2.b",
+                "pfalse p3.b",
+                "pfalse p4.b",
+                "pfalse p5.b",
+                "pfalse p6.b",
+                "pfalse p7.b",
+                "pfalse p8.b",
+                "pfalse p9.b",
+                "pfalse p10.b",
+                "pfalse p11.b",
+                "pfalse p12.b",
+                "pfalse p13.b",
+                "pfalse p14.b",
+                "pfalse p15.b",
+
+                "setffr",*/
+            );
+        }
+    };
+}
+
+#[repr(C)]
+pub struct BasicBlockInfo {
+    pub offset_in_code: u32,
+    pub size: u16, // in bytes
+    pub entity_changes_count: u16, // Number of entity changes
+    pub entity_changes_offset: u32,
+}
+
+impl BasicBlockInfo {
+    pub unsafe fn entity_changes(&self) -> &[EntityChange] {
+        std::slice::from_raw_parts(
+            __entity_changes_registry.add(self.entity_changes_offset as usize),
+            self.entity_changes_count as usize
+        )
+    }
+}
+
+#[repr(u64)]
+pub enum EntityChangeFlags {
+    None = 0x0,
+    Global = 0x1,
+    ThreadLocal = 0x2,
+    Stack = 0x4,
+    Heap = 0x8,
+    Register = 0x10,
+    U8 = 0x20,
+    U16 = 0x40,
+    U32 = 0x80,
+    U64 = 0x100,
+    F32 = 0x200,
+    F64 = 0x400,
+    V64 = 0x800,
+    V128 = 0x1000,
+    V256 = 0x2000,
+    V512 = 0x4000,
+    Ptr = 0x8000,
+    Bytes = 0x10000,
+    // aarch64 exclusive
+    MOVK = 0x20000,
+    MOVZ = 0x40000,
+    LSL16 = 0x80000,
+    LSL32 = 0x100000,
+    LSL48 = 0x200000,
+    // rest of bits are used for tls offset, register, other metadata
+}
+
+const METADATA_SHIFT: u64 = 22;
+
+const REGISTER_MASK: u64 = 0x3F << METADATA_SHIFT; // 6 bits
+
+const TLS_OFFSET_BITS: u64 = 32;
+const TLS_OFFSET_MASK: u64 = ((1 << TLS_OFFSET_BITS) - 1) << METADATA_SHIFT;
+
+const GLOBAL_OFFSET_BITS: u64 = 32;
+const GLOBAL_OFFSET_MASK: u64 = ((1 << GLOBAL_OFFSET_BITS) - 1) << METADATA_SHIFT;
+
+const STACK_OFFSET_BITS: u64 = 32;
+const STACK_OFFSET_MASK: u64 = ((1 << STACK_OFFSET_BITS) - 1) << METADATA_SHIFT;
+
+const HEAP_OFFSET_BITS: u64 = 32;
+const HEAP_OFFSET_MASK: u64 = ((1 << HEAP_OFFSET_BITS) - 1) << METADATA_SHIFT;
+
+const DATA_TYPE_BITS: u64 = 12;  // 12 bits (5-16)
+const DATA_TYPE_SHIFT: u64 = 5;  // Start at bit 5
+const DATA_TYPE_MASK: u64 = ((1 << DATA_TYPE_BITS) - 1) << DATA_TYPE_SHIFT;
+
+const CHANGE_TYPE_MASK: u64 = 0x1F;
+
+#[repr(C)]
+pub union EntityChangeData {
+    pub u8: u8,
+    pub u16: u16,
+    pub u32: u32,
+    pub u64: u64,
+    pub f32: f32,
+    pub f64: f64,
+    pub ptr: *const u8, // this will also contain vector values
+}
+
+#[repr(C)]
+pub struct EntityChange {
+    pub flags: u64,
+    pub data: EntityChangeData,
+}
+
+impl EntityChange {
+    pub fn is_global(&self) -> bool {
+        self.flags & EntityChangeFlags::Global != 0
+    }
+
+    pub fn is_thread_local(&self) -> bool {
+        self.flags & EntityChangeFlags::ThreadLocal != 0
+    }
+
+    pub fn is_stack(&self) -> bool {
+        self.flags & EntityChangeFlags::Stack != 0
+    }
+
+    pub fn is_heap(&self) -> bool {
+        self.flags & EntityChangeFlags::Heap != 0
+    }
+
+    pub fn is_register(&self) -> bool {
+        self.flags & EntityChangeFlags::Register != 0
+    }
+
+    pub fn is_u8(&self) -> bool {
+        self.flags & EntityChangeFlags::U8 != 0
+    }
+
+    pub fn is_u16(&self) -> bool {
+        self.flags & EntityChangeFlags::U16 != 0
+    }
+
+    pub fn is_u32(&self) -> bool {
+        self.flags & EntityChangeFlags::U32 != 0
+    }
+
+    pub fn is_u64(&self) -> bool {
+        self.flags & EntityChangeFlags::U64 != 0
+    }
+
+    pub fn is_f32(&self) -> bool {
+        self.flags & EntityChangeFlags::F32 != 0
+    }
+
+    pub fn is_f64(&self) -> bool {
+        self.flags & EntityChangeFlags::F64 != 0
+    }
+
+    pub fn is_v64(&self) -> bool {
+        self.flags & EntityChangeFlags::V64 != 0
+    }
+
+    pub fn is_v128(&self) -> bool {
+        self.flags & EntityChangeFlags::V128 != 0
+    }
+
+    pub fn is_v256(&self) -> bool {
+        self.flags & EntityChangeFlags::V256 != 0
+    }
+
+    pub fn is_v512(&self) -> bool {
+        self.flags & EntityChangeFlags::V512 != 0
+    }
+
+    pub fn is_ptr(&self) -> bool {
+        self.flags & EntityChangeFlags::Ptr != 0
+    }
+
+    pub fn is_bytes(&self) -> bool {
+        self.flags & EntityChangeFlags::Bytes != 0
+    }
+
+    pub fn is_movk(&self) -> bool {
+        self.flags & EntityChangeFlags::MOVK != 0
+    }
+
+    pub fn is_movz(&self) -> bool {
+        self.flags & EntityChangeFlags::MOVZ != 0
+    }
+
+    pub fn is_lsl16(&self) -> bool {
+        self.flags & EntityChangeFlags::LSL16 != 0
+    }
+    
+    pub fn is_lsl32(&self) -> bool {
+        self.flags & EntityChangeFlags::LSL32 != 0
+    }
+
+    pub fn is_lsl48(&self) -> bool {
+        self.flags & EntityChangeFlags::LSL48 != 0
+    }
+
+    pub fn is_lsl(&self) -> u32 {
+        if self.is_lsl16() {
+            16
+        } else if self.is_lsl32() {
+            32
+        } else if self.is_lsl48() {
+            48
+        } else {
+            0
+        }
+    }
+
+    pub fn get_stack_offset(&self) -> u32 {
+        (self.flags & STACK_OFFSET_MASK) >> STACK_OFFSET_SHIFT
+    }
+
+    pub fn get_global_offset(&self) -> u32 {
+        (self.flags & GLOBAL_OFFSET_MASK) >> GLOBAL_OFFSET_SHIFT
+    }
+
+    pub fn get_tls_offset(&self) -> u32 {
+        (self.flags & TLS_OFFSET_MASK) >> TLS_OFFSET_SHIFT
+    }
+
+    pub fn get_register(&self) -> u32 {
+        (self.flags & REGISTER_MASK) >> REGISTER_SHIFT
+    }
+
+    pub fn get_heap_offset(&self) -> u32 {
+        (self.flags & HEAP_OFFSET_MASK) >> HEAP_OFFSET_SHIFT
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+impl EntityChange {
+    pub fn apply_change(&self) {
+        let value_type = (self.flags & DATA_TYPE_MASK) >> DATA_TYPE_SHIFT;
+        
+        match self.flags & CHANGE_TYPE_MASK {
+            x if x == EntityChangeFlags::Global as u64 => self.apply_global(value_type),
+            x if x == EntityChangeFlags::ThreadLocal as u64 => self.apply_thread_local(value_type),
+            x if x == EntityChangeFlags::Stack as u64 => self.apply_stack(value_type),
+            x if x == EntityChangeFlags::Heap as u64 => self.apply_heap(value_type),
+            x if x == EntityChangeFlags::Register as u64 => self.apply_register(value_type),
+            _ => {} // ?????????
+        }
+    }
+
+    pub fn apply_global(&self, value_type: u32) {
+        let offset = self.get_global_offset();
+    }
+
+    pub fn apply_thread_local(&self, value_type: u32) {
+        let offset = self.get_tls_offset();
+    }
+
+    pub fn apply_stack(&self, value_type: u32) {
+        let offset = self.get_stack_offset();
+    }
+    
+    pub fn apply_heap(&self, value_type: u32) {
+        let offset = self.get_heap_offset();
+    }
+
+    pub fn apply_register(&self, value_type: u32) {
+        let register = self.get_register();
+        let is_lsl = self.is_lsl();
+
+        match is_lsl {
+            16 => self.apply_register_lsl(value_type, register, 16),
+            32 => self.apply_register_lsl(value_type, register, 32),
+            48 => self.apply_register_lsl(value_type, register, 48),
+            _ => {
+                match value_type {
+                    //0 => self.apply_register_u64(register),
+                    x if x == EntityChangeFlags::U64 as u64 => DeltaSnapshot::mov_GPR_IMM64(register as u8, self.data.u64),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub fn apply_register_lsl(&self, value_type: u32, register: u32, lsl: u32) { // keep
+        if self.is_movk() {
+            self.apply_register_lsl_k(self.data.u16, register, lsl)
+        } else if self.is_movz() {
+            self.apply_register_lsl_z(self.data.u16, register, lsl)
+        }
+    }
+
+    pub fn apply_register_lsl_k(&self, value: u16, register: u32, lsl: u32) { // keep
+        let (code, size) = DeltaSnapshot::movk_GPR_IMM16_LSL(register as u8, value, lsl as u8);
+    }
+
+    pub fn apply_register_lsl_z(&self, value: u16, register: u32, lsl: u32) { // zero
+        let (code, size) = DeltaSnapshot::movz_GPR_IMM16_LSL(register as u8, value, lsl as u8);
     }
 }
 
@@ -305,7 +693,7 @@ impl DeltaSnapshot {
 impl DeltaSnapshot {
     /// Encodes the EOR X_dst, X_dst, X_src instruction.
     /// This is the AArch64 equivalent of xor reg_dst, reg_src.
-    fn xor_GPR_GPR(&self, reg_dst: u8, reg_src: u8) -> ([u8; 4], usize) {
+    fn xor_GPR_GPR(reg_dst: u8, reg_src: u8) -> ([u8; 4], usize) {
         let mut code = [0; 4];
 
         // EOR Xd, Xn, Xm instruction encoding for 64-bit registers.
@@ -321,8 +709,17 @@ impl DeltaSnapshot {
         (code, 4)
     }
 
+    fn zero_GPR(reg: u8) -> ([u8; 4], usize) {
+        let mut code = [0; 4];
+        // MOV Xd, XZR instruction encoding
+        // This is actually: ORR Xd, XZR, XZR
+        let instr: u32 = 0xAA1F03E0 | (reg as u32 & 0x1F);
+        code.copy_from_slice(&instr.to_le_bytes());
+        (code, 4)
+    }
+
     /// Encodes loading an 8-bit immediate into a register using MOVZ.
-    fn mov_GPR_IMM8(&self, reg: u8, value: u8) -> ([u8; 4], usize) {
+    fn mov_GPR_IMM8(reg: u8, value: u8) -> ([u8; 4], usize) {
         let mut code = [0; 4];
         
         // MOVZ Xd, #imm, LSL 0
@@ -334,7 +731,7 @@ impl DeltaSnapshot {
     }
 
     /// Encodes loading a 16-bit immediate into a register using MOVZ.
-    fn mov_GPR_IMM16(&self, reg: u8, value: u16) -> ([u8; 4], usize) {
+    fn mov_GPR_IMM16(reg: u8, value: u16) -> ([u8; 4], usize) {
         let mut code = [0; 4];
         
         // MOVZ Xd, #imm, LSL 0
@@ -346,7 +743,7 @@ impl DeltaSnapshot {
     }
 
     /// Encodes loading a 32-bit immediate using a MOVZ/MOVK sequence.
-    fn mov_GPR_IMM32(&self, reg: u8, value: u32) -> ([u8; 8], usize) {
+    fn mov_GPR_IMM32(reg: u8, value: u32) -> ([u8; 8], usize) {
         let mut code = [0; 8];
         let mut size = 0;
         let reg = reg as u32 & 0x1F;
@@ -381,7 +778,7 @@ impl DeltaSnapshot {
     }
 
     /// Encodes loading a 64-bit immediate using a MOVZ/MOVK sequence.
-    fn mov_GPR_IMM64(&self, reg: u8, value: u64) -> ([u8; 16], usize) {
+    fn mov_GPR_IMM64(reg: u8, value: u64) -> ([u8; 16], usize) {
         let mut code = [0; 16];
         let mut size = 0;
         let reg = reg as u32 & 0x1F;
@@ -420,10 +817,47 @@ impl DeltaSnapshot {
 
         (code, size)
     }
+
+    fn movz_GPR_IMM16_LSL(reg: u8, value: u16, lsl: u8) -> ([u8; 4], usize) {
+        let mut code = [0; 4];
+        // MOVZ Xd, #imm16, LSL #shift
+        // shift: 0, 16, 32, or 48 (encoded as 0, 1, 2, 3)
+        let shift_bits = match lsl {
+            0 => 0,
+            16 => 1,
+            32 => 2,
+            48 => 3,
+            _ => panic!("Invalid LSL value: {}", lsl),
+        };
+        let instr: u32 = 0xD2800000 
+                       | ((shift_bits as u32) << 21)   // hw field (bits 22-21)
+                       | ((value as u32) << 5)         // imm16 field (bits 20-5)
+                       | (reg as u32 & 0x1F);          // Rd field (bits 4-0)
+        code.copy_from_slice(&instr.to_le_bytes());
+        (code, 4)
+    }
+
+    fn movk_GPR_IMM16_LSL(reg: u8, value: u16, lsl: u8) -> ([u8; 4], usize) {
+        let mut code = [0; 4];
+        // MOVK Xd, #imm16, LSL #shift
+        let shift_bits = match lsl {
+            0 => 0,
+            16 => 1,
+            32 => 2,
+            48 => 3,
+            _ => panic!("Invalid LSL value: {}", lsl),
+        };
+        let instr: u32 = 0xF2800000                    // MOVK opcode
+                       | ((shift_bits as u32) << 21)   // hw field
+                       | ((value as u32) << 5)         // imm16 field
+                       | (reg as u32 & 0x1F);          // Rd field
+        code.copy_from_slice(&instr.to_le_bytes());
+        (code, 4)
+    }
 }
 
 #[cfg(target_arch = "x86_64")]
-impl DeltaSnapshot {
+impl EntityChange {
     fn xor_GPR_GPR(&self, reg_dst: u8, reg_src: u8) -> ([u8; 3], usize) {
         let mut code = [0; 3];
         let mut size = 0;
@@ -534,249 +968,10 @@ impl DeltaSnapshot {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
-#[repr(u8)]
-#[derive(Debug)]
-pub enum Registers {
-    X(u8, u64) = 0, // x<n>, value, x0-x30
-    SP(u64) = 31, // sp
-    NZCV(u64) = 32,
-    FPCR(u64) = 33,
-    FPSR(u64) = 34,
-    TPIDR_EL0(u64) = 35,
-    TPIDRRO_EL0(u64) = 36,
-    V(u8, u128) = 37, // v<n>, value, v0-v31
-    P(u8, u128) = 69, // p<n>, value, p0-p15
-    FFR(u128) = 84,
-    VG(u32) = 85
-}
-
-#[cfg(target_arch = "aarch64")]
-#[macro_export]
-macro_rules! clear_registers {
-    () => {
-        unsafe {
-            std::arch::asm!(
-                //"mov x0, xzr", ; arg0
-                //"mov x1, xzr", ; func_to_call
-                //"mov x2, xzr", ; stack_top 
-                "mov x3, xzr",
-                "mov x4, xzr",
-                "mov x5, xzr",
-                "mov x6, xzr",
-                "mov x7, xzr",
-                "mov x8, xzr",
-                "mov x9, xzr",
-                "mov x10, xzr",
-                "mov x11, xzr",
-                "mov x12, xzr",
-                "mov x13, xzr",
-                "mov x14, xzr",
-                "mov x15, xzr",
-                "mov x16, xzr",
-                "mov x17, xzr",
-                "mov x18, xzr",
-                "mov x19, xzr",
-                "mov x20, xzr",
-                "mov x21, xzr",
-                "mov x22, xzr",
-                "mov x23, xzr",
-                "mov x24, xzr",
-                "mov x25, xzr",
-                "mov x26, xzr",
-                "mov x27, xzr",
-                "mov x28, xzr",
-                "mov x29, xzr",
-                "mov x30, xzr",
-
-                "movi v0.16b, #0",
-                "movi v1.16b, #0",
-                "movi v2.16b, #0",
-                "movi v3.16b, #0",
-                "movi v4.16b, #0",
-                "movi v5.16b, #0",
-                "movi v6.16b, #0",
-                "movi v7.16b, #0",
-                "movi v8.16b, #0",
-                "movi v9.16b, #0",
-                "movi v10.16b, #0",
-                "movi v11.16b, #0",
-                "movi v12.16b, #0",
-                "movi v13.16b, #0",
-                "movi v14.16b, #0",
-                "movi v15.16b, #0",
-                "movi v16.16b, #0",
-                "movi v17.16b, #0",
-                "movi v18.16b, #0",
-                "movi v19.16b, #0",
-                "movi v20.16b, #0",
-                "movi v21.16b, #0",
-                "movi v22.16b, #0",
-                "movi v23.16b, #0",
-                "movi v24.16b, #0",
-                "movi v25.16b, #0",
-                "movi v26.16b, #0",
-                "movi v27.16b, #0",
-                "movi v28.16b, #0",
-                "movi v29.16b, #0",
-                "movi v30.16b, #0",
-                "movi v31.16b, #0",
-
-                "msr fpcr, xzr",
-                "msr fpsr, xzr",
-
-                /*"pfalse p0.b",
-                "pfalse p1.b", 
-                "pfalse p2.b",
-                "pfalse p3.b",
-                "pfalse p4.b",
-                "pfalse p5.b",
-                "pfalse p6.b",
-                "pfalse p7.b",
-                "pfalse p8.b",
-                "pfalse p9.b",
-                "pfalse p10.b",
-                "pfalse p11.b",
-                "pfalse p12.b",
-                "pfalse p13.b",
-                "pfalse p14.b",
-                "pfalse p15.b",
-
-                "setffr",*/
-            );
-        }
-    };
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct TlsEntry {
-    pub name: *const std::ffi::c_char,
-    pub address: *mut u8,
-    pub size: usize,
-}
-
-impl TlsEntry {
-    pub fn name(&self) -> &str {
-        unsafe { 
-            std::ffi::CStr::from_ptr(self.name)
-                .to_str()
-                .unwrap_or("<invalid_utf8>")
-        }
-    }
-
-    pub fn address(&self) -> *mut u8 {
-        self.address
-    }
-
-    pub fn read(&self) -> Vec<u8> {
-        let mut value = vec![0; self.size];
-        unsafe { std::ptr::copy_nonoverlapping(self.address, value.as_mut_ptr(), self.size); }
-        value
-    }
-
-    pub fn write(&self, value: &[u8]) {
-       unsafe { std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size); }
-    }
-}
-
 extern "C" {
-    static __tls_registry: *const TlsEntry;
-    static __tls_registry_size: usize;
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct GlobalEntry {
-    pub name: *const std::ffi::c_char,
-    pub address: *mut u8,
-    pub size: usize,
-    pub is_const: bool,
-    pub is_atomic: bool,
-}
-
-extern "C" {
-    static __globals_registry: *const GlobalEntry;
-    static __globals_registry_size: usize;
-}
-
-impl GlobalEntry {
-    pub fn name(&self) -> &str {
-        unsafe { std::ffi::CStr::from_ptr(self.name)
-            .to_str()
-            .unwrap_or("<invalid_utf8>")
-        }
-    }
-
-    pub fn address(&self) -> *mut u8 {
-        self.address
-    }
-
-    pub fn read(&self) -> Vec<u8> {
-        let mut value = vec![0; self.size];
-        unsafe { std::ptr::copy_nonoverlapping(self.address, value.as_mut_ptr(), self.size); }
-        value
-    }
-
-    pub fn write(&self, value: &[u8]) {
-        unsafe { std::ptr::copy_nonoverlapping(value.as_ptr(), self.address, self.size); }
-    }
-}
-
-#[repr(C)]
-pub enum EntityType {
-    Global = 0,
-    ThreadLocal = 1,
-    StackVar = 2,
-    HeapAllocation = 3,
-    Register = 4,
-}
-
-#[repr(C)]
-pub struct EntityChange {
-    pub entity_type: EntityType,
-    pub entity_ptr: *const u8,
-    pub offset_in_entity: u32,
-    pub old_value_ptr: *const u8,
-    pub new_value_ptr: *const u8,
-    pub size: u32,
-    pub value_type: ValueType,
-}
-
-#[repr(C)]
-pub enum ValueType {
-    U8 = 0,
-    U16 = 1,
-    U32 = 2,
-    U64 = 3,
-    I8 = 4,
-    I16 = 5,
-    I32 = 6,
-    I64 = 7,
-    F32 = 8,
-    F64 = 9,
-    Ptr = 10,
-    Bytes = 11,
-}
-
-#[repr(C)]
-pub struct BasicBlockEntry {
-    pub id: u32,
-    pub function_name: *const std::ffi::c_char,
-    pub start_address: *mut u8,
-    pub size: u32,
-    pub instruction_count: u32,
-    pub execution_count: u64,
-    pub fuel_cost: u32,
-    pub entity_changes_offset: u32,      // Offset into entity changes array
-    pub entity_changes_count: u32,       // Number of entity changes
-}
-
-extern "C" {
-    static __basic_blocks_registry: *const BasicBlockEntry;
+    static __basic_blocks_registry: *const BasicBlockInfo;
     static __basic_blocks_count: usize;
     static __entity_changes_registry: *const EntityChange;
-    static __entity_changes_count: usize;
 }
 
 #[no_mangle]
