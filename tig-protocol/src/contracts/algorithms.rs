@@ -32,7 +32,7 @@ pub async fn submit_advance<T: Context>(
         return Err(anyhow!("Insufficient balance"));
     }
 
-    let advance_id = ctx
+    let algorithm_id = ctx
         .add_advance_to_mempool(
             AdvanceDetails {
                 name,
@@ -43,7 +43,7 @@ pub async fn submit_advance<T: Context>(
             evidence,
         )
         .await?;
-    Ok(advance_id)
+    Ok(algorithm_id)
 }
 
 #[time]
@@ -165,9 +165,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for player_id in active_player_ids.iter() {
         let player_state = &active_players_state[player_id];
         let player_data = &active_players_block_data[player_id];
-        for (advance_id, vote) in player_state.votes.iter() {
+        for (algorithm_id, vote) in player_state.votes.iter() {
             let yes = vote.value;
-            if let Some(advance_state) = voting_advances_state.get_mut(advance_id) {
+            if let Some(advance_state) = voting_advances_state.get_mut(algorithm_id) {
                 let n = advance_state.round_votes_tallied - block_details.round;
                 let votes: PreciseNumber = player_data
                     .deposit_by_locked_period
@@ -240,9 +240,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update advance merge points
     let adoption_threshold = PreciseNumber::from_f64(config.advances.adoption_threshold);
-    for advance_id in active_advance_ids.iter() {
-        let is_merged = active_advances_state[advance_id].round_merged.is_some();
-        let advance_data = active_advances_block_data.get_mut(advance_id).unwrap();
+    for algorithm_id in active_advance_ids.iter() {
+        let is_merged = active_advances_state[algorithm_id].round_merged.is_some();
+        let advance_data = active_advances_block_data.get_mut(algorithm_id).unwrap();
 
         if !is_merged && advance_data.adoption >= adoption_threshold {
             advance_data.merge_points += 1;
