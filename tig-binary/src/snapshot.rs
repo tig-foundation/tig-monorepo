@@ -260,10 +260,11 @@ impl Snapshot {
                 "cmp x2, x5",
                 "b.ge 3f",                   // Exit loop if region_idx >= max
                 
-                // Call is_region_dirty(region_idx)
-                "mov x0, x2",
-                "bl {is_region_dirty}",
-                "cbz x0, 4f",                // Skip if not dirty
+                // Inline is_region_dirty(region_idx) logic
+                "adrp x0, {dirty_regions}",
+                "add x0, x0, :lo12:{dirty_regions}",
+                "ldrb w0, [x0, x2]",         // Load dirty_regions[region_idx]
+                "cbz w0, 4f",                // Skip if not dirty (w0 == 0)
                 
                 // DIRTY REGION CAPTURE LOGIC
                 // Calculate region address: heap_base + (region_idx * region_size)
@@ -368,11 +369,9 @@ impl Snapshot {
                 max_memory = sym __max_memory_usage,
                 max_allowed_memory = sym __max_allowed_memory_usage,
                 curr_memory = sym __curr_memory_usage,
-                is_region_dirty = sym is_region_dirty,
                 heap_size = sym __heap_size,
                 region_size = sym __region_size,
                 heap_base = sym __heap_base,
-                memcpy = sym memcpy,
                 snapshot_size = const std::mem::size_of::<Snapshot>(),
                 registers_offset = const std::mem::offset_of!(Snapshot, registers),
                 memory_offset = const std::mem::offset_of!(Snapshot, memory),
@@ -390,6 +389,7 @@ impl Snapshot {
                 tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
+                dirty_regions = sym __dirty_regions,
                 options(noreturn)
             );
         }
