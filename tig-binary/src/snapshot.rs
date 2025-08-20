@@ -144,6 +144,8 @@ impl Snapshot {
                 "mov x27, #{snapshot_size}",
                 "mul x29, x29, x27",          // index * sizeof(Snapshot)
                 "add x30, x30, x29",          // registry[index] address
+
+                "prfm pldl1strm, [x30]",
                 
                 // Store snapshot address on stack for later use
                 "str x30, [sp, #40]",         // Store snapshot pointer on stack
