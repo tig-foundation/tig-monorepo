@@ -290,50 +290,20 @@ impl Snapshot {
                 // Store region address in entry
                 "str x8, [x6]",              // entry.0 = region_address
                 
-                // Copy region data to entry (optimized with alignment handling)
+                // Copy region data to entry
                 "add x6, x6, #8",            // x6 = &entry.1 (data array)
                 "ldr x1, [sp, #72]",         // x1 = region_size (bytes to copy)
-                
                 "mov x9, #0",                // copy_idx = 0
                 
-                // First, handle unaligned bytes to get to 8-byte boundary
-                "add x11, x8, x9",           // x11 = current source address
-                "and x10, x11, #7",          // x10 = source_addr % 8 (misalignment)
-                "cbz x10, 5f",               // If already aligned, skip to word copy
-                
-                "sub x10, #8, x10",          // x10 = bytes needed to reach alignment
-                "cmp x10, x1",               // Compare with remaining bytes
-                "csel x10, x1, x10, hi",     // x10 = min(alignment_bytes, remaining_bytes)
-                
-                "9:", // Alignment byte loop (renamed from 4:)
-                "cbz x10, 5f",               // If no alignment bytes needed, go to word copy
-                "ldrb w11, [x8, x9]",        // Load byte from source
-                "strb w11, [x6, x9]",        // Store byte to destination
-                "add x9, x9, #1",            // copy_idx++
-                "sub x10, x10, #1",          // alignment_count--
-                "sub x1, x1, #1",            // remaining_bytes--
-                "b 9b",                      // Continue alignment loop
-                
-                // Now source should be 8-byte aligned, do fast word copy
+                // Since pointers are 8-byte aligned and size is a multiple of 8,
+                // a simple word-copy loop is sufficient.
                 "5:", // Word copy loop
-                "cmp x1, #8",                // Check if we have at least 8 bytes left
-                "b.lt 7f",                   // If less than 8 bytes, go to byte remainder
-                
-                "ldr x11, [x8, x9]",         // Load 8 bytes from source (now aligned)
+                "cbz x1, 6f",                // If remaining_bytes is zero, we are done
+                "ldr x11, [x8, x9]",         // Load 8 bytes from source
                 "str x11, [x6, x9]",         // Store 8 bytes to destination
                 "add x9, x9, #8",            // copy_idx += 8
                 "sub x1, x1, #8",            // remaining_bytes -= 8
                 "b 5b",                      // Continue word loop
-                
-                "7:", // Handle remaining bytes (0-7 bytes left)
-                "cbz x1, 6f",                // If no bytes left, we're done
-                
-                "8:", // Final byte remainder loop
-                "ldrb w11, [x8, x9]",        // Load remaining byte
-                "strb w11, [x6, x9]",        // Store remaining byte
-                "add x9, x9, #1",            // copy_idx++
-                "sub x1, x1, #1",            // remaining_bytes--
-                "cbnz x1, 8b",               // Continue if more bytes
                 
                 "6:", // Copy complete
                 
@@ -344,7 +314,7 @@ impl Snapshot {
                 "add w3, w3, #1",            // w3++
                 "str w3, [x0]",              // Store updated count
                 
-                "4:", // Continue main loop (this is the original label 4:)
+                "4:", // Continue main loop
                 "add x2, x2, #1",            // region_idx++
                 "b 2b",                      // Back to loop start
                 
