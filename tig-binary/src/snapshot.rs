@@ -196,14 +196,22 @@ impl Snapshot {
                 "str x28, [x29, #{tpidrro_el0_offset}]",
 
                 "add x28, x29, #{vregs_offset}",
-                "stp q0, q1, [x28, #0]", "stp q2, q3, [x28, #32]",
-                "stp q4, q5, [x28, #64]", "stp q6, q7, [x28, #96]",
-                "stp q8, q9, [x28, #128]", "stp q10, q11, [x28, #160]",
-                "stp q12, q13, [x28, #192]", "stp q14, q15, [x28, #224]",
-                "stp q16, q17, [x28, #256]", "stp q18, q19, [x28, #288]",
-                "stp q20, q21, [x28, #320]", "stp q22, q23, [x28, #352]",
-                "stp q24, q25, [x28, #384]", "stp q26, q27, [x28, #416]",
-                "stp q28, q29, [x28, #448]", "stp q30, q31, [x28, #480]",
+                "stp q0, q1, [x28, #0]", 
+                "stp q2, q3, [x28, #32]",
+                "stp q4, q5, [x28, #64]", 
+                "stp q6, q7, [x28, #96]",
+                "stp q8, q9, [x28, #128]",
+                "stp q10, q11, [x28, #160]",
+                "stp q12, q13, [x28, #192]", 
+                "stp q14, q15, [x28, #224]",
+                "stp q16, q17, [x28, #256]", 
+                "stp q18, q19, [x28, #288]",
+                "stp q20, q21, [x28, #320]", 
+                "stp q22, q23, [x28, #352]",
+                "stp q24, q25, [x28, #384]", 
+                "stp q26, q27, [x28, #416]",
+                "stp q28, q29, [x28, #448]", 
+                "stp q30, q31, [x28, #480]",
                 
                 // Save memory usage values
                 "adrp x28, {total_memory}", 
@@ -228,7 +236,7 @@ impl Snapshot {
 
                 // Initialize memory snapshot
                 "add x29, x30, #{memory_offset}",
-                "str wzr, [x29]",             // dirty_region_count = 0
+                "str wzr, [x29]", // dirty_region_count = 0
                 
                 // Restore work registers from stack for memory capture phase
                 "ldp x27, x28, [sp, #0]",
@@ -1187,3 +1195,4 @@ static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::Ato
 
 
 // we will need to handle SEXT/ZEXT
+// actually no we dont
