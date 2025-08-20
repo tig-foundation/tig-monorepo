@@ -72,9 +72,9 @@ pub async fn submit_code<T: Context>(
         return Err(anyhow!("Invalid challenge '{}'", challenge_id));
     }
 
-    if let Some(advance_id) = &algorithm_id {
-        if ctx.get_advance_state(advance_id).await.is_none() {
-            return Err(anyhow!("Invalid advance '{}'", advance_id));
+    if let Some(algorithm_id) = &algorithm_id {
+        if ctx.get_advance_state(algorithm_id).await.is_none() {
+            return Err(anyhow!("Invalid advance '{}'", algorithm_id));
         }
     }
 
