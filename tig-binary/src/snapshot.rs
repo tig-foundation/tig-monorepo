@@ -52,7 +52,7 @@ pub struct RegisterSnapshot {
 #[repr(C)]
 pub struct MemorySnapshot {
     pub dirty_region_count: u32,
-    pub dirty_regions: [(u64, [u8; 64]); 0], // region, value
+    pub dirty_regions: [(u64, [u8; 64]); 0], // region_idx, value
 }
 
 impl MemorySnapshot {
@@ -77,32 +77,32 @@ impl MemorySnapshot {
         }
     }
 
-    pub fn set_dirty_region(&mut self, index: u32, region_addr: u64, region_value: &[u8]) {
+    pub fn set_dirty_region(&mut self, index: u32, region_idx: u64, region_value: &[u8]) {
         unsafe {
             let entry = &mut *self.dirty_regions().add(index as usize);
-            entry.0 = region_addr;
+            entry.0 = region_idx;
             entry.1[..region_value.len().min(__region_size)].copy_from_slice(
                 &region_value[..region_value.len().min(__region_size)]
             );
         }
     }
 
-    pub fn add_dirty_region_if_not_exists(&mut self, region_addr: u64, region_value: &[u8]) {
+    pub fn add_dirty_region_if_not_exists(&mut self, region_idx: u64, region_value: &[u8]) {
         for idx in 0..self.dirty_region_count {
-            let (existing_addr, _) = self.get_dirty_region(idx);
-            if existing_addr == region_addr {
+            let (existing_idx, _) = self.get_dirty_region(idx);
+            if existing_idx == region_idx {
                 return; // Already exists, don't add again
             }
         }
         
-        self.set_dirty_region(self.dirty_region_count, region_addr, region_value);
+        self.set_dirty_region(self.dirty_region_count, region_idx, region_value);
         self.dirty_region_count += 1;
     }
 
-    pub fn contains_dirty_region(&self, region_addr: u64) -> bool {
+    pub fn contains_dirty_region(&self, region_idx: u64) -> bool {
         for idx in 0..self.dirty_region_count {
-            let (existing_addr, _) = self.get_dirty_region(idx);
-            if existing_addr == region_addr {
+            let (existing_idx, _) = self.get_dirty_region(idx);
+            if existing_idx == region_idx {
                 return true;
             }
         }
@@ -267,7 +267,7 @@ impl Snapshot {
                 "cbz w0, 4f",                // Skip if not dirty (w0 == 0)
                 
                 // DIRTY REGION CAPTURE LOGIC
-                // Calculate region address: heap_base + (region_idx * region_size)
+                // Calculate region address (still needed for the memory copy source)
                 "ldr x1, [sp, #72]",         // Load region_size from stack
                 "mul x8, x2, x1",            // x8 = region_idx * region_size
                 "add x8, x7, x8",            // x8 = heap_base + offset = region_address
@@ -287,8 +287,8 @@ impl Snapshot {
                 "mul x9, x3, x9",            // x9 = count * entry_size
                 "add x6, x6, x9",            // x6 = &dirty_regions[count]
                 
-                // Store region address in entry
-                "str x8, [x6]",              // entry.0 = region_address
+                // Store region index in entry
+                "str x2, [x6]",              // entry.0 = region_idx (from x2)
                 
                 // Copy region data to entry
                 "add x6, x6, #8",            // x6 = &entry.1 (data array)
@@ -299,7 +299,7 @@ impl Snapshot {
                 // a simple word-copy loop is sufficient.
                 "5:", // Word copy loop
                 "cbz x1, 6f",                // If remaining_bytes is zero, we are done
-                "ldr x11, [x8, x9]",         // Load 8 bytes from source
+                "ldr x11, [x8, x9]",         // Load 8 bytes from source (x8 is region_address)
                 "str x11, [x6, x9]",         // Store 8 bytes to destination
                 "add x9, x9, #8",            // copy_idx += 8
                 "sub x1, x1, #8",            // remaining_bytes -= 8
