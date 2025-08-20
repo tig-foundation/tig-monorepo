@@ -52,7 +52,8 @@ pub struct RegisterSnapshot {
 #[repr(C)]
 pub struct MemorySnapshot {
     pub dirty_region_count: u32,
-    pub dirty_regions: [(u64, [u8; 64]); 0], // region_idx, value
+    // Flexible array member holding (region_idx, value)
+    pub dirty_regions: [(u64, [u8; 64]); 0],
 }
 
 impl MemorySnapshot {
@@ -115,18 +116,25 @@ impl Snapshot {
     pub fn capture() -> *const Snapshot {
         unsafe {
             std::arch::naked_asm!(
-                // FIRST: Capture pristine state immediately (before touching ANY registers)
-                "sub sp, sp, #40",            // Reserve stack space for work registers + snapshot ptr
-                "stp x27, x28, [sp, #0]",     // Save work registers
+                // FIRST: Capture pristine state immediately
+                // Stack layout:
+                // [sp, #0]:  original x27, x28
+                // [sp, #16]: original x29, x30
+                // [sp, #32]: pristine NZCV
+                // [sp, #40]: snapshot_ptr
+                "sub sp, sp, #48",            // Reserve stack space for work regs, flags, snapshot ptr
+                "stp x27, x28, [sp, #0]",     // Save work registers first
                 "stp x29, x30, [sp, #16]",
+                "mrs x27, nzcv",              // Use a saved register (x27) to capture pristine NZCV
+                "str x27, [sp, #32]",         // Store pristine NZCV on the stack
                 
                 // Atomic increment of snapshot count and get index
                 "adrp x30, {snapshot_count}",
                 "add x30, x30, :lo12:{snapshot_count}",
                 "1:",
-                "ldaxr x29, [x30]",           // Load-acquire exclusive (current count)
+                "ldaxr x29, [x30]",           // Load-acquire exclusive
                 "add x28, x29, #1",           // Increment for new count
-                "stlxr w27, x28, [x30]",      // Store-release exclusive (new count)
+                "stlxr w27, x28, [x30]",      // Store-release exclusive
                 "cbnz w27, 1b",               // Retry if failed
                 
                 // Load registry pointer and calculate snapshot address
@@ -138,12 +146,12 @@ impl Snapshot {
                 "add x30, x30, x29",          // registry[index] address
                 
                 // Store snapshot address on stack for later use
-                "str x30, [sp, #32]",         // Store snapshot pointer on stack
+                "str x30, [sp, #40]",         // Store snapshot pointer on stack
                 
                 // Calculate offset to registers field within Snapshot
                 "add x29, x30, #{registers_offset}",
                 
-                // Save ALL GPRs x0-x26 (pristine values - captured BEFORE any work)
+                // Save ALL GPRs x0-x26
                 "stp x0, x1, [x29, #{gprs_offset}]",
                 "stp x2, x3, [x29, #{gprs_offset} + 16]", 
                 "stp x4, x5, [x29, #{gprs_offset} + 32]",
@@ -159,180 +167,158 @@ impl Snapshot {
                 "stp x24, x25, [x29, #{gprs_offset} + 192]",
                 "str x26, [x29, #{gprs_offset} + 208]",
                 
-                // Restore original x27, x28, x29, x30 from stack and save them
+                // Restore original x27-x30 from stack and save them to the snapshot
                 "ldp x27, x28, [sp, #0]",
                 "stp x27, x28, [x29, #{gprs_offset} + 216]",
                 "ldp x27, x28, [sp, #16]",
                 "stp x27, x28, [x29, #{gprs_offset} + 232]",
                 
-                // Save SP (original stack pointer + 40 for our reserved space)
+                // Save SP (original stack pointer + 48 for our reserved space)
                 "mov x28, sp",
-                "add x28, x28, #40",
+                "add x28, x28, #48",
                 "str x28, [x29, #{sp_offset}]",
                 
-                // Save NZCV (condition flags)
-                "mrs x28, nzcv",
+                // Save the pristine NZCV from the stack to the snapshot
+                "ldr x28, [sp, #32]",
                 "str x28, [x29, #{nzcv_offset}]",
                 
-                // Save floating-point control/status
-                "mrs x28, fpcr",
+                // Save floating-point control/status, thread pointers, and vector registers
+                "mrs x28, fpcr", 
                 "str x28, [x29, #{fpcr_offset}]",
+
                 "mrs x28, fpsr", 
                 "str x28, [x29, #{fpsr_offset}]",
-                
-                // Save thread pointers
-                "mrs x28, tpidr_el0",
+
+                "mrs x28, tpidr_el0", 
                 "str x28, [x29, #{tpidr_el0_offset}]",
-                "mrs x28, tpidrro_el0",
+
+                "mrs x28, tpidrro_el0", 
                 "str x28, [x29, #{tpidrro_el0_offset}]",
-                
-                // Save ALL vector registers v0-v31
+
                 "add x28, x29, #{vregs_offset}",
-                "stp q0, q1, [x28, #0]",
-                "stp q2, q3, [x28, #32]",
-                "stp q4, q5, [x28, #64]",
-                "stp q6, q7, [x28, #96]",
-                "stp q8, q9, [x28, #128]",
-                "stp q10, q11, [x28, #160]",
-                "stp q12, q13, [x28, #192]",
-                "stp q14, q15, [x28, #224]",
-                "stp q16, q17, [x28, #256]",
-                "stp q18, q19, [x28, #288]",
-                "stp q20, q21, [x28, #320]",
-                "stp q22, q23, [x28, #352]",
-                "stp q24, q25, [x28, #384]",
-                "stp q26, q27, [x28, #416]",
-                "stp q28, q29, [x28, #448]",
-                "stp q30, q31, [x28, #480]",
+                "stp q0, q1, [x28, #0]", "stp q2, q3, [x28, #32]",
+                "stp q4, q5, [x28, #64]", "stp q6, q7, [x28, #96]",
+                "stp q8, q9, [x28, #128]", "stp q10, q11, [x28, #160]",
+                "stp q12, q13, [x28, #192]", "stp q14, q15, [x28, #224]",
+                "stp q16, q17, [x28, #256]", "stp q18, q19, [x28, #288]",
+                "stp q20, q21, [x28, #320]", "stp q22, q23, [x28, #352]",
+                "stp q24, q25, [x28, #384]", "stp q26, q27, [x28, #416]",
+                "stp q28, q29, [x28, #448]", "stp q30, q31, [x28, #480]",
                 
                 // Save memory usage values
-                "adrp x28, {total_memory}",
-                "add x28, x28, :lo12:{total_memory}",
-                "ldr x27, [x28]",
+                "adrp x28, {total_memory}", 
+                "add x28, x28, :lo12:{total_memory}", 
+                "ldr x27, [x28]", 
                 "str x27, [x30, #{total_memory_offset}]",
-                
-                "adrp x28, {max_memory}",
-                "add x28, x28, :lo12:{max_memory}",
-                "ldr x27, [x28]",
+
+                "adrp x28, {max_memory}", 
+                "add x28, x28, :lo12:{max_memory}", 
+                "ldr x27, [x28]", 
                 "str x27, [x30, #{max_memory_offset}]",
-                
-                "adrp x28, {max_allowed_memory}",
-                "add x28, x28, :lo12:{max_allowed_memory}",
-                "ldr x27, [x28]",
+
+                "adrp x28, {max_allowed_memory}", 
+                "add x28, x28, :lo12:{max_allowed_memory}", 
+                "ldr x27, [x28]", 
                 "str x27, [x30, #{max_allowed_memory_offset}]",
-                
-                "adrp x28, {curr_memory}",
-                "add x28, x28, :lo12:{curr_memory}",
-                "ldr x27, [x28]",
+
+                "adrp x28, {curr_memory}", 
+                "add x28, x28, :lo12:{curr_memory}", 
+                "ldr x27, [x28]", 
                 "str x27, [x30, #{curr_memory_offset}]",
-                
-                // Initialize memory snapshot dirty region count to 0
+
+                // Initialize memory snapshot
                 "add x29, x30, #{memory_offset}",
                 "str wzr, [x29]",             // dirty_region_count = 0
                 
-                // Restore work registers from stack 
+                // Restore work registers from stack for memory capture phase
                 "ldp x27, x28, [sp, #0]",
                 "ldp x29, x30, [sp, #16]",
                 
-                // NOW do memory capture work (registers already captured pristine)
-                "sub sp, sp, #80",            // Reserve additional stack space for memory work + more vars
-                "stp x0, x1, [sp, #0]",       // Save registers for memory work
+                // NOW do memory capture work (registers already pristine)
+                "sub sp, sp, #80",
+                "stp x0, x1, [sp, #0]", 
                 "stp x2, x3, [sp, #16]",
-                "stp x5, x6, [sp, #32]",
-                "stp x7, x8, [sp, #48]",      // Extra registers for memory operations
-                "str x9, [sp, #64]",          // region_size, heap_base
+                "stp x5, x6, [sp, #32]", 
+                "stp x7, x8, [sp, #48]",
+                "str x9, [sp, #64]",
                 
                 // Memory capture loop preparation
-                "adrp x0, {heap_size}",
-                "add x0, x0, :lo12:{heap_size}",
-                "ldr x0, [x0]",              // Load __heap_size
-                "adrp x1, {region_size}",  
-                "add x1, x1, :lo12:{region_size}",
-                "ldr x1, [x1]",              // Load __region_size
-                "str x1, [sp, #72]",          // Store region_size on stack
-                "adrp x7, {heap_base}",
-                "add x7, x7, :lo12:{heap_base}",
-                "ldr x7, [x7]",              // Load __heap_base
-                "udiv x5, x0, x1",           // x5 = __heap_size / __region_size
-                "mov x2, #0",                // region_idx = 0
+                "adrp x0, {heap_size}", 
+                "add x0, x0, :lo12:{heap_size}", 
+                "ldr x0, [x0]",
+                "adrp x1, {region_size}", 
+                "add x1, x1, :lo12:{region_size}", 
+                "ldr x1, [x1]",
+                "str x1, [sp, #72]",
+                "adrp x7, {heap_base}", 
+                "add x7, x7, :lo12:{heap_base}", 
+                "ldr x7, [x7]",
+                "udiv x5, x0, x1",
+                "mov x2, #0",
                 
-                "2:", // Loop start
-                "cmp x2, x5",
-                "b.ge 3f",                   // Exit loop if region_idx >= max
+                "2:", // Memory loop start
+                "cmp x2, x5", 
+                "b.ge 3f",
+                "adrp x0, {dirty_regions}", 
+                "add x0, x0, :lo12:{dirty_regions}", 
+                "ldrb w0, [x0, x2]",
+                "cbz w0, 4f",
                 
-                // Inline is_region_dirty(region_idx) logic
-                "adrp x0, {dirty_regions}",
-                "add x0, x0, :lo12:{dirty_regions}",
-                "ldrb w0, [x0, x2]",         // Load dirty_regions[region_idx]
-                "cbz w0, 4f",                // Skip if not dirty (w0 == 0)
+                // Dirty region capture logic
+                "ldr x1, [sp, #72]", 
+                "mul x8, x2, x1", 
+                "add x8, x7, x8",
+                "ldr x0, [sp, #120]", // sp+80(mem_work)+40(initial_snapshot_ptr_offset)
+                "add x0, x0, #{memory_offset}",
+                "ldr w3, [x0]", 
+                "uxtw x3, w3",
+                "add x6, x0, #{memory_size}",
+                "mov x9, #{dirty_region_entry_size}", 
+                "mul x9, x3, x9", 
+                "add x6, x6, x9",
+                "str x2, [x6]", // Store region_idx
+                "add x6, x6, #8", 
+                "ldr x1, [sp, #72]", 
+                "mov x9, #0",
                 
-                // DIRTY REGION CAPTURE LOGIC
-                // Calculate region address (still needed for the memory copy source)
-                "ldr x1, [sp, #72]",         // Load region_size from stack
-                "mul x8, x2, x1",            // x8 = region_idx * region_size
-                "add x8, x7, x8",            // x8 = heap_base + offset = region_address
-                
-                // Get snapshot pointer and memory snapshot
-                "ldr x0, [sp, #112]",        // Load snapshot pointer from original stack location (sp+80+32)
-                "add x0, x0, #{memory_offset}", // x0 = &snapshot.memory
-                
-                // Get current dirty_region_count
-                "ldr w3, [x0]",              // w3 = dirty_region_count
-                
-                // Get pointer to dirty regions array
-                "add x6, x0, #{memory_size}", // x6 = dirty_regions array start
-                
-                // Calculate entry address: dirty_regions + (count * sizeof(entry))
-                "mov x9, #{dirty_region_entry_size}",
-                "mul x9, x3, x9",            // x9 = count * entry_size
-                "add x6, x6, x9",            // x6 = &dirty_regions[count]
-                
-                // Store region index in entry
-                "str x2, [x6]",              // entry.0 = region_idx (from x2)
-                
-                // Copy region data to entry
-                "add x6, x6, #8",            // x6 = &entry.1 (data array)
-                "ldr x1, [sp, #72]",         // x1 = region_size (bytes to copy)
-                "mov x9, #0",                // copy_idx = 0
-                
-                // Since pointers are 8-byte aligned and size is a multiple of 8,
-                // a simple word-copy loop is sufficient.
                 "5:", // Word copy loop
-                "cbz x1, 6f",                // If remaining_bytes is zero, we are done
-                "ldr x11, [x8, x9]",         // Load 8 bytes from source (x8 is region_address)
-                "str x11, [x6, x9]",         // Store 8 bytes to destination
-                "add x9, x9, #8",            // copy_idx += 8
-                "sub x1, x1, #8",            // remaining_bytes -= 8
-                "b 5b",                      // Continue word loop
-                
-                "6:", // Copy complete
+                "cbz x1, 6f",
+                "ldr x11, [x8, x9]", 
+                "str x11, [x6, x9]",
+                "add x9, x9, #8", 
+                "sub x1, x1, #8", "b 5b",
+                "6:",
                 
                 // Increment dirty_region_count
-                "ldr x0, [sp, #112]",        // Reload snapshot pointer
-                "add x0, x0, #{memory_offset}", // x0 = &snapshot.memory
-                "ldr w3, [x0]",              // w3 = dirty_region_count
-                "add w3, w3, #1",            // w3++
-                "str w3, [x0]",              // Store updated count
+                "ldr x0, [sp, #120]", 
+                "add x0, x0, #{memory_offset}", 
+                "ldr w3, [x0]",
+                "add w3, w3, #1", 
+                "str w3, [x0]",
                 
                 "4:", // Continue main loop
-                "add x2, x2, #1",            // region_idx++
-                "b 2b",                      // Back to loop start
-                
+                "add x2, x2, #1", "b 2b",
                 "3:", // Loop end
                 
-                // Restore memory work registers and clean up memory work stack
-                "ldp x0, x1, [sp, #0]",
+                // Restore memory work registers and clean up stack
+                "ldp x0, x1, [sp, #0]", 
                 "ldp x2, x3, [sp, #16]",
-                "ldp x5, x6, [sp, #32]",
+                "ldp x5, x6, [sp, #32]", 
                 "ldp x7, x8, [sp, #48]",
                 "ldr x9, [sp, #64]",
-                "add sp, sp, #80",           // Clean up memory work stack space
+                "add sp, sp, #80",
                 
-                // Get snapshot pointer from stack and set up return value  
-                "ldr x0, [sp, #32]",         // Load snapshot pointer from stack
-                "add sp, sp, #40",           // Clean up initial stack space
-                "ret",
+                // FINAL CLEANUP AND RETURN
+                // ** RESTORE PRISTINE NZCV **
+                // Use x0 as a temporary register, as it will hold the return value anyway.
+                "ldr x0, [sp, #32]",         // Load pristine NZCV into x0
+                "msr nzcv, x0",              // Restore the condition flags
+                // Now, set up the actual return value in x0
+                "ldr x0, [sp, #40]",         // Load snapshot pointer into x0 for return
+                "add sp, sp, #48",           // Clean up initial stack space
+                "ret",                       // Return to caller with pristine flags
                 
+                // Symbols and constants
                 registry_ptr = sym __snapshot_registry,
                 snapshot_count = sym __snapshot_count,
                 total_memory = sym __total_memory_usage,
