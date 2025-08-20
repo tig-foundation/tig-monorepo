@@ -113,7 +113,7 @@ impl MemorySnapshot {
 
 impl Snapshot {
     #[naked]
-    pub fn capture() -> *const Snapshot {
+    pub fn capture() { // MODIFIED: No longer returns a value
         unsafe {
             std::arch::naked_asm!(
                 // FIRST: Capture pristine state immediately
@@ -145,6 +145,7 @@ impl Snapshot {
                 "mul x29, x29, x27",          // index * sizeof(Snapshot)
                 "add x30, x30, x29",          // registry[index] address
 
+                // OPTIMIZATION: Hint to the CPU to prepare this memory for writes
                 "prfm pldl1strm, [x30]",
                 
                 // Store snapshot address on stack for later use
@@ -187,22 +188,19 @@ impl Snapshot {
                 // Save floating-point control/status, thread pointers, and vector registers
                 "mrs x28, fpcr", 
                 "str x28, [x29, #{fpcr_offset}]",
-
                 "mrs x28, fpsr", 
                 "str x28, [x29, #{fpsr_offset}]",
-
                 "mrs x28, tpidr_el0", 
                 "str x28, [x29, #{tpidr_el0_offset}]",
-
                 "mrs x28, tpidrro_el0", 
                 "str x28, [x29, #{tpidrro_el0_offset}]",
-
                 "add x28, x29, #{vregs_offset}",
+
                 "stp q0, q1, [x28, #0]", 
                 "stp q2, q3, [x28, #32]",
                 "stp q4, q5, [x28, #64]", 
                 "stp q6, q7, [x28, #96]",
-                "stp q8, q9, [x28, #128]",
+                "stp q8, q9, [x28, #128]", 
                 "stp q10, q11, [x28, #160]",
                 "stp q12, q13, [x28, #192]", 
                 "stp q14, q15, [x28, #224]",
@@ -212,7 +210,7 @@ impl Snapshot {
                 "stp q22, q23, [x28, #352]",
                 "stp q24, q25, [x28, #384]", 
                 "stp q26, q27, [x28, #416]",
-                "stp q28, q29, [x28, #448]", 
+                "stp q28, q29, [x28, #448]",
                 "stp q30, q31, [x28, #480]",
                 
                 // Save memory usage values
@@ -222,7 +220,7 @@ impl Snapshot {
                 "str x27, [x30, #{total_memory_offset}]",
 
                 "adrp x28, {max_memory}", 
-                "add x28, x28, :lo12:{max_memory}", 
+                "add x28, x28, :lo12:{max_memory}",
                 "ldr x27, [x28]", 
                 "str x27, [x30, #{max_memory_offset}]",
 
@@ -235,7 +233,7 @@ impl Snapshot {
                 "add x28, x28, :lo12:{curr_memory}", 
                 "ldr x27, [x28]", 
                 "str x27, [x30, #{curr_memory_offset}]",
-
+                
                 // Initialize memory snapshot
                 "add x29, x30, #{memory_offset}",
                 "str wzr, [x29]", // dirty_region_count = 0
@@ -245,12 +243,12 @@ impl Snapshot {
                 "ldp x29, x30, [sp, #16]",
                 
                 // NOW do memory capture work (registers already pristine)
-                "sub sp, sp, #80",
+                "sub sp, sp, #96", // FIX: Allocate 96 bytes for 16-byte alignment
                 "stp x0, x1, [sp, #0]", 
                 "stp x2, x3, [sp, #16]",
                 "stp x5, x6, [sp, #32]", 
                 "stp x7, x8, [sp, #48]",
-                "str x9, [sp, #64]",
+                "stp x9, x11, [sp, #64]",     // FIX: Save both x9 and x11
                 
                 // Memory capture loop preparation
                 "adrp x0, {heap_size}", 
@@ -259,7 +257,7 @@ impl Snapshot {
                 "adrp x1, {region_size}", 
                 "add x1, x1, :lo12:{region_size}", 
                 "ldr x1, [x1]",
-                "str x1, [sp, #72]",
+                "str x1, [sp, #80]", // FIX: Store region_size in the new, non-conflicting location
                 "adrp x7, {heap_base}", 
                 "add x7, x7, :lo12:{heap_base}", 
                 "ldr x7, [x7]",
@@ -275,20 +273,19 @@ impl Snapshot {
                 "cbz w0, 4f",
                 
                 // Dirty region capture logic
-                "ldr x1, [sp, #72]", 
+                "ldr x1, [sp, #80]",          // FIX: Load region_size from its new location
                 "mul x8, x2, x1", 
                 "add x8, x7, x8",
-                "ldr x0, [sp, #120]", // sp+80(mem_work)+40(initial_snapshot_ptr_offset)
+                "ldr x0, [sp, #136]",         // FIX: Adjust offset: 40 (initial) + 96 (local) = 136
                 "add x0, x0, #{memory_offset}",
-                "ldr w3, [x0]", 
-                "uxtw x3, w3",
+                "ldr w3, [x0]", "uxtw x3, w3",
                 "add x6, x0, #{memory_size}",
                 "mov x9, #{dirty_region_entry_size}", 
                 "mul x9, x3, x9", 
                 "add x6, x6, x9",
-                "str x2, [x6]", // Store region_idx
+                "str x2, [x6]", 
                 "add x6, x6, #8", 
-                "ldr x1, [sp, #72]", 
+                "ldr x1, [sp, #80]",          // FIX: Load region_size from its new location
                 "mov x9, #0",
                 
                 "5:", // Word copy loop
@@ -300,14 +297,15 @@ impl Snapshot {
                 "6:",
                 
                 // Increment dirty_region_count
-                "ldr x0, [sp, #120]", 
+                "ldr x0, [sp, #136]",         // FIX: Adjust offset
                 "add x0, x0, #{memory_offset}", 
-                "ldr w3, [x0]",
+                "ldr w3, [x0]", 
                 "add w3, w3, #1", 
                 "str w3, [x0]",
                 
                 "4:", // Continue main loop
-                "add x2, x2, #1", "b 2b",
+                "add x2, x2, #1", 
+                "b 2b",
                 "3:", // Loop end
                 
                 // Restore memory work registers and clean up stack
@@ -315,18 +313,19 @@ impl Snapshot {
                 "ldp x2, x3, [sp, #16]",
                 "ldp x5, x6, [sp, #32]", 
                 "ldp x7, x8, [sp, #48]",
-                "ldr x9, [sp, #64]",
-                "add sp, sp, #80",
+                "ldp x9, x11, [sp, #64]",     // FIX: Restore both x9 and x11
+                "add sp, sp, #96",            // FIX: Deallocate the full 96 bytes
                 
                 // FINAL CLEANUP AND RETURN
                 // ** RESTORE PRISTINE NZCV **
-                // Use x0 as a temporary register, as it will hold the return value anyway.
-                "ldr x0, [sp, #32]",         // Load pristine NZCV into x0
-                "msr nzcv, x0",              // Restore the condition flags
-                // Now, set up the actual return value in x0
-                "ldr x0, [sp, #40]",         // Load snapshot pointer into x0 for return
-                "add sp, sp, #48",           // Clean up initial stack space
-                "ret",                       // Return to caller with pristine flags
+                "ldr x0, [sp, #32]",          // Load pristine NZCV into scratch register x0
+                "msr nzcv, x0",               // Restore the condition flags
+                // REMOVED: "ldr x0, [sp, #40]" -> No return value
+                "add sp, sp, #48",            // Clean up initial stack space
+                "ret",                        // Return to caller with pristine flags
+                
+                
+                // !!!todo!!!: restore x0
                 
                 // Symbols and constants
                 registry_ptr = sym __snapshot_registry,
@@ -338,6 +337,7 @@ impl Snapshot {
                 heap_size = sym __heap_size,
                 region_size = sym __region_size,
                 heap_base = sym __heap_base,
+                dirty_regions = sym __dirty_regions,
                 snapshot_size = const std::mem::size_of::<Snapshot>(),
                 registers_offset = const std::mem::offset_of!(Snapshot, registers),
                 memory_offset = const std::mem::offset_of!(Snapshot, memory),
@@ -355,7 +355,6 @@ impl Snapshot {
                 tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
-                dirty_regions = sym __dirty_regions,
                 options(noreturn)
             );
         }
@@ -375,7 +374,7 @@ impl DeltaSnapshot {
             changed_regs: Vec::new(),
         };
 
-        for i in 0..31 {
+        for i in 0..old.registers.gprs.len() {
             if old.registers.gprs[i] != new.registers.gprs[i] {
                 delta.changed_regs.push(Registers::X(i as u8, new.registers.gprs[i]));
             }
@@ -417,7 +416,7 @@ impl DeltaSnapshot {
             delta.changed_regs.push(Registers::CNTFRQ_EL0(new.registers.cntfrq_el0));
         }*/
 
-        for i in 0..32 {
+        for i in 0..old.registers.vregs.len() {
             if old.registers.vregs[i] != new.registers.vregs[i] {
                 delta.changed_regs.push(Registers::V(i as u8, new.registers.vregs[i]));
             }
