@@ -12,8 +12,7 @@ MASTER_PORT = input("Enter Master Port: ")
 print("Fetching latest data from Master")
 data = requests.get(f"http://{MASTER_IP}:{MASTER_PORT}/get-latest-data").json()
 block = Block.from_dict(data["block"])
-algorithms = {k: Algorithm.from_dict(v) for k, v in data["algorithms"].items()}
-wasms = {k: Binary.from_dict(v) for k, v in data["wasms"].items()}
+algorithms = {k: Code.from_dict(v) for k, v in data["algorithms"].items()}
 precommits = {k: Precommit.from_dict(v) for k, v in data["precommits"].items()}
 benchmarks = {k: Benchmark.from_dict(v) for k, v in data["benchmarks"].items()}
 proofs = {k: Proof.from_dict(v) for k, v in data["proofs"].items()}

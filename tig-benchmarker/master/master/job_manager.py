@@ -24,7 +24,7 @@ class JobManager:
         benchmarks: Dict[str, Benchmark],
         proofs: Dict[str, Proof],
         challenges: Dict[str, Challenge],
-        algorithms: Dict[str, Algorithm],
+        algorithms: Dict[str, Code],
         binarys: Dict[str, Binary],
         **kwargs
     ):

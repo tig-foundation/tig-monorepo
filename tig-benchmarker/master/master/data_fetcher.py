@@ -48,7 +48,7 @@ class DataFetcher:
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
             algorithms_data, benchmarks_data, challenges_data = list(executor.map(_get, tasks))
 
-        algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data["algorithms"]}
+        algorithms = {a["id"]: Code.from_dict(a) for a in algorithms_data["codes"]}
         binarys = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data["binarys"]}
         
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data["precommits"]}

@@ -7,15 +7,15 @@ Point = Tuple[int, ...]
 Frontier = Set[Point]
 
 @dataclass
-class AlgorithmDetails(FromDict):
+class CodeDetails(FromDict):
     name: str
     player_id: str
     challenge_id: str
-    advance_id: Optional[str]
+    algorithm_id: Optional[str]
     fee_paid: PreciseNumber
 
 @dataclass
-class AlgorithmState(FromDict):
+class CodeState(FromDict):
     block_confirmed: int
     round_submitted: int
     round_pushed: Optional[int]
@@ -24,18 +24,18 @@ class AlgorithmState(FromDict):
     banned: bool
 
 @dataclass
-class AlgorithmBlockData(FromDict):
+class CodeBlockData(FromDict):
     num_qualifiers_by_player: Dict[str, int]
     adoption: PreciseNumber
     merge_points: int
     reward: PreciseNumber
 
 @dataclass
-class Algorithm(FromDict):
+class Code(FromDict):
     id: str
-    details: AlgorithmDetails
-    state: AlgorithmState
-    block_data: Optional[AlgorithmBlockData]
+    details: CodeDetails
+    state: CodeState
+    block_data: Optional[CodeBlockData]
 
 @dataclass
 class BenchmarkSettings(FromDict):
