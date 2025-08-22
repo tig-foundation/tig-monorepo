@@ -27,17 +27,11 @@ paths:
     get:
       tags:
         - GET
-      summary: Get latest algorithm data
+      summary: Get latest algorithm data (code, binarys and advances)
       description: |-
         # Notes
         
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
-        
-        * If `algorithm.round_pushed != null`, the data can be accessed via:
-          * `code`: `https://github.com/tig-foundation/tig-monorepo/blob/<branch>/tig-algorithms/src/<branch>/benchmarker_outbound.rs`
-          * `wasm_blob`: `https://github.com/tig-foundation/tig-monorepo/blob/<branch>/tig-algorithms/wasm/<branch>.wasm`
-        
-          where `<branch>` is `<challenge_name>/<algorithm_name>`
           
         * `names` is a map of `<player_id>` to ENS name (only if one exists)
       parameters:
@@ -292,12 +286,12 @@ paths:
     get:
       tags:
         - GET
-      summary: Get round emissions for a specific round (algorithms, advances, opow, players, and totals)
+      summary: Get round emissions for a specific round (codes, advances, opow, players, and totals)
       description: |-
         # Notes
-        * `advances` is a map of `<advance_id>` to `uint256`
+        * `advances` is a map of `<algorithm_id>` to `uint256`
 
-        * `algorithms` is a map of `<algorithm_id>` to `uint256`
+        * `codes` is a map of `<algorithm_id>` to `uint256`
         
         * `opow` is a map of `<player_id>` to a dict:
         
@@ -482,17 +476,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SetVoteResponse'
-  /submit-algorithm:
+  /submit-code:
     post:
       tags:
         - POST
-      summary: Submit an algorithm
+      summary: Submit code
       description: |-
         # Notes
         
         * This endpoint can only be invoked once every few seconds
         
-        * If an algorithm submission has failed to compile (`binary.state.compiled_success = false`), you can re-use the same algorithm name.
+        * If a code submission has failed to compile (`binary.state.compiled_success = false`), you can re-use the same algorithm name.
         
         * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
           
@@ -501,7 +495,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubmitAlgorithmRequest'
+              $ref: '#/components/schemas/SubmitCodeRequest'
       parameters:
         - in: header
           name: X-Api-Key
@@ -514,7 +508,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubmitAlgorithmResponse'
+                $ref: '#/components/schemas/SubmitCodeResponse'
   /submit-benchmark:
     post:
       tags:
@@ -613,18 +607,18 @@ components:
     Address:
       type: string
       pattern: ^0x[a-f0-9]{40}$
-    Algorithm:
+    Code:
       type: object
       properties:
         id:
           $ref: '#/components/schemas/AlgorithmId'
         details:
-          $ref: '#/components/schemas/AlgorithmDetails'
+          $ref: '#/components/schemas/CodeDetails'
         state:
-          $ref: '#/components/schemas/AlgorithmState'
+          $ref: '#/components/schemas/CodeState'
         block_data:
-          $ref: '#/components/schemas/AlgorithmBlockData'
-    AlgorithmBlockData:
+          $ref: '#/components/schemas/CodeBlockData'
+    CodeBlockData:
       type: object
       properties:
         num_qualifiers_by_player:
@@ -640,30 +634,28 @@ components:
           format: uint32
         reward:
           $ref: '#/components/schemas/PreciseNumber'
-    AlgorithmDetails:
+    CodeDetails:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/AlgorithmName'
+          $ref: '#/components/schemas/Name'
         player_id:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-        advance_id:
-          $ref: '#/components/schemas/MD5'
-        type:
-          $ref: '#/components/schemas/AlgorithmType'
+        algorithm_id:
+          $ref: '#/components/schemas/AlgorithmId'
         fee_paid:
           $ref: '#/components/schemas/PreciseNumber'
     AlgorithmId:
       type: string
       pattern: ^c[0-9]{3}_a[0-9]{3}$
       example: c002_a001
-    AlgorithmName:
+    Name:
       type: string
       pattern: ^[a-z][a-z_]{4,19}$
       example: clarke_wright
-    AlgorithmState:
+    CodeState:
       type: object
       properties:
         block_confirmed:
@@ -683,11 +675,6 @@ components:
           format: uint32
         banned:
           type: boolean
-    AlgorithmType:
-      type: string
-      enum:
-        - wasm
-        - ptx
     Benchmark:
       type: object
       properties:
@@ -887,7 +874,7 @@ components:
            advance:
              type: array 
              items:
-                $ref: '#/components/schemas/AdvanceId'
+                $ref: '#/components/schemas/AlgorithmId'
            challenge:
              type: array 
              items:
@@ -915,7 +902,7 @@ components:
         active_ids:
           type: object
           properties:
-            algorithm:
+            code:
              type: array
              items:
                 $ref: '#/components/schemas/AlgorithmId'
@@ -926,7 +913,7 @@ components:
             advance:
              type: array 
              items:
-                $ref: '#/components/schemas/AdvanceId'
+                $ref: '#/components/schemas/AlgorithmId'
             challenge:
              type: array 
              items:
@@ -947,7 +934,7 @@ components:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/AdvanceId'
+          $ref: '#/components/schemas/AlgorithmId'
         details:
           $ref: '#/components/schemas/AdvanceDetails'
         state:
@@ -973,10 +960,6 @@ components:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-    AdvanceId:
-      type: string
-      pattern: ^c[0-9]{3}_b[0-9]{3}$
-      example: c002_b001
     AdvanceState:
       type: object
       properties:
@@ -1390,15 +1373,15 @@ components:
     GetAlgorithmsResponse:
       type: object
       properties:
-        algorithms:
+        codes:
           type: array
           items:
-            $ref: '#/components/schemas/Algorithm'
+            $ref: '#/components/schemas/Code'
         advances:
           type: array
           items:
             $ref: '#/components/schemas/Advance'
-        binaries:
+        binarys:
           type: array
           items:
             $ref: '#/components/schemas/Binary'
@@ -1527,7 +1510,7 @@ components:
          additionalProperties:
            type: object
            properties:
-             algorithm:
+             code:
               $ref: '#/components/schemas/PreciseNumber'
              benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1542,7 +1525,7 @@ components:
        totals:
          type: object
          properties:
-            algorithm:
+            code:
               $ref: '#/components/schemas/PreciseNumber'
             advance:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1619,11 +1602,11 @@ components:
       properties:
         ok:
           type: boolean
-    SubmitAlgorithmRequest:
+    SubmitCodeRequest:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/AlgorithmName'
+          $ref: '#/components/schemas/Name'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
         code:
@@ -1634,7 +1617,7 @@ components:
             cuda:
               type: string
               nullable: true
-    SubmitAlgorithmResponse:
+    SubmitCodeResponse:
       type: object
       properties:
         algorithm_id:

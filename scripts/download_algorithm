@@ -24,7 +24,7 @@ def main():
     block = requests.get(f"{api_url}/get-block").json()["block"]
     challenges = requests.get(f"{api_url}/get-challenges?block_id={block['id']}").json()["challenges"]
     data = requests.get(f"{api_url}/get-algorithms?block_id={block['id']}").json()
-    algorithms = sorted(data["algorithms"], key=lambda x: x['id'], reverse=True)
+    algorithms = sorted(data["codes"], key=lambda x: x['id'], reverse=True)
     download_urls = {x['algorithm_id']: x['details']['download_url'] for x in data['binarys']}
 
     c_id = next(
