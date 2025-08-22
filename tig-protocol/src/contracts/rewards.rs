@@ -88,10 +88,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let mut total_advances_reward = zero.clone();
     let reward_pool_per_challenge =
         advances_reward_pool / PreciseNumber::from(active_challenge_ids.len());
-    for advance_id in active_advance_ids.iter() {
-        let advance_state = &active_advances_state[advance_id];
-        let advance_details = &active_advances_details[advance_id];
-        let advance_data = active_advances_block_data.get_mut(advance_id).unwrap();
+    for algorithm_id in active_advance_ids.iter() {
+        let advance_state = &active_advances_state[algorithm_id];
+        let advance_details = &active_advances_details[algorithm_id];
+        let advance_data = active_advances_block_data.get_mut(algorithm_id).unwrap();
 
         let is_merged = advance_state.round_merged.is_some();
         if advance_state.banned {

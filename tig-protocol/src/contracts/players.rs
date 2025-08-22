@@ -150,7 +150,7 @@ pub async fn set_reward_share<T: Context>(
 pub async fn set_vote<T: Context>(
     ctx: &T,
     player_id: String,
-    advance_id: String,
+    algorithm_id: String,
     yes: bool,
 ) -> Result<()> {
     let config = ctx.get_config().await;
@@ -159,19 +159,19 @@ pub async fn set_vote<T: Context>(
     let player_state = ctx.get_player_state(&player_id).await.unwrap();
 
     let advance_state = ctx
-        .get_advance_state(&advance_id)
+        .get_advance_state(&algorithm_id)
         .await
-        .ok_or_else(|| anyhow!("Invalid advance '{}'", advance_id))?;
+        .ok_or_else(|| anyhow!("Invalid advance '{}'", algorithm_id))?;
     if latest_block_details.round < advance_state.round_voting_starts
         || latest_block_details.round >= advance_state.round_votes_tallied
     {
-        return Err(anyhow!("Cannot vote on advance '{}'", advance_id));
+        return Err(anyhow!("Cannot vote on advance '{}'", algorithm_id));
     }
 
-    if player_state.votes.contains_key(&advance_id) {
+    if player_state.votes.contains_key(&algorithm_id) {
         return Err(anyhow!(
             "You have already voted on advance '{}'",
-            advance_id
+            algorithm_id
         ));
     }
 
@@ -193,7 +193,7 @@ pub async fn set_vote<T: Context>(
         ));
     }
 
-    ctx.set_player_vote(player_id, advance_id, yes).await?;
+    ctx.set_player_vote(player_id, algorithm_id, yes).await?;
     Ok(())
 }
 
