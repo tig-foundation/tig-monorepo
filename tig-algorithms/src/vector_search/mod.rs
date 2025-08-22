@@ -142,7 +142,8 @@ pub use improved_search_adp as c004_a064;
 
 // c004_a067
 
-// c004_a068
+pub mod is_adp_optimal;
+pub use is_adp_optimal as c004_a068;
 
 // c004_a069
 
