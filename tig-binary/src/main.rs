@@ -250,49 +250,8 @@ fn __copy_to_restore_region(restore_chunk: &[u8]) -> *mut u8 {
 
 #[cfg(feature = "entry_point")]
 extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
-    // --- First Snapshot ---
-    // Get the pointer to the snapshot data
-    let snapshot_ptr = snapshot::Snapshot::capture_pristine() as *const snapshot::Snapshot;
-
-    // Allocate memory on the stack for our own independent copy
-    let mut snapshot_bkup_storage = std::mem::MaybeUninit::<snapshot::Snapshot>::uninit();
-
-    // Perform a deep copy of the bytes from the source pointer to our new storage
-    // This creates a truly independent copy.
-    unsafe {
-        std::ptr::copy_nonoverlapping(snapshot_ptr, snapshot_bkup_storage.as_mut_ptr(), 1);
-    }
-    let snapshot_bkup = unsafe { snapshot_bkup_storage.assume_init() };
-    //println!("Snapshot: {:?}, hash: {}", &snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
-
-
-    // --- Second Snapshot ---
-    // Now, taking the second snapshot can't harm our backup
-    let snapshot_ptr2 = snapshot::Snapshot::capture_pristine() as *const snapshot::Snapshot;
-    // We can just clone this one since we're done taking snapshots
-    let snapshot_bkup2 = unsafe { &*snapshot_ptr2 }.clone();
-    //println!("Snapshot2: {:?}, hash: {}", &snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
-
-    //println!("Final Snapshot1: {:?}, hash: {}", snapshot_bkup, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0]);
-    //println!("Final Snapshot2: {:?}, hash: {}", snapshot_bkup2, tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
-
-    println!("Snapshot1 {:p}, Snapshot2 {:p}", snapshot_ptr, snapshot_ptr2);
-    println!("{} {}", tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup))[0], tig_utils::u64s_from_str(&format!("{:?}", &snapshot_bkup2))[0]);
-
-
-    // --- Delta Calculation ---    // --- Delta Calculation ---
-    // The delta should now be calculated correctly
-    let delta = snapshot::DeltaSnapshot::delta_from(&snapshot_bkup, &snapshot_bkup2);
-    println!("Delta: {:?}", delta);
-    //let restore_chunk = delta.generate_restore_chunk();
-    //let delta = snapshot::DeltaSnapshot::delta_from(&snapshot, &snapshot2);
-    //println!("Delta: {:?}", delta);
-
-    //let restore_chunk = delta.generate_restore_chunk();
-    //let restore_region = __copy_to_restore_region(&restore_chunk);
-    //println!("Restore region: {:?}, written: {}", restore_region, restore_chunk.len());
-
-    //let stack_ptr: usize;
+    snapshot::Snapshot::capture();
+    
     let challenge_box = unsafe { Box::from_raw(ptr_to_challenge as *mut Challenge) };
     let challenge = &*challenge_box;
 
@@ -321,6 +280,8 @@ extern "C" fn solve(ptr_to_challenge: *const core::ffi::c_void) {
 
         (result, fuel_consumed, runtime_signature)
     };
+
+    snapshot::Snapshot::capture();
 
     if fuel_consumed >= __max_fuel.load(std::sync::atomic::Ordering::Relaxed) {
         eprintln!("Out of fuel");

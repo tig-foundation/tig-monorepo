@@ -50,6 +50,7 @@ pub struct RegisterSnapshot {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct MemorySnapshot {
     pub dirty_region_count: u32,
     // Flexible array member holding (region_idx, value)
@@ -113,222 +114,192 @@ impl MemorySnapshot {
 
 impl Snapshot {
     #[naked]
-    pub fn capture() { // MODIFIED: No longer returns a value
+    #[no_mangle]
+    pub fn capture() {
         unsafe {
             std::arch::naked_asm!(
-                // FIRST: Capture pristine state immediately
-                // Stack layout:
-                // [sp, #0]:  original x27, x28
-                // [sp, #16]: original x29, x30
-                // [sp, #32]: pristine NZCV
-                // [sp, #40]: snapshot_ptr
-                "sub sp, sp, #48",            // Reserve stack space for work regs, flags, snapshot ptr
-                "stp x27, x28, [sp, #0]",     // Save work registers first
-                "stp x29, x30, [sp, #16]",
-                "mrs x27, nzcv",              // Use a saved register (x27) to capture pristine NZCV
-                "str x27, [sp, #32]",         // Store pristine NZCV on the stack
-                
-                // Atomic increment of snapshot count and get index
-                "adrp x30, {snapshot_count}",
-                "add x30, x30, :lo12:{snapshot_count}",
+                "sub sp, sp, #128",
+                "stp x29, x30, [sp, #112]",    // Save FP and LR
+                "stp x27, x28, [sp, #96]",     // Save temporary registers
+
+                "mrs x27, nzcv",               // Capture pristine NZCV
+                "str x27, [sp, #88]",          // Store NZCV on stack
+
+                "adrp x30, {next_snapshot_addr}",
+                "add x30, x30, :lo12:{next_snapshot_addr}",
                 "1:",
-                "ldaxr x29, [x30]",           // Load-acquire exclusive
-                "add x28, x29, #1",           // Increment for new count
-                "stlxr w27, x28, [x30]",      // Store-release exclusive
-                "cbnz w27, 1b",               // Retry if failed
-                
-                // Load registry pointer and calculate snapshot address
-                "adrp x30, {registry_ptr}",
-                "add x30, x30, :lo12:{registry_ptr}",
-                "ldr x30, [x30]",             // Dereference to get actual array address
-                "mov x27, #{snapshot_size}",
-                "mul x29, x29, x27",          // index * sizeof(Snapshot)
-                "add x30, x30, x29",          // registry[index] address
+                "ldaxr x29, [x30]",
+                "stlxr w27, xzr, [x30]",
+                "cbnz w27, 1b",
+                "cbz x29, 1b",
 
-                // OPTIMIZATION: Hint to the CPU to prepare this memory for writes
-                "prfm pldl1strm, [x30]",
-                
-                // Store snapshot address on stack for later use
-                "str x30, [sp, #40]",         // Store snapshot pointer on stack
-                
-                // Calculate offset to registers field within Snapshot
-                "add x29, x30, #{registers_offset}",
-                
-                // Save ALL GPRs x0-x26
-                "stp x0, x1, [x29, #{gprs_offset}]",
-                "stp x2, x3, [x29, #{gprs_offset} + 16]", 
-                "stp x4, x5, [x29, #{gprs_offset} + 32]",
-                "stp x6, x7, [x29, #{gprs_offset} + 48]",
-                "stp x8, x9, [x29, #{gprs_offset} + 64]",
-                "stp x10, x11, [x29, #{gprs_offset} + 80]",
-                "stp x12, x13, [x29, #{gprs_offset} + 96]",
-                "stp x14, x15, [x29, #{gprs_offset} + 112]",
-                "stp x16, x17, [x29, #{gprs_offset} + 128]",
-                "stp x18, x19, [x29, #{gprs_offset} + 144]",
-                "stp x20, x21, [x29, #{gprs_offset} + 160]",
-                "stp x22, x23, [x29, #{gprs_offset} + 176]",
-                "stp x24, x25, [x29, #{gprs_offset} + 192]",
-                "str x26, [x29, #{gprs_offset} + 208]",
-                
-                // Restore original x27-x30 from stack and save them to the snapshot
-                "ldp x27, x28, [sp, #0]",
-                "stp x27, x28, [x29, #{gprs_offset} + 216]",
-                "ldp x27, x28, [sp, #16]",
-                "stp x27, x28, [x29, #{gprs_offset} + 232]",
-                
-                // Save SP (original stack pointer + 48 for our reserved space)
-                "mov x28, sp",
-                "add x28, x28, #48",
-                "str x28, [x29, #{sp_offset}]",
-                
-                // Save the pristine NZCV from the stack to the snapshot
-                "ldr x28, [sp, #32]",
-                "str x28, [x29, #{nzcv_offset}]",
-                
-                // Save floating-point control/status, thread pointers, and vector registers
-                "mrs x28, fpcr", 
-                "str x28, [x29, #{fpcr_offset}]",
-                "mrs x28, fpsr", 
-                "str x28, [x29, #{fpsr_offset}]",
-                "mrs x28, tpidr_el0", 
-                "str x28, [x29, #{tpidr_el0_offset}]",
-                "mrs x28, tpidrro_el0", 
-                "str x28, [x29, #{tpidrro_el0_offset}]",
-                "add x28, x29, #{vregs_offset}",
+                "str x29, [sp, #80]",
 
-                "stp q0, q1, [x28, #0]", 
-                "stp q2, q3, [x28, #32]",
-                "stp q4, q5, [x28, #64]", 
-                "stp q6, q7, [x28, #96]",
-                "stp q8, q9, [x28, #128]", 
-                "stp q10, q11, [x28, #160]",
-                "stp q12, q13, [x28, #192]", 
-                "stp q14, q15, [x28, #224]",
-                "stp q16, q17, [x28, #256]", 
-                "stp q18, q19, [x28, #288]",
-                "stp q20, q21, [x28, #320]", 
-                "stp q22, q23, [x28, #352]",
-                "stp q24, q25, [x28, #384]", 
-                "stp q26, q27, [x28, #416]",
-                "stp q28, q29, [x28, #448]",
-                "stp q30, q31, [x28, #480]",
-                
-                // Save memory usage values
+                "add x28, x29, #{registers_offset}",
+                "stp x0, x1, [x28, #{gprs_offset}]", 
+                "stp x2, x3, [x28, #{gprs_offset} + 16]",
+                "stp x4, x5, [x28, #{gprs_offset} + 32]", 
+                "stp x6, x7, [x28, #{gprs_offset} + 48]",
+                "stp x8, x9, [x28, #{gprs_offset} + 64]", 
+                "stp x10, x11, [x28, #{gprs_offset} + 80]",
+                "stp x12, x13, [x28, #{gprs_offset} + 96]", 
+                "stp x14, x15, [x28, #{gprs_offset} + 112]",
+                "stp x16, x17, [x28, #{gprs_offset} + 128]", 
+                "stp x18, x19, [x28, #{gprs_offset} + 144]",
+                "stp x20, x21, [x28, #{gprs_offset} + 160]", 
+                "stp x22, x23, [x28, #{gprs_offset} + 176]",
+                "stp x24, x25, [x28, #{gprs_offset} + 192]", 
+                "str x26, [x28, #{gprs_offset} + 208]",
+
+                "ldp x27, x28, [sp, #96]",
+                "stp x27, x28, [x28, #{gprs_offset} + 216]",
+                "ldp x27, x28, [sp, #112]",
+                "stp x27, x28, [x28, #{gprs_offset} + 232]",
+
+                "add x27, sp, #128", "str x27, [x28, #{sp_offset}]",
+                "ldr x27, [sp, #88]", "str x27, [x28, #{nzcv_offset}]",
+
+                "mrs x27, fpcr", "str x27, [x28, #{fpcr_offset}]",
+                "mrs x27, fpsr", "str x27, [x28, #{fpsr_offset}]",
+                "mrs x27, tpidr_el0", "str x27, [x28, #{tpidr_el0_offset}]",
+                "mrs x27, tpidrro_el0", "str x27, [x28, #{tpidrro_el0_offset}]",
+
+                "add x27, x28, #{vregs_offset}",
+                "stp q0, q1, [x27, #0]", 
+                "stp q2, q3, [x27, #32]", 
+                "stp q4, q5, [x27, #64]",
+                "stp q6, q7, [x27, #96]", 
+                "stp q8, q9, [x27, #128]", 
+                "stp q10, q11, [x27, #160]",
+                "stp q12, q13, [x27, #192]", 
+                "stp q14, q15, [x27, #224]", 
+                "stp q16, q17, [x27, #256]",
+                "stp q18, q19, [x27, #288]", 
+                "stp q20, q21, [x27, #320]", 
+                "stp q22, q23, [x27, #352]",
+                "stp q24, q25, [x27, #384]", 
+                "stp q26, q27, [x27, #416]", 
+                "stp q28, q29, [x27, #448]",
+                "stp q30, q31, [x27, #480]",
+
                 "adrp x28, {total_memory}", 
                 "add x28, x28, :lo12:{total_memory}", 
                 "ldr x27, [x28]", 
-                "str x27, [x30, #{total_memory_offset}]",
+                "str x27, [x29, #{total_memory_offset}]",
 
                 "adrp x28, {max_memory}", 
-                "add x28, x28, :lo12:{max_memory}",
+                "add x28, x28, :lo12:{max_memory}", 
                 "ldr x27, [x28]", 
-                "str x27, [x30, #{max_memory_offset}]",
+                "str x27, [x29, #{max_memory_offset}]",
 
                 "adrp x28, {max_allowed_memory}", 
                 "add x28, x28, :lo12:{max_allowed_memory}", 
                 "ldr x27, [x28]", 
-                "str x27, [x30, #{max_allowed_memory_offset}]",
+                "str x27, [x29, #{max_allowed_memory_offset}]",
 
                 "adrp x28, {curr_memory}", 
                 "add x28, x28, :lo12:{curr_memory}", 
                 "ldr x27, [x28]", 
-                "str x27, [x30, #{curr_memory_offset}]",
-                
-                // Initialize memory snapshot
-                "add x29, x30, #{memory_offset}",
-                "str wzr, [x29]", // dirty_region_count = 0
-                
-                // Restore work registers from stack for memory capture phase
-                "ldp x27, x28, [sp, #0]",
-                "ldp x29, x30, [sp, #16]",
-                
-                // NOW do memory capture work (registers already pristine)
-                "sub sp, sp, #96", // FIX: Allocate 96 bytes for 16-byte alignment
+                "str x27, [x29, #{curr_memory_offset}]",
+
+                "add x28, x29, #{memory_offset}",
+                "str wzr, [x28]",
+
                 "stp x0, x1, [sp, #0]", 
                 "stp x2, x3, [sp, #16]",
-                "stp x5, x6, [sp, #32]", 
-                "stp x7, x8, [sp, #48]",
-                "stp x9, x11, [sp, #64]",     // FIX: Save both x9 and x11
-                
-                // Memory capture loop preparation
+                "stp x4, x5, [sp, #32]", 
+                "stp x6, x7, [sp, #48]",
+                "stp x8, x9, [sp, #64]",
+
                 "adrp x0, {heap_size}", 
                 "add x0, x0, :lo12:{heap_size}", 
                 "ldr x0, [x0]",
                 "adrp x1, {region_size}", 
+                
                 "add x1, x1, :lo12:{region_size}", 
                 "ldr x1, [x1]",
-                "str x1, [sp, #80]", // FIX: Store region_size in the new, non-conflicting location
                 "adrp x7, {heap_base}", 
                 "add x7, x7, :lo12:{heap_base}", 
                 "ldr x7, [x7]",
                 "udiv x5, x0, x1",
                 "mov x2, #0",
-                
-                "2:", // Memory loop start
-                "cmp x2, x5", 
-                "b.ge 3f",
+
+                "2:",
+                "cmp x2, x5", "b.ge 3f",
                 "adrp x0, {dirty_regions}", 
                 "add x0, x0, :lo12:{dirty_regions}", 
                 "ldrb w0, [x0, x2]",
                 "cbz w0, 4f",
-                
-                // Dirty region capture logic
-                "ldr x1, [sp, #80]",          // FIX: Load region_size from its new location
-                "mul x8, x2, x1", 
-                "add x8, x7, x8",
-                "ldr x0, [sp, #136]",         // FIX: Adjust offset: 40 (initial) + 96 (local) = 136
+
+                "ldr x0, [sp, #80]",
                 "add x0, x0, #{memory_offset}",
-                "ldr w3, [x0]", "uxtw x3, w3",
+                "ldr w3, [x0]",
+
+                "mul x8, x2, x1",
+                "add x8, x7, x8",
+                "uxtw x3, w3",
+                "mov x4, #{dirty_region_entry_size}", 
+                "mul x3, x3, x4",
                 "add x6, x0, #{memory_size}",
-                "mov x9, #{dirty_region_entry_size}", 
-                "mul x9, x3, x9", 
-                "add x6, x6, x9",
-                "str x2, [x6]", 
-                "add x6, x6, #8", 
-                "ldr x1, [sp, #80]",          // FIX: Load region_size from its new location
-                "mov x9, #0",
-                
-                "5:", // Word copy loop
-                "cbz x1, 6f",
-                "ldr x11, [x8, x9]", 
-                "str x11, [x6, x9]",
-                "add x9, x9, #8", 
-                "sub x1, x1, #8", "b 5b",
-                "6:",
-                
-                // Increment dirty_region_count
-                "ldr x0, [sp, #136]",         // FIX: Adjust offset
-                "add x0, x0, #{memory_offset}", 
-                "ldr w3, [x0]", 
+                "add x6, x6, x3",
+
+                "str x2, [x6]",
+                "add x6, x6, #8",
+                "mov x9, x1",
+
+                "5:",
+                "cbz x9, 7f",
+                "ldr x4, [x8], #8",
+                "str x4, [x6], #8",
+                "sub x9, x9, #8",
+                "b 5b",
+                "7:",
+
+                "ldr w3, [x0]",
                 "add w3, w3, #1", 
                 "str w3, [x0]",
-                
-                "4:", // Continue main loop
+
+                "4:",
                 "add x2, x2, #1", 
                 "b 2b",
-                "3:", // Loop end
-                
-                // Restore memory work registers and clean up stack
+                "3:",
+
+                "ldr x0, [sp, #80]",
+                "add x1, x0, #{memory_offset}",
+                "ldr w2, [x1]",
+                "uxtw x2, w2",
+                "mov x3, #{dirty_region_entry_size}",
+                "mul x2, x2, x3",
+                "add x2, x2, #{snapshot_size}",
+                "add x2, x0, x2",
+
+                "add x2, x2, #63",  // align to cache line
+                "and x2, x2, #-64",
+
+                "adrp x30, {next_snapshot_addr}",
+                "add x30, x30, :lo12:{next_snapshot_addr}",
+                "stlr x2, [x30]",
+
+                "adrp x30, {snapshot_count}",
+                "add x30, x30, :lo12:{snapshot_count}",
+                "mov x29, #1",
+                "ldadd x29, xzr, [x30]",
+
+                "ldr x27, [sp, #88]",          // Load pristine NZCV into a scratch register
+                "msr nzcv, x27",               // Restore the condition flags
+
                 "ldp x0, x1, [sp, #0]", 
                 "ldp x2, x3, [sp, #16]",
-                "ldp x5, x6, [sp, #32]", 
-                "ldp x7, x8, [sp, #48]",
-                "ldp x9, x11, [sp, #64]",     // FIX: Restore both x9 and x11
-                "add sp, sp, #96",            // FIX: Deallocate the full 96 bytes
-                
-                // FINAL CLEANUP AND RETURN
-                // ** RESTORE PRISTINE NZCV **
-                "ldr x0, [sp, #32]",          // Load pristine NZCV into scratch register x0
-                "msr nzcv, x0",               // Restore the condition flags
-                // REMOVED: "ldr x0, [sp, #40]" -> No return value
-                "add sp, sp, #48",            // Clean up initial stack space
-                "ret",                        // Return to caller with pristine flags
-                
-                
-                // !!!todo!!!: restore x0
-                
-                // Symbols and constants
-                registry_ptr = sym __snapshot_registry,
+                "ldp x4, x5, [sp, #32]", 
+                "ldp x6, x7, [sp, #48]",
+                "ldp x8, x9, [sp, #64]",
+
+                "ldp x27, x28, [sp, #96]",
+                "ldp x29, x30, [sp, #112]",
+                "add sp, sp, #128",
+                "ret",
+
+                next_snapshot_addr = sym __next_snapshot_address,
                 snapshot_count = sym __snapshot_count,
                 total_memory = sym __total_memory_usage,
                 max_memory = sym __max_memory_usage,
@@ -355,7 +326,6 @@ impl Snapshot {
                 tpidr_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidr_el0),
                 tpidrro_el0_offset = const std::mem::offset_of!(RegisterSnapshot, tpidrro_el0),
                 vregs_offset = const std::mem::offset_of!(RegisterSnapshot, vregs),
-                options(noreturn)
             );
         }
     }
@@ -658,91 +628,91 @@ pub struct EntityChange {
 
 impl EntityChange {
     pub fn is_global(&self) -> bool {
-        self.flags & EntityChangeFlags::Global != 0
+        self.flags & EntityChangeFlags::Global as u64 != 0
     }
 
     pub fn is_thread_local(&self) -> bool {
-        self.flags & EntityChangeFlags::ThreadLocal != 0
+        self.flags & EntityChangeFlags::ThreadLocal as u64 != 0
     }
 
     pub fn is_stack(&self) -> bool {
-        self.flags & EntityChangeFlags::Stack != 0
+        self.flags & EntityChangeFlags::Stack as u64 != 0
     }
 
     pub fn is_heap(&self) -> bool {
-        self.flags & EntityChangeFlags::Heap != 0
+        self.flags & EntityChangeFlags::Heap as u64 != 0
     }
 
     pub fn is_register(&self) -> bool {
-        self.flags & EntityChangeFlags::Register != 0
+        self.flags & EntityChangeFlags::Register as u64 != 0
     }
 
     pub fn is_u8(&self) -> bool {
-        self.flags & EntityChangeFlags::U8 != 0
+        self.flags & EntityChangeFlags::U8 as u64 != 0
     }
 
     pub fn is_u16(&self) -> bool {
-        self.flags & EntityChangeFlags::U16 != 0
+        self.flags & EntityChangeFlags::U16 as u64 != 0
     }
 
     pub fn is_u32(&self) -> bool {
-        self.flags & EntityChangeFlags::U32 != 0
+        self.flags & EntityChangeFlags::U32 as u64 != 0
     }
 
     pub fn is_u64(&self) -> bool {
-        self.flags & EntityChangeFlags::U64 != 0
+        self.flags & EntityChangeFlags::U64 as u64 != 0
     }
 
     pub fn is_f32(&self) -> bool {
-        self.flags & EntityChangeFlags::F32 != 0
+        self.flags & EntityChangeFlags::F32 as u64 != 0
     }
 
     pub fn is_f64(&self) -> bool {
-        self.flags & EntityChangeFlags::F64 != 0
+        self.flags & EntityChangeFlags::F64 as u64 != 0
     }
 
     pub fn is_v64(&self) -> bool {
-        self.flags & EntityChangeFlags::V64 != 0
+        self.flags & EntityChangeFlags::V64 as u64 != 0
     }
 
     pub fn is_v128(&self) -> bool {
-        self.flags & EntityChangeFlags::V128 != 0
+        self.flags & EntityChangeFlags::V128 as u64 != 0
     }
 
     pub fn is_v256(&self) -> bool {
-        self.flags & EntityChangeFlags::V256 != 0
+        self.flags & EntityChangeFlags::V256 as u64 != 0
     }
 
     pub fn is_v512(&self) -> bool {
-        self.flags & EntityChangeFlags::V512 != 0
+        self.flags & EntityChangeFlags::V512 as u64 != 0
     }
 
     pub fn is_ptr(&self) -> bool {
-        self.flags & EntityChangeFlags::Ptr != 0
+        self.flags & EntityChangeFlags::Ptr as u64 != 0
     }
 
     pub fn is_bytes(&self) -> bool {
-        self.flags & EntityChangeFlags::Bytes != 0
+        self.flags & EntityChangeFlags::Bytes as u64 != 0
     }
 
     pub fn is_movk(&self) -> bool {
-        self.flags & EntityChangeFlags::MOVK != 0
+        self.flags & EntityChangeFlags::MOVK as u64 != 0
     }
 
     pub fn is_movz(&self) -> bool {
-        self.flags & EntityChangeFlags::MOVZ != 0
+        self.flags & EntityChangeFlags::MOVZ as u64 != 0
     }
 
     pub fn is_lsl16(&self) -> bool {
-        self.flags & EntityChangeFlags::LSL16 != 0
+        self.flags & EntityChangeFlags::LSL16 as u64 != 0
     }
     
     pub fn is_lsl32(&self) -> bool {
-        self.flags & EntityChangeFlags::LSL32 != 0
+        self.flags & EntityChangeFlags::LSL32 as u64 != 0
     }
 
     pub fn is_lsl48(&self) -> bool {
-        self.flags & EntityChangeFlags::LSL48 != 0
+        self.flags & EntityChangeFlags::LSL48 as u64 != 0
     }
 
     pub fn is_lsl(&self) -> u32 {
@@ -758,23 +728,23 @@ impl EntityChange {
     }
 
     pub fn get_stack_offset(&self) -> u32 {
-        (self.flags & STACK_OFFSET_MASK) >> STACK_OFFSET_SHIFT
+        ((self.flags & STACK_OFFSET_MASK) >> METADATA_SHIFT) as u32
     }
 
     pub fn get_global_offset(&self) -> u32 {
-        (self.flags & GLOBAL_OFFSET_MASK) >> GLOBAL_OFFSET_SHIFT
+        ((self.flags & GLOBAL_OFFSET_MASK) >> METADATA_SHIFT) as u32
     }
 
     pub fn get_tls_offset(&self) -> u32 {
-        (self.flags & TLS_OFFSET_MASK) >> TLS_OFFSET_SHIFT
+        ((self.flags & TLS_OFFSET_MASK) >> METADATA_SHIFT) as u32
     }
 
     pub fn get_register(&self) -> u32 {
-        (self.flags & REGISTER_MASK) >> REGISTER_SHIFT
+        ((self.flags & REGISTER_MASK) >> METADATA_SHIFT) as u32
     }
 
     pub fn get_heap_offset(&self) -> u32 {
-        (self.flags & HEAP_OFFSET_MASK) >> HEAP_OFFSET_SHIFT
+        ((self.flags & HEAP_OFFSET_MASK) >> METADATA_SHIFT) as u32
     }
 }
 
@@ -782,16 +752,18 @@ impl DeltaSnapshot {
     pub fn generate_restore_chunk(&self) -> Vec<u8> {
         let mut code = Vec::new();
 
-        for change in self.changes.iter() {
-            change.generate_restore_chunk(&mut code);
+        for change in self.changed_regs.iter() {
+            //code.extend(change.generate_restore_chunk());
         }
+
+        code
     }
 }
 
 #[cfg(target_arch = "aarch64")]
 impl EntityChange {
     pub fn apply_change(&self) {
-        let value_type = (self.flags & DATA_TYPE_MASK) >> DATA_TYPE_SHIFT;
+        let value_type = ((self.flags & DATA_TYPE_MASK) >> DATA_TYPE_SHIFT) as u32;
         
         match self.flags & CHANGE_TYPE_MASK {
             x if x == EntityChangeFlags::Global as u64 => self.apply_global(value_type),
@@ -830,7 +802,7 @@ impl EntityChange {
             _ => {
                 match value_type {
                     //0 => self.apply_register_u64(register),
-                    x if x == EntityChangeFlags::U64 as u64 => DeltaSnapshot::mov_GPR_IMM64(register as u8, self.data.u64),
+                    //x if x == EntityChangeFlags::U64 as u64 => DeltaSnapshot::mov_GPR_IMM64(register as u8, self.data.u64),
                     _ => {}
                 }
             }
@@ -839,9 +811,9 @@ impl EntityChange {
 
     pub fn apply_register_lsl(&self, value_type: u32, register: u32, lsl: u32) { // keep
         if self.is_movk() {
-            self.apply_register_lsl_k(self.data.u16, register, lsl)
+            self.apply_register_lsl_k(unsafe { self.data.u16 }, register, lsl)
         } else if self.is_movz() {
-            self.apply_register_lsl_z(self.data.u16, register, lsl)
+            self.apply_register_lsl_z(unsafe { self.data.u16 }, register, lsl)
         }
     }
 
@@ -1163,6 +1135,9 @@ static __snapshot_registry: std::sync::atomic::AtomicPtr<u8> = std::sync::atomic
 
 #[no_mangle]
 static __snapshot_count: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+#[no_mangle]
+static __next_snapshot_address: std::sync::atomic::AtomicPtr<u8> = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 
 
 // mprotect, fork
