@@ -58,6 +58,8 @@ Options:
 
 The following exit codes indicate specific meanings:
 * 0 - solution found
+* 82 - cuda out of memory
+* 83 - host out of memory
 * 84 - runtime error
 * 85 - no solution found
 * 86 - invalid solution

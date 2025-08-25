@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ "$1" = "disable" ]; then
+    echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+elif [ "$1" = "enable" ]; then
+    echo 2 | sudo tee /proc/sys/kernel/randomize_va_space
+else
+    echo "Usage: $0 <enable|disable>"
+    exit 1
+fi

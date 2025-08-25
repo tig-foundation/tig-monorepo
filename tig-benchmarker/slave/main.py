@@ -57,17 +57,18 @@ def download_library(algorithms_dir, batch):
         return so_path, ptx_path
 
 
-def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
+def run_algorithm(nonce, batch, algorithm_path, ptx_path, results_dir):
     output_file = f"{results_dir}/{batch['id']}/{nonce}.json"
     start = now()
     cmd = [
-        "docker", "exec", batch["challenge"], "tig-runtime",
+        "docker", "exec", batch["challenge"], 
+        "setarch", "-R",
+        algorithm_path,
+        "--fuel", str(batch["runtime_config"]["max_fuel"]),
+        "--output", output_file,
         json.dumps(batch["settings"], separators=(',',':')),
         batch["rand_hash"],
         str(nonce),
-        so_path,
-        "--fuel", str(batch["runtime_config"]["max_fuel"]),
-        "--output", output_file,
     ]
     if ptx_path is not None:
         cmd += [
@@ -75,18 +76,21 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         ]
     logger.debug(f"computing batch: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
     process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
     while True:
         ret = process.poll()
         if ret is not None:
-            # exit codes:
-            # 0 - success
-            # 84 - runtime error
-            # 85 - no solution
-            # 86 - invalid solution
-            # 87 - out of fuel
-            if (ret == 84 or ret == 87) and not os.path.exists(output_file):
+            exit_codes = {
+                0: "success",
+                82: "cuda out of memory",
+                83: "host out of memory",
+                84: "runtime error",
+                85: "no solution",
+                86: "invalid solution",
+                87: "out of fuel",
+            }
+            if (ret != 0 and ret in exit_codes) and not os.path.exists(output_file):
                 with open(output_file, "w") as f:
                     json.dump(dict(
                         nonce=nonce,
@@ -96,8 +100,11 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
                         cpu_arch=CPU_ARCH
                     ), f)
 
-            if ret not in {0, 84, 85, 86, 87}:
-                logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
+            if ret != 0:
+                if ret not in exit_codes:
+                    logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
+                else:
+                    logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {exit_codes[ret]}")
             
             break
 
@@ -331,7 +338,7 @@ def process_nonces(results_dir):
     
     logger.debug(f"batch {batch_id}, nonce {nonce} started")
     try:
-        run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir)
+        run_algorithm(nonce, batch, so_path, ptx_path, results_dir)
     except Exception as e:
         logger.error(f"batch {batch_id}, nonce {nonce}, runtime error: {e}")
     finally:

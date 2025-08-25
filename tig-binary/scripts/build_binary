@@ -1,4 +1,16 @@
 #!/bin/bash
+# note: need to run docker container with --privileged flag
+# another way: --security-opt seccomp=unconfined, because of personality syscall
+# yet another would be a custom seccomp profile
+# sudo sysctl -w vm.overcommit_memory=1 to allow overcommitting memory
+# run with setarch -R <binary> to disable ASLR
+
+#...
+#stmdb r13!,{r5}
+#...temporarily use r5 for something else...
+#ldmia r13!,{r5}
+#...
+#stm is store multiple you can save more than one register at a time, up to all of them in one instruction
 
 set -e
 
@@ -17,7 +29,7 @@ fi
 
 ALGORITHM="$1"
 
-echo "Compiling .so for $CHALLENGE/$ALGORITHM"
+echo "Compiling binary for $CHALLENGE/$ALGORITHM"
 cp tig-binary/src/entry_point_template.rs tig-binary/src/entry_point.rs
 sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-binary/src/entry_point.rs
 sed -i "s/{ALGORITHM}/$ALGORITHM/g" tig-binary/src/entry_point.rs
@@ -30,7 +42,7 @@ RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
 else
     echo "x86_64-unknown-linux-gnu";
 fi)
-RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C opt-level=3 -C lto=no -C debuginfo=2 -C relocation-model=pic" \
+RUSTFLAGS="--emit=llvm-ir -C embed-bitcode=yes -C codegen-units=1 -C opt-level=3 -C lto=no -C debuginfo=2 -C relocation-model=static" \
 cargo +nightly-2025-02-10 build \
     -p tig-binary \
     --target=$RUST_TARGET \
@@ -81,21 +93,24 @@ process_file() {
             echo "Skipping $ll_file (not in whitelist)"
 
             cat "$ll_file" | \
-            llc -relocation-model=pic -o - | \
-            clang -fPIC -c -x assembler - -o "$temp_obj"
+            llc -relocation-model=static -o - | \
+            clang -c -x assembler - -o "$temp_obj"
             
-            return 0
+            return $?
         fi
     fi
 
+
+    local basename=$(basename "$ll_file" | sed -E 's/-[a-f0-9]+\.ll$//' | sed 's/\.ll$//')
+    
     echo "Processing $ll_file"
 
     cat "$ll_file" | \
-    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 opt \
+    IS_FIRST_SRC=$is_first INSTRUMENT_FUEL=1 INSTRUMENT_RTSIG=1 INSTRUMENT_MEMORY=1 LL_FILE_BASENAME="$basename" opt \
             -load-pass-plugin /opt/llvm/lib/LLVMFuelRTSig.so \
             -passes="fuel-rt-sig" -S -o - | \
-    llc -relocation-model=pic -o - | \
-    clang -fPIC -c -x assembler - -o "$temp_obj"
+    llc -relocation-model=static -o - | \
+    clang -c -x assembler - -o "$temp_obj"
     
     return $?
 }
@@ -210,23 +225,37 @@ ARCH=$(if [ "$(uname -i)" = "aarch64" ] || [ "$(uname -i)" = "arm64" ] || [ "$(a
 else
     echo "amd64"
 fi)
-output=tig-algorithms/lib/$CHALLENGE/$ARCH/$ALGORITHM.so
+output=tig-algorithms/lib/$CHALLENGE/$ARCH/$ALGORITHM
 mkdir -p $(dirname $output)
 
-echo "Linking into shared library '$output'"
+echo "Linking binary '$output'"
 cat > export_symbols.map << 'EOF'
 {
   global:
     entry_point;
-    __fuel_remaining;
-    __runtime_signature;
+    __curr_memory_usage;
+    __total_memory_usage;
+    __max_memory_usage;
+    __cudarc_fuel_used;
+    __cudarc_host_memory_used;
+    __cudarc_device_memory_used;
+    __cudarc_runtime_signature;
+    __switch_stack_and_call;
   local: *;
 };
 EOF
-clang "${object_files[@]}" \
-    -shared \
-    -fPIC \
-    -O3 \
+
+# add libmalloc.o to the list of files
+object_files+=("/opt/llvm/lib/libmalloc.o")
+#object_files+=("/opt/llvm/lib/libstack.o")
+
+build_script_libs=()
+while IFS= read -r line; do
+    echo "Found build script artifact: $line"
+    build_script_libs+=("$(realpath $line)")
+done < <(find "target/$RUST_TARGET/release/build" -name "*.a")
+
+clang "${object_files[@]}" "${build_script_libs[@]}" \
     -o $output \
     -L "$RUST_TARGET_LIBDIR" \
     -lm \
@@ -238,11 +267,17 @@ clang "${object_files[@]}" \
     -Wl,--build-id=none \
     -Wl,--eh-frame-hdr \
     -Wl,--version-script=export_symbols.map \
-    -Wl,-Map=output.map
+    -Wl,-Map=output.map \
+    -no-pie
+
+if [ $? -ne 0 ]; then
+    echo "Failed to link binary"
+    exit 1
+fi
 
 strip --strip-debug $output
 
 # Clean up temp files
-rm -f /tmp/*.o.path
+rm -f /tmp/*.o
 
 echo "Done"
