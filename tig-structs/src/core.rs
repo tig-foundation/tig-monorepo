@@ -422,6 +422,7 @@ serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
         num_nonces: u32,
+        hyperparameters: Option<Map<String, Value>>,
         rand_hash: String,
         fee_paid: PreciseNumber,
     }

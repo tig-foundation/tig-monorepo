@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS config (
 CREATE TABLE IF NOT EXISTS job (
     benchmark_id TEXT PRIMARY KEY,
     settings JSONB NOT NULL,
+    hyperparameters JSONB,
     num_nonces INTEGER NOT NULL,
     rand_hash TEXT NOT NULL,
     runtime_config JSONB NOT NULL,

@@ -98,7 +98,8 @@ class JobManager:
                     INSERT INTO job 
                     (
                         benchmark_id, 
-                        settings, 
+                        settings,
+                        hyperparameters,
                         num_nonces, 
                         num_batches, 
                         rand_hash, 
@@ -118,6 +119,7 @@ class JobManager:
                     (
                         benchmark_id,
                         json.dumps(asdict(x.settings)),
+                        json.dumps(x.details.hyperparameters) if x.details.hyperparameters else None,
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,

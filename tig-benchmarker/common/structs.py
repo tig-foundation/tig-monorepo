@@ -52,6 +52,7 @@ class BenchmarkSettings(FromDict):
 class PrecommitDetails(FromDict):
     block_started: int
     num_nonces: int
+    hyperparameters: Optional[Dict[str, Any]]
     rand_hash: str
     fee_paid: PreciseNumber
 

@@ -2,6 +2,7 @@ use crate::context::*;
 use anyhow::{anyhow, Result};
 use logging_timer::time;
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng, SeedableRng};
+use serde_json::{Map, Value};
 use std::collections::HashSet;
 use tig_structs::core::*;
 use tig_utils::*;
@@ -11,6 +12,7 @@ pub async fn submit_precommit<T: Context>(
     ctx: &T,
     player_id: String,
     settings: BenchmarkSettings,
+    hyperparameters: Option<Map<String, Value>>,
     num_nonces: u32,
     seed: u64,
 ) -> Result<String> {
@@ -97,6 +99,7 @@ pub async fn submit_precommit<T: Context>(
             PrecommitDetails {
                 block_started: block_details.height,
                 num_nonces,
+                hyperparameters,
                 rand_hash: hex::encode(StdRng::seed_from_u64(seed).gen::<[u8; 16]>()),
                 fee_paid: submission_fee,
             },

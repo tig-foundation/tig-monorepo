@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use clap::{arg, ArgAction, Command};
 use libloading::Library;
+use serde_json::{Map, Value};
 use std::{fs, panic, path::PathBuf};
 use tig_challenges::*;
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData, Solution};
@@ -46,6 +47,10 @@ fn cli() -> Command {
                 .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(
+            arg!(--hyperparameters [HYPERPARAMETERS] "A json string of hyperparameters")
+                .value_parser(clap::value_parser!(String)),
+        )
+        .arg(
             arg!(--compress [COMPRESS] "If output file is set, the output data will be compressed as zlib")
             .action(ArgAction::SetTrue)
         )
@@ -66,6 +71,7 @@ fn main() {
         matches.get_one::<PathBuf>("ptx").cloned(),
         *matches.get_one::<u64>("fuel").unwrap(),
         matches.get_one::<PathBuf>("output").cloned(),
+        matches.get_one("hyperparameters").cloned(),
         matches.get_one::<bool>("compress").unwrap().clone(),
         matches.get_one::<usize>("gpu").cloned(),
     ) {
@@ -82,12 +88,19 @@ pub fn compute_solution(
     ptx_path: Option<PathBuf>,
     max_fuel: u64,
     output_file: Option<PathBuf>,
+    hyperparameters: Option<String>,
     compress: bool,
     gpu_device: Option<usize>,
 ) -> Result<()> {
     let settings = load_settings(&settings);
     let seed = settings.calc_seed(&rand_hash, nonce);
 
+    let hyperparameters = hyperparameters.map(|x| {
+        dejsonify::<Map<String, Value>>(&x).unwrap_or_else(|_| {
+            eprintln!("Failed to parse hyperparameters as JSON");
+            std::process::exit(1);
+        })
+    });
     let library = load_module(&library_path)?;
     let fuel_remaining_ptr = unsafe { *library.get::<*mut u64>(b"__fuel_remaining")? };
     unsafe { *fuel_remaining_ptr = max_fuel };
@@ -104,15 +117,17 @@ pub fn compute_solution(
             ($c:ident, cpu) => {{
                 // library function may exit 87 if it runs out of fuel
                 let solve_challenge_fn = unsafe {
-                    library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(
-                        b"entry_point",
-                    )?
+                    library.get::<fn(
+                        &$c::Challenge,
+                        &Map<String, Value>,
+                    ) -> Result<Option<$c::Solution>, String>>(b"entry_point")?
                 };
 
                 let challenge =
                     $c::Challenge::generate_instance(&seed, &settings.difficulty.into())?;
 
-                let result = solve_challenge_fn(&challenge).map_err(|e| anyhow!("{}", e))?;
+                let result = solve_challenge_fn(&challenge, &hyperparameters)
+                    .map_err(|e| anyhow!("{}", e))?;
                 let fuel_consumed =
                     max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
                 if fuel_consumed > max_fuel {
@@ -148,6 +163,7 @@ pub fn compute_solution(
                 let solve_challenge_fn = unsafe {
                     library.get::<fn(
                         &$c::Challenge,
+                        &Map<String, Value>,
                         Arc<CudaModule>,
                         Arc<CudaStream>,
                         &cudaDeviceProp,
@@ -195,7 +211,13 @@ pub fn compute_solution(
                         .launch(cfg)?;
                 }
 
-                let result = solve_challenge_fn(&challenge, module.clone(), stream.clone(), &prop);
+                let result = solve_challenge_fn(
+                    &challenge,
+                    &hyperparameters,
+                    module.clone(),
+                    stream.clone(),
+                    &prop,
+                );
                 if result
                     .as_ref()
                     .is_err_and(|e| e.contains("ran out of fuel"))

@@ -17,6 +17,7 @@ rand = { version = "0.8.5", default-features = false, features = [
     "std_rng",
     "small_rng",
 ] }
+serde_json = { version = "1.0.113" }
 tig-challenges = { path = "../tig-challenges" }
 
 [lib]

@@ -56,6 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=str, default="rand_hash", help="String to use as seed instance generation (default: 'rand_hash')")
     parser.add_argument("--start", type=int, default=0, help="Starting nonce (default: 0)")
     parser.add_argument("--nonces", type=int, default=100, help="Number of nonces to process (default: 100)")
+    parser.add_argument("--hyperparameters", type=str, default=None, help="JSON string of hyperparameters (default: None)")
     parser.add_argument("--fuel", type=int, default=int(100e9), help="Max fuel (default: 100 billion)")
     parser.add_argument("--workers", type=int, default=1, help="Number of worker threads (default: 1)")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
@@ -139,6 +140,10 @@ f"""Library not found at {so_path}:
             so_path,
             "--fuel", str(args.fuel),
         ]
+        if args.hyperparameters is not None:
+            cmd += [
+                "--hyperparameters", args.hyperparameters
+            ]
         if ptx_path is not None:
             cmd += [
                 "--ptx", ptx_path,

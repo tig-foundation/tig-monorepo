@@ -2030,6 +2030,7 @@ dependencies = [
  "cudarc",
  "ndarray",
  "rand",
+ "serde_json",
  "tig-challenges",
 ]
 
@@ -2038,6 +2039,7 @@ name = "tig-binary"
 version = "0.1.0"
 dependencies = [
  "cudarc",
+ "serde_json",
  "tig-algorithms",
  "tig-challenges",
 ]

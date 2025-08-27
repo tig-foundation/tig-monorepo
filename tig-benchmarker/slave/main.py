@@ -69,6 +69,10 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         "--fuel", str(batch["runtime_config"]["max_fuel"]),
         "--output", output_file,
     ]
+    if batch["hyperparameters"]:
+        cmd += [
+            "--hyperparameters", json.dumps(batch["hyperparameters"], separators=(',',':'))
+        ]
     if ptx_path is not None:
         cmd += [
             "--ptx", ptx_path,

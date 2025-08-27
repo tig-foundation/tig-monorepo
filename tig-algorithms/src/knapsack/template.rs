@@ -38,11 +38,30 @@ acknowledgments below:
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
+use serde_json::{Map, Value};
 use tig_challenges::knapsack::*;
 
-pub fn solve_challenge(challenge: &Challenge) -> anyhow::Result<Option<Solution>> {
+#[derive(Serialize, Deserialize)]
+pub struct MyHyperparameters {
+    // Optionally define your hyperparameters here. Example:
+    // pub param1: usize,
+    // pub param2: f64,
+}
+
+pub fn solve_challenge(
+    challenge: &Challenge,
+    hyperparameters: &Option<Map<String, Value>>,
+) -> anyhow::Result<Option<Solution>> {
     // Boiler plate for looping through and solving sub-instances
     // You can modify this function if you want
+    let hyperparameters = match hyperparameters {
+        Some(hyperparameters) => {
+            serde_json::from_value::<MyHyperparameters>(Value::Object(hyperparameters.clone()))
+                .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?
+        }
+        None => MyHyperparameters {},
+    };
+
     let mut solution = Solution {
         sub_solutions: Vec::new(),
     };
