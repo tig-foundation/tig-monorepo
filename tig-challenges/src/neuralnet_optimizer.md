@@ -21,11 +21,14 @@ TIG’s neural network optimizer challenge asks innovators to implement an optim
 
 **Data Generation**:
   Synthetic regression via Random Fourier Features: RFF count K = 128, amplitude scaling `√(2/K)`, lengthscale l = 0.3, and Additive Gaussian noise σ = 0.2. Input dims = 8, Output dims = 1. That is, for an input point $x\in [-1,1]^{8}$ a target point $y \in \mathbb{R}$ is constructed as 
-$$ y = f(x) + \xi, \quad f(x) = \mathbf{a} \cdot \boldsymbol{\phi}(x), \quad \mathbf{a} \sim \mathcal{N}(\mathbf{0}_K, \mathbf{I}_K),$$   
-where
-$$ \boldsymbol{\phi}(x) = \sqrt{\frac{2}{K}} \left[ \cos{(\boldsymbol{\omega}_1 \cdot x + b_{1})}, \ldots, \cos{(\boldsymbol{\omega}_K \cdot x + b_{K})} \right], $$
 
-with $ \boldsymbol{\omega} \sim \mathcal{N}(0, l^{-2} \, \mathbf{I}_8)$ and $b \sim$Uniform$(0, 2\pi)$, $\xi$ \sim \mathcal{N}(0, \sigma^2)$, where $l$ is the lengthscale parameter.
+$$y = f(x) + \xi, \quad f(x) = \mathbf{a} \cdot \boldsymbol{\phi}(x), \quad \mathbf{a} \sim \mathcal{N}(\mathbf{0}_K, \mathbf{I}_K),$$
+
+where
+
+$$\boldsymbol{\phi}(x) = \sqrt{\frac{2}{K}} \left[ \cos{(\boldsymbol{\omega}_1 \cdot x + b_1)}, \ldots, \cos{(\boldsymbol{\omega}_K \cdot x + b_K)} \right],$$
+
+with $\boldsymbol{\omega} \sim \mathcal{N}(0, l^{-2} \, \mathbf{I}_8)$ and $b \sim \text{Uniform}(0, 2\pi)$, $\xi \sim \mathcal{N}(0, \sigma^2)$, where $l$ is the lengthscale parameter.
 
 The data has the following split: Train = 1000, Validation = 200, Test = 250.
 
