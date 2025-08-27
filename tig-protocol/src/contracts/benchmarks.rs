@@ -51,14 +51,17 @@ pub async fn submit_precommit<T: Context>(
 
     // verify difficulty
     let difficulty = &settings.difficulty;
-    let difficulty_parameters = &config.challenges.difficulty_parameters[&settings.challenge_id];
-    if difficulty.len() != difficulty_parameters.len()
-        || difficulty
-            .iter()
-            .zip(difficulty_parameters.iter())
-            .any(|(d, p)| *d < p.min_value || *d > p.max_value)
-    {
+    let challenge_config = &config.challenges[&settings.challenge_id];
+    if difficulty.len() != challenge_config.difficulty.parameter_names.len() {
         return Err(anyhow!("Invalid difficulty '{:?}'", difficulty));
+    }
+
+    if num_nonces < challenge_config.benchmarks.min_num_nonces {
+        return Err(anyhow!(
+            "Invalid num_nonces '{}'. Must be >= {}",
+            num_nonces,
+            challenge_config.benchmarks.min_num_nonces
+        ));
     }
 
     let challenge_data = ctx
@@ -143,7 +146,8 @@ pub async fn submit_benchmark<T: Context>(
     // random sample nonces
     let config = ctx.get_config().await;
     let mut rng = StdRng::seed_from_u64(seed);
-    let max_samples = config.benchmarks.max_samples;
+    let benchmark_config = &config.challenges[&settings.challenge_id].benchmarks;
+    let max_samples = benchmark_config.max_samples;
 
     // sample nonces from solutions
     let mut sampled_solution_nonces = HashSet::new();

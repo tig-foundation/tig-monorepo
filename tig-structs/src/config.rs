@@ -7,8 +7,7 @@ use tig_utils::PreciseNumber;
 serializable_struct_with_getters! {
     ProtocolConfig {
         advances: AdvancesConfig,
-        benchmarks: BenchmarksConfig,
-        challenges: ChallengesConfig,
+        challenges: HashMap<String, ChallengeConfig>,
         codes: CodesConfig,
         deposits: DepositsConfig,
         erc20: ERC20Config,
@@ -61,15 +60,13 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     BenchmarksConfig {
-        min_num_solutions: u32,
+        min_num_nonces: u32,
         submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
         min_per_nonce_fee: PreciseNumber,
         min_base_fee: PreciseNumber,
         runtime_config: RuntimeConfig,
-        target_solution_rate: u32,
-        hash_threshold_max_percent_delta: f64,
     }
 }
 serializable_struct_with_getters! {
@@ -79,28 +76,20 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    ChallengesConfig {
-        max_scaling_factor: f64,
-        difficulty_parameters: HashMap<String, Vec<DifficultyParameter>>,
+    ChallengeConfig {
+        benchmarks: BenchmarksConfig,
+        difficulty: DifficultyConfig,
     }
 }
 serializable_struct_with_getters! {
-    DifficultyParameter {
-        name: String,
-        min_value: i32,
-        max_value: i32,
-    }
-}
-pub trait MinMaxDifficulty {
-    fn min_difficulty(&self) -> Point;
-    fn max_difficulty(&self) -> Point;
-}
-impl MinMaxDifficulty for Vec<DifficultyParameter> {
-    fn min_difficulty(&self) -> Point {
-        self.iter().map(|p| p.min_value).collect()
-    }
-    fn max_difficulty(&self) -> Point {
-        self.iter().map(|p| p.max_value).collect()
+    DifficultyConfig {
+        parameter_names: Vec<String>,
+        min_difficulty: Point,
+        max_difficulty: Point,
+        max_scaling_factor: f64,
+        total_qualifiers_threshold: u32,
+        target_solution_rate: u32,
+        hash_threshold_max_percent_delta: f64,
     }
 }
 serializable_struct_with_getters! {
@@ -108,13 +97,11 @@ serializable_struct_with_getters! {
         imbalance_multiplier: f64,
         cutoff_phase_in_period: u32,
         cutoff_multiplier: f64,
-        total_qualifiers_threshold: u32,
         max_deposit_to_qualifier_ratio: f64,
         deposit_multiplier: f64,
         deposit_to_cutoff_ratio: f64,
         max_coinbase_outputs: usize,
         coinbase_update_period: u32,
-        min_num_nonces: u32,
     }
 }
 serializable_struct_with_getters! {

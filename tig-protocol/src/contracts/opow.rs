@@ -97,11 +97,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     // update hash threshold
 
     let denominator: u64 = 1_000_000_000_000_000;
-    let max_delta = U256::MAX / U256::from(denominator)
-        * U256::from(
-            (config.benchmarks.hash_threshold_max_percent_delta * denominator as f64) as u64,
-        );
     for challenge_id in active_challenge_ids.iter() {
+        let difficulty_config = &config.challenges[challenge_id].difficulty;
+        let max_delta = U256::MAX / U256::from(denominator)
+            * U256::from(
+                (difficulty_config.hash_threshold_max_percent_delta * denominator as f64) as u64,
+            );
         let prev_hash_threshold = active_challenges_prev_block_data
             .get(challenge_id)
             .map(|x| U256::from(x.hash_threshold.clone().0))
@@ -111,7 +112,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             U256::MAX
         } else {
             (prev_hash_threshold / U256::from(current_solution_rate))
-                .saturating_mul(U256::from(config.benchmarks.target_solution_rate))
+                .saturating_mul(U256::from(difficulty_config.target_solution_rate))
         };
         let diff = prev_hash_threshold.abs_diff(target_threshold);
         let delta = (diff / U256::from(100)).min(max_delta);
@@ -149,6 +150,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         if !solutions_by_challenge.contains_key(challenge_id) {
             continue;
         }
+        let challenge_config = &config.challenges[challenge_id];
         let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
         let points = solutions
             .iter()
@@ -174,7 +176,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
 
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        let min_num_nonces = config.opow.min_num_nonces as u64;
         let mut player_code_solutions = HashMap::<String, HashMap<String, u32>>::new();
         let mut player_solutions = HashMap::<String, u32>::new();
         let mut player_discarded_solutions = HashMap::<String, u32>::new();
@@ -187,14 +188,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 let BenchmarkSettings {
                     player_id,
                     algorithm_id,
-                    challenge_id,
                     difficulty,
                     ..
                 } = settings;
 
-                let difficulty_parameters = &config.challenges.difficulty_parameters[challenge_id];
-                let min_difficulty = difficulty_parameters.min_difficulty();
-                let max_difficulty = difficulty_parameters.max_difficulty();
+                let min_difficulty = challenge_config.difficulty.min_difficulty.clone();
+                let max_difficulty = challenge_config.difficulty.max_difficulty.clone();
                 if (0..difficulty.len())
                     .into_iter()
                     .any(|i| difficulty[i] < min_difficulty[i] || difficulty[i] > max_difficulty[i])
@@ -234,17 +233,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .map(|player_id| {
                     (
                         player_id.clone(),
-                        if player_nonces[player_id] >= min_num_nonces {
-                            max_qualifiers_by_player[player_id].min(player_solutions[player_id])
-                        } else {
-                            0
-                        },
+                        max_qualifiers_by_player[player_id].min(player_solutions[player_id]),
                     )
                 })
                 .collect();
 
             let num_qualifiers = player_qualifiers.values().sum::<u32>();
-            if num_qualifiers >= config.opow.total_qualifiers_threshold
+            if num_qualifiers >= challenge_config.difficulty.total_qualifiers_threshold
                 || frontier_idx == solutions_by_frontier_idx.len() - 1
             {
                 let mut sum_weighted_solution_ratio = 0.0;
@@ -287,11 +282,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     // update frontiers
     for challenge_id in active_challenge_ids.iter() {
+        let challenge_config = &config.challenges[challenge_id];
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
 
-        let difficulty_parameters = &config.challenges.difficulty_parameters[challenge_id];
-        let min_difficulty = difficulty_parameters.min_difficulty();
-        let max_difficulty = difficulty_parameters.max_difficulty();
+        let min_difficulty = challenge_config.difficulty.min_difficulty.clone();
+        let max_difficulty = challenge_config.difficulty.max_difficulty.clone();
 
         let points = challenge_data
             .qualifier_difficulties
@@ -313,8 +308,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
 
             let mut scaling_factor = (challenge_data.num_qualifiers as f64
-                / config.opow.total_qualifiers_threshold as f64)
-                .min(config.challenges.max_scaling_factor);
+                / challenge_config.difficulty.total_qualifiers_threshold as f64)
+                .min(challenge_config.difficulty.max_scaling_factor);
 
             if scaling_factor < 1.0 {
                 base_frontier = scale_frontier(
@@ -324,7 +319,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     scaling_factor,
                 );
                 base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
-                scaling_factor = (1.0 / scaling_factor).min(config.challenges.max_scaling_factor);
+                scaling_factor =
+                    (1.0 / scaling_factor).min(challenge_config.difficulty.max_scaling_factor);
             }
 
             let mut scaled_frontier = scale_frontier(
