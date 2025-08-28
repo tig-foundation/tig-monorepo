@@ -19,3 +19,5 @@ __pycache__/
 
 # Ignore these. 
 db_data/
+
+.DS_Store
