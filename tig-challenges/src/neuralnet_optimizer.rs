@@ -140,8 +140,8 @@ impl Challenge {
         const RFF_AMPLITUDE_PER_FUNC: f32 = 1.0;
         const RFF_LENGTHSCALE_PER_INPUT_DIM: f32 = 0.3;
         const NOISE_STD: f32 = 0.2;
-        const INPUT_DIMS: usize = 1;
-        const OUTPUT_DIMS: usize = 2;
+        const INPUT_DIMS: usize = 8;
+        const OUTPUT_DIMS: usize = 1;
         const TRAIN_SIZE: usize = 1000;
         const VALIDATION_SIZE: usize = 200;
         const TEST_SIZE: usize = 250;
