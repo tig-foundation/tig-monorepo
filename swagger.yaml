@@ -61,7 +61,7 @@ paths:
 
         * Returns all confirmed precommits, benchmarks, proofs, and frauds for the player where the benchmark was started within `120` blocks of the latest block.
       
-        * Fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
+        * Fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `benchmark.non_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
         
             * To retrieve that data, use /get-benchmark-data endpoint
       parameters:
@@ -90,8 +90,8 @@ paths:
       summary: Get all data for a benchmark
       description: |-
         # Notes
-        
-        * Will include data for fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
+
+        * Will include data for fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `benchmark.non_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
       parameters:
         - name: benchmark_id
           in: query
@@ -625,7 +625,7 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: uint32
+            format: uint64
           example: {"0x1234...": 5, "0x5678...": 3}
         adoption:
           $ref: '#/components/schemas/PreciseNumber'
@@ -689,20 +689,31 @@ components:
           items:
             type: integer
             format: uint64
+          nullable: true
         discarded_solution_nonces:
           type: array
           items:
             type: integer
             format: uint64
+          nullable: true
+        non_solution_nonces:
+          type: array
+          items:
+            type: integer
+            format: uint64
+          nullable: true
     BenchmarkDetails:
       type: object
       properties:
         num_solutions:
           type: integer
-          format: uint32
+          format: uint64
         num_discarded_solutions:
           type: integer
-          format: uint32
+          format: uint64
+        num_non_solutions:
+          type: integer
+          format: uint64
         merkle_root:
           $ref: '#/components/schemas/MerkleHash'
         sampled_nonces:
@@ -1007,7 +1018,7 @@ components:
       properties:
         num_qualifiers:
           type: integer
-          format: uint32
+          format: uint64
         average_solution_ratio:
           type: number
           format: double
@@ -1110,6 +1121,7 @@ components:
           $ref: '#/components/schemas/FraudState'
         allegation:
           type: string
+          nullable: true
     FraudState:
       type: object
       properties:
@@ -1150,7 +1162,7 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: uint32
+            format: uint64
           example: {"c001": 5, "c002": 3}
         solution_ratio_by_challenge:
           type: object
@@ -1160,7 +1172,7 @@ components:
           example: {"c001": 0.001, "c002": 0.5}
         cutoff:
           type: integer
-          format: uint32
+          format: uint64
         self_deposit:
           $ref: '#/components/schemas/PreciseNumber'
         delegated_weighted_deposit:
@@ -1322,6 +1334,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MerkleProof'
+          nullable: true
     ProofDetails:
       type: object
       properties:

@@ -11,7 +11,7 @@ pub async fn submit_precommit<T: Context>(
     ctx: &T,
     player_id: String,
     settings: BenchmarkSettings,
-    num_nonces: u32,
+    num_nonces: u64,
     seed: u64,
 ) -> Result<String> {
     if player_id != settings.player_id {
@@ -114,8 +114,9 @@ pub async fn submit_benchmark<T: Context>(
     player_id: String,
     benchmark_id: String,
     merkle_root: MerkleHash,
-    solution_nonces: HashSet<u64>,
-    discarded_solution_nonces: HashSet<u64>,
+    non_solution_nonces: Option<HashSet<u64>>,
+    solution_nonces: Option<HashSet<u64>>,
+    discarded_solution_nonces: Option<HashSet<u64>>,
     seed: u64,
 ) -> Result<()> {
     // check benchmark is not duplicate
@@ -136,83 +137,89 @@ pub async fn submit_benchmark<T: Context>(
         ));
     }
 
-    // check solution nonces is valid
+    // check at least 2 sets of nonces are provided
     let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
     let num_nonces = precommit_details.num_nonces as u64;
-    if !solution_nonces.iter().all(|n| *n < num_nonces) {
-        return Err(anyhow!("Invalid solution nonces"));
+
+    let mut nonces_sets = vec![
+        &solution_nonces,
+        &discarded_solution_nonces,
+        &non_solution_nonces,
+    ];
+    nonces_sets.sort_by_key(|x| x.is_none());
+    if nonces_sets[1].is_none() || nonces_sets[2].is_some() {
+        return Err(anyhow!("Exactly 2 sets of nonces must be provided"));
+    }
+    let set_a = nonces_sets[0].as_ref().unwrap();
+    let set_b = nonces_sets[1].as_ref().unwrap();
+    if !set_a.is_disjoint(set_b) {
+        return Err(anyhow!("Nonces sets must be disjoint.",));
+    }
+    let set_c_size = num_nonces as usize - set_a.len() - set_b.len();
+    if set_a.len() > set_c_size || set_b.len() > set_c_size {
+        return Err(anyhow!("The 2 smaller sets of nonces must be submitted"));
+    }
+    if !set_a.iter().all(|n| *n < num_nonces) || !set_b.iter().all(|n| *n < num_nonces) {
+        return Err(anyhow!("Invalid nonces"));
     }
 
     // random sample nonces
     let config = ctx.get_config().await;
     let mut rng = StdRng::seed_from_u64(seed);
     let benchmark_config = &config.challenges[&settings.challenge_id].benchmarks;
-    let max_samples = benchmark_config.max_samples;
-
-    // sample nonces from solutions
-    let mut sampled_solution_nonces = HashSet::new();
-    if !solution_nonces.is_empty() {
-        for _ in 0..25 {
-            if sampled_solution_nonces.len() == max_samples {
-                break;
-            }
-            sampled_solution_nonces.insert(*solution_nonces.iter().choose(&mut rng).unwrap());
-        }
-    }
-
-    // sample nonces from discarded solutions
-    let mut sampled_discarded_solution_nonces = HashSet::new();
-    if !discarded_solution_nonces.is_empty() {
-        for _ in 0..25 {
-            if sampled_discarded_solution_nonces.len() == max_samples {
-                break;
-            }
-            sampled_discarded_solution_nonces
-                .insert(*discarded_solution_nonces.iter().choose(&mut rng).unwrap());
-        }
-    }
-
-    // sample nonces from non-solutions
-    let mut sampled_non_solution_nonces = HashSet::new();
-    let num_non_solution_nonces =
-        num_nonces - solution_nonces.len() as u64 - discarded_solution_nonces.len() as u64;
-    if num_non_solution_nonces > 0 {
-        if num_non_solution_nonces * 2 <= num_nonces {
-            let non_solution_nonces: HashSet<u64> = (0..num_nonces)
-                .filter(|n| !solution_nonces.contains(n) && !discarded_solution_nonces.contains(n))
-                .collect();
-            for _ in 0..25 {
-                if sampled_non_solution_nonces.len() == max_samples {
-                    break;
+    let mut sampled_nonces = HashSet::new();
+    for set_x in [
+        &solution_nonces,
+        &discarded_solution_nonces,
+        &non_solution_nonces,
+    ] {
+        let break_size = sampled_nonces.len() + benchmark_config.max_samples;
+        if let Some(set_x) = set_x {
+            if !set_x.is_empty() {
+                for _ in 0..25 {
+                    if sampled_nonces.len() == break_size {
+                        break;
+                    }
+                    sampled_nonces.insert(*set_x.iter().choose(&mut rng).unwrap());
                 }
-                sampled_non_solution_nonces
-                    .insert(*non_solution_nonces.iter().choose(&mut rng).unwrap());
             }
         } else {
-            // if there are more non-solutions than solutions, sample from all non-solutions
+            // this set is at least 1/3 of the total nonces
             for _ in 0..25 {
-                if sampled_non_solution_nonces.len() == max_samples {
+                if sampled_nonces.len() == break_size {
                     break;
                 }
-                sampled_non_solution_nonces.insert(rng.gen_range(0..num_nonces));
+                let nonce = rng.gen_range(0..num_nonces);
+                if !set_a.contains(&nonce) && !set_b.contains(&nonce) {
+                    sampled_nonces.insert(nonce);
+                }
             }
         }
     }
-
-    let sampled_nonces: HashSet<u64> = sampled_solution_nonces
-        .into_iter()
-        .chain(sampled_non_solution_nonces.into_iter())
-        .chain(sampled_discarded_solution_nonces.into_iter())
-        .collect();
+    let num_other_nonces = (set_a.len() + set_b.len()) as u64;
+    let num_solutions = if let Some(solution_nonces) = &solution_nonces {
+        solution_nonces.len() as u64
+    } else {
+        num_nonces - num_other_nonces
+    };
+    let num_discarded_solutions =
+        if let Some(discarded_solution_nonces) = &discarded_solution_nonces {
+            discarded_solution_nonces.len() as u64
+        } else {
+            num_nonces - num_other_nonces
+        };
+    let num_non_solutions = num_nonces - num_solutions - num_discarded_solutions;
 
     ctx.add_benchmark_to_mempool(
         benchmark_id,
         BenchmarkDetails {
-            num_solutions: solution_nonces.len() as u32,
-            num_discarded_solutions: discarded_solution_nonces.len() as u32,
+            num_solutions,
+            num_discarded_solutions,
+            num_non_solutions,
             merkle_root,
             sampled_nonces,
         },
+        non_solution_nonces,
         solution_nonces,
         discarded_solution_nonces,
     )
@@ -237,8 +244,21 @@ pub async fn submit_proof<T: Context>(
         .get_benchmark_details(&benchmark_id)
         .await
         .ok_or_else(|| anyhow!("Benchmark needs to be submitted first."))?;
-    let (solution_nonces, discarded_solution_nonces) =
+    let (solution_nonces, discarded_solution_nonces, non_solution_nonces) =
         ctx.get_benchmark_data(&benchmark_id).await.unwrap();
+    // expect that exactly 2 sets of nonces are provided
+    let mut nonces_sets = vec![
+        &solution_nonces,
+        &discarded_solution_nonces,
+        &non_solution_nonces,
+    ];
+    nonces_sets.sort_by_key(|x| x.is_none());
+    let set_x = nonces_sets[0]
+        .as_ref()
+        .unwrap()
+        .union(nonces_sets[1].as_ref().unwrap())
+        .cloned()
+        .collect::<HashSet<u64>>();
 
     // check player owns benchmark
     let settings = ctx.get_precommit_settings(&benchmark_id).await.unwrap();
@@ -272,8 +292,9 @@ pub async fn submit_proof<T: Context>(
         .ok_or_else(|| anyhow!("Block too old"))?;
 
     // use reliability to adjust hash threshold
-    let solution_ratio =
-        (solution_nonces.len() + discarded_solution_nonces.len()) as f64 / num_nonces as f64;
+    let solution_ratio = (benchmark_details.num_solutions
+        + benchmark_details.num_discarded_solutions) as f64
+        / num_nonces as f64;
     let reliability = if average_solution_ratio == 0.0 {
         1.0
     } else if solution_ratio == 0.0 {
@@ -297,27 +318,40 @@ pub async fn submit_proof<T: Context>(
                 .any(|(d, _)| *d as usize > max_branch_len)
         {
             verification_result = Err(anyhow!(
-                "Invalid merkle proof for nonce {}",
+                "Invalid merkle proof for nonce {}. Branch too long",
                 merkle_proof.leaf.nonce
             ));
             break;
         }
         let output_meta_data = OutputMetaData::from(merkle_proof.leaf.clone());
         let hash = MerkleHash::from(output_meta_data);
-        if solution_nonces.contains(&merkle_proof.leaf.nonce) && hash.0 > hash_threshold.0 {
-            verification_result = Err(anyhow!(
-                "Invalid merkle hash for solution @ nonce {} does not meet threshold",
-                merkle_proof.leaf.nonce
-            ));
-            break;
-        } else if discarded_solution_nonces.contains(&merkle_proof.leaf.nonce)
-            && hash.0 <= hash_threshold.0
-        {
-            verification_result = Err(anyhow!(
-                "Invalid merkle hash for discarded solution @ nonce {} meets threshold",
-                merkle_proof.leaf.nonce
-            ));
-            break;
+        if hash.0 > hash_threshold.0 {
+            // if nonce is a solution, it must be below hash_threshold
+            if solution_nonces
+                .as_ref()
+                .is_some_and(|x| x.contains(&merkle_proof.leaf.nonce))
+                || (solution_nonces.is_none() && !set_x.contains(&merkle_proof.leaf.nonce))
+            {
+                verification_result = Err(anyhow!(
+                    "Invalid merkle hash for solution @ nonce {} does not meet threshold",
+                    merkle_proof.leaf.nonce
+                ));
+                break;
+            }
+        } else {
+            // if nonce is a discarded solution, it must be above hash_threshold
+            if discarded_solution_nonces
+                .as_ref()
+                .is_some_and(|x| x.contains(&merkle_proof.leaf.nonce))
+                || (discarded_solution_nonces.is_none()
+                    && !set_x.contains(&merkle_proof.leaf.nonce))
+            {
+                verification_result = Err(anyhow!(
+                    "Invalid merkle hash for discarded solution @ nonce {} meets threshold",
+                    merkle_proof.leaf.nonce
+                ));
+                break;
+            }
         }
         let result = merkle_proof
             .branch
@@ -326,7 +360,7 @@ pub async fn submit_proof<T: Context>(
             .is_ok_and(|actual_merkle_root| actual_merkle_root == benchmark_details.merkle_root)
         {
             verification_result = Err(anyhow!(
-                "Invalid merkle proof for nonce {}",
+                "Invalid merkle proof for nonce {}. Merkle root does not match",
                 merkle_proof.leaf.nonce
             ));
             break;

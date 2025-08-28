@@ -60,7 +60,8 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     BenchmarksConfig {
-        min_num_nonces: u32,
+        min_num_nonces: u64,
+        min_num_solutions: u64,
         submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
@@ -87,8 +88,8 @@ serializable_struct_with_getters! {
         min_difficulty: Point,
         max_difficulty: Point,
         max_scaling_factor: f64,
-        total_qualifiers_threshold: u32,
-        target_solution_rate: u32,
+        total_qualifiers_threshold: u64,
+        target_solution_rate: u64,
         hash_threshold_max_percent_delta: f64,
     }
 }

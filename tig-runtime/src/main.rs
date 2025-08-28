@@ -180,6 +180,8 @@ pub fn compute_solution(
                     &prop,
                 )?;
 
+                // ctx.enable_memory_tracking(1024 * 1024);
+
                 let initialize_kernel = module.load_function("initialize_kernel")?;
 
                 let cfg = LaunchConfig {
@@ -295,6 +297,12 @@ pub fn compute_solution(
                 panic!("tig-runtime was not compiled with '--features c005'");
                 #[cfg(feature = "c005")]
                 dispatch_challenge!(c005, gpu)
+            }
+            "c006" => {
+                #[cfg(not(feature = "c006"))]
+                panic!("tig-runtime was not compiled with '--features c006'");
+                #[cfg(feature = "c006")]
+                dispatch_challenge!(c006, gpu)
             }
             _ => panic!("Unsupported challenge"),
         }

@@ -14,13 +14,18 @@ pub trait Context {
     async fn get_benchmark_data(
         &self,
         benchmark_id: &String,
-    ) -> Option<(HashSet<u64>, HashSet<u64>)>;
+    ) -> Option<(
+        Option<HashSet<u64>>,
+        Option<HashSet<u64>>,
+        Option<HashSet<u64>>,
+    )>;
     async fn add_benchmark_to_mempool(
         &self,
         benchmark_id: String,
         details: BenchmarkDetails,
-        solution_nonces: HashSet<u64>,
-        discarded_solution_nonces: HashSet<u64>,
+        non_solution_nonces: Option<HashSet<u64>>,
+        solution_nonces: Option<HashSet<u64>>,
+        discarded_solution_nonces: Option<HashSet<u64>>,
     ) -> Result<()>;
     async fn get_binary_details(&self, code_id: &String) -> Option<BinaryDetails>;
     async fn add_binary_to_mempool(&self, code_id: String, details: BinaryDetails) -> Result<()>;
@@ -94,6 +99,6 @@ pub struct AddBlockCache {
     pub active_advances_state: HashMap<String, AdvanceState>,
     pub active_advances_details: HashMap<String, AdvanceDetails>,
     pub active_advances_block_data: HashMap<String, AdvanceBlockData>,
-    pub active_solutions: Vec<(BenchmarkSettings, u32, u32, u32)>,
-    pub confirmed_num_solutions: HashMap<String, u32>,
+    pub active_solutions: Vec<(BenchmarkSettings, u64, u64, u64)>,
+    pub confirmed_num_solutions: HashMap<String, u64>,
 }
