@@ -80,13 +80,16 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
     while True:
         ret = process.poll()
         if ret is not None:
-            # exit codes:
-            # 0 - success
-            # 84 - runtime error
-            # 85 - no solution
-            # 86 - invalid solution
-            # 87 - out of fuel
-            if (ret == 84 or ret == 87) and not os.path.exists(output_file):
+            exit_codes = {
+                0: "success",
+                82: "cuda out of memory",
+                83: "host out of memory",
+                84: "runtime error",
+                85: "no solution",
+                86: "invalid solution",
+                87: "out of fuel",
+            }
+            if (ret != 0 and ret in exit_codes) and not os.path.exists(output_file):
                 with open(output_file, "w") as f:
                     json.dump(dict(
                         nonce=nonce,
@@ -96,8 +99,11 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
                         cpu_arch=CPU_ARCH
                     ), f)
 
-            if ret not in {0, 84, 85, 86, 87}:
-                logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
+            if ret != 0:
+                if ret not in exit_codes:
+                    logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
+                else:
+                    logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {exit_codes[ret]}")
             
             break
 
