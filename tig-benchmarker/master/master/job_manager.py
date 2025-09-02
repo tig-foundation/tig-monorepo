@@ -121,7 +121,7 @@ class JobManager:
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,
-                        json.dumps(block.config["benchmarks"]["runtime_config"]),
+                        json.dumps(block.config["challenges"][x.settings.challenge_id]["benchmarks"]["runtime_config"]),
                         batch_size,
                         c_name,
                         a_name,
