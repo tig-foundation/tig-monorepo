@@ -10,7 +10,8 @@
 
 // c003_a006
 
-// c003_a007
+pub mod firstryever;
+pub use firstryever as c003_a007;
 
 // c003_a008
 
