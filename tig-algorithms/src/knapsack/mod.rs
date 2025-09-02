@@ -6,7 +6,8 @@
 
 // c003_a004
 
-// c003_a005
+pub mod wrongidentifier;
+pub use wrongidentifier as c003_a005;
 
 // c003_a006
 
