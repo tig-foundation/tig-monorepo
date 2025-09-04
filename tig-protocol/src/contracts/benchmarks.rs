@@ -166,17 +166,14 @@ pub async fn submit_benchmark<T: Context>(
     // random sample nonces
     let config = ctx.get_config().await;
     let mut rng = StdRng::seed_from_u64(seed);
-    let benchmark_config = &config.challenges[&settings.challenge_id]
-        .benchmarks
-        .max_samples;
-    let max_samples = benchmark_config.max_samples;
+    let benchmark_config = &config.challenges[&settings.challenge_id].benchmarks;
     let mut sampled_nonces = HashSet::new();
     for set_x in [
         &solution_nonces,
         &discarded_solution_nonces,
         &non_solution_nonces,
     ] {
-        let break_size = sampled_nonces.len() + max_samples;
+        let break_size = sampled_nonces.len() + benchmark_config.max_samples;
         if let Some(set_x) = set_x {
             if !set_x.is_empty() {
                 for _ in 0..25 {
