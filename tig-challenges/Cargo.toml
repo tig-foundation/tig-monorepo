@@ -20,6 +20,17 @@ rand = { version = "0.8.5", default-features = false, features = [
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 statrs = { version = "0.18.0" }
+blake3 = { version = "1.5.4", optional = true }
+ark-bls12-381 = "0.5.0"
+ark-ff = "0.5.0"
+spartan = "0.9.0"
+ark-poly = { version = "0.5.0" }
+ark-std = { version = "0.5.0" }
+bincode = "1.3.3"
+serde_bytes = "0.11.17"
+blake2 = "0.10"
+merlin = "3.0"
+curve25519-dalek = { version = "4.1", features = ["serde"] }
 
 [features]
 cuda = ["cudarc"]
@@ -33,3 +44,5 @@ c004 = ["cuda"]
 vector_search = ["c004"]
 c005 = ["cuda"]
 hypergraph = ["c005"]
+c007 = ["zk", "blake3"]
+zk = ["c007"]

@@ -14,3 +14,7 @@ pub fn u64s_from_str(input: &str) -> [u64; 4] {
     }
     output
 }
+
+pub fn u8s_from_bytes(input: &[u8]) -> [u8; 32] {
+    blake3::hash(input).into()
+}
