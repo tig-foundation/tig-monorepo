@@ -664,7 +664,7 @@ pub fn solve_challenge_inner(challenge: &Challenge, build_circuit: BuildCircuitF
 // =============================================================================
 
 // Main entry point for the solver, using the optimized compiler.
-pub fn solve_challenge(challenge: &Challenge) -> Result<Solution> {
+pub fn solve_challenge(challenge: &Challenge, build_circuit: BuildCircuitFn) -> Result<Solution> {
     // The participant provides their optimization algorithm here.
-    solve_challenge_inner(challenge, compiler::compile_optimized)
+    solve_challenge_inner(challenge, build_circuit)
 }
