@@ -20,7 +20,7 @@ pub use vector_search as c004;
 pub mod hypergraph;
 #[cfg(feature = "c005")]
 pub use hypergraph as c005;
-#[cfg(feature = "c006")]
+#[cfg(feature = "c007")]
 pub mod zk;
-#[cfg(feature = "c006")]
-pub use zk as c006;
+#[cfg(feature = "c007")]
+pub use zk as c007;
