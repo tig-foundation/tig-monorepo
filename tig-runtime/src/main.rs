@@ -250,11 +250,18 @@ pub fn compute_solution(
                     Some(s) => {
                         match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
                             Ok(_) => (
-                                serde_json::to_value(&s)
-                                    .unwrap()
-                                    .as_object()
-                                    .unwrap()
-                                    .to_owned(),
+                                match serde_json::to_value(&s).unwrap() {
+                                    serde_json::Value::String(s) => {
+                                        let mut map = serde_json::Map::new();
+                                        map.insert(
+                                            "base64".to_string(),
+                                            serde_json::Value::String(s),
+                                        );
+                                        map
+                                    }
+                                    serde_json::Value::Object(map) => map,
+                                    _ => panic!("Expected String or Object from to_value"),
+                                },
                                 None,
                             ),
                             Err(e) => (Solution::new(), Some(e.to_string())),

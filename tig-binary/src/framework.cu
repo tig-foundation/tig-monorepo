@@ -29,6 +29,8 @@ extern "C" __global__ void finalize_kernel(
     u_int64_t *errorstat_ptr    // RETURNED: (64-bit) Error status
 )
 {
+    gbl_FUELUSAGE += fuelusage_ptr[0];
+    gbl_SIGNATURE ^= signature_ptr[0];
     fuelusage_ptr[0] = gbl_FUELUSAGE; // RETURNED: (64-bit) Fuel usage
     signature_ptr[0] = gbl_SIGNATURE; // RETURNED: (64-bit) Run-time signature
     errorstat_ptr[0] = gbl_ERRORSTAT; // RETURNED: (64-bit) Error status -- set to non-zero if fuel runs out

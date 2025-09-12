@@ -1,14 +1,24 @@
 use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use cudarc::{
     cublas::CudaBlas,
     cudnn::Cudnn,
     driver::{CudaModule, CudaSlice, CudaStream, CudaView, LaunchConfig, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use rand::{prelude::*, rngs::StdRng};
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 use serde_json::{from_value, Map, Value};
-use std::{any::Any, sync::Arc};
+use std::{
+    any::Any,
+    fmt,
+    io::{Read, Write},
+    sync::Arc,
+};
 
 use crate::neuralnet::MLP;
 
@@ -34,22 +44,126 @@ impl Into<Vec<i32>> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Solution {
-    pub weights: Vec<Vec<Vec<u32>>>,
-    pub biases: Vec<Vec<u32>>,
+    pub weights: Vec<Vec<Vec<f32>>>,
+    pub biases: Vec<Vec<f32>>,
     pub epochs_used: usize,
-    pub bn_weights: Vec<Vec<u32>>,
-    pub bn_biases: Vec<Vec<u32>>,
-    pub bn_running_means: Vec<Vec<u32>>,
-    pub bn_running_vars: Vec<Vec<u32>>,
+    pub bn_weights: Vec<Vec<f32>>,
+    pub bn_biases: Vec<Vec<f32>>,
+    pub bn_running_means: Vec<Vec<f32>>,
+    pub bn_running_vars: Vec<Vec<f32>>,
+}
+
+// Helper struct for (de)serialization
+#[derive(Serialize, Deserialize)]
+struct SolutionData {
+    weights: Vec<Vec<Vec<f32>>>,
+    biases: Vec<Vec<f32>>,
+    epochs_used: usize,
+    bn_weights: Vec<Vec<f32>>,
+    bn_biases: Vec<Vec<f32>>,
+    bn_running_means: Vec<Vec<f32>>,
+    bn_running_vars: Vec<Vec<f32>>,
+}
+
+impl Serialize for Solution {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Serialize with bincode
+        let bincode_data = bincode::serialize(&SolutionData {
+            weights: self.weights.clone(),
+            biases: self.biases.clone(),
+            epochs_used: self.epochs_used,
+            bn_weights: self.bn_weights.clone(),
+            bn_biases: self.bn_biases.clone(),
+            bn_running_means: self.bn_running_means.clone(),
+            bn_running_vars: self.bn_running_vars.clone(),
+        })
+        .map_err(|e| serde::ser::Error::custom(format!("Bincode serialization failed: {}", e)))?;
+
+        // Compress with gzip
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(&bincode_data)
+            .map_err(|e| serde::ser::Error::custom(format!("Compression failed: {}", e)))?;
+        let compressed_data = encoder
+            .finish()
+            .map_err(|e| serde::ser::Error::custom(format!("Compression finish failed: {}", e)))?;
+
+        // Encode as base64
+        let base64_string = BASE64.encode(&compressed_data);
+
+        // Serialize the base64 string
+        serializer.serialize_str(&base64_string)
+    }
+}
+
+impl<'de> Deserialize<'de> for Solution {
+    fn deserialize<D>(deserializer: D) -> Result<Solution, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SolutionVisitor;
+
+        impl<'de> Visitor<'de> for SolutionVisitor {
+            type Value = Solution;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a base64 encoded, compressed, bincode serialized Solution")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Solution, E>
+            where
+                E: de::Error,
+            {
+                // Decode from base64
+                let compressed_data = BASE64
+                    .decode(value)
+                    .map_err(|e| E::custom(format!("Base64 decode failed: {}", e)))?;
+
+                // Decompress
+                let mut decoder = GzDecoder::new(&compressed_data[..]);
+                let mut bincode_data = Vec::new();
+                decoder
+                    .read_to_end(&mut bincode_data)
+                    .map_err(|e| E::custom(format!("Decompression failed: {}", e)))?;
+
+                // Deserialize with bincode
+                let solution: SolutionData = bincode::deserialize(&bincode_data)
+                    .map_err(|e| E::custom(format!("Bincode deserialization failed: {}", e)))?;
+
+                Ok(Solution {
+                    weights: solution.weights,
+                    biases: solution.biases,
+                    epochs_used: solution.epochs_used,
+                    bn_weights: solution.bn_weights,
+                    bn_biases: solution.bn_biases,
+                    bn_running_means: solution.bn_running_means,
+                    bn_running_vars: solution.bn_running_vars,
+                })
+            }
+        }
+
+        deserializer.deserialize_str(SolutionVisitor)
+    }
 }
 
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
 
     fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
+        let base64_value = v
+            .get("base64")
+            .ok_or_else(|| de::Error::custom("Missing 'base64' field"))?;
+
+        let base64_string = base64_value
+            .as_str()
+            .ok_or_else(|| de::Error::custom("'base64' field must be a string"))?;
+
+        from_value(Value::String(base64_string.to_string()))
     }
 }
 
@@ -595,36 +709,21 @@ pub fn training_loop(
     Ok((solution, train_losses, validation_losses))
 }
 
-fn vec_u32_to_f32(vec: &Vec<u32>) -> Vec<f32> {
-    vec.iter().map(|u| f32::from_bits(*u)).collect()
-}
-
 pub fn load_solution(mlp: &mut MLP, solution: &Solution, stream: Arc<CudaStream>) -> Result<()> {
     for (i, layer) in mlp.lin.iter_mut().enumerate() {
-        let w_flat: Vec<f32> =
-            vec_u32_to_f32(&solution.weights[i].iter().flatten().cloned().collect());
+        let w_flat: Vec<f32> = solution.weights[i].iter().flatten().cloned().collect();
         stream.memcpy_htod(&w_flat, &mut layer.weight)?;
 
-        stream.memcpy_htod(&vec_u32_to_f32(&solution.biases[i]), &mut layer.bias)?;
+        stream.memcpy_htod(&solution.biases[i], &mut layer.bias)?;
     }
     for (i, bn) in mlp.bns.iter_mut().enumerate() {
-        stream.memcpy_htod(&vec_u32_to_f32(&solution.bn_weights[i]), &mut bn.weight)?;
-        stream.memcpy_htod(&vec_u32_to_f32(&solution.bn_biases[i]), &mut bn.bias)?;
-        stream.memcpy_htod(
-            &vec_u32_to_f32(&solution.bn_running_means[i]),
-            &mut bn.running_mean,
-        )?;
-        stream.memcpy_htod(
-            &vec_u32_to_f32(&solution.bn_running_vars[i]),
-            &mut bn.running_var,
-        )?;
+        stream.memcpy_htod(&solution.bn_weights[i], &mut bn.weight)?;
+        stream.memcpy_htod(&solution.bn_biases[i], &mut bn.bias)?;
+        stream.memcpy_htod(&solution.bn_running_means[i], &mut bn.running_mean)?;
+        stream.memcpy_htod(&solution.bn_running_vars[i], &mut bn.running_var)?;
     }
     stream.synchronize()?;
     Ok(())
-}
-
-fn vec_f32_to_u32(vec: Vec<f32>) -> Vec<u32> {
-    vec.into_iter().map(|f| f.to_bits()).collect()
 }
 
 pub fn to_solution(mlp: &MLP, epochs_used: usize, stream: Arc<CudaStream>) -> Result<Solution> {
@@ -632,8 +731,8 @@ pub fn to_solution(mlp: &MLP, epochs_used: usize, stream: Arc<CudaStream>) -> Re
     let mut weights = Vec::new();
     let mut biases = Vec::new();
     for layer in &mlp.lin {
-        let w = vec_f32_to_u32(stream.memcpy_dtov(&layer.weight)?);
-        let b = vec_f32_to_u32(stream.memcpy_dtov(&layer.bias)?);
+        let w = stream.memcpy_dtov(&layer.weight)?;
+        let b = stream.memcpy_dtov(&layer.bias)?;
 
         weights.push(w.chunks(layer.in_features).map(|c| c.to_vec()).collect());
         biases.push(b);
@@ -645,10 +744,10 @@ pub fn to_solution(mlp: &MLP, epochs_used: usize, stream: Arc<CudaStream>) -> Re
     let mut bn_running_vars = Vec::new();
 
     for bn in &mlp.bns {
-        bn_weights.push(vec_f32_to_u32(stream.memcpy_dtov(&bn.weight)?));
-        bn_biases.push(vec_f32_to_u32(stream.memcpy_dtov(&bn.bias)?));
-        bn_running_means.push(vec_f32_to_u32(stream.memcpy_dtov(&bn.running_mean)?));
-        bn_running_vars.push(vec_f32_to_u32(stream.memcpy_dtov(&bn.running_var)?));
+        bn_weights.push(stream.memcpy_dtov(&bn.weight)?);
+        bn_biases.push(stream.memcpy_dtov(&bn.bias)?);
+        bn_running_means.push(stream.memcpy_dtov(&bn.running_mean)?);
+        bn_running_vars.push(stream.memcpy_dtov(&bn.running_var)?);
     }
 
     Ok(Solution {
