@@ -27,17 +27,11 @@ paths:
     get:
       tags:
         - GET
-      summary: Get latest algorithm data
+      summary: Get latest algorithm data (code, binarys and advances)
       description: |-
         # Notes
         
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
-        
-        * If `algorithm.round_pushed != null`, the data can be accessed via:
-          * `code`: `https://github.com/tig-foundation/tig-monorepo/blob/<branch>/tig-algorithms/src/<branch>/benchmarker_outbound.rs`
-          * `wasm_blob`: `https://github.com/tig-foundation/tig-monorepo/blob/<branch>/tig-algorithms/wasm/<branch>.wasm`
-        
-          where `<branch>` is `<challenge_name>/<algorithm_name>`
           
         * `names` is a map of `<player_id>` to ENS name (only if one exists)
       parameters:
@@ -67,7 +61,7 @@ paths:
 
         * Returns all confirmed precommits, benchmarks, proofs, and frauds for the player where the benchmark was started within `120` blocks of the latest block.
       
-        * Fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
+        * Fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `benchmark.non_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation` will always be `null`
         
             * To retrieve that data, use /get-benchmark-data endpoint
       parameters:
@@ -96,8 +90,8 @@ paths:
       summary: Get all data for a benchmark
       description: |-
         # Notes
-        
-        * Will include data for fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
+
+        * Will include data for fields `benchmark.solution_nonces`, `benchmark.discarded_solution_nonces`, `benchmark.non_solution_nonces`, `proof.merkle_proofs`, and `fraud.allegation`.
       parameters:
         - name: benchmark_id
           in: query
@@ -292,12 +286,12 @@ paths:
     get:
       tags:
         - GET
-      summary: Get round emissions for a specific round (algorithms, breakthroughs, opow, players, and totals)
+      summary: Get round emissions for a specific round (codes, advances, opow, players, and totals)
       description: |-
         # Notes
-        * `algorithms` is a map of `<algorithm_id>` to `uint256`
-        
-        * `breakthroughs` is a map of `<breakthrough_id>` to `uint256`
+        * `advances` is a map of `<algorithm_id>` to `uint256`
+
+        * `codes` is a map of `<algorithm_id>` to `uint256`
         
         * `opow` is a map of `<player_id>` to a dict:
         
@@ -307,7 +301,7 @@ paths:
           
           * `coinbase` is the total reward distributed by the Benchmarker with pool members this round
           
-        * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, breakthroughs, delegator)
+        * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, advance, delegator)
         
         * `names` is a map of `<player_id>` to ENS name (only if one exists)
 
@@ -450,7 +444,7 @@ paths:
     post:
       tags:
         - POST
-      summary: Cast vote on breakthrough
+      summary: Cast vote on advance
       description: |-
         # Notes
         * Votes are immutable. Once set, cannot change
@@ -461,9 +455,9 @@ paths:
 
         * Signature must be from signing the following message:
           
-          * If voting yes: `I hereby confirm my vote that '<breakthrough_name>' IS A BREAKTHROUGH`
+          * If voting yes: `I hereby confirm my vote that '<advance_name>' IS AN ADVANCE`
           
-          * If voting no: `I hereby confirm my vote that '<breakthrough_name>' IS INELIGIBLE AS A BREAKTHROUGH`
+          * If voting no: `I hereby confirm my vote that '<advance_name>' IS INELIGIBLE AS AN ADVANCE`
       requestBody:
         content:
           application/json:
@@ -482,17 +476,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SetVoteResponse'
-  /submit-algorithm:
+  /submit-code:
     post:
       tags:
         - POST
-      summary: Submit an algorithm
+      summary: Submit code
       description: |-
         # Notes
         
         * This endpoint can only be invoked once every few seconds
         
-        * If an algorithm submission has failed to compile (`binary.state.compiled_success = false`), you can re-use the same algorithm name.
+        * If a code submission has failed to compile (`binary.state.compiled_success = false`), you can re-use the same algorithm name.
         
         * Header `X-Api-Key` is required. Use `/request-api-key` endpoint. 
           
@@ -501,7 +495,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubmitAlgorithmRequest'
+              $ref: '#/components/schemas/SubmitCodeRequest'
       parameters:
         - in: header
           name: X-Api-Key
@@ -514,7 +508,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubmitAlgorithmResponse'
+                $ref: '#/components/schemas/SubmitCodeResponse'
   /submit-benchmark:
     post:
       tags:
@@ -613,25 +607,25 @@ components:
     Address:
       type: string
       pattern: ^0x[a-f0-9]{40}$
-    Algorithm:
+    Code:
       type: object
       properties:
         id:
           $ref: '#/components/schemas/AlgorithmId'
         details:
-          $ref: '#/components/schemas/AlgorithmDetails'
+          $ref: '#/components/schemas/CodeDetails'
         state:
-          $ref: '#/components/schemas/AlgorithmState'
+          $ref: '#/components/schemas/CodeState'
         block_data:
-          $ref: '#/components/schemas/AlgorithmBlockData'
-    AlgorithmBlockData:
+          $ref: '#/components/schemas/CodeBlockData'
+    CodeBlockData:
       type: object
       properties:
         num_qualifiers_by_player:
           type: object
           additionalProperties:
             type: integer
-            format: uint32
+            format: uint64
           example: {"0x1234...": 5, "0x5678...": 3}
         adoption:
           $ref: '#/components/schemas/PreciseNumber'
@@ -640,30 +634,28 @@ components:
           format: uint32
         reward:
           $ref: '#/components/schemas/PreciseNumber'
-    AlgorithmDetails:
+    CodeDetails:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/AlgorithmName'
+          $ref: '#/components/schemas/Name'
         player_id:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-        breakthrough_id:
-          $ref: '#/components/schemas/MD5'
-        type:
-          $ref: '#/components/schemas/AlgorithmType'
+        algorithm_id:
+          $ref: '#/components/schemas/AlgorithmId'
         fee_paid:
           $ref: '#/components/schemas/PreciseNumber'
     AlgorithmId:
       type: string
       pattern: ^c[0-9]{3}_a[0-9]{3}$
       example: c002_a001
-    AlgorithmName:
+    Name:
       type: string
       pattern: ^[a-z][a-z_]{4,19}$
       example: clarke_wright
-    AlgorithmState:
+    CodeState:
       type: object
       properties:
         block_confirmed:
@@ -683,11 +675,6 @@ components:
           format: uint32
         banned:
           type: boolean
-    AlgorithmType:
-      type: string
-      enum:
-        - wasm
-        - ptx
     Benchmark:
       type: object
       properties:
@@ -702,20 +689,31 @@ components:
           items:
             type: integer
             format: uint64
+          nullable: true
         discarded_solution_nonces:
           type: array
           items:
             type: integer
             format: uint64
+          nullable: true
+        non_solution_nonces:
+          type: array
+          items:
+            type: integer
+            format: uint64
+          nullable: true
     BenchmarkDetails:
       type: object
       properties:
         num_solutions:
           type: integer
-          format: uint32
+          format: uint64
         num_discarded_solutions:
           type: integer
-          format: uint32
+          format: uint64
+        num_non_solutions:
+          type: integer
+          format: uint64
         merkle_root:
           $ref: '#/components/schemas/MerkleHash'
         sampled_nonces:
@@ -798,7 +796,7 @@ components:
            binary:
              type: integer
              format: uint32
-           breakthrough:
+           advance:
              type: integer
              format: uint32
            challenge:
@@ -828,7 +826,7 @@ components:
            benchmark:
              type: integer 
              format: uint32
-           breakthrough:
+           advance:
              type: integer
              format: uint32
            challenge:
@@ -849,18 +847,23 @@ components:
         emissions:
           type: object
           properties:
-              algorithms:
+              algorithm:
                 $ref: '#/components/schemas/PreciseNumber'
-              breakthroughs:
+              advance:
                 $ref: '#/components/schemas/PreciseNumber'
-              benchmarkers:
+              benchmarker:
                 $ref: '#/components/schemas/PreciseNumber'
-              delegators:
+              delegator:
                 $ref: '#/components/schemas/PreciseNumber'
               bootstrap:
                 $ref: '#/components/schemas/PreciseNumber'
               vault:
                 $ref: '#/components/schemas/PreciseNumber'
+              challenge_owner:
+                $ref: '#/components/schemas/PreciseNumber'
+        gamma_value:
+          type: number
+          format: double
     BlockData:
       type: object
       properties:
@@ -879,10 +882,10 @@ components:
              type: array 
              items:
                 $ref: '#/components/schemas/AlgorithmId'
-           breakthrough:
+           advance:
              type: array 
              items:
-                $ref: '#/components/schemas/BreakthroughId'
+                $ref: '#/components/schemas/AlgorithmId'
            challenge:
              type: array 
              items:
@@ -910,7 +913,7 @@ components:
         active_ids:
           type: object
           properties:
-            algorithm:
+            code:
              type: array
              items:
                 $ref: '#/components/schemas/AlgorithmId'
@@ -918,10 +921,10 @@ components:
              type: array 
              items:
                 $ref: '#/components/schemas/MD5'
-            breakthrough:
+            advance:
              type: array 
              items:
-                $ref: '#/components/schemas/BreakthroughId'
+                $ref: '#/components/schemas/AlgorithmId'
             challenge:
              type: array 
              items:
@@ -938,18 +941,18 @@ components:
              type: array 
              items:
                 $ref: '#/components/schemas/Address'
-    Breakthrough:
+    Advance:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/BreakthroughId'
+          $ref: '#/components/schemas/AlgorithmId'
         details:
-          $ref: '#/components/schemas/BreakthroughDetails'
+          $ref: '#/components/schemas/AdvanceDetails'
         state:
-          $ref: '#/components/schemas/BreakthroughState'
+          $ref: '#/components/schemas/AdvanceState'
         block_data:
-          $ref: '#/components/schemas/BreakthroughBlockData'
-    BreakthroughBlockData:
+          $ref: '#/components/schemas/AdvanceBlockData'
+    AdvanceBlockData:
       type: object
       properties:
         adoption:
@@ -959,7 +962,7 @@ components:
           format: uint32
         reward:
           $ref: '#/components/schemas/PreciseNumber'
-    BreakthroughDetails:
+    AdvanceDetails:
       type: object
       properties:
         name:
@@ -968,11 +971,7 @@ components:
           $ref: '#/components/schemas/Address'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
-    BreakthroughId:
-      type: string
-      pattern: ^c[0-9]{3}_b[0-9]{3}$
-      example: c002_b001
-    BreakthroughState:
+    AdvanceState:
       type: object
       properties:
         block_confirmed:
@@ -1019,7 +1018,7 @@ components:
       properties:
         num_qualifiers:
           type: integer
-          format: uint32
+          format: uint64
         average_solution_ratio:
           type: number
           format: double
@@ -1045,6 +1044,9 @@ components:
       properties:
         name:
           type: string
+        type:
+          type: string
+          enum: [cpu, gpu]
     ChallengeId:
           type: string
           pattern: ^c[0-9]{3}$
@@ -1119,6 +1121,7 @@ components:
           $ref: '#/components/schemas/FraudState'
         allegation:
           type: string
+          nullable: true
     FraudState:
       type: object
       properties:
@@ -1159,7 +1162,7 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: uint32
+            format: uint64
           example: {"c001": 5, "c002": 3}
         solution_ratio_by_challenge:
           type: object
@@ -1169,7 +1172,7 @@ components:
           example: {"c001": 0.001, "c002": 0.5}
         cutoff:
           type: integer
-          format: uint32
+          format: uint64
         self_deposit:
           $ref: '#/components/schemas/PreciseNumber'
         delegated_weighted_deposit:
@@ -1210,6 +1213,9 @@ components:
           type: object
           additionalProperties:
             type: string
+        cpu_arch:
+          type: string
+          enum: [amd64, arm64]
     Player:
       type: object
       properties:
@@ -1234,7 +1240,7 @@ components:
               $ref: '#/components/schemas/PreciseNumber'
             benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
-            breakthrough:
+            advance:
               $ref: '#/components/schemas/PreciseNumber'
             delegator:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1328,6 +1334,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MerkleProof'
+          nullable: true
     ProofDetails:
       type: object
       properties:
@@ -1379,15 +1386,15 @@ components:
     GetAlgorithmsResponse:
       type: object
       properties:
-        algorithms:
+        codes:
           type: array
           items:
-            $ref: '#/components/schemas/Algorithm'
-        breakthroughs:
+            $ref: '#/components/schemas/Code'
+        advances:
           type: array
           items:
-            $ref: '#/components/schemas/Breakthrough'
-        binaries:
+            $ref: '#/components/schemas/Advance'
+        binarys:
           type: array
           items:
             $ref: '#/components/schemas/Binary'
@@ -1494,7 +1501,7 @@ components:
          type: object
          additionalProperties:
           $ref: '#/components/schemas/PreciseNumber'
-       breakthroughs:
+       advances:
          type: object
          additionalProperties:
           $ref: '#/components/schemas/PreciseNumber'
@@ -1516,11 +1523,11 @@ components:
          additionalProperties:
            type: object
            properties:
-             algorithm:
+             code:
               $ref: '#/components/schemas/PreciseNumber'
              benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
-             breakthrough:
+             advance:
               $ref: '#/components/schemas/PreciseNumber'
              delegator:
               $ref: '#/components/schemas/PreciseNumber'
@@ -1531,17 +1538,19 @@ components:
        totals:
          type: object
          properties:
-            algorithms:
+            code:
               $ref: '#/components/schemas/PreciseNumber'
-            breakthroughs:
+            advance:
               $ref: '#/components/schemas/PreciseNumber'
-            benchmarkers:
+            benchmarker:
               $ref: '#/components/schemas/PreciseNumber'
-            delegators:
+            delegator:
               $ref: '#/components/schemas/PreciseNumber'
             bootstrap:
               $ref: '#/components/schemas/PreciseNumber'
             vault:
+              $ref: '#/components/schemas/PreciseNumber'
+            challenge_owner:
               $ref: '#/components/schemas/PreciseNumber'
     RequestApiKeyRequest:
       type: object
@@ -1595,7 +1604,7 @@ components:
     SetVoteRequest:
       type: object
       properties:
-        breakthrough_id:
+        advance_id:
           type: string
         yes:
           type: boolean
@@ -1606,16 +1615,22 @@ components:
       properties:
         ok:
           type: boolean
-    SubmitAlgorithmRequest:
+    SubmitCodeRequest:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/AlgorithmName'
+          $ref: '#/components/schemas/Name'
         challenge_id:
           $ref: '#/components/schemas/ChallengeId'
         code:
-          type: string
-    SubmitAlgorithmResponse:
+          type: object
+          properties:
+            rust:
+              type: string
+            cuda:
+              type: string
+              nullable: true
+    SubmitCodeResponse:
       type: object
       properties:
         algorithm_id:

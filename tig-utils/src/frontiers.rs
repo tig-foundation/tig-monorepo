@@ -268,16 +268,18 @@ pub fn pareto_frontier(frontier: &Frontier) -> Frontier {
 
 pub fn extend_frontier(frontier: &Frontier, min_point: &Point, max_point: &Point) -> Frontier {
     let mut frontier = frontier.clone();
-    (0..min_point.len()).into_iter().for_each(|i| {
-        let mut d = min_point.clone();
-        if let Some(v) = frontier.iter().map(|d| d[i]).max() {
-            d[i] = v;
+    for i in 0..min_point.len() {
+        if frontier.iter().all(|p| p[i] != max_point[i]) {
+            let mut d = min_point.clone();
+            if let Some(v) = frontier.iter().map(|d| d[i]).max() {
+                d[i] = v;
+            }
+            if !frontier.contains(&d) {
+                d[i] = min(d[i] + 1, max_point[i]);
+                frontier.push(d);
+            }
         }
-        if !frontier.contains(&d) {
-            d[i] = min(d[i] + 1, max_point[i]);
-            frontier.push(d);
-        }
-    });
+    }
 
     return frontier;
 }

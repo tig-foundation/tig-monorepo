@@ -9,8 +9,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         ..
     } = cache;
 
-    for challenge_data in active_challenges_block_data.values_mut() {
-        challenge_data.base_fee = config.benchmarks.min_base_fee;
-        challenge_data.per_nonce_fee = config.benchmarks.min_per_nonce_fee;
+    for (challenge_id, challenge_data) in active_challenges_block_data.iter_mut() {
+        let benchmarks_config = &config.challenges[challenge_id].benchmarks;
+        challenge_data.base_fee = benchmarks_config.min_base_fee;
+        challenge_data.per_nonce_fee = benchmarks_config.min_per_nonce_fee;
     }
 }

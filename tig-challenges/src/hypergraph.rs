@@ -146,13 +146,32 @@ impl SubInstance {
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
+        let mut rng = StdRng::from_seed(seed.clone());
         let num_hyperedges = difficulty.num_hyperedges;
         let target_num_nodes = difficulty.num_hyperedges; // actual number may be around 8% less
         let depth = 6;
         let num_parts = 1 << depth; // 2^6 = 64 partitions
         let level_weights: Vec<f32> = vec![
-            42.0, 31023.0, 51220.0, 39820.0, 1360.0, 500.0, 208.0, 11.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            20.0,
+            20.0 + rng.gen::<f32>() * 4.0,
+            19.0 + rng.gen::<f32>() * 14.0,
+            20.0 + rng.gen::<f32>() * 6.0,
+            1.0 + rng.gen::<f32>() * 15.0,
+            rng.gen::<f32>() * 0.3,
+            rng.gen::<f32>() * 0.1,
+            rng.gen::<f32>() * 0.01,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         ];
 
         // Get kernels

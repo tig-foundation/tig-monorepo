@@ -24,7 +24,7 @@ class JobManager:
         benchmarks: Dict[str, Benchmark],
         proofs: Dict[str, Proof],
         challenges: Dict[str, Challenge],
-        algorithms: Dict[str, Algorithm],
+        algorithms: Dict[str, Code],
         binarys: Dict[str, Binary],
         **kwargs
     ):
@@ -67,27 +67,29 @@ class JobManager:
                 self.hash_thresholds[x.details.block_started] = {
                     c['id']: c['block_data']['hash_threshold']
                     for c in d["challenges"]
+                    if c['state']['round_active'] <= block.details.round
                 }
                 self.average_solution_ratio[x.details.block_started] = {
                     c['id']: c['block_data']['average_solution_ratio']
                     for c in d["challenges"]
+                    if c['state']['round_active'] <= block.details.round
                 }
             hash_threshold = self.hash_thresholds[x.details.block_started][x.settings.challenge_id]
             average_solution_ratio = self.average_solution_ratio[x.details.block_started][x.settings.challenge_id]
 
             bin = binarys.get(x.settings.algorithm_id, None)
             if bin is None:
-                logger.error(f"batch {x.id}: no binary-blob found for {x.settings.algorithm_id}. skipping job")
+                logger.error(f"batch {x.benchmark_id}: no binary-blob found for {x.settings.algorithm_id}. skipping job")
                 continue
             if bin.details.download_url is None:
-                logger.error(f"batch {x.id}: no download_url found for {bin.algorithm_id}. skipping job")
+                logger.error(f"batch {x.benchmark_id}: no download_url found for {bin.algorithm_id}. skipping job")
                 continue
             batch_size = next(
                 (s["batch_size"] for s in algo_selection if s["algorithm_id"] == x.settings.algorithm_id),
                 None
             )
             if batch_size is None:
-                logger.error(f"batch {x.id}: no batch size found for {x.settings.algorithm_id}. skipping job")
+                logger.error(f"batch {x.benchmark_id}: no batch size found for {x.settings.algorithm_id}. skipping job")
                 continue
             num_batches = math.ceil(x.details.num_nonces / batch_size)
             atomic_inserts = [
@@ -119,7 +121,7 @@ class JobManager:
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,
-                        json.dumps(block.config["benchmarks"]["runtime_config"]),
+                        json.dumps(block.config["challenges"][x.settings.challenge_id]["benchmarks"]["runtime_config"]),
                         batch_size,
                         c_name,
                         a_name,

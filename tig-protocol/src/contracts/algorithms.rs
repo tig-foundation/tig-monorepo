@@ -6,63 +6,10 @@ use tig_structs::core::*;
 use tig_utils::*;
 
 #[time]
-pub async fn submit_algorithm<T: Context>(
+pub async fn submit_advance<T: Context>(
     ctx: &T,
     player_id: String,
-    algorithm_name: String,
-    challenge_id: String,
-    breakthrough_id: Option<String>,
-    code: AlgorithmCode,
-) -> Result<String> {
-    let config = ctx.get_config().await;
-    let latest_block_id = ctx.get_latest_block_id().await;
-    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
-    if !ctx
-        .get_challenge_state(&challenge_id)
-        .await
-        .is_some_and(|s| s.round_active <= latest_block_details.round)
-    {
-        return Err(anyhow!("Invalid challenge '{}'", challenge_id));
-    }
-
-    if let Some(breakthrough_id) = &breakthrough_id {
-        if ctx.get_breakthrough_state(breakthrough_id).await.is_none() {
-            return Err(anyhow!("Invalid breakthrough '{}'", breakthrough_id));
-        }
-    }
-
-    if !ctx
-        .get_player_state(&player_id)
-        .await
-        .is_some_and(|s| s.available_fee_balance >= config.algorithms.submission_fee)
-    {
-        return Err(anyhow!("Insufficient balance"));
-    }
-
-    let algorithm_id = ctx
-        .add_algorithm_to_mempool(
-            AlgorithmDetails {
-                name: algorithm_name,
-                challenge_id,
-                player_id,
-                breakthrough_id,
-                r#type: match code.cuda {
-                    Some(_) => AlgorithmType::GPU,
-                    None => AlgorithmType::CPU,
-                },
-                fee_paid: config.algorithms.submission_fee,
-            },
-            code,
-        )
-        .await?;
-    Ok(algorithm_id)
-}
-
-#[time]
-pub async fn submit_breakthrough<T: Context>(
-    ctx: &T,
-    player_id: String,
-    breakthrough_name: String,
+    name: String,
     challenge_id: String,
     evidence: String,
 ) -> Result<String> {
@@ -80,23 +27,78 @@ pub async fn submit_breakthrough<T: Context>(
     if !ctx
         .get_player_state(&player_id)
         .await
-        .is_some_and(|s| s.available_fee_balance >= config.breakthroughs.submission_fee)
+        .is_some_and(|s| s.available_fee_balance >= config.advances.submission_fee)
     {
         return Err(anyhow!("Insufficient balance"));
     }
 
-    let breakthrough_id = ctx
-        .add_breakthrough_to_mempool(
-            BreakthroughDetails {
-                name: breakthrough_name,
+    let algorithm_id = ctx
+        .add_advance_to_mempool(
+            AdvanceDetails {
+                name,
                 challenge_id,
                 player_id,
-                fee_paid: config.breakthroughs.submission_fee,
+                fee_paid: config.advances.submission_fee,
             },
             evidence,
         )
         .await?;
-    Ok(breakthrough_id)
+    Ok(algorithm_id)
+}
+
+#[time]
+pub async fn submit_code<T: Context>(
+    ctx: &T,
+    player_id: String,
+    name: String,
+    challenge_id: String,
+    algorithm_id: Option<String>,
+    code: SourceCode,
+) -> Result<String> {
+    let config = ctx.get_config().await;
+    let latest_block_id = ctx.get_latest_block_id().await;
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+    if !ctx
+        .get_challenge_state(&challenge_id)
+        .await
+        .is_some_and(|s| {
+            s.round_active
+                <= latest_block_details.round
+                    + config.advances.vote_start_delay
+                    + config.advances.vote_period
+                    + config.codes.push_delay_period
+        })
+    {
+        return Err(anyhow!("Invalid challenge '{}'", challenge_id));
+    }
+
+    if let Some(algorithm_id) = &algorithm_id {
+        if ctx.get_advance_state(algorithm_id).await.is_none() {
+            return Err(anyhow!("Invalid advance '{}'", algorithm_id));
+        }
+    }
+
+    if !ctx
+        .get_player_state(&player_id)
+        .await
+        .is_some_and(|s| s.available_fee_balance >= config.codes.submission_fee)
+    {
+        return Err(anyhow!("Insufficient balance"));
+    }
+
+    let algorithm_id = ctx
+        .add_code_to_mempool(
+            CodeDetails {
+                name,
+                challenge_id,
+                player_id,
+                algorithm_id,
+                fee_paid: config.codes.submission_fee,
+            },
+            code,
+        )
+        .await?;
+    Ok(algorithm_id)
 }
 
 #[time]
@@ -106,12 +108,12 @@ pub async fn submit_binary<T: Context>(
     compile_success: bool,
     download_url: Option<String>,
 ) -> Result<()> {
-    if ctx.get_algorithm_state(&algorithm_id).await.is_none() {
+    if ctx.get_code_state(&algorithm_id).await.is_none() {
         return Err(anyhow!("Invalid algorithm: {}", algorithm_id));
     }
     if ctx.get_binary_details(&algorithm_id).await.is_some() {
         return Err(anyhow!(
-            "WASM already submitted for algorithm: {}",
+            "Binary already submitted for algorithm: {}",
             algorithm_id
         ));
     }
@@ -136,26 +138,26 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         config,
         block_details,
         block_data,
-        active_algorithms_details,
-        active_algorithms_state,
-        active_algorithms_block_data,
-        active_breakthroughs_state,
-        active_breakthroughs_block_data,
+        active_codes_details,
+        active_codes_state,
+        active_codes_block_data,
+        active_advances_state,
+        active_advances_block_data,
         active_opow_block_data,
-        voting_breakthroughs_state,
+        voting_advances_state,
         active_players_state,
         active_players_block_data,
         ..
     } = cache;
 
-    let active_algorithm_ids = &block_data.active_ids[&ActiveType::Algorithm];
-    let active_breakthrough_ids = &block_data.active_ids[&ActiveType::Breakthrough];
+    let active_code_ids = &block_data.active_ids[&ActiveType::Code];
+    let active_advance_ids = &block_data.active_ids[&ActiveType::Advance];
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
     let active_player_ids = &block_data.active_ids[&ActiveType::Player];
 
     // update votes
-    for breakthrough_state in voting_breakthroughs_state.values_mut() {
-        breakthrough_state.votes_tally = HashMap::from([
+    for advance_state in voting_advances_state.values_mut() {
+        advance_state.votes_tally = HashMap::from([
             (true, PreciseNumber::from(0)),
             (false, PreciseNumber::from(0)),
         ]);
@@ -163,32 +165,32 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     for player_id in active_player_ids.iter() {
         let player_state = &active_players_state[player_id];
         let player_data = &active_players_block_data[player_id];
-        for (breakthrough_id, vote) in player_state.votes.iter() {
+        for (algorithm_id, vote) in player_state.votes.iter() {
             let yes = vote.value;
-            if let Some(breakthrough_state) = voting_breakthroughs_state.get_mut(breakthrough_id) {
-                let n = breakthrough_state.round_votes_tallied - block_details.round;
+            if let Some(advance_state) = voting_advances_state.get_mut(algorithm_id) {
+                let n = advance_state.round_votes_tallied - block_details.round;
                 let votes: PreciseNumber = player_data
                     .deposit_by_locked_period
                     .iter()
                     .skip(n as usize)
                     .sum();
-                *breakthrough_state.votes_tally.get_mut(&yes).unwrap() += votes;
+                *advance_state.votes_tally.get_mut(&yes).unwrap() += votes;
             }
         }
     }
 
     // update adoption
-    let mut algorithms_by_challenge = HashMap::<String, Vec<String>>::new();
-    for algorithm_id in active_algorithm_ids.iter() {
-        let algorithm_details = &active_algorithms_details[algorithm_id];
-        algorithms_by_challenge
-            .entry(algorithm_details.challenge_id.clone())
+    let mut codes_by_challenge = HashMap::<String, Vec<String>>::new();
+    for algorithm_id in active_code_ids.iter() {
+        let code_details = &active_codes_details[algorithm_id];
+        codes_by_challenge
+            .entry(code_details.challenge_id.clone())
             .or_default()
             .push(algorithm_id.clone());
     }
 
     for challenge_id in active_challenge_ids.iter() {
-        let algorithm_ids = match algorithms_by_challenge.get(challenge_id) {
+        let algorithm_ids = match codes_by_challenge.get(challenge_id) {
             None => continue,
             Some(ids) => ids,
         };
@@ -196,7 +198,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mut weights = Vec::<PreciseNumber>::new();
         for algorithm_id in algorithm_ids.iter() {
             let mut weight = PreciseNumber::from(0);
-            for (player_id, &num_qualifiers) in active_algorithms_block_data[algorithm_id]
+            for (player_id, &num_qualifiers) in active_codes_block_data[algorithm_id]
                 .num_qualifiers_by_player
                 .iter()
             {
@@ -212,91 +214,86 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
         let adoption = weights.normalise();
         for (algorithm_id, adoption) in algorithm_ids.iter().zip(adoption) {
-            active_algorithms_block_data
+            active_codes_block_data
                 .get_mut(algorithm_id)
                 .unwrap()
                 .adoption = adoption.clone();
 
-            if let Some(breakthrough_id) = &active_algorithms_details[algorithm_id].breakthrough_id
-            {
-                if let Some(block_data) = active_breakthroughs_block_data.get_mut(breakthrough_id) {
+            if let Some(algorithm_id) = &active_codes_details[algorithm_id].algorithm_id {
+                if let Some(block_data) = active_advances_block_data.get_mut(algorithm_id) {
                     block_data.adoption += adoption;
                 }
             }
         }
     }
 
-    // update algorithm merge points
-    let adoption_threshold = PreciseNumber::from_f64(config.algorithms.adoption_threshold);
-    for algorithm_id in active_algorithm_ids.iter() {
-        let is_merged = active_algorithms_state[algorithm_id].round_merged.is_some();
-        let algorithm_data = active_algorithms_block_data.get_mut(algorithm_id).unwrap();
+    // update code merge points
+    let adoption_threshold = PreciseNumber::from_f64(config.codes.adoption_threshold);
+    for algorithm_id in active_code_ids.iter() {
+        let is_merged = active_codes_state[algorithm_id].round_merged.is_some();
+        let code_data = active_codes_block_data.get_mut(algorithm_id).unwrap();
 
-        if !is_merged && algorithm_data.adoption >= adoption_threshold {
-            algorithm_data.merge_points += 1;
+        if !is_merged && code_data.adoption >= adoption_threshold {
+            code_data.merge_points += 1;
         }
     }
 
-    // update breakthrough merge points
-    let adoption_threshold = PreciseNumber::from_f64(config.breakthroughs.adoption_threshold);
-    for breakthrough_id in active_breakthrough_ids.iter() {
-        let is_merged = active_breakthroughs_state[breakthrough_id]
-            .round_merged
-            .is_some();
-        let breakthrough_data = active_breakthroughs_block_data
-            .get_mut(breakthrough_id)
-            .unwrap();
+    // update advance merge points
+    let adoption_threshold = PreciseNumber::from_f64(config.advances.adoption_threshold);
+    for algorithm_id in active_advance_ids.iter() {
+        let is_merged = active_advances_state[algorithm_id].round_merged.is_some();
+        let advance_data = active_advances_block_data.get_mut(algorithm_id).unwrap();
 
-        if !is_merged && breakthrough_data.adoption >= adoption_threshold {
-            breakthrough_data.merge_points += 1;
+        if !is_merged && advance_data.adoption >= adoption_threshold {
+            advance_data.merge_points += 1;
         }
     }
 
     // update merges at last block of the round
     if (block_details.height + 1) % config.rounds.blocks_per_round == 0 {
-        for algorithm_ids in algorithms_by_challenge.values() {
+        for algorithm_ids in codes_by_challenge.values() {
             let algorithm_id = algorithm_ids
                 .iter()
-                .max_by_key(|&id| active_algorithms_block_data[id].merge_points)
+                .max_by_key(|&id| active_codes_block_data[id].merge_points)
                 .unwrap();
 
-            if active_algorithms_block_data[algorithm_id].merge_points
-                < config.algorithms.merge_points_threshold
+            if active_codes_block_data[algorithm_id].merge_points
+                < config.codes.merge_points_threshold
             {
                 continue;
             }
 
-            active_algorithms_state
+            active_codes_state
                 .get_mut(algorithm_id)
                 .unwrap()
                 .round_merged = Some(block_details.round + 1);
         }
 
-        for breakthrough_id in active_breakthrough_ids.iter() {
-            if active_breakthroughs_block_data[breakthrough_id].merge_points
-                < config.breakthroughs.merge_points_threshold
+        for algorithm_id in active_advance_ids.iter() {
+            if active_advances_block_data[algorithm_id].merge_points
+                < config.advances.merge_points_threshold
             {
                 continue;
             }
 
-            active_breakthroughs_state
-                .get_mut(breakthrough_id)
+            active_advances_state
+                .get_mut(algorithm_id)
                 .unwrap()
                 .round_merged = Some(block_details.round + 1);
         }
     }
 
-    // update breakthroughs
+    // update advances
     if (block_details.height + 1) % config.rounds.blocks_per_round == 0 {
-        let yes_threshold = PreciseNumber::from_f64(config.breakthroughs.min_percent_yes_votes);
+        let yes_threshold = PreciseNumber::from_f64(config.advances.min_percent_yes_votes);
         let zero = PreciseNumber::from(0);
-        for breakthrough in voting_breakthroughs_state.values_mut() {
-            if breakthrough.round_votes_tallied == block_details.round + 1 {
-                let yes = &breakthrough.votes_tally[&true];
-                let no = &breakthrough.votes_tally[&false];
+        for advance in voting_advances_state.values_mut() {
+            if advance.round_votes_tallied == block_details.round + 1 {
+                let yes = &advance.votes_tally[&true];
+                let no = &advance.votes_tally[&false];
                 let total = yes + no;
                 if total != zero && yes / total >= yes_threshold {
-                    breakthrough.round_active = Some(block_details.round + 1);
+                    advance.round_active = Some(block_details.round + 1);
                 }
             }
         }

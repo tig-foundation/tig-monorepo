@@ -31,3 +31,7 @@ pub use vector_search as c004;
 pub mod hypergraph;
 #[cfg(feature = "c005")]
 pub use hypergraph as c005;
+#[cfg(feature = "c006")]
+pub mod neuralnet_optimizer;
+#[cfg(feature = "c006")]
+pub use neuralnet_optimizer as c006;

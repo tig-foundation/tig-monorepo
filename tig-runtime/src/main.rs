@@ -122,17 +122,17 @@ pub fn compute_solution(
                 let runtime_signature =
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
                 let (solution, invalid_reason) = match result {
-                    Some(s) => (
-                        serde_json::to_value(&s)
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .to_owned(),
-                        match challenge.verify_solution(&s) {
-                            Ok(_) => None,
-                            Err(e) => Some(e.to_string()),
-                        },
-                    ),
+                    Some(s) => match challenge.verify_solution(&s) {
+                        Ok(_) => (
+                            serde_json::to_value(&s)
+                                .unwrap()
+                                .as_object()
+                                .unwrap()
+                                .to_owned(),
+                            None,
+                        ),
+                        Err(e) => (Solution::new(), Some(e.to_string())),
+                    },
                     None => (Solution::new(), None),
                 };
 
@@ -179,6 +179,8 @@ pub fn compute_solution(
                     stream.clone(),
                     &prop,
                 )?;
+
+                // ctx.enable_memory_tracking(1024 * 1024);
 
                 let initialize_kernel = module.load_function("initialize_kernel")?;
 
@@ -230,29 +232,41 @@ pub fn compute_solution(
                 if stream.memcpy_dtov(&error_stat)?[0] != 0 {
                     break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
                 }
-                let fuel_consumed = (stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale
-                    + max_fuel
-                    - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? });
+                let gpu_fuel_consumed = stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
+                let cpu_fuel_consumed =
+                    max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                let fuel_consumed = gpu_fuel_consumed + cpu_fuel_consumed;
 
                 if fuel_consumed > max_fuel {
                     break 'out_of_fuel (max_fuel + 1, 0, Solution::new(), None);
                 }
 
-                let runtime_signature = (stream.memcpy_dtov(&signature)?[0]
-                    ^ unsafe { **library.get::<*const u64>(b"__runtime_signature")? });
+                let gpu_runtime_signature = stream.memcpy_dtov(&signature)?[0];
+                let cpu_runtime_signature =
+                    unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                let runtime_signature = gpu_runtime_signature ^ cpu_runtime_signature;
 
                 let (solution, invalid_reason) = match result {
-                    Some(s) => (
-                        serde_json::to_value(&s)
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .to_owned(),
+                    Some(s) => {
                         match challenge.verify_solution(&s, module.clone(), stream.clone(), &prop) {
-                            Ok(_) => None,
-                            Err(e) => Some(e.to_string()),
-                        },
-                    ),
+                            Ok(_) => (
+                                match serde_json::to_value(&s).unwrap() {
+                                    serde_json::Value::String(s) => {
+                                        let mut map = serde_json::Map::new();
+                                        map.insert(
+                                            "base64".to_string(),
+                                            serde_json::Value::String(s),
+                                        );
+                                        map
+                                    }
+                                    serde_json::Value::Object(map) => map,
+                                    _ => panic!("Expected String or Object from to_value"),
+                                },
+                                None,
+                            ),
+                            Err(e) => (Solution::new(), Some(e.to_string())),
+                        }
+                    }
                     None => (Solution::new(), None),
                 };
 
@@ -290,6 +304,12 @@ pub fn compute_solution(
                 panic!("tig-runtime was not compiled with '--features c005'");
                 #[cfg(feature = "c005")]
                 dispatch_challenge!(c005, gpu)
+            }
+            "c006" => {
+                #[cfg(not(feature = "c006"))]
+                panic!("tig-runtime was not compiled with '--features c006'");
+                #[cfg(feature = "c006")]
+                dispatch_challenge!(c006, gpu)
             }
             _ => panic!("Unsupported challenge"),
         }

@@ -24,7 +24,6 @@ class PrecommitManager:
         precommits: Dict[str, Precommit],
         benchmarks: Dict[str, Benchmark],
         challenges: Dict[str, Challenge],
-        algorithms: Dict[str, Algorithm],
         difficulty_data: Dict[str, List[DifficultyData]],
         **kwargs
     ):

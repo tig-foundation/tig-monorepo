@@ -48,14 +48,18 @@ class DataFetcher:
         with ThreadPoolExecutor(max_workers=4) as executor: # Defined max workers as there are 4 process to be executed in parallel.
             algorithms_data, benchmarks_data, challenges_data = list(executor.map(_get, tasks))
 
-        algorithms = {a["id"]: Algorithm.from_dict(a) for a in algorithms_data["algorithms"]}
+        algorithms = {a["id"]: Code.from_dict(a) for a in algorithms_data["codes"]}
         binarys = {w["algorithm_id"]: Binary.from_dict(w) for w in algorithms_data["binarys"]}
         
         precommits = {b["benchmark_id"]: Precommit.from_dict(b) for b in benchmarks_data["precommits"]}
         benchmarks = {b["id"]: Benchmark.from_dict(b) for b in benchmarks_data["benchmarks"]}
         proofs = {p["benchmark_id"]: Proof.from_dict(p) for p in benchmarks_data["proofs"]}
         frauds = {f["benchmark_id"]: Fraud.from_dict(f) for f in benchmarks_data["frauds"]}        
-        challenges = {c["id"]: Challenge.from_dict(c) for c in challenges_data["challenges"]}
+        challenges = {
+            c["id"]: Challenge.from_dict(c) 
+            for c in challenges_data["challenges"]
+            if c["state"]["round_active"] <= block.details.round
+        }
         
         # Fetch difficulty data for each challenge
         difficulty_urls = [

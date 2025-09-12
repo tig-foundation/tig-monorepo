@@ -5,7 +5,7 @@ import logging
 import os
 from common.structs import *
 from common.utils import *
-from typing import Union, Set, List, Dict
+from typing import Union, Set, List, Dict, Optional
 from master.sql import get_db_conn
 from master.client_manager import CONFIG
 
@@ -20,8 +20,9 @@ class SubmitPrecommitRequest(FromDict):
 class SubmitBenchmarkRequest(FromDict):
     benchmark_id: str
     merkle_root: MerkleHash
-    discarded_solution_nonces: Set[int]
-    solution_nonces: Set[int]
+    non_solution_nonces: Optional[List[int]]
+    discarded_solution_nonces: Optional[List[int]]
+    solution_nonces: Optional[List[int]]
 
 @dataclass
 class SubmitProofRequest(FromDict):
@@ -116,10 +117,11 @@ class SubmissionsManager:
                     ORDER BY block_started
                     LIMIT 1
                 )
-                RETURNING benchmark_id
+                RETURNING benchmark_id, num_nonces
             )
-            SELECT 
-                B.benchmark_id, 
+            SELECT
+                A.benchmark_id, 
+                A.num_nonces,
                 B.merkle_root,
                 B.solution_nonces,
                 B.discarded_solution_nonces
@@ -132,13 +134,28 @@ class SubmissionsManager:
 
         if benchmark_to_submit:
             benchmark_id = benchmark_to_submit["benchmark_id"]
+            num_nonces = benchmark_to_submit["num_nonces"]
             merkle_root = benchmark_to_submit["merkle_root"] 
+            non_solution_nonces = list(
+                set(range(num_nonces)) - 
+                set(benchmark_to_submit["solution_nonces"]) - 
+                set(benchmark_to_submit["discarded_solution_nonces"])
+            )
             solution_nonces = benchmark_to_submit["solution_nonces"]
             discarded_solution_nonces = benchmark_to_submit["discarded_solution_nonces"]
+
+            max_size = max(len(non_solution_nonces), len(solution_nonces), len(discarded_solution_nonces))
+            if len(solution_nonces) == max_size:
+                solution_nonces = None
+            elif len(discarded_solution_nonces) == max_size:
+                discarded_solution_nonces = None
+            else:
+                non_solution_nonces = None
 
             self._post_thread("benchmark", SubmitBenchmarkRequest(
                 benchmark_id=benchmark_id,
                 merkle_root=merkle_root,
+                non_solution_nonces=non_solution_nonces,
                 solution_nonces=solution_nonces,
                 discarded_solution_nonces=discarded_solution_nonces,
             ))

@@ -10,6 +10,5 @@ RUN apt-get update && apt-get install -y docker.io \
 
 COPY common common
 COPY slave/main.py main.py
-COPY slave/config.json config.json
 
 CMD ["python", "main.py"]

@@ -26,8 +26,7 @@ factors = {
     benchmarker: {
         **{
             f: (
-                opow_data[benchmarker].block_data.num_qualifiers_by_challenge.get(f, 0) * 
-                opow_data[benchmarker].block_data.solution_ratio_by_challenge.get(f, 0)
+                opow_data[benchmarker].block_data.num_qualifiers_by_challenge.get(f, 0)
             )
             for f in block.data.active_ids["challenge"]
         },

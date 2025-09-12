@@ -11,7 +11,7 @@ edition.workspace = true
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "automatic-fuel-check", features = [
+cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "runtime-fuel/cudnn-cublas", features = [
     "cuda-version-from-build-system",
 ], optional = true }
 tig-challenges = { path = "../tig-challenges" }
@@ -30,3 +30,5 @@ c004 = ["cuda", "tig-algorithms/c004", "tig-challenges/c004"]
 vector_search = ["c004"]
 c005 = ["cuda", "tig-algorithms/c005", "tig-challenges/c005"]
 hypergraph = ["c005"]
+c006 = ["cuda", "tig-algorithms/c006", "tig-challenges/c006"]
+neuralnet_optimizer = ["c006"]
