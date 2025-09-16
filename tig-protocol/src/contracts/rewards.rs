@@ -65,9 +65,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let player_data = active_players_block_data
             .get_mut(&code_details.player_id)
             .unwrap();
-        player_data
-            .reward_by_type
-            .insert(EmissionsType::Code, zero.clone());
 
         if code_data.adoption >= adoption_threshold || (is_merged && code_data.adoption > zero) {
             let reward = reward_pool_per_challenge * code_data.adoption;
@@ -76,8 +73,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
             *player_data
                 .reward_by_type
-                .get_mut(&EmissionsType::Code)
-                .unwrap() += code_data.reward;
+                .entry(EmissionsType::Code)
+                .or_insert_with(|| zero.clone()) += code_data.reward;
         }
     }
 
@@ -101,9 +98,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let player_data = active_players_block_data
             .get_mut(&advance_details.player_id)
             .unwrap();
-        player_data
-            .reward_by_type
-            .insert(EmissionsType::Advance, zero.clone());
 
         if advance_data.adoption >= adoption_threshold
             || (is_merged && advance_data.adoption > zero)
@@ -114,8 +108,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
             *player_data
                 .reward_by_type
-                .get_mut(&EmissionsType::Advance)
-                .unwrap() += advance_data.reward;
+                .entry(EmissionsType::Advance)
+                .or_insert_with(|| zero.clone()) += advance_data.reward;
         }
     }
 
@@ -159,7 +153,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             *player_data
                 .reward_by_type
                 .entry(EmissionsType::Benchmarker)
-                .or_insert(zero.clone()) += reward;
+                .or_insert_with(|| zero.clone()) += reward;
             total_benchmarkers_reward += reward;
         }
 
@@ -175,7 +169,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             *player_data
                 .reward_by_type
                 .entry(EmissionsType::Delegator)
-                .or_insert(zero.clone()) += reward;
+                .or_insert_with(|| zero.clone()) += reward;
             total_delegators_reward += reward;
         }
     }
