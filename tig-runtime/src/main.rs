@@ -104,15 +104,17 @@ pub fn compute_solution(
             ($c:ident, cpu) => {{
                 // library function may exit 87 if it runs out of fuel
                 let solve_challenge_fn = unsafe {
-                    library.get::<fn(&$c::Challenge) -> Result<Option<$c::Solution>, String>>(
-                        b"entry_point",
-                    )?
+                    library
+                        .get::<fn(&$c::Challenge, &mut Option<$c::Solution>) -> Result<(), String>>(
+                            b"entry_point",
+                        )?
                 };
 
                 let challenge =
                     $c::Challenge::generate_instance(&seed, &settings.difficulty.into())?;
 
-                let result = solve_challenge_fn(&challenge).map_err(|e| anyhow!("{}", e))?;
+                let mut solution: Option<$c::Solution> = None;
+                solve_challenge_fn(&challenge, &mut solution).map_err(|e| anyhow!("{}", e))?;
                 let fuel_consumed =
                     max_fuel - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
                 if fuel_consumed > max_fuel {
@@ -121,7 +123,7 @@ pub fn compute_solution(
 
                 let runtime_signature =
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
-                let (solution, invalid_reason) = match result {
+                let (solution, invalid_reason) = match solution {
                     Some(s) => match challenge.verify_solution(&s) {
                         Ok(_) => (
                             serde_json::to_value(&s)

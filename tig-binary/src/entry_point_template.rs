@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 #[cfg(not(feature = "cuda"))]
 #[unsafe(no_mangle)]
-pub extern "C" fn entry_point(challenge: &Challenge) -> Result<Option<Solution>, String>
+pub extern "C" fn entry_point(challenge: &Challenge, solution: &mut Option<Solution>) -> Result<(), String>
 {
     return catch_unwind(|| {
         {ALGORITHM}::solve_challenge(challenge).map_err(|e| e.to_string())
