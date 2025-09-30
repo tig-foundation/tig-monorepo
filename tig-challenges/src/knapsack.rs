@@ -33,6 +33,14 @@ pub struct Solution {
     pub sub_solutions: Vec<SubSolution>,
 }
 
+impl Solution {
+    pub fn new() -> Self {
+        Self {
+            sub_solutions: Vec::new(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubSolution {
     pub items: Vec<usize>,

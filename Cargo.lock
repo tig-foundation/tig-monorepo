@@ -2046,6 +2046,7 @@ dependencies = [
 name = "tig-binary"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "cudarc",
  "tig-algorithms",
  "tig-challenges",

@@ -1,4 +1,5 @@
-use std::panic::catch_unwind;
+use anyhow::{anyhow, Result};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use tig_algorithms::{CHALLENGE}::{ALGORITHM};
 use tig_challenges::{CHALLENGE}::*;
 
@@ -13,28 +14,32 @@ use std::sync::Arc;
 
 #[cfg(not(feature = "cuda"))]
 #[unsafe(no_mangle)]
-pub extern "C" fn entry_point(challenge: &Challenge) -> Result<Option<Solution>, String>
+pub fn entry_point(
+    challenge: &Challenge,
+    save_solution: &dyn Fn(&Solution) -> Result<()>
+) -> Result<()>
 {
-    return catch_unwind(|| {
-        {ALGORITHM}::solve_challenge(challenge).map_err(|e| e.to_string())
-    }).unwrap_or_else(|_| {
-        Err("Panic occurred calling solve_challenge".to_string())
-    });
+    catch_unwind(AssertUnwindSafe(|| {
+        {ALGORITHM}::solve_challenge(challenge, save_solution)
+    })).unwrap_or_else(|_| {
+        Err(anyhow!("Panic occurred calling solve_challenge"))
+    })
 }
 
 
 #[cfg(feature = "cuda")]
 #[unsafe(no_mangle)]
-pub extern "C" fn entry_point(
+pub fn entry_point(
     challenge: &Challenge,
+    save_solution: &dyn Fn(&Solution) -> Result<()>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
 ) -> Result<Option<Solution>, String>
 {
-    return catch_unwind(|| {
-        {ALGORITHM}::solve_challenge(challenge, module, stream, prop).map_err(|e| e.to_string())
-    }).unwrap_or_else(|_| {
-        Err("Panic occurred calling solve_challenge".to_string())
-    });
+    catch_unwind(AssertUnwindSafe(|| {
+        {ALGORITHM}::solve_challenge(challenge, module, stream, prop)
+    })).unwrap_or_else(|_| {
+        Err(anyhow!("Panic occurred calling solve_challenge"))
+    })
 }

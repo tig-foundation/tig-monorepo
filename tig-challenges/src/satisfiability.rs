@@ -42,6 +42,14 @@ pub struct Solution {
     pub variables: Vec<bool>,
 }
 
+impl Solution {
+    pub fn new() -> Self {
+        Self {
+            variables: Vec::new(),
+        }
+    }
+}
+
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
 

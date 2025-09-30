@@ -33,6 +33,14 @@ pub struct Solution {
     pub indexes: Vec<usize>,
 }
 
+impl Solution {
+    pub fn new() -> Self {
+        Self {
+            indexes: Vec::new(),
+        }
+    }
+}
+
 impl TryFrom<Map<String, Value>> for Solution {
     type Error = serde_json::Error;
 

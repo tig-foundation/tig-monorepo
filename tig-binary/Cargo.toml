@@ -11,6 +11,7 @@ edition.workspace = true
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
+anyhow = "1.0.81"
 cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "runtime-fuel/cudnn-cublas", features = [
     "cuda-version-from-build-system",
 ], optional = true }

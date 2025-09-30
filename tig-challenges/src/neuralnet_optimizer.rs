@@ -55,6 +55,20 @@ pub struct Solution {
     pub bn_running_vars: Vec<Vec<f32>>,
 }
 
+impl Solution {
+    pub fn new() -> Self {
+        Self {
+            weights: Vec::new(),
+            biases: Vec::new(),
+            epochs_used: 0,
+            bn_weights: Vec::new(),
+            bn_biases: Vec::new(),
+            bn_running_means: Vec::new(),
+            bn_running_vars: Vec::new(),
+        }
+    }
+}
+
 // Helper struct for (de)serialization
 #[derive(Serialize, Deserialize)]
 struct SolutionData {
