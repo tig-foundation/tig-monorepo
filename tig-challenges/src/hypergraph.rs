@@ -9,7 +9,10 @@ use std::sync::Arc;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Difficulty {
     pub num_hyperedges: u32,
+    #[cfg(feature = "pub_baseline")]
     pub better_than_baseline: u32,
+    #[cfg(not(feature = "pub_baseline"))]
+    better_than_baseline: u32,
 }
 
 impl From<Vec<i32>> for Difficulty {
@@ -75,7 +78,10 @@ pub struct SubInstance {
     pub d_node_degrees: CudaSlice<i32>,
     pub d_node_offsets: CudaSlice<i32>,
     pub d_node_hyperedges: CudaSlice<i32>,
+    #[cfg(feature = "pub_baseline")]
     pub baseline_connectivity_metric: u32,
+    #[cfg(not(feature = "pub_baseline"))]
+    max_distance: f32,
 }
 
 pub const NUM_SUB_INSTANCES: usize = 4;

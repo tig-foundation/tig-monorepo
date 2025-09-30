@@ -11,7 +11,10 @@ use std::collections::{HashMap, HashSet};
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_nodes: usize,
+    #[cfg(feature = "pub_baseline")]
     pub better_than_baseline: u32,
+    #[cfg(not(feature = "pub_baseline"))]
+    better_than_baseline: u32,
 }
 
 impl From<Vec<i32>> for Difficulty {
@@ -68,7 +71,10 @@ pub struct SubInstance {
     pub difficulty: Difficulty,
     pub demands: Vec<i32>,
     pub distance_matrix: Vec<Vec<i32>>,
+    #[cfg(feature = "pub_baseline")]
     pub baseline_total_distance: i32,
+    #[cfg(not(feature = "pub_baseline"))]
+    baseline_total_distance: i32,
     pub max_capacity: i32,
     pub fleet_size: usize,
     pub service_time: i32,

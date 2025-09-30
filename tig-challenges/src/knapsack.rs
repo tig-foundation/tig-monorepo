@@ -10,7 +10,10 @@ use std::collections::HashSet;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Difficulty {
     pub num_items: usize,
+    #[cfg(feature = "pub_baseline")]
     pub better_than_baseline: u32,
+    #[cfg(not(feature = "pub_baseline"))]
+    better_than_baseline: u32,
 }
 
 impl From<Vec<i32>> for Difficulty {
@@ -69,7 +72,10 @@ pub struct SubInstance {
     pub values: Vec<u32>,
     pub interaction_values: Vec<Vec<i32>>,
     pub max_weight: u32,
+    #[cfg(feature = "pub_baseline")]
     pub baseline_value: u32,
+    #[cfg(not(feature = "pub_baseline"))]
+    baseline_value: u32,
 }
 
 pub const NUM_SUB_INSTANCES: usize = 16;

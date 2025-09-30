@@ -11,7 +11,10 @@ use std::sync::Arc;
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_queries: u32,
+    #[cfg(feature = "pub_baseline")]
     pub better_than_baseline: u32,
+    #[cfg(not(feature = "pub_baseline"))]
+    better_than_baseline: u32,
 }
 
 impl From<Vec<i32>> for Difficulty {
@@ -56,7 +59,10 @@ pub struct Challenge {
     pub database_size: u32,
     pub d_database_vectors: CudaSlice<f32>,
     pub d_query_vectors: CudaSlice<f32>,
+    #[cfg(feature = "pub_baseline")]
     pub max_distance: f32,
+    #[cfg(not(feature = "pub_baseline"))]
+    max_distance: f32,
 }
 
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
