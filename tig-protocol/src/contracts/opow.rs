@@ -173,12 +173,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     ..
                 } = settings;
 
-                let min_difficulty = challenge_config.difficulty.min_difficulty.clone();
-                let max_difficulty = challenge_config.difficulty.max_difficulty.clone();
-                if (0..difficulty.len())
-                    .into_iter()
-                    .any(|i| difficulty[i] < min_difficulty[i] || difficulty[i] > max_difficulty[i])
-                {
+                let min_frontier = &challenge_config.difficulty.min_frontier;
+                let max_frontier = &challenge_config.difficulty.max_frontier;
+                if min_frontier.iter().any(|min_point| {
+                    pareto_compare(difficulty, min_point) == ParetoCompare::BDominatesA
+                }) || max_frontier.iter().any(|max_point| {
+                    pareto_compare(difficulty, max_point) == ParetoCompare::ADominatesB
+                }) {
                     continue;
                 }
                 *player_code_solutions
@@ -266,8 +267,22 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let challenge_config = &config.challenges[challenge_id];
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
 
-        let min_difficulty = challenge_config.difficulty.min_difficulty.clone();
-        let max_difficulty = challenge_config.difficulty.max_difficulty.clone();
+        let min_difficulty = challenge_config.difficulty.min_frontier.iter().fold(
+            vec![i32::MAX; 2],
+            |mut acc, x| {
+                acc[0] = acc[0].min(x[0]);
+                acc[1] = acc[1].min(x[1]);
+                acc
+            },
+        );
+        let max_difficulty = challenge_config.difficulty.max_frontier.iter().fold(
+            vec![i32::MIN; 2],
+            |mut acc, x| {
+                acc[0] = acc[0].max(x[0]);
+                acc[1] = acc[1].max(x[1]);
+                acc
+            },
+        );
 
         let points = challenge_data
             .qualifier_difficulties
