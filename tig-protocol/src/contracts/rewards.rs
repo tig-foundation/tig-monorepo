@@ -124,7 +124,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             continue;
         }
 
-        if opow_data.delegated_weighted_deposit > zero {
+        if opow_data.weighted_delegated_deposit > zero {
             opow_data.reward_share = opow_data.reward
                 * PreciseNumber::from_f64(
                     active_players_state[delegatee]
@@ -165,7 +165,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let player_data = active_players_block_data.get_mut(delegator).unwrap();
             let fraction = PreciseNumber::from_f64(*player_data.delegatees.get(delegatee).unwrap());
             let reward = opow_data.reward_share * fraction * player_data.weighted_deposit
-                / opow_data.delegated_weighted_deposit;
+                / opow_data.weighted_delegated_deposit;
             *player_data
                 .reward_by_type
                 .entry(EmissionsType::Delegator)
