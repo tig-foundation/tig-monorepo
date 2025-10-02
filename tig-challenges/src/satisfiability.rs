@@ -105,27 +105,29 @@ impl Challenge {
         })
     }
 
-    pub fn verify_solution(&self, solution: &Solution) -> Result<()> {
-        if solution.variables.len() != self.difficulty.num_variables {
-            return Err(anyhow!(
-                "Invalid number of variables. Expected: {}, Actual: {}",
-                self.difficulty.num_variables,
-                solution.variables.len()
-            ));
-        }
+    conditional_pub!(
+        fn verify_solution(&self, solution: &Solution) -> Result<()> {
+            if solution.variables.len() != self.difficulty.num_variables {
+                return Err(anyhow!(
+                    "Invalid number of variables. Expected: {}, Actual: {}",
+                    self.difficulty.num_variables,
+                    solution.variables.len()
+                ));
+            }
 
-        if let Some((idx, _)) = self.clauses.iter().enumerate().find(|(_, clause)| {
-            !clause.iter().any(|&literal| {
-                let var_idx = literal.abs() as usize - 1;
-                let var_value = solution.variables[var_idx];
-                (literal > 0 && var_value) || (literal < 0 && !var_value)
-            })
-        }) {
-            Err(anyhow!("Clause '{}' not satisfied", idx))
-        } else {
-            Ok(())
+            if let Some((idx, _)) = self.clauses.iter().enumerate().find(|(_, clause)| {
+                !clause.iter().any(|&literal| {
+                    let var_idx = literal.abs() as usize - 1;
+                    let var_value = solution.variables[var_idx];
+                    (literal > 0 && var_value) || (literal < 0 && !var_value)
+                })
+            }) {
+                Err(anyhow!("Clause '{}' not satisfied", idx))
+            } else {
+                Ok(())
+            }
         }
-    }
+    );
 }
 
 mod bool_vec_as_u8 {

@@ -115,20 +115,14 @@ pub fn compute_solution(
                 let runtime_signature =
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
 
-                let solution = match challenge.verify_solution(&solution) {
-                    Ok(_) => match serde_json::to_value(&solution).unwrap() {
-                        serde_json::Value::String(s) => {
-                            let mut map = serde_json::Map::new();
-                            map.insert("base64".to_string(), serde_json::Value::String(s));
-                            map
-                        }
-                        serde_json::Value::Object(map) => map,
-                        _ => return Err(anyhow!("Expected String or Object from to_value")),
-                    },
-                    Err(e) => {
-                        eprintln!("Invalid solution: {}", e);
-                        serde_json::Map::new()
+                let solution = match serde_json::to_value(&solution)? {
+                    serde_json::Value::String(s) => {
+                        let mut map = serde_json::Map::new();
+                        map.insert("base64".to_string(), serde_json::Value::String(s));
+                        map
                     }
+                    serde_json::Value::Object(map) => map,
+                    _ => return Err(anyhow!("Expected String or Object from to_value")),
                 };
 
                 let output_data = OutputData {
@@ -243,25 +237,14 @@ pub fn compute_solution(
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
                 let runtime_signature = gpu_runtime_signature ^ cpu_runtime_signature;
 
-                let solution = match challenge.verify_solution(
-                    &solution,
-                    module.clone(),
-                    stream.clone(),
-                    &prop,
-                ) {
-                    Ok(_) => match serde_json::to_value(&solution).unwrap() {
-                        serde_json::Value::String(s) => {
-                            let mut map = serde_json::Map::new();
-                            map.insert("base64".to_string(), serde_json::Value::String(s));
-                            map
-                        }
-                        serde_json::Value::Object(map) => map,
-                        _ => return Err(anyhow!("Expected String or Object from to_value")),
-                    },
-                    Err(e) => {
-                        eprintln!("Invalid solution: {}", e);
-                        serde_json::Map::new()
+                let solution = match serde_json::to_value(&solution)? {
+                    serde_json::Value::String(s) => {
+                        let mut map = serde_json::Map::new();
+                        map.insert("base64".to_string(), serde_json::Value::String(s));
+                        map
                     }
+                    serde_json::Value::Object(map) => map,
+                    _ => return Err(anyhow!("Expected String or Object from to_value")),
                 };
 
                 let output_data = OutputData {

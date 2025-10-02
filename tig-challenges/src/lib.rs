@@ -1,5 +1,15 @@
 pub const BUILD_TIME_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
+macro_rules! conditional_pub {
+    (fn $name:ident $($rest:tt)*) => {
+        #[cfg(not(feature = "hide_verification"))]
+        pub fn $name $($rest)*
+
+        #[cfg(feature = "hide_verification")]
+        fn $name $($rest)*
+    };
+}
+
 #[cfg(feature = "c001")]
 pub mod satisfiability;
 #[cfg(feature = "c001")]

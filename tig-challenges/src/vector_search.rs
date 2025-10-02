@@ -11,9 +11,9 @@ use std::sync::Arc;
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_queries: u32,
-    #[cfg(feature = "pub_baseline")]
+    #[cfg(not(feature = "hide_verification"))]
     pub better_than_baseline: u32,
-    #[cfg(not(feature = "pub_baseline"))]
+    #[cfg(feature = "hide_verification")]
     better_than_baseline: u32,
 }
 
@@ -59,9 +59,9 @@ pub struct Challenge {
     pub database_size: u32,
     pub d_database_vectors: CudaSlice<f32>,
     pub d_query_vectors: CudaSlice<f32>,
-    #[cfg(feature = "pub_baseline")]
+    #[cfg(not(feature = "hide_verification"))]
     pub max_distance: f32,
-    #[cfg(not(feature = "pub_baseline"))]
+    #[cfg(feature = "hide_verification")]
     max_distance: f32,
 }
 
@@ -170,33 +170,35 @@ impl Challenge {
         });
     }
 
-    pub fn verify_solution(
-        &self,
-        solution: &Solution,
-        module: Arc<CudaModule>,
-        stream: Arc<CudaStream>,
-        prop: &cudaDeviceProp,
-    ) -> Result<f32> {
-        let avg_dist = calc_average_distance(
-            self.difficulty.num_queries,
-            self.vector_dims,
-            self.database_size,
-            &self.d_query_vectors,
-            &self.d_database_vectors,
-            &solution.indexes,
-            module.clone(),
-            stream.clone(),
-            prop,
-        )?;
-        if avg_dist > self.max_distance {
-            return Err(anyhow!(
-                "Average query vector distance is '{}'. Max dist: '{}'",
-                avg_dist,
-                self.max_distance
-            ));
+    conditional_pub!(
+        fn verify_solution(
+            &self,
+            solution: &Solution,
+            module: Arc<CudaModule>,
+            stream: Arc<CudaStream>,
+            prop: &cudaDeviceProp,
+        ) -> Result<f32> {
+            let avg_dist = calc_average_distance(
+                self.difficulty.num_queries,
+                self.vector_dims,
+                self.database_size,
+                &self.d_query_vectors,
+                &self.d_database_vectors,
+                &solution.indexes,
+                module.clone(),
+                stream.clone(),
+                prop,
+            )?;
+            if avg_dist > self.max_distance {
+                return Err(anyhow!(
+                    "Average query vector distance is '{}'. Max dist: '{}'",
+                    avg_dist,
+                    self.max_distance
+                ));
+            }
+            Ok(avg_dist)
         }
-        Ok(avg_dist)
-    }
+    );
 }
 
 pub fn calc_average_distance(

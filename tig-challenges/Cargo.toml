@@ -25,7 +25,7 @@ flate2 = { version = "1.0", optional = true }
 base64 = { version = "0.21", optional = true }
 
 [features]
-pub_baseline = []
+hide_verification = []
 bincode_solution = ["bincode", "flate2", "base64"]
 c001 = []
 satisfiability = ["c001"]

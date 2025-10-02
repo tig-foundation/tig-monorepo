@@ -27,7 +27,10 @@ const THREADS_PER_BLOCK: u32 = 1024;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Difficulty {
     pub num_hidden_layers: usize,
+    #[cfg(not(feature = "hide_verification"))]
     pub accuracy_factor: u32,
+    #[cfg(feature = "hide_verification")]
+    accuracy_factor: u32,
 }
 
 impl From<Vec<i32>> for Difficulty {
@@ -363,63 +366,65 @@ impl Challenge {
         })
     }
 
-    pub fn verify_solution(
-        &self,
-        solution: &Solution,
-        module: Arc<CudaModule>,
-        stream: Arc<CudaStream>,
-        _prop: &cudaDeviceProp,
-    ) -> Result<()> {
-        let cublas = CudaBlas::new(stream.clone())?;
-        let cudnn = Cudnn::new(stream.clone())?;
+    conditional_pub!(
+        fn verify_solution(
+            &self,
+            solution: &Solution,
+            module: Arc<CudaModule>,
+            stream: Arc<CudaStream>,
+            _prop: &cudaDeviceProp,
+        ) -> Result<()> {
+            let cublas = CudaBlas::new(stream.clone())?;
+            let cudnn = Cudnn::new(stream.clone())?;
 
-        let mut model = MLP::new(&self.layer_dims(), self.num_frozen_layers, stream.clone())?;
+            let mut model = MLP::new(&self.layer_dims(), self.num_frozen_layers, stream.clone())?;
 
-        load_solution(&mut model, solution, stream.clone())?;
+            load_solution(&mut model, solution, stream.clone())?;
 
-        let (output, _) = model.forward(
-            &self.dataset.test_inputs(),
-            false,
-            stream.clone(),
-            module.clone(),
-            &cublas,
-            &cudnn,
-        )?;
-        let (loss, _) = model.loss_and_grad(
-            &output,
-            &&self.dataset.test_targets_noisy(),
-            stream.clone(),
-            module.clone(),
-        )?;
+            let (output, _) = model.forward(
+                &self.dataset.test_inputs(),
+                false,
+                stream.clone(),
+                module.clone(),
+                &cublas,
+                &cudnn,
+            )?;
+            let (loss, _) = model.loss_and_grad(
+                &output,
+                &&self.dataset.test_targets_noisy(),
+                stream.clone(),
+                module.clone(),
+            )?;
 
-        let avg_model_loss_on_test = stream.memcpy_dtov(&loss)?[0];
+            let avg_model_loss_on_test = stream.memcpy_dtov(&loss)?[0];
 
-        // Calculate baseline error epsilon_star_squared
-        let alpha = 4.0 - self.difficulty.accuracy_factor as f32 / 1000.0;
+            // Calculate baseline error epsilon_star_squared
+            let alpha = 4.0 - self.difficulty.accuracy_factor as f32 / 1000.0;
 
-        let y_h = stream.memcpy_dtov(&self.dataset.test_targets_noisy())?;
-        let f_h = stream.memcpy_dtov(&self.dataset.test_targets_true_f())?;
-        stream.synchronize()?;
+            let y_h = stream.memcpy_dtov(&self.dataset.test_targets_noisy())?;
+            let f_h = stream.memcpy_dtov(&self.dataset.test_targets_true_f())?;
+            stream.synchronize()?;
 
-        let sum_sq_diff_true_vs_noisy: f32 = y_h
-            .iter()
-            .zip(f_h.iter())
-            .map(|(y, f)| (*y - *f).powi(2))
-            .sum();
+            let sum_sq_diff_true_vs_noisy: f32 = y_h
+                .iter()
+                .zip(f_h.iter())
+                .map(|(y, f)| (*y - *f).powi(2))
+                .sum();
 
-        let epsilon_star_squared =
-            (alpha / self.dataset.test_size as f32) * sum_sq_diff_true_vs_noisy;
+            let epsilon_star_squared =
+                (alpha / self.dataset.test_size as f32) * sum_sq_diff_true_vs_noisy;
 
-        if avg_model_loss_on_test <= epsilon_star_squared {
-            Ok(())
-        } else {
-            Err(anyhow!(
+            if avg_model_loss_on_test <= epsilon_star_squared {
+                Ok(())
+            } else {
+                Err(anyhow!(
                 "Model test loss ({:.4e}) exceeds target baseline epsilon_star_squared ({:.4e})",
                 avg_model_loss_on_test,
                 epsilon_star_squared
             ))
+            }
         }
-    }
+    );
 
     pub fn layer_dims(&self) -> Vec<usize> {
         let mut layer_dims = vec![self.hidden_layers_dims; self.difficulty.num_hidden_layers];

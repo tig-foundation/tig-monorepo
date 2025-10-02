@@ -11,9 +11,9 @@ use std::collections::{HashMap, HashSet};
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
     pub num_nodes: usize,
-    #[cfg(feature = "pub_baseline")]
+    #[cfg(not(feature = "hide_verification"))]
     pub better_than_baseline: u32,
-    #[cfg(not(feature = "pub_baseline"))]
+    #[cfg(feature = "hide_verification")]
     better_than_baseline: u32,
 }
 
@@ -71,9 +71,9 @@ pub struct SubInstance {
     pub difficulty: Difficulty,
     pub demands: Vec<i32>,
     pub distance_matrix: Vec<Vec<i32>>,
-    #[cfg(feature = "pub_baseline")]
+    #[cfg(not(feature = "hide_verification"))]
     pub baseline_total_distance: i32,
-    #[cfg(not(feature = "pub_baseline"))]
+    #[cfg(feature = "hide_verification")]
     baseline_total_distance: i32,
     pub max_capacity: i32,
     pub fleet_size: usize,
@@ -99,35 +99,37 @@ impl Challenge {
         })
     }
 
-    pub fn verify_solution(&self, solution: &Solution) -> Result<()> {
-        let mut better_than_baselines = Vec::new();
-        for (i, (sub_instance, sub_solution)) in self
-            .sub_instances
-            .iter()
-            .zip(&solution.sub_solutions)
-            .enumerate()
-        {
-            match sub_instance.verify_solution(&sub_solution) {
-                Ok(total_distance) => better_than_baselines
-                    .push(total_distance as f64 / sub_instance.baseline_total_distance as f64),
-                Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
+    conditional_pub!(
+        fn verify_solution(&self, solution: &Solution) -> Result<()> {
+            let mut better_than_baselines = Vec::new();
+            for (i, (sub_instance, sub_solution)) in self
+                .sub_instances
+                .iter()
+                .zip(&solution.sub_solutions)
+                .enumerate()
+            {
+                match sub_instance.verify_solution(&sub_solution) {
+                    Ok(total_distance) => better_than_baselines
+                        .push(total_distance as f64 / sub_instance.baseline_total_distance as f64),
+                    Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
+                }
+            }
+            let average = 1.0
+                - (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
+                    / better_than_baselines.len() as f64)
+                    .sqrt();
+            let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
+            if average >= threshold {
+                Ok(())
+            } else {
+                Err(anyhow!(
+                    "Average better_than_baseline ({}) is less than ({})",
+                    average,
+                    threshold
+                ))
             }
         }
-        let average = 1.0
-            - (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
-                / better_than_baselines.len() as f64)
-                .sqrt();
-        let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
-        if average >= threshold {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Average better_than_baseline ({}) is less than ({})",
-                average,
-                threshold
-            ))
-        }
-    }
+    );
 }
 
 impl SubInstance {
@@ -264,26 +266,28 @@ impl SubInstance {
         })
     }
 
-    pub fn verify_solution(&self, solution: &SubSolution) -> Result<i32> {
-        if solution.routes.len() > self.fleet_size {
-            return Err(anyhow!(
-                "Number of routes ({}) exceeds fleet size ({})",
-                solution.routes.len(),
-                self.fleet_size
-            ));
+    conditional_pub!(
+        fn verify_solution(&self, solution: &SubSolution) -> Result<i32> {
+            if solution.routes.len() > self.fleet_size {
+                return Err(anyhow!(
+                    "Number of routes ({}) exceeds fleet size ({})",
+                    solution.routes.len(),
+                    self.fleet_size
+                ));
+            }
+            let total_distance = calc_routes_total_distance(
+                self.difficulty.num_nodes,
+                self.max_capacity,
+                &self.demands,
+                &self.distance_matrix,
+                &solution.routes,
+                self.service_time,
+                &self.ready_times,
+                &self.due_times,
+            )?;
+            Ok(total_distance)
         }
-        let total_distance = calc_routes_total_distance(
-            self.difficulty.num_nodes,
-            self.max_capacity,
-            &self.demands,
-            &self.distance_matrix,
-            &solution.routes,
-            self.service_time,
-            &self.ready_times,
-            &self.due_times,
-        )?;
-        Ok(total_distance)
-    }
+    );
 }
 
 fn truncated_normal_sample<T: Rng>(

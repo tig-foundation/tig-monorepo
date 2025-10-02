@@ -10,9 +10,9 @@ use std::collections::HashSet;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Difficulty {
     pub num_items: usize,
-    #[cfg(feature = "pub_baseline")]
+    #[cfg(not(feature = "hide_verification"))]
     pub better_than_baseline: u32,
-    #[cfg(not(feature = "pub_baseline"))]
+    #[cfg(feature = "hide_verification")]
     better_than_baseline: u32,
 }
 
@@ -72,9 +72,9 @@ pub struct SubInstance {
     pub values: Vec<u32>,
     pub interaction_values: Vec<Vec<i32>>,
     pub max_weight: u32,
-    #[cfg(feature = "pub_baseline")]
+    #[cfg(not(feature = "hide_verification"))]
     pub baseline_value: u32,
-    #[cfg(not(feature = "pub_baseline"))]
+    #[cfg(feature = "hide_verification")]
     baseline_value: u32,
 }
 
@@ -95,35 +95,37 @@ impl Challenge {
         })
     }
 
-    pub fn verify_solution(&self, solution: &Solution) -> Result<()> {
-        let mut better_than_baselines = Vec::new();
-        for (i, (sub_instance, sub_solution)) in self
-            .sub_instances
-            .iter()
-            .zip(&solution.sub_solutions)
-            .enumerate()
-        {
-            match sub_instance.verify_solution(&sub_solution) {
-                Ok(total_value) => better_than_baselines
-                    .push(total_value as f64 / sub_instance.baseline_value as f64),
-                Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
+    conditional_pub!(
+        fn verify_solution(&self, solution: &Solution) -> Result<()> {
+            let mut better_than_baselines = Vec::new();
+            for (i, (sub_instance, sub_solution)) in self
+                .sub_instances
+                .iter()
+                .zip(&solution.sub_solutions)
+                .enumerate()
+            {
+                match sub_instance.verify_solution(&sub_solution) {
+                    Ok(total_value) => better_than_baselines
+                        .push(total_value as f64 / sub_instance.baseline_value as f64),
+                    Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
+                }
+            }
+            let average = (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
+                / better_than_baselines.len() as f64)
+                .sqrt()
+                - 1.0;
+            let threshold = self.difficulty.better_than_baseline as f64 / 10000.0;
+            if average >= threshold {
+                Ok(())
+            } else {
+                Err(anyhow!(
+                    "Average better_than_baseline ({}) is less than ({})",
+                    average,
+                    threshold
+                ))
             }
         }
-        let average = (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
-            / better_than_baselines.len() as f64)
-            .sqrt()
-            - 1.0;
-        let threshold = self.difficulty.better_than_baseline as f64 / 10000.0;
-        if average >= threshold {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Average better_than_baseline ({}) is less than ({})",
-                average,
-                threshold
-            ))
-        }
-    }
+    );
 }
 
 impl SubInstance {
@@ -317,36 +319,38 @@ impl SubInstance {
         })
     }
 
-    pub fn verify_solution(&self, solution: &SubSolution) -> Result<u32> {
-        let selected_items: HashSet<usize> = solution.items.iter().cloned().collect();
-        if selected_items.len() != solution.items.len() {
-            return Err(anyhow!("Duplicate items selected."));
-        }
+    conditional_pub!(
+        fn verify_solution(&self, solution: &SubSolution) -> Result<u32> {
+            let selected_items: HashSet<usize> = solution.items.iter().cloned().collect();
+            if selected_items.len() != solution.items.len() {
+                return Err(anyhow!("Duplicate items selected."));
+            }
 
-        let total_weight = selected_items
-            .iter()
-            .map(|&item| {
-                if item >= self.weights.len() {
-                    return Err(anyhow!("Item ({}) is out of bounds", item));
-                }
-                Ok(self.weights[item])
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .sum::<u32>();
+            let total_weight = selected_items
+                .iter()
+                .map(|&item| {
+                    if item >= self.weights.len() {
+                        return Err(anyhow!("Item ({}) is out of bounds", item));
+                    }
+                    Ok(self.weights[item])
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .iter()
+                .sum::<u32>();
 
-        if total_weight > self.max_weight {
-            return Err(anyhow!(
-                "Total weight ({}) exceeded max weight ({})",
-                total_weight,
-                self.max_weight
-            ));
+            if total_weight > self.max_weight {
+                return Err(anyhow!(
+                    "Total weight ({}) exceeded max weight ({})",
+                    total_weight,
+                    self.max_weight
+                ));
+            }
+            let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
+            let total_value =
+                calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
+            Ok(total_value)
         }
-        let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
-        let total_value =
-            calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
-        Ok(total_value)
-    }
+    );
 }
 
 pub fn calculate_total_value(
