@@ -226,12 +226,9 @@ pub fn calc_average_distance(
     let mut d_total_distance = stream.alloc_zeros::<f32>(1)?;
     let mut errorflag = stream.alloc_zeros::<u32>(1)?;
 
-    let threads_per_block = MAX_THREADS_PER_BLOCK;
-    let blocks = (num_queries + threads_per_block - 1) / threads_per_block;
-
     let cfg = LaunchConfig {
-        grid_dim: (blocks, 1, 1),
-        block_dim: (threads_per_block, 1, 1),
+        grid_dim: (1, 1, 1),
+        block_dim: (1, 1, 1),
         shared_mem_bytes: 0,
     };
 

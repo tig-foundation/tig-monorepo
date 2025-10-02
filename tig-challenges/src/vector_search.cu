@@ -142,9 +142,9 @@ extern "C" __global__ void calc_total_distance(
     int *error_flag
 )
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx < num_queries) {
+    *total_distance = 0.0f;
+    
+    for (int idx = 0; idx < num_queries; idx++) {
         size_t search_index = solution_indexes[idx];
 
         if (search_index >= database_size) {
@@ -162,6 +162,6 @@ extern "C" __global__ void calc_total_distance(
         }
         dist = sqrtf(dist);
 
-        atomicAdd(total_distance, dist);
+        *total_distance += dist;
     }
 }
