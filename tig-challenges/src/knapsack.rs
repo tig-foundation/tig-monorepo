@@ -1,10 +1,6 @@
 use anyhow::{anyhow, Result};
-use rand::{
-    rngs::{SmallRng, StdRng},
-    Rng, SeedableRng,
-};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Map, Value};
 use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -31,41 +27,20 @@ impl Into<Vec<i32>> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Solution {
-    pub sub_solutions: Vec<SubSolution>,
+impl_base64_serde! {
+    Solution {
+        items: Vec<usize>,
+    }
 }
 
 impl Solution {
     pub fn new() -> Self {
-        Self {
-            sub_solutions: Vec::new(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SubSolution {
-    pub items: Vec<usize>,
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
+        Self { items: Vec::new() }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
-    pub seed: [u8; 32],
-    pub difficulty: Difficulty,
-    pub sub_instances: Vec<SubInstance>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SubInstance {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub weights: Vec<u32>,
@@ -78,58 +53,8 @@ pub struct SubInstance {
     baseline_value: u32,
 }
 
-pub const NUM_SUB_INSTANCES: usize = 16;
-
 impl Challenge {
-    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Challenge> {
-        let mut rng = StdRng::from_seed(seed.clone());
-        let mut sub_instances = Vec::new();
-        for _ in 0..NUM_SUB_INSTANCES {
-            sub_instances.push(SubInstance::generate_instance(&rng.gen(), difficulty)?);
-        }
-
-        Ok(Challenge {
-            seed: seed.clone(),
-            difficulty: difficulty.clone(),
-            sub_instances,
-        })
-    }
-
-    conditional_pub!(
-        fn verify_solution(&self, solution: &Solution) -> Result<()> {
-            let mut better_than_baselines = Vec::new();
-            for (i, (sub_instance, sub_solution)) in self
-                .sub_instances
-                .iter()
-                .zip(&solution.sub_solutions)
-                .enumerate()
-            {
-                match sub_instance.verify_solution(&sub_solution) {
-                    Ok(total_value) => better_than_baselines
-                        .push(total_value as f64 / sub_instance.baseline_value as f64),
-                    Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
-                }
-            }
-            let average = (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
-                / better_than_baselines.len() as f64)
-                .sqrt()
-                - 1.0;
-            let threshold = self.difficulty.better_than_baseline as f64 / 10000.0;
-            if average >= threshold {
-                Ok(())
-            } else {
-                Err(anyhow!(
-                    "Average better_than_baseline ({}) is less than ({})",
-                    average,
-                    threshold
-                ))
-            }
-        }
-    );
-}
-
-impl SubInstance {
-    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<SubInstance> {
+    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
         let mut rng = SmallRng::from_seed(seed.clone());
         // Set constant density for value generation
         let density = 0.25;
@@ -308,7 +233,7 @@ impl SubInstance {
 
         let baseline_value = calculate_total_value(&selected_items, &values, &interaction_values);
 
-        Ok(SubInstance {
+        Ok(Challenge {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             weights,
@@ -319,36 +244,53 @@ impl SubInstance {
         })
     }
 
+    pub fn calculate_total_value(&self, solution: &Solution) -> Result<u32> {
+        let selected_items: HashSet<usize> = solution.items.iter().cloned().collect();
+        if selected_items.len() != solution.items.len() {
+            return Err(anyhow!("Duplicate items selected."));
+        }
+
+        let total_weight = selected_items
+            .iter()
+            .map(|&item| {
+                if item >= self.weights.len() {
+                    return Err(anyhow!("Item ({}) is out of bounds", item));
+                }
+                Ok(self.weights[item])
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .sum::<u32>();
+
+        if total_weight > self.max_weight {
+            return Err(anyhow!(
+                "Total weight ({}) exceeded max weight ({})",
+                total_weight,
+                self.max_weight
+            ));
+        }
+        let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
+        let total_value =
+            calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
+        Ok(total_value)
+    }
+
     conditional_pub!(
-        fn verify_solution(&self, solution: &SubSolution) -> Result<u32> {
-            let selected_items: HashSet<usize> = solution.items.iter().cloned().collect();
-            if selected_items.len() != solution.items.len() {
-                return Err(anyhow!("Duplicate items selected."));
+        fn verify_solution(&self, solution: &Solution) -> Result<()> {
+            let total_value = self.calculate_total_value(solution)?;
+            let btb = self.difficulty.better_than_baseline as f64 / 10000.0;
+            let total_value_threshold = (self.baseline_value as f64 * (1.0 + btb)).floor() as u32;
+            if total_value < total_value_threshold {
+                Err(anyhow!(
+                    "Total value ({}) is less than threshold ({}) (baseline: {}, better_than_baseline: {}%)",
+                    total_value,
+                    total_value_threshold,
+                    self.baseline_value,
+                    btb * 100.0
+                ))
+            } else {
+                Ok(())
             }
-
-            let total_weight = selected_items
-                .iter()
-                .map(|&item| {
-                    if item >= self.weights.len() {
-                        return Err(anyhow!("Item ({}) is out of bounds", item));
-                    }
-                    Ok(self.weights[item])
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .iter()
-                .sum::<u32>();
-
-            if total_weight > self.max_weight {
-                return Err(anyhow!(
-                    "Total weight ({}) exceeded max weight ({})",
-                    total_weight,
-                    self.max_weight
-                ));
-            }
-            let selected_items_vec: Vec<usize> = selected_items.into_iter().collect();
-            let total_value =
-                calculate_total_value(&selected_items_vec, &self.values, &self.interaction_values);
-            Ok(total_value)
         }
     );
 }

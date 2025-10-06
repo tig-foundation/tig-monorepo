@@ -5,12 +5,7 @@ use rand::{
     rngs::{SmallRng, StdRng},
     Rng, SeedableRng,
 };
-use serde::{
-    de::{self, SeqAccess, Visitor},
-    ser::SerializeSeq,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-use serde_json::{from_value, Map, Value};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
@@ -36,10 +31,10 @@ impl Into<Vec<i32>> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Solution {
-    #[serde(with = "bool_vec_as_u8")]
-    pub variables: Vec<bool>,
+impl_base64_serde! {
+    Solution {
+        variables: Vec<bool>,
+    }
 }
 
 impl Solution {
@@ -47,14 +42,6 @@ impl Solution {
         Self {
             variables: Vec::new(),
         }
-    }
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
     }
 }
 
@@ -128,53 +115,4 @@ impl Challenge {
             }
         }
     );
-}
-
-mod bool_vec_as_u8 {
-    use super::*;
-    use std::fmt;
-
-    pub fn serialize<S>(data: &Vec<bool>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(data.len()))?;
-        for &value in data {
-            seq.serialize_element(&(if value { 1 } else { 0 }))?;
-        }
-        seq.end()
-    }
-
-    struct BoolVecVisitor;
-
-    impl<'de> Visitor<'de> for BoolVecVisitor {
-        type Value = Vec<bool>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a sequence of booleans or integers 0/1")
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            let mut vec = Vec::new();
-            while let Some(value) = seq.next_element::<serde_json::Value>()? {
-                match value {
-                    serde_json::Value::Number(n) if n.as_u64() == Some(1) => vec.push(true),
-                    serde_json::Value::Number(n) if n.as_u64() == Some(0) => vec.push(false),
-                    serde_json::Value::Bool(b) => vec.push(b),
-                    _ => return Err(de::Error::custom("expected 0, 1, true, or false")),
-                }
-            }
-            Ok(vec)
-        }
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<bool>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_seq(BoolVecVisitor)
-    }
 }

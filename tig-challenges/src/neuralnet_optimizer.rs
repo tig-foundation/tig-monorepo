@@ -47,15 +47,16 @@ impl Into<Vec<i32>> for Difficulty {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Solution {
-    pub weights: Vec<Vec<Vec<f32>>>,
-    pub biases: Vec<Vec<f32>>,
-    pub epochs_used: usize,
-    pub bn_weights: Vec<Vec<f32>>,
-    pub bn_biases: Vec<Vec<f32>>,
-    pub bn_running_means: Vec<Vec<f32>>,
-    pub bn_running_vars: Vec<Vec<f32>>,
+impl_base64_serde! {
+    Solution {
+        weights: Vec<Vec<Vec<f32>>>,
+        biases: Vec<Vec<f32>>,
+        epochs_used: usize,
+        bn_weights: Vec<Vec<f32>>,
+        bn_biases: Vec<Vec<f32>>,
+        bn_running_means: Vec<Vec<f32>>,
+        bn_running_vars: Vec<Vec<f32>>,
+    }
 }
 
 impl Solution {
@@ -69,118 +70,6 @@ impl Solution {
             bn_running_means: Vec::new(),
             bn_running_vars: Vec::new(),
         }
-    }
-}
-
-// Helper struct for (de)serialization
-#[derive(Serialize, Deserialize)]
-struct SolutionData {
-    weights: Vec<Vec<Vec<f32>>>,
-    biases: Vec<Vec<f32>>,
-    epochs_used: usize,
-    bn_weights: Vec<Vec<f32>>,
-    bn_biases: Vec<Vec<f32>>,
-    bn_running_means: Vec<Vec<f32>>,
-    bn_running_vars: Vec<Vec<f32>>,
-}
-
-impl Serialize for Solution {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialize with bincode
-        let bincode_data = bincode::serialize(&SolutionData {
-            weights: self.weights.clone(),
-            biases: self.biases.clone(),
-            epochs_used: self.epochs_used,
-            bn_weights: self.bn_weights.clone(),
-            bn_biases: self.bn_biases.clone(),
-            bn_running_means: self.bn_running_means.clone(),
-            bn_running_vars: self.bn_running_vars.clone(),
-        })
-        .map_err(|e| serde::ser::Error::custom(format!("Bincode serialization failed: {}", e)))?;
-
-        // Compress with gzip
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder
-            .write_all(&bincode_data)
-            .map_err(|e| serde::ser::Error::custom(format!("Compression failed: {}", e)))?;
-        let compressed_data = encoder
-            .finish()
-            .map_err(|e| serde::ser::Error::custom(format!("Compression finish failed: {}", e)))?;
-
-        // Encode as base64
-        let base64_string = BASE64.encode(&compressed_data);
-
-        // Serialize the base64 string
-        serializer.serialize_str(&base64_string)
-    }
-}
-
-impl<'de> Deserialize<'de> for Solution {
-    fn deserialize<D>(deserializer: D) -> Result<Solution, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct SolutionVisitor;
-
-        impl<'de> Visitor<'de> for SolutionVisitor {
-            type Value = Solution;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a base64 encoded, compressed, bincode serialized Solution")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Solution, E>
-            where
-                E: de::Error,
-            {
-                // Decode from base64
-                let compressed_data = BASE64
-                    .decode(value)
-                    .map_err(|e| E::custom(format!("Base64 decode failed: {}", e)))?;
-
-                // Decompress
-                let mut decoder = GzDecoder::new(&compressed_data[..]);
-                let mut bincode_data = Vec::new();
-                decoder
-                    .read_to_end(&mut bincode_data)
-                    .map_err(|e| E::custom(format!("Decompression failed: {}", e)))?;
-
-                // Deserialize with bincode
-                let solution: SolutionData = bincode::deserialize(&bincode_data)
-                    .map_err(|e| E::custom(format!("Bincode deserialization failed: {}", e)))?;
-
-                Ok(Solution {
-                    weights: solution.weights,
-                    biases: solution.biases,
-                    epochs_used: solution.epochs_used,
-                    bn_weights: solution.bn_weights,
-                    bn_biases: solution.bn_biases,
-                    bn_running_means: solution.bn_running_means,
-                    bn_running_vars: solution.bn_running_vars,
-                })
-            }
-        }
-
-        deserializer.deserialize_str(SolutionVisitor)
-    }
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        let base64_value = v
-            .get("base64")
-            .ok_or_else(|| de::Error::custom("Missing 'base64' field"))?;
-
-        let base64_string = base64_value
-            .as_str()
-            .ok_or_else(|| de::Error::custom("'base64' field must be a string"))?;
-
-        from_value(Value::String(base64_string.to_string()))
     }
 }
 

@@ -31,9 +31,10 @@ impl Into<Vec<i32>> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Solution {
-    pub indexes: Vec<usize>,
+impl_base64_serde! {
+    Solution {
+        indexes: Vec<usize>,
+    }
 }
 
 impl Solution {
@@ -41,14 +42,6 @@ impl Solution {
         Self {
             indexes: Vec::new(),
         }
-    }
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
     }
 }
 
@@ -170,6 +163,26 @@ impl Challenge {
         });
     }
 
+    pub fn calc_average_distance(
+        &self,
+        solution: &Solution,
+        module: Arc<CudaModule>,
+        stream: Arc<CudaStream>,
+        prop: &cudaDeviceProp,
+    ) -> Result<f32> {
+        calc_average_distance(
+            self.difficulty.num_queries,
+            self.vector_dims,
+            self.database_size,
+            &self.d_query_vectors,
+            &self.d_database_vectors,
+            &solution.indexes,
+            module.clone(),
+            stream.clone(),
+            prop,
+        )
+    }
+
     conditional_pub!(
         fn verify_solution(
             &self,
@@ -177,26 +190,17 @@ impl Challenge {
             module: Arc<CudaModule>,
             stream: Arc<CudaStream>,
             prop: &cudaDeviceProp,
-        ) -> Result<f32> {
-            let avg_dist = calc_average_distance(
-                self.difficulty.num_queries,
-                self.vector_dims,
-                self.database_size,
-                &self.d_query_vectors,
-                &self.d_database_vectors,
-                &solution.indexes,
-                module.clone(),
-                stream.clone(),
-                prop,
-            )?;
+        ) -> Result<()> {
+            let avg_dist = self.calc_average_distance(solution, module, stream, prop)?;
             if avg_dist > self.max_distance {
                 return Err(anyhow!(
                     "Average query vector distance is '{}'. Max dist: '{}'",
                     avg_dist,
                     self.max_distance
                 ));
+            } else {
+                Ok(())
             }
-            Ok(avg_dist)
         }
     );
 }

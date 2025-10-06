@@ -3,7 +3,6 @@ use cudarc::driver::*;
 use cudarc::runtime::sys::cudaDeviceProp;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Map, Value};
 use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -29,39 +28,21 @@ impl Into<Vec<i32>> for Difficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Solution {
-    pub sub_solutions: Vec<SubSolution>,
+impl_base64_serde! {
+    Solution {
+        partition: Vec<u32>,
+    }
 }
 
 impl Solution {
     pub fn new() -> Self {
         Self {
-            sub_solutions: Vec::new(),
+            partition: Vec::new(),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SubSolution {
-    pub partition: Vec<u32>,
-}
-
-impl TryFrom<Map<String, Value>> for Solution {
-    type Error = serde_json::Error;
-
-    fn try_from(v: Map<String, Value>) -> Result<Self, Self::Error> {
-        from_value(Value::Object(v))
-    }
-}
-
 pub struct Challenge {
-    pub seed: [u8; 32],
-    pub difficulty: Difficulty,
-    pub sub_instances: Vec<SubInstance>,
-}
-
-pub struct SubInstance {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub num_nodes: u32,
@@ -84,83 +65,9 @@ pub struct SubInstance {
     baseline_connectivity_metric: u32,
 }
 
-pub const NUM_SUB_INSTANCES: usize = 4;
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
 
 impl Challenge {
-    pub fn generate_instance(
-        seed: &[u8; 32],
-        difficulty: &Difficulty,
-        module: Arc<CudaModule>,
-        stream: Arc<CudaStream>,
-        prop: &cudaDeviceProp,
-    ) -> Result<Challenge> {
-        let mut rng = StdRng::from_seed(seed.clone());
-        let mut sub_instances = Vec::new();
-        for _ in 0..NUM_SUB_INSTANCES {
-            sub_instances.push(SubInstance::generate_instance(
-                &rng.gen(),
-                difficulty,
-                module.clone(),
-                stream.clone(),
-                prop,
-            )?);
-        }
-
-        Ok(Challenge {
-            seed: seed.clone(),
-            difficulty: difficulty.clone(),
-            sub_instances,
-        })
-    }
-
-    conditional_pub!(
-        fn verify_solution(
-            &self,
-            solution: &Solution,
-            module: Arc<CudaModule>,
-            stream: Arc<CudaStream>,
-            prop: &cudaDeviceProp,
-        ) -> Result<()> {
-            let mut better_than_baselines = Vec::new();
-            for (i, (sub_instance, sub_solution)) in self
-                .sub_instances
-                .iter()
-                .zip(&solution.sub_solutions)
-                .enumerate()
-            {
-                match sub_instance.verify_solution(
-                    sub_solution,
-                    module.clone(),
-                    stream.clone(),
-                    prop,
-                ) {
-                    Ok(connectivity_metric) => better_than_baselines.push(
-                        connectivity_metric as f64
-                            / sub_instance.baseline_connectivity_metric as f64,
-                    ),
-                    Err(e) => return Err(anyhow!("Instance {}: {}", i, e.to_string())),
-                }
-            }
-            let average = 1.0
-                - (better_than_baselines.iter().map(|x| x * x).sum::<f64>()
-                    / better_than_baselines.len() as f64)
-                    .sqrt();
-            let threshold = self.difficulty.better_than_baseline as f64 / 1000.0;
-            if average >= threshold {
-                Ok(())
-            } else {
-                Err(anyhow!(
-                    "Average better_than_baseline ({}) is less than ({})",
-                    average,
-                    threshold
-                ))
-            }
-        }
-    );
-}
-
-impl SubInstance {
     pub fn generate_instance(
         seed: &[u8; 32],
         difficulty: &Difficulty,
@@ -479,99 +386,123 @@ impl SubInstance {
         })
     }
 
+    pub fn calc_connectivity_metric(
+        &self,
+        solution: &Solution,
+        module: Arc<CudaModule>,
+        stream: Arc<CudaStream>,
+        _prop: &cudaDeviceProp,
+    ) -> Result<u32> {
+        if solution.partition.len() != self.num_nodes as usize {
+            return Err(anyhow!(
+                "Invalid number of partitions. Expected: {}, Actual: {}",
+                self.num_nodes,
+                solution.partition.len()
+            ));
+        }
+
+        // Get the kernels
+        let validate_partition_kernel = module.load_function("validate_partition")?;
+        let calc_connectivity_metric_kernel = module.load_function("calc_connectivity_metric")?;
+        let count_nodes_in_part_kernel = module.load_function("count_nodes_in_part")?;
+
+        let block_size = MAX_THREADS_PER_BLOCK;
+        let grid_size = (self.difficulty.num_hyperedges + block_size - 1) / block_size;
+
+        let cfg = LaunchConfig {
+            grid_dim: (grid_size, 1, 1),
+            block_dim: (block_size, 1, 1),
+            shared_mem_bytes: 0,
+        };
+
+        // 1.1 Check if all nodes are assigned to a part
+        let d_partition = stream.memcpy_stod(&solution.partition)?;
+        let mut d_error_flag = stream.alloc_zeros::<u32>(1)?;
+
+        unsafe {
+            stream
+                .launch_builder(&validate_partition_kernel)
+                .arg(&self.num_nodes)
+                .arg(&self.num_parts)
+                .arg(&d_partition)
+                .arg(&mut d_error_flag)
+                .launch(cfg)?;
+        }
+        stream.synchronize()?;
+
+        if stream.memcpy_dtov(&d_error_flag)?[0] != 0 {
+            return Err(anyhow!(
+                "Invalid partition. All nodes must be assigned to one of {} parts",
+                self.num_parts
+            ));
+        };
+
+        // 1.2 Check if any partition exceeds the maximum size
+        let mut d_nodes_in_part = stream.alloc_zeros::<u32>(self.num_parts as usize)?;
+        unsafe {
+            stream
+                .launch_builder(&count_nodes_in_part_kernel)
+                .arg(&self.num_nodes)
+                .arg(&self.num_parts)
+                .arg(&d_partition)
+                .arg(&mut d_nodes_in_part)
+                .launch(cfg.clone())?;
+        }
+        stream.synchronize()?;
+
+        let nodes_in_partition = stream.memcpy_dtov(&d_nodes_in_part)?;
+        if nodes_in_partition
+            .iter()
+            .any(|&x| x < 1 || x > self.max_part_size)
+        {
+            return Err(anyhow!(
+                "Each part must have at least 1 and at most {} nodes",
+                self.max_part_size
+            ));
+        }
+
+        // 1.3 Calculate connectivity
+        let mut d_connectivity_metric = stream.alloc_zeros::<u32>(1)?;
+        unsafe {
+            stream
+                .launch_builder(&calc_connectivity_metric_kernel)
+                .arg(&self.difficulty.num_hyperedges)
+                .arg(&self.d_hyperedge_offsets)
+                .arg(&self.d_hyperedge_nodes)
+                .arg(&d_partition)
+                .arg(&mut d_connectivity_metric)
+                .launch(cfg.clone())?;
+        }
+        stream.synchronize()?;
+
+        let connectivity_metric = stream.memcpy_dtov(&d_connectivity_metric)?[0];
+        Ok(connectivity_metric)
+    }
+
     conditional_pub!(
         fn verify_solution(
             &self,
-            solution: &SubSolution,
+            solution: &Solution,
             module: Arc<CudaModule>,
             stream: Arc<CudaStream>,
             _prop: &cudaDeviceProp,
-        ) -> Result<u32> {
-            if solution.partition.len() != self.num_nodes as usize {
-                return Err(anyhow!(
-                    "Invalid number of partitions. Expected: {}, Actual: {}",
-                    self.num_nodes,
-                    solution.partition.len()
-                ));
+        ) -> Result<()> {
+            let connectivity_metric =
+                self.calc_connectivity_metric(solution, module, stream, _prop)?;
+            let btb = self.difficulty.better_than_baseline as f64 / 1000.0;
+            let connectivity_metric_threshold =
+                (self.baseline_connectivity_metric as f64 * (1.0 - btb)).ceil() as u32;
+            if connectivity_metric > connectivity_metric_threshold {
+                Err(anyhow!(
+                    "connectivity_metric {} is greater than threshold {} (baseline: {}, better_than_baseline: {}%)",
+                    connectivity_metric,
+                    connectivity_metric_threshold,
+                    self.baseline_connectivity_metric,
+                    btb * 100.0
+                ))
+            } else {
+                Ok(())
             }
-
-            // Get the kernels
-            let validate_partition_kernel = module.load_function("validate_partition")?;
-            let calc_connectivity_metric_kernel =
-                module.load_function("calc_connectivity_metric")?;
-            let count_nodes_in_part_kernel = module.load_function("count_nodes_in_part")?;
-
-            let block_size = MAX_THREADS_PER_BLOCK;
-            let grid_size = (self.difficulty.num_hyperedges + block_size - 1) / block_size;
-
-            let cfg = LaunchConfig {
-                grid_dim: (grid_size, 1, 1),
-                block_dim: (block_size, 1, 1),
-                shared_mem_bytes: 0,
-            };
-
-            // 1.1 Check if all nodes are assigned to a part
-            let d_partition = stream.memcpy_stod(&solution.partition)?;
-            let mut d_error_flag = stream.alloc_zeros::<u32>(1)?;
-
-            unsafe {
-                stream
-                    .launch_builder(&validate_partition_kernel)
-                    .arg(&self.num_nodes)
-                    .arg(&self.num_parts)
-                    .arg(&d_partition)
-                    .arg(&mut d_error_flag)
-                    .launch(cfg)?;
-            }
-            stream.synchronize()?;
-
-            if stream.memcpy_dtov(&d_error_flag)?[0] != 0 {
-                return Err(anyhow!(
-                    "Invalid partition. All nodes must be assigned to one of {} parts",
-                    self.num_parts
-                ));
-            };
-
-            // 1.2 Check if any partition exceeds the maximum size
-            let mut d_nodes_in_part = stream.alloc_zeros::<u32>(self.num_parts as usize)?;
-            unsafe {
-                stream
-                    .launch_builder(&count_nodes_in_part_kernel)
-                    .arg(&self.num_nodes)
-                    .arg(&self.num_parts)
-                    .arg(&d_partition)
-                    .arg(&mut d_nodes_in_part)
-                    .launch(cfg.clone())?;
-            }
-            stream.synchronize()?;
-
-            let nodes_in_partition = stream.memcpy_dtov(&d_nodes_in_part)?;
-            if nodes_in_partition
-                .iter()
-                .any(|&x| x < 1 || x > self.max_part_size)
-            {
-                return Err(anyhow!(
-                    "Each part must have at least 1 and at most {} nodes",
-                    self.max_part_size
-                ));
-            }
-
-            // 1.3 Calculate connectivity
-            let mut d_connectivity_metric = stream.alloc_zeros::<u32>(1)?;
-            unsafe {
-                stream
-                    .launch_builder(&calc_connectivity_metric_kernel)
-                    .arg(&self.difficulty.num_hyperedges)
-                    .arg(&self.d_hyperedge_offsets)
-                    .arg(&self.d_hyperedge_nodes)
-                    .arg(&d_partition)
-                    .arg(&mut d_connectivity_metric)
-                    .launch(cfg.clone())?;
-            }
-            stream.synchronize()?;
-
-            let connectivity_metric = stream.memcpy_dtov(&d_connectivity_metric)?[0];
-            Ok(connectivity_metric)
         }
     );
 }
