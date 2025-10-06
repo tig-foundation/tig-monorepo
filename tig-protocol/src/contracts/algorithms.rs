@@ -53,7 +53,7 @@ pub async fn submit_code<T: Context>(
     name: String,
     challenge_id: String,
     algorithm_id: Option<String>,
-    code: SourceCode,
+    source_code: HashMap<String, String>,
 ) -> Result<String> {
     let config = ctx.get_config().await;
     let latest_block_id = ctx.get_latest_block_id().await;
@@ -95,7 +95,7 @@ pub async fn submit_code<T: Context>(
                 algorithm_id,
                 fee_paid: config.codes.submission_fee,
             },
-            code,
+            source_code,
         )
         .await?;
     Ok(algorithm_id)

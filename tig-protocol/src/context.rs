@@ -38,7 +38,11 @@ pub trait Context {
         block_id: &String,
     ) -> Option<ChallengeBlockData>;
     async fn get_code_state(&self, code_id: &String) -> Option<CodeState>;
-    async fn add_code_to_mempool(&self, details: CodeDetails, code: SourceCode) -> Result<String>;
+    async fn add_code_to_mempool(
+        &self,
+        details: CodeDetails,
+        source_code: HashMap<String, String>,
+    ) -> Result<String>;
     async fn get_config(&self) -> ProtocolConfig;
     async fn add_deposit_to_mempool(&self, details: DepositDetails) -> Result<String>;
     async fn get_player_details(&self, player_id: &String) -> Option<PlayerDetails>;
