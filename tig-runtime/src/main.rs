@@ -34,7 +34,7 @@ fn cli() -> Command {
                 .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(
-            arg!(--hyperparameters [HYPERPARAMETERS] "A json string of hyperparameters")
+            arg!(--hyperparameters [HYPERPARAMETERS] "Hyperparameters json string or path to json file")
                 .value_parser(clap::value_parser!(String)),
         )
         .arg(
@@ -89,12 +89,7 @@ pub fn compute_solution(
     let settings = load_settings(&settings);
     let seed = settings.calc_seed(&rand_hash, nonce);
 
-    let hyperparameters = hyperparameters.map(|x| {
-        dejsonify::<Map<String, Value>>(&x).unwrap_or_else(|_| {
-            eprintln!("Failed to parse hyperparameters as JSON");
-            std::process::exit(1);
-        })
-    });
+    let hyperparameters = hyperparameters.map(|x| load_hyperparameters(&x));
 
     let library = load_module(&library_path)?;
     let fuel_remaining_ptr = unsafe { *library.get::<*mut u64>(b"__fuel_remaining")? };
@@ -328,6 +323,22 @@ fn load_settings(settings: &str) -> BenchmarkSettings {
 
     dejsonify::<BenchmarkSettings>(&settings).unwrap_or_else(|_| {
         eprintln!("Failed to parse settings");
+        std::process::exit(1);
+    })
+}
+
+fn load_hyperparameters(hyperparameters: &str) -> Map<String, Value> {
+    let hyperparameters = if hyperparameters.ends_with(".json") {
+        fs::read_to_string(hyperparameters).unwrap_or_else(|_| {
+            eprintln!("Failed to read hyperparameters file: {}", hyperparameters);
+            std::process::exit(1);
+        })
+    } else {
+        hyperparameters.to_string()
+    };
+
+    dejsonify::<Map<String, Value>>(&hyperparameters).unwrap_or_else(|_| {
+        eprintln!("Failed to parse hyperparameters as JSON");
         std::process::exit(1);
     })
 }
