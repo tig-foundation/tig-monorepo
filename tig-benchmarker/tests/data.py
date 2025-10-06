@@ -10,20 +10,16 @@ from common.structs import BenchmarkSettings, OutputData
 
 class TestData(unittest.TestCase):
     def test_calc_solution_signature(self):
-        solution = {
-            "data_x": 42,
-            "data_y": "test"
-        }
-
         output_data = OutputData(
             nonce=123,
             runtime_signature=456,
             fuel_consumed=789,
-            solution=solution
+            solution="test",
+            cpu_arch="AMD64"
         )
 
         # Assert same as Rust version: tig-structs/tests/core.rs
-        self.assertEqual(output_data.calc_solution_signature(), 11549591319018095145)
+        self.assertEqual(output_data.calc_solution_signature(), 11204800550749450632)
 
     def test_calc_seed(self):
         settings = BenchmarkSettings(
@@ -45,24 +41,20 @@ class TestData(unittest.TestCase):
         self.assertEqual(settings.calc_seed(rand_hash, nonce), expected)
 
     def test_outputdata_to_merklehash(self):
-        solution = {
-            "data_x": 42,
-            "data_y": "test"
-        }
-
         output_data = OutputData(
             nonce=123,
             runtime_signature=456,
             fuel_consumed=789,
-            solution=solution
+            solution="test",
+            cpu_arch="AMD64"
         )
 
         merkle_hash = output_data.to_merkle_hash()
 
         # Assert same as Rust version: tig-structs/tests/core.rs
         expected = MerkleHash(bytes([
-            207, 29, 184, 163, 158, 22, 137, 73, 72, 58, 24, 246, 67, 9, 44, 20,
-            32, 22, 86, 206, 191, 5, 52, 241, 41, 113, 198, 85, 11, 53, 190, 57
+            79, 126, 186, 90, 12, 111, 100, 8, 120, 150, 225, 176, 200, 201, 125, 150, 58, 122,
+            214, 216, 68, 6, 125, 247, 248, 4, 165, 185, 157, 44, 13, 151
         ]))
         self.assertEqual(merkle_hash, expected)
 

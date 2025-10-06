@@ -104,7 +104,7 @@ class OutputData(FromDict):
     nonce: int
     runtime_signature: int
     fuel_consumed: int
-    solution: dict
+    solution: str
     cpu_arch: str
 
     def calc_solution_signature(self) -> int:

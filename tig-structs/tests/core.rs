@@ -1,27 +1,18 @@
-use serde_json::json;
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData};
 use tig_utils::MerkleHash;
 
 #[test]
 fn test_calc_solution_signature() {
-    let solution = json!({
-        "data_x": 42,
-        "data_y": "test"
-    })
-    .as_object()
-    .unwrap()
-    .clone();
-
     let output_data = OutputData {
         nonce: 123,
         runtime_signature: 456,
         fuel_consumed: 789,
-        solution: solution.clone(),
+        solution: "test".to_string(),
         cpu_arch: CPUArchitecture::AMD64,
     };
 
     // Assert same as Python version: tig-benchmarker/tests/core.rs
-    assert_eq!(output_data.calc_solution_signature(), 11549591319018095145);
+    assert_eq!(output_data.calc_solution_signature(), 11204800550749450632);
 }
 
 #[test]
@@ -49,19 +40,11 @@ fn test_calc_seed() {
 
 #[test]
 fn test_outputdata_to_merklehash() {
-    let solution = json!({
-        "data_x": 42,
-        "data_y": "test"
-    })
-    .as_object()
-    .unwrap()
-    .clone();
-
     let output_data = OutputData {
         nonce: 123,
         runtime_signature: 456,
         fuel_consumed: 789,
-        solution: solution.clone(),
+        solution: "test".to_string(),
         cpu_arch: CPUArchitecture::AMD64,
     };
 
@@ -71,8 +54,8 @@ fn test_outputdata_to_merklehash() {
     assert_eq!(
         merkle_hash,
         MerkleHash([
-            207, 29, 184, 163, 158, 22, 137, 73, 72, 58, 24, 246, 67, 9, 44, 20, 32, 22, 86, 206,
-            191, 5, 52, 241, 41, 113, 198, 85, 11, 53, 190, 57
+            79, 126, 186, 90, 12, 111, 100, 8, 120, 150, 225, 176, 200, 201, 125, 150, 58, 122,
+            214, 216, 68, 6, 125, 247, 248, 4, 165, 185, 157, 44, 13, 151
         ])
     );
 }

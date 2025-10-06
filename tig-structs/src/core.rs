@@ -304,12 +304,6 @@ serializable_struct_with_getters! {
 
 // Code child structs
 serializable_struct_with_getters! {
-    SourceCode {
-        rust: String,
-        cuda: Option<String>,
-    }
-}
-serializable_struct_with_getters! {
     CodeDetails {
         name: String,
         player_id: String,
@@ -452,13 +446,12 @@ pub enum CPUArchitecture {
     AMD64,
     ARM64,
 }
-pub type Solution = Map<String, Value>;
 serializable_struct_with_getters! {
     OutputData {
         nonce: u64,
         runtime_signature: u64,
         fuel_consumed: u64,
-        solution: Solution,
+        solution: String,
         cpu_arch: CPUArchitecture,
     }
 }
