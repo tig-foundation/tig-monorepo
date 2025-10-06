@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use std::{fs, io::Read, panic, path::PathBuf};
 use tig_challenges::*;
-use tig_structs::core::{BenchmarkSettings, Solution};
+use tig_structs::core::BenchmarkSettings;
 use tig_utils::dejsonify;
 
 #[cfg(feature = "cuda")]
@@ -90,7 +90,7 @@ pub fn verify_solution(
             let challenge =
                 $c::Challenge::generate_instance(&seed, &settings.difficulty.into()).unwrap();
 
-            match $c::Solution::try_from(solution) {
+            match serde_json::from_str::<$c::Solution>(&solution) {
                 Ok(solution) => match challenge.verify_solution(&solution) {
                     Ok(_) => println!("Solution is valid"),
                     Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
@@ -130,7 +130,7 @@ pub fn verify_solution(
             )
             .unwrap();
 
-            match $c::Solution::try_from(solution) {
+            match serde_json::from_str::<$c::Solution>(&solution) {
                 Ok(solution) => {
                     match challenge.verify_solution(
                         &solution,
@@ -225,8 +225,8 @@ fn load_settings(settings: &str) -> BenchmarkSettings {
     })
 }
 
-fn load_solution(solution: &str) -> Solution {
-    let solution = if solution == "-" {
+fn load_solution(solution: &str) -> String {
+    if solution == "-" {
         let mut buffer = String::new();
         std::io::stdin()
             .read_to_string(&mut buffer)
@@ -235,17 +235,12 @@ fn load_solution(solution: &str) -> Solution {
                 std::process::exit(1);
             });
         buffer
-    } else if solution.ends_with(".json") {
+    } else if solution.ends_with(".b64") {
         fs::read_to_string(&solution).unwrap_or_else(|_| {
             eprintln!("Failed to read solution file: {}", solution);
             std::process::exit(1);
         })
     } else {
         solution.to_string()
-    };
-
-    dejsonify::<Solution>(&solution).unwrap_or_else(|_| {
-        eprintln!("Failed to parse solution");
-        std::process::exit(1);
-    })
+    }
 }
