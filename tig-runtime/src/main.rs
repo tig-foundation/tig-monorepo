@@ -112,7 +112,7 @@ pub fn compute_solution(
                 library.get::<fn(
                     &$c::Challenge,
                     &dyn Fn(&$c::Solution) -> Result<()>,
-                    &Option<Map<String, Value>>,
+                    Option<String>,
                 ) -> Result<()>>(b"entry_point")?
             };
 
@@ -140,7 +140,7 @@ pub fn compute_solution(
                 fs::write(&output_file, jsonify(&output_data))?;
                 Ok(())
             };
-            let result = solve_challenge_fn(&challenge, &save_solution_fn, &hyperparameters);
+            let result = solve_challenge_fn(&challenge, &save_solution_fn, hyperparameters);
             if !output_file.exists() {
                 save_solution_fn(&$c::Solution::new())?;
             }
@@ -157,7 +157,7 @@ pub fn compute_solution(
                 library.get::<fn(
                     &$c::Challenge,
                     save_solution: &dyn Fn(&$c::Solution) -> anyhow::Result<()>,
-                    &Option<Map<String, Value>>,
+                    Option<String>,
                     Arc<CudaModule>,
                     Arc<CudaStream>,
                     &cudaDeviceProp,
@@ -258,7 +258,7 @@ pub fn compute_solution(
             let result = solve_challenge_fn(
                 &challenge,
                 &save_solution_fn,
-                &hyperparameters,
+                hyperparameters,
                 module.clone(),
                 stream.clone(),
                 &prop,
@@ -327,7 +327,7 @@ fn load_settings(settings: &str) -> BenchmarkSettings {
     })
 }
 
-fn load_hyperparameters(hyperparameters: &str) -> Map<String, Value> {
+fn load_hyperparameters(hyperparameters: &str) -> String {
     let hyperparameters = if hyperparameters.ends_with(".json") {
         fs::read_to_string(hyperparameters).unwrap_or_else(|_| {
             eprintln!("Failed to read hyperparameters file: {}", hyperparameters);
@@ -337,10 +337,12 @@ fn load_hyperparameters(hyperparameters: &str) -> Map<String, Value> {
         hyperparameters.to_string()
     };
 
-    dejsonify::<Map<String, Value>>(&hyperparameters).unwrap_or_else(|_| {
+    // validate it is valid JSON
+    let _ = dejsonify::<Map<String, Value>>(&hyperparameters).unwrap_or_else(|_| {
         eprintln!("Failed to parse hyperparameters as JSON");
         std::process::exit(1);
-    })
+    });
+    hyperparameters
 }
 
 pub fn load_module(path: &PathBuf) -> Result<Library> {

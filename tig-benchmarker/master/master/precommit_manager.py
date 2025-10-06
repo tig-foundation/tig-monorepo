@@ -94,7 +94,8 @@ class PrecommitManager:
                 block_id=self.last_block_id,
                 difficulty=difficulty_samples[a_id]
             ),
-            num_nonces=selection["num_nonces"]
+            num_nonces=selection["num_nonces"],
+            hyperparameters=selection["hyperparameters"]
         )
-        logger.info(f"Created precommit (algorithm_id: {a_id}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces})")
+        logger.info(f"Created precommit (algorithm_id: {a_id}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters})")
         return req

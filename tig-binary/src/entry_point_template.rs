@@ -18,10 +18,11 @@ use std::sync::Arc;
 pub fn entry_point(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
-    hyperparameters: &Option<Map<String, Value>>,
+    hyperparameters: Option<String>,
 ) -> Result<()>
 {
     catch_unwind(AssertUnwindSafe(|| {
+        let hyperparameters = hyperparameters.map(|x| serde_json::from_str::<Map<String, Value>>(&x).unwrap());
         {ALGORITHM}::solve_challenge(challenge, save_solution, hyperparameters)
     })).unwrap_or_else(|_| {
         Err(anyhow!("Panic occurred calling solve_challenge"))
@@ -34,13 +35,14 @@ pub fn entry_point(
 pub fn entry_point(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
-    hyperparameters: &Option<Map<String, Value>>,
+    hyperparameters: Option<String>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
 ) -> Result<()>
 {
     catch_unwind(AssertUnwindSafe(|| {
+        let hyperparameters = hyperparameters.map(|x| serde_json::from_str::<Map<String, Value>>(x));
         {ALGORITHM}::solve_challenge(challenge, save_solution, hyperparameters, module, stream, prop)
     })).unwrap_or_else(|_| {
         Err(anyhow!("Panic occurred calling solve_challenge"))

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS config (
 CREATE TABLE IF NOT EXISTS job (
     benchmark_id TEXT PRIMARY KEY,
     settings JSONB NOT NULL,
+    hyperparameters JSONB,
     num_nonces INTEGER NOT NULL,
     rand_hash TEXT NOT NULL,
     runtime_config JSONB NOT NULL,
@@ -119,7 +120,8 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "hyperparameters": null
     },
     {
       "algorithm_id": "c002_a001",
@@ -127,7 +129,8 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "hyperparameters": null
     },
     {
       "algorithm_id": "c003_a001",
@@ -135,7 +138,8 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "hyperparameters": null
     },
     {
       "algorithm_id": "c004_a001",
@@ -143,7 +147,8 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "hyperparameters": null
     },
     {
       "algorithm_id": "c005_a001",
@@ -151,7 +156,8 @@ SELECT '
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "hyperparameters": null
     }
   ],
   "time_before_batch_retry": 60000,

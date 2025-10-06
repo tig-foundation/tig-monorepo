@@ -65,6 +65,7 @@ class Precommit(FromDict):
     details: PrecommitDetails
     settings: BenchmarkSettings
     state: PrecommitState
+    hyperparameters: Optional[dict]
 
 @dataclass
 class BenchmarkDetails(FromDict):

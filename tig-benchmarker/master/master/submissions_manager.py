@@ -15,6 +15,7 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 class SubmitPrecommitRequest(FromDict):
     settings: BenchmarkSettings
     num_nonces: int
+    hyperparameters: Optional[dict]
 
 @dataclass
 class SubmitBenchmarkRequest(FromDict):

@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
+use serde_json::{Map, Value};
 use std::{fs, io::Read, panic, path::PathBuf};
 use tig_challenges::*;
 use tig_structs::core::BenchmarkSettings;
@@ -22,7 +23,7 @@ fn cli() -> Command {
         )
         .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
         .arg(
-            arg!(<SOLUTION> "Solution base64 string, path to b64 file, or '-' for stdin")
+            arg!(<SOLUTION> "Solution base64 string, path to json file with solution field, or '-' for stdin")
                 .value_parser(clap::value_parser!(String)),
         )
         .arg(arg!(--ptx [PTX] "Path to a CUDA ptx file").value_parser(clap::value_parser!(PathBuf)))
@@ -204,11 +205,28 @@ fn load_solution(solution: &str) -> String {
                 std::process::exit(1);
             });
         buffer
-    } else if solution.ends_with(".b64") {
-        fs::read_to_string(&solution).unwrap_or_else(|_| {
+    } else if solution.ends_with(".json") {
+        let d = fs::read_to_string(&solution).unwrap_or_else(|_| {
             eprintln!("Failed to read solution file: {}", solution);
             std::process::exit(1);
-        })
+        });
+        let d = serde_json::from_str::<Map<String, Value>>(&d).unwrap_or_else(|_| {
+            eprintln!("Failed to parse solution file: {}", solution);
+            std::process::exit(1);
+        });
+        match d.get("solution") {
+            None => {
+                eprintln!("json file does not contain 'solution' field: {}", solution);
+                std::process::exit(1);
+            }
+            Some(v) => match v.as_str() {
+                None => {
+                    eprintln!("invalid 'solution' field in json file. Expecting string");
+                    std::process::exit(1);
+                }
+                Some(s) => s.to_string(),
+            },
+        }
     } else {
         solution.to_string()
     }

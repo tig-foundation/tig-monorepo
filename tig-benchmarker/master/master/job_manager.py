@@ -98,7 +98,8 @@ class JobManager:
                     INSERT INTO job 
                     (
                         benchmark_id, 
-                        settings, 
+                        settings,
+                        hyperparameters,
                         num_nonces, 
                         num_batches, 
                         rand_hash, 
@@ -112,12 +113,13 @@ class JobManager:
                         average_solution_ratio,
                         start_time
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
                     ON CONFLICT (benchmark_id) DO NOTHING;
                     """,
                     (
                         benchmark_id,
                         json.dumps(asdict(x.settings)),
+                        json.dumps(x.hyperparameters),
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,

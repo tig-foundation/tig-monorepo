@@ -58,22 +58,28 @@ def download_library(algorithms_dir, batch):
 
 
 def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
-    output_file = f"{results_dir}/{batch['id']}/{nonce}.json"
+    output_dir = f"{results_dir}/{batch['id']}"
+    output_file = f"{output_dir}/{nonce}.json"
+    settings = json.dumps(batch["settings"], separators=(',',':'))
     start = now()
     cmd = [
         "docker", "exec", batch["challenge"], "tig-runtime",
-        json.dumps(batch["settings"], separators=(',',':')),
+        settings,
         batch["rand_hash"],
         str(nonce),
         so_path,
         "--fuel", str(batch["runtime_config"]["max_fuel"]),
-        "--output", output_file,
+        "--output", output_dir,
     ]
+    if batch["hyperparameters"] is not None:
+        cmd += [
+            "--hyperparameters", json.dumps(batch["hyperparameters"], separators=(',',':')),
+        ]
     if ptx_path is not None:
         cmd += [
             "--ptx", ptx_path,
         ]
-    logger.debug(f"computing batch: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
+    logger.debug(f"computing nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -82,29 +88,52 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         if ret is not None:
             exit_codes = {
                 0: "success",
-                82: "cuda out of memory",
-                83: "host out of memory",
+                # 82: "cuda out of memory",
+                # 83: "host out of memory",
                 84: "runtime error",
-                85: "no solution",
-                86: "invalid solution",
+                # 85: "no solution",
+                # 86: "invalid solution",
                 87: "out of fuel",
             }
-            if (ret != 0 and ret in exit_codes) and not os.path.exists(output_file):
+
+            if ret not in exit_codes:
+                logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
+            else:
+                logger.debug(f"batch {batch['id']}, nonce {nonce} finished with exit code {ret}: {exit_codes[ret]}")
+
+            if not os.path.exists(output_file):
                 with open(output_file, "w") as f:
                     json.dump(dict(
                         nonce=nonce,
                         runtime_signature=0,
                         fuel_consumed=(ret == 87) and (batch["runtime_config"]["max_fuel"] + 1),
-                        solution={},
+                        solution="",
                         cpu_arch=CPU_ARCH
                     ), f)
-
-            if ret != 0:
-                if ret not in exit_codes:
-                    logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
+            else:
+                start = now()
+                cmd = [
+                    "docker", "exec", batch["challenge"], "tig-verifier",
+                    settings,
+                    batch["rand_hash"],
+                    str(nonce),
+                    output_file,
+                ]
+                if ptx_path is not None:
+                    cmd += [
+                        "--ptx", ptx_path,
+                    ]
+                logger.debug(f"verifying nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
+                ret = subprocess.run(cmd, capture_output=True, text=True)
+                if ret.returncode == 0:
+                    logger.debug(f"batch {batch['id']}, nonce {nonce} valid solution")
                 else:
-                    logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {exit_codes[ret]}")
-            
+                    logger.debug(f"batch {batch['id']}, nonce {nonce} invalid solution (exit code: {ret.returncode}, stderr: {ret.stderr.strip()})")
+                    with open(output_file, "r") as f:
+                        d = json.load(f)
+                        d["solution"] = ""
+                    with open(output_file, "w") as f:
+                        json.dump(d, f)
             break
 
         elif batch["id"] not in PROCESSING_BATCH_IDS:
