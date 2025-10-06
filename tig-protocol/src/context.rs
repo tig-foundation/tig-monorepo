@@ -1,4 +1,5 @@
 pub use anyhow::Result;
+use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 
@@ -71,6 +72,7 @@ pub trait Context {
         &self,
         settings: BenchmarkSettings,
         details: PrecommitDetails,
+        hyperparameters: Option<Map<String, Value>>,
     ) -> Result<String>;
     async fn get_proof_details(&self, benchmark_id: &String) -> Option<ProofDetails>;
     async fn get_proof_state(&self, benchmark_id: &String) -> Option<ProofState>;

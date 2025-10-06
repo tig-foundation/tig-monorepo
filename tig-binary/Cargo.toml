@@ -15,6 +15,7 @@ anyhow = "1.0.81"
 cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "runtime-fuel/cudnn-cublas", features = [
     "cuda-version-from-build-system",
 ], optional = true }
+serde_json = { version = "1.0.113" }
 tig-challenges = { path = "../tig-challenges", features = [
     "hide_verification",
 ] }

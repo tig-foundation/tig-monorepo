@@ -2039,6 +2039,7 @@ dependencies = [
  "cudarc",
  "ndarray",
  "rand",
+ "serde_json",
  "tig-challenges",
 ]
 
@@ -2048,6 +2049,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cudarc",
+ "serde_json",
  "tig-algorithms",
  "tig-challenges",
 ]
@@ -2062,6 +2064,7 @@ dependencies = [
  "cudarc",
  "flate2",
  "ndarray",
+ "paste",
  "rand",
  "serde",
  "serde_json",

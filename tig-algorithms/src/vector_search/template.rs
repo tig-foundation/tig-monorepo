@@ -1,40 +1,3 @@
-/*!
-Copyright [year copyright work created] [name of copyright owner]
-
-Identity of Submitter [name of person or entity that submits the Work to TIG]
-
-UAI [UAI (if applicable)]
-
-Licensed under the TIG Inbound Game License v2.0 or (at your option) any later
-version (the "License"); you may not use this file except in compliance with the
-License. You may obtain a copy of the License at
-
-https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
-
-Unless required by applicable law or agreed to in writing, software distributed
-under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
-language governing permissions and limitations under the License.
-*/
-
-// REMOVE BELOW SECTION IF UNUSED
-/*
-REFERENCES AND ACKNOWLEDGMENTS
-
-This implementation is based on or inspired by existing work. Citations and
-acknowledgments below:
-
-1. Academic Papers:
-   - [Author(s), "Paper Title", DOI (if available)]
-
-2. Code References:
-   - [Author(s), URL]
-
-3. Other:
-   - [Author(s), Details]
-
-*/
-
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
@@ -42,14 +5,24 @@ use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
+use serde_json::{Map, Value};
 use std::sync::Arc;
 use tig_challenges::vector_search::*;
+
+#[derive(Serialize, Deserialize)]
+pub struct Hyperparameters {
+    // Optionally define hyperparameters here. Example:
+    // pub param1: usize,
+    // pub param2: f64,
+}
 
 // when launching kernels, you should not exceed this const or else it may not be deterministic
 const MAX_THREADS_PER_BLOCK: u32 = 1024;
 
 pub fn solve_challenge(
     challenge: &Challenge,
+    save_solution: &dyn Fn(&Solution) -> Result<()>,
+    hyperparameters: &Option<Map<String, Value>>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
@@ -63,6 +36,15 @@ pub fn solve_challenge(
     // let hasher = seeded_hasher(&challenge.seed);
     // let map = HashMap::with_hasher(hasher);
 
+    // Support hyperparameters if needed:
+    // let hyperparameters = match hyperparameters {
+    //     Some(hyperparameters) => {
+    //         serde_json::from_value::<Hyperparameters>(Value::Object(hyperparameters.clone()))
+    //             .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?
+    //     }
+    //     None => Hyperparameters { /* set default values here */ },
+    // };
+
     // when launching kernels, you should hardcode the LaunchConfig for determinism:
     //      Example:
     //      LaunchConfig {
@@ -71,9 +53,10 @@ pub fn solve_challenge(
     //          shared_mem_bytes: 400,
     //      }
 
+    // use save_solution(&Solution) to save your solution. Overwrites any previous solution
+
     // return Err(<msg>) if your algorithm encounters an error
-    // return Ok(None) if your algorithm finds no solution or needs to exit early
-    // return Ok(Solution { .. }) if your algorithm finds a solution
+    // return Ok(()) if your algorithm is finished
     Err(anyhow!("Not implemented"))
 }
 

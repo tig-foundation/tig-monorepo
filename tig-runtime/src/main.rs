@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use libloading::Library;
+use serde_json::{Map, Value};
 use std::{fs, panic, path::PathBuf};
 use tig_challenges::*;
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData};
@@ -33,6 +34,10 @@ fn cli() -> Command {
                 .value_parser(clap::value_parser!(PathBuf)),
         )
         .arg(
+            arg!(--hyperparameters [HYPERPARAMETERS] "A json string of hyperparameters")
+                .value_parser(clap::value_parser!(String)),
+        )
+        .arg(
             arg!(--ptx [PTX] "Path to a CUDA ptx file")
                 .value_parser(clap::value_parser!(PathBuf)),
         )
@@ -59,6 +64,7 @@ fn main() {
         matches.get_one::<String>("RAND_HASH").unwrap().clone(),
         *matches.get_one::<u64>("NONCE").unwrap(),
         matches.get_one::<PathBuf>("BINARY").unwrap().clone(),
+        matches.get_one("hyperparameters").cloned(),
         matches.get_one::<PathBuf>("ptx").cloned(),
         *matches.get_one::<u64>("fuel").unwrap(),
         matches.get_one::<PathBuf>("output").cloned(),
@@ -74,6 +80,7 @@ pub fn compute_solution(
     rand_hash: String,
     nonce: u64,
     library_path: PathBuf,
+    hyperparameters: Option<String>,
     ptx_path: Option<PathBuf>,
     max_fuel: u64,
     output_folder: Option<PathBuf>,
@@ -81,6 +88,13 @@ pub fn compute_solution(
 ) -> Result<()> {
     let settings = load_settings(&settings);
     let seed = settings.calc_seed(&rand_hash, nonce);
+
+    let hyperparameters = hyperparameters.map(|x| {
+        dejsonify::<Map<String, Value>>(&x).unwrap_or_else(|_| {
+            eprintln!("Failed to parse hyperparameters as JSON");
+            std::process::exit(1);
+        })
+    });
 
     let library = load_module(&library_path)?;
     let fuel_remaining_ptr = unsafe { *library.get::<*mut u64>(b"__fuel_remaining")? };
@@ -100,10 +114,11 @@ pub fn compute_solution(
         ($c:ident, cpu) => {{
             // library function may exit 87 if it runs out of fuel
             let solve_challenge_fn = unsafe {
-                library
-                    .get::<fn(&$c::Challenge, &dyn Fn(&$c::Solution) -> Result<()>) -> Result<()>>(
-                        b"entry_point",
-                    )?
+                library.get::<fn(
+                    &$c::Challenge,
+                    &dyn Fn(&$c::Solution) -> Result<()>,
+                    &Option<Map<String, Value>>,
+                ) -> Result<()>>(b"entry_point")?
             };
 
             let challenge = $c::Challenge::generate_instance(&seed, &settings.difficulty.into())?;
@@ -130,7 +145,7 @@ pub fn compute_solution(
                 fs::write(&output_file, jsonify(&output_data))?;
                 Ok(())
             };
-            let result = solve_challenge_fn(&challenge, &save_solution_fn);
+            let result = solve_challenge_fn(&challenge, &save_solution_fn, &hyperparameters);
             if !output_file.exists() {
                 save_solution_fn(&$c::Solution::new())?;
             }
@@ -147,6 +162,7 @@ pub fn compute_solution(
                 library.get::<fn(
                     &$c::Challenge,
                     save_solution: &dyn Fn(&$c::Solution) -> anyhow::Result<()>,
+                    &Option<Map<String, Value>>,
                     Arc<CudaModule>,
                     Arc<CudaStream>,
                     &cudaDeviceProp,
@@ -247,6 +263,7 @@ pub fn compute_solution(
             let result = solve_challenge_fn(
                 &challenge,
                 &save_solution_fn,
+                &hyperparameters,
                 module.clone(),
                 stream.clone(),
                 &prop,

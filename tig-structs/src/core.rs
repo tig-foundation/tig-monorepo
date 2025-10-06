@@ -88,6 +88,7 @@ serializable_struct_with_getters! {
         details: PrecommitDetails,
         settings: BenchmarkSettings,
         state: PrecommitState,
+        hyperparameters: Option<Map<String, Value>>,
     }
 }
 serializable_struct_with_getters! {

@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use serde_json::{Map, Value};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use tig_algorithms::{CHALLENGE}::{ALGORITHM};
 use tig_challenges::{CHALLENGE}::*;
@@ -16,11 +17,12 @@ use std::sync::Arc;
 #[unsafe(no_mangle)]
 pub fn entry_point(
     challenge: &Challenge,
-    save_solution: &dyn Fn(&Solution) -> Result<()>
+    save_solution: &dyn Fn(&Solution) -> Result<()>,
+    hyperparameters: &Option<Map<String, Value>>,
 ) -> Result<()>
 {
     catch_unwind(AssertUnwindSafe(|| {
-        {ALGORITHM}::solve_challenge(challenge, save_solution)
+        {ALGORITHM}::solve_challenge(challenge, save_solution, hyperparameters)
     })).unwrap_or_else(|_| {
         Err(anyhow!("Panic occurred calling solve_challenge"))
     })
@@ -32,13 +34,14 @@ pub fn entry_point(
 pub fn entry_point(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
+    hyperparameters: &Option<Map<String, Value>>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
-) -> Result<Option<Solution>, String>
+) -> Result<()>
 {
     catch_unwind(AssertUnwindSafe(|| {
-        {ALGORITHM}::solve_challenge(challenge, module, stream, prop)
+        {ALGORITHM}::solve_challenge(challenge, save_solution, hyperparameters, module, stream, prop)
     })).unwrap_or_else(|_| {
         Err(anyhow!("Panic occurred calling solve_challenge"))
     })
