@@ -460,20 +460,23 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .zip(factor_weights.iter())
             .map(|(x, w)| x * w)
             .sum::<PreciseNumber>();
-        let average_factor = factors.arithmetic_mean();
-        let variance = factors
+        let weighted_variance_factor = factors
             .iter()
-            .map(|x| x - average_factor)
-            .map(|x| x * x)
-            .sum::<PreciseNumber>()
-            / PreciseNumber::from(factors.len() as u64);
-        let cv_sqr = if average_factor == zero {
+            .zip(factor_weights.iter())
+            .map(|(x, w)| {
+                let diff = if x > weighted_average_factor {
+                    x - weighted_average_factor
+                } else {
+                    weighted_average_factor - x
+                };
+                diff * diff * w
+            })
+            .sum::<PreciseNumber>();
+        let imbalance = if weighted_average_factor == zero || weighted_average_factor == one {
             zero.clone()
         } else {
-            variance / (average_factor * average_factor)
+            weighted_variance_factor / (weighted_average_factor * (one - weighted_average_factor))
         };
-
-        let imbalance = cv_sqr / (num_factors - one);
         weights.push(
             weighted_average_factor
                 * PreciseNumber::approx_inv_exp(imbalance_multiplier * imbalance),
