@@ -10,62 +10,36 @@ use cudarc::{driver::CudaContext, nvrtc::Ptx, runtime::result::device::get_devic
 
 fn cli() -> Command {
     Command::new("tig-verifier")
-        .about("Verifies a solution or merkle proof")
+        .about("Verifies a solution")
         .arg_required_else_help(true)
-        .subcommand(
-            Command::new("verify_solution")
-                .about("Verifies a solution")
-                .arg(
-                    arg!(<SETTINGS> "Settings json string or path to json file")
-                        .value_parser(clap::value_parser!(String)),
-                )
-                .arg(
-                    arg!(<RAND_HASH> "A string used in seed generation")
-                        .value_parser(clap::value_parser!(String)),
-                )
-                .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
-                .arg(
-                    arg!(<SOLUTION> "Solution json string, path to json file, or '-' for stdin")
-                        .value_parser(clap::value_parser!(String)),
-                )
-                .arg(
-                    arg!(--ptx [PTX] "Path to a CUDA ptx file")
-                        .value_parser(clap::value_parser!(PathBuf)),
-                )
-                .arg(
-                    arg!(--gpu [GPU] "Which GPU device to use")
-                        .value_parser(clap::value_parser!(usize)),
-                ),
+        .arg(
+            arg!(<SETTINGS> "Settings json string or path to json file")
+                .value_parser(clap::value_parser!(String)),
         )
-        .subcommand(
-            Command::new("verify_merkle_proof")
-                .about("Verifies a merkle proof")
-                .arg(arg!(<ROOT> "Merkle root").value_parser(clap::value_parser!(String)))
-                .arg(
-                    arg!(<PROOF> "Merkle proof json string, path to json file, or '-' for stdin")
-                        .value_parser(clap::value_parser!(String)),
-                ),
+        .arg(
+            arg!(<RAND_HASH> "A string used in seed generation")
+                .value_parser(clap::value_parser!(String)),
         )
+        .arg(arg!(<NONCE> "Nonce value").value_parser(clap::value_parser!(u64)))
+        .arg(
+            arg!(<SOLUTION> "Solution base64 string, path to b64 file, or '-' for stdin")
+                .value_parser(clap::value_parser!(String)),
+        )
+        .arg(arg!(--ptx [PTX] "Path to a CUDA ptx file").value_parser(clap::value_parser!(PathBuf)))
+        .arg(arg!(--gpu [GPU] "Which GPU device to use").value_parser(clap::value_parser!(usize)))
 }
 
 fn main() {
     let matches = cli().get_matches();
 
-    if let Err(e) = match matches.subcommand() {
-        Some(("verify_solution", sub_m)) => verify_solution(
-            sub_m.get_one::<String>("SETTINGS").unwrap().clone(),
-            sub_m.get_one::<String>("RAND_HASH").unwrap().clone(),
-            *sub_m.get_one::<u64>("NONCE").unwrap(),
-            sub_m.get_one::<String>("SOLUTION").unwrap().clone(),
-            sub_m.get_one::<PathBuf>("ptx").cloned(),
-            sub_m.get_one::<usize>("gpu").cloned(),
-        ),
-        Some(("verify_merkle_proof", sub_m)) => verify_merkle_proof(
-            sub_m.get_one::<String>("ROOT").unwrap().clone(),
-            sub_m.get_one::<String>("PROOF").unwrap().clone(),
-        ),
-        _ => Err(anyhow!("Invalid subcommand")),
-    } {
+    if let Err(e) = verify_solution(
+        matches.get_one::<String>("SETTINGS").unwrap().clone(),
+        matches.get_one::<String>("RAND_HASH").unwrap().clone(),
+        *matches.get_one::<u64>("NONCE").unwrap(),
+        matches.get_one::<String>("SOLUTION").unwrap().clone(),
+        matches.get_one::<PathBuf>("ptx").cloned(),
+        matches.get_one::<usize>("gpu").cloned(),
+    ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }
@@ -202,11 +176,6 @@ pub fn verify_solution(
     }
 
     Ok(())
-}
-
-pub fn verify_merkle_proof(_merkle_root: String, _merkle_proof: String) -> Result<()> {
-    // TODO
-    Err(anyhow!("Merkle proof verification is not implemented yet"))
 }
 
 fn load_settings(settings: &str) -> BenchmarkSettings {
