@@ -16,13 +16,13 @@ pub fn solve_challenge(
     save_solution: &dyn Fn(&Solution) -> Result<()>,
     hyperparameters: &Option<Map<String, Value>>,
 ) -> Result<()> {
-    // If you need random numbers, recommend using SmallRng with instance.seed:
+    // If you need random numbers, recommend using SmallRng with challenge.seed:
     // use rand::{rngs::SmallRng, Rng, SeedableRng};
-    // let mut rng = SmallRng::from_seed(instance.seed);
+    // let mut rng = SmallRng::from_seed(challenge.seed);
 
     // If you need HashMap or HashSet, make sure to use a deterministic hasher for consistent runtime_signature:
     // use crate::{seeded_hasher, HashMap, HashSet};
-    // let hasher = seeded_hasher(&instance.seed);
+    // let hasher = seeded_hasher(&challenge.seed);
     // let map = HashMap::with_hasher(hasher);
 
     // Support hyperparameters if needed:

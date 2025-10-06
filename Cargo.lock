@@ -2039,6 +2039,7 @@ dependencies = [
  "cudarc",
  "ndarray",
  "rand",
+ "serde",
  "serde_json",
  "tig-challenges",
 ]
