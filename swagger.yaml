@@ -1173,9 +1173,9 @@ components:
         cutoff:
           type: integer
           format: uint64
-        self_deposit:
+        weighted_self_deposit:
           $ref: '#/components/schemas/PreciseNumber'
-        delegated_weighted_deposit:
+        weighted_delegated_deposit:
           $ref: '#/components/schemas/PreciseNumber'
         delegators:
           type: array
@@ -1302,6 +1302,9 @@ components:
           $ref: '#/components/schemas/BenchmarkSettings'
         state:
           $ref: '#/components/schemas/PrecommitState'
+        hyperparameters:
+          type: object
+          nullable: true
     PrecommitDetails:
       type: object
       properties:
