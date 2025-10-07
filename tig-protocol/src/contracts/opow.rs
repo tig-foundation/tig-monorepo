@@ -350,21 +350,22 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .filter(|(delegatee, _)| active_opow_ids.contains(delegatee.as_str()))
                 .map(|(delegatee, fraction)| (delegatee.clone(), *fraction))
                 .collect();
-        } else {
-            continue;
         }
 
+        // self deposit
+        if active_opow_ids.contains(player_id) {
+            let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
+            let self_deposit_fraction =
+                PreciseNumber::from_f64(1.0 - player_data.delegatees.values().sum::<f64>());
+            opow_data.weighted_self_deposit += player_data.weighted_deposit * self_deposit_fraction;
+        }
+
+        // delegated deposit
         for (delegatee, fraction) in player_data.delegatees.iter() {
             let fraction = PreciseNumber::from_f64(*fraction);
             let opow_data = active_opow_block_data.get_mut(delegatee).unwrap();
-            if player_id == delegatee {
-                // self deposit
-                opow_data.weighted_self_deposit += player_data.weighted_deposit * fraction;
-            } else {
-                // delegated deposit
-                opow_data.delegators.insert(player_id.clone());
-                opow_data.weighted_delegated_deposit += player_data.weighted_deposit * fraction;
-            }
+            opow_data.delegators.insert(player_id.clone());
+            opow_data.weighted_delegated_deposit += player_data.weighted_deposit * fraction;
         }
     }
     let total_weighted_delegated_deposit = active_opow_block_data

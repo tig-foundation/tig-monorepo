@@ -84,10 +84,14 @@ pub async fn set_delegatees<T: Context>(
         }
     }
 
-    if delegatees.values().any(|&v| v <= 0.0 || v > 1.0) {
+    if delegatees.keys().any(|k| k == &player_id) {
         return Err(anyhow!(
-            "Fraction must be greater than 0.0 and less than or equal to 1.0"
+            "Cannot delegate to yourself. Any undelegated deposit will count as self-deposit"
         ));
+    }
+
+    if delegatees.values().any(|&v| v < 0.0 || v > 1.0) {
+        return Err(anyhow!("Fractions must be between 0.0 and 1.0"));
     }
 
     if delegatees.values().cloned().sum::<f64>() > 1.0 {
