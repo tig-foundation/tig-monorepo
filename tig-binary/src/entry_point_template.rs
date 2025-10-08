@@ -23,7 +23,7 @@ pub fn entry_point(
 {
     catch_unwind(AssertUnwindSafe(|| {
         let hyperparameters = hyperparameters.map(|x| serde_json::from_str::<Map<String, Value>>(&x).unwrap());
-        {ALGORITHM}::solve_challenge(challenge, save_solution, hyperparameters)
+        {ALGORITHM}::solve_challenge(challenge, save_solution, &hyperparameters)
     })).unwrap_or_else(|_| {
         Err(anyhow!("Panic occurred calling solve_challenge"))
     })
@@ -43,7 +43,7 @@ pub fn entry_point(
 {
     catch_unwind(AssertUnwindSafe(|| {
         let hyperparameters = hyperparameters.map(|x| serde_json::from_str::<Map<String, Value>>(x));
-        {ALGORITHM}::solve_challenge(challenge, save_solution, hyperparameters, module, stream, prop)
+        {ALGORITHM}::solve_challenge(challenge, save_solution, &hyperparameters, module, stream, prop)
     })).unwrap_or_else(|_| {
         Err(anyhow!("Panic occurred calling solve_challenge"))
     })
