@@ -279,19 +279,14 @@ fn compute_solution(
     }
 }
 
-
 pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> anyhow::Result<()>,
     hyperparameters: &Option<Map<String, Value>>,
 ) -> anyhow::Result<()> {
-    let target_value = (challenge.baseline_value as f64
-        * (1.0 + challenge.difficulty.better_than_baseline as f64 / 1000.0))
-        as u32;
     let mut rng =
         StdRng::seed_from_u64(u64::from_le_bytes(challenge.seed[..8].try_into().unwrap()));
 
-    let mut best_solution: Option<Solution> = None;
     let mut best_value = 0;
 
     for _outer_iter in 0..200 {
@@ -316,20 +311,11 @@ pub fn solve_challenge(
 
         if value > best_value {
             best_value = value;
-            best_solution = Some(Solution {
-                items: solution.items.clone(),
-            });
-        }
-
-        let threshold = lookup_threshold(challenge.difficulty.num_items);
-        if (target_value as f32) * (1.0 - threshold * 0.008) >= best_value as f32 {
-            return Ok(());
-        } else if target_value <= best_value as u32 {
-            return Ok(best_solution);
+            let _ = save_solution(&solution);
         }
     }
 
-    Ok(best_solution)
+    Ok(())
 }
 
 fn lookup_threshold(num_items: usize) -> f32 {
