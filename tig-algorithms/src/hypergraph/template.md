@@ -6,6 +6,7 @@
 * **Submission Name:** [name of code submission]
 * **Copyright:** [year work created] [name of copyright owner]  
 * **Identity of Submitter:** [name of person or entity submitting the work to TIG] 
+* **Identity of Creator of Algorithmic Method:** [if applicable else null]
 * **Unique Algorithm Identifier (UAI):** [if applicable else null]
 
 
