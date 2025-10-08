@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -48,10 +49,12 @@ def now():
 
 if __name__ == "__main__":
     tig_runtime_path = shutil.which("tig-runtime")
+    tig_verifier_path = shutil.which("tig-verifier")
     parser = argparse.ArgumentParser(description="TIG Algorithm Tester")
     parser.add_argument("algorithm", type=str, help="Algorithm name")
     parser.add_argument("difficulty", type=str, help="JSON string of difficulty")
     parser.add_argument("--tig_runtime_path", type=str, default=tig_runtime_path, help=f"Path to tig-runtime executable (default: {tig_runtime_path})")
+    parser.add_argument("--tig_verifier_path", type=str, default=tig_verifier_path, help=f"Path to tig-verifier executable (default: {tig_verifier_path})")
     parser.add_argument("--lib-dir", type=str, default="./tig-algorithms/lib", help="Path to the algorithms library folder (default: ./tig-algorithms/lib)")
     parser.add_argument("--seed", type=str, default="rand_hash", help="String to use as seed instance generation (default: 'rand_hash')")
     parser.add_argument("--start", type=int, default=0, help="Starting nonce (default: 0)")
@@ -107,19 +110,22 @@ f"""Library not found at {so_path}:
         start = now()
         while True:
             time.sleep(0.5)
-            num_processing, num_finished, num_solutions = 0, 0, 0
-            for (_, _, ret) in results.values():
-                if ret is None:
+            num_processing, num_finished, num_solutions, num_invalid, num_no_output, num_errors = 0, 0, 0, 0, 0, 0
+            for (_, _, status) in results.values():
+                if status is None:
                     num_processing += 1
                 else:
                     num_finished += 1
-                    num_solutions += int(ret == 0)
+                    num_solutions += int(status == 0)
+                    num_invalid += int(status == 1)
+                    num_no_output += int(status == 2)
+                    num_errors += int(status == 3)
             
             elapsed = (now() - start) / 1000
             solution_ratio = num_solutions / (num_finished or 1)
             solution_rate = num_solutions / elapsed
             score = solution_rate * solution_ratio
-            out = f"#processing: {num_processing}, #finished: {num_finished}, #solutions: {num_solutions}, elapsed: {elapsed:.2f}s, solution_ratio: {solution_ratio:.4f}, solution_rate: {solution_rate:.4f}, score: {score:.4f}"
+            out = f"#processing: {num_processing}, #finished: {num_finished} - (#solutions: {num_solutions}, #invalid: {num_invalid}, #no_output: {num_no_output}, #errors: {num_errors}), elapsed: {elapsed:.2f}s, solution_ratio: {solution_ratio:.4f}, solution_rate: {solution_rate:.4f}, score: {score:.4f}"
             if args.verbose:
                 print(out)
             else:
@@ -131,41 +137,74 @@ f"""Library not found at {so_path}:
             print("\n")
 
     def run_tig_runtime(nonce):
-        cmd = [
-            args.tig_runtime_path,
-            json.dumps(settings, separators=(',',':')),
-            args.seed,
-            str(nonce),
-            so_path,
-            "--fuel", str(args.fuel),
-        ]
-        if ptx_path is not None:
-            cmd += [
-                "--ptx", ptx_path,
-                "--gpu", str(nonce % len(VISIBLE_GPUS)),
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cmd = [
+                args.tig_runtime_path,
+                json.dumps(settings, separators=(',',':')),
+                args.seed,
+                str(nonce),
+                so_path,
+                "--fuel", str(args.fuel),
+                "--output", temp_dir,
             ]
-        if args.verbose:
-            print(f"computing nonce {nonce}: {' '.join(cmd[:1] + [f"'{cmd[1]}'"] + cmd[2:])}")
-        start = now()
-        results[nonce] = (start, None, None)
-        ret = subprocess.run(cmd, capture_output=True, text=True)
-        elapsed = now() - start
-        results[nonce] = (start, elapsed, ret.returncode)
-        if args.verbose:
-            out = f"computing nonce {nonce}: took {elapsed}ms, "
-            if ret.returncode == 0:
-                out += "found solution"
-            elif ret.returncode == 84:
-                out += f"runtime error: {ret.stderr.strip()}"
-            elif ret.returncode == 85:
-                out += "no solution found"
-            elif ret.returncode == 86:
-                out += f"invalid solution: {ret.stderr.strip()}"
-            elif ret.returncode == 87:
-                out += "out of fuel"
+            if ptx_path is not None:
+                cmd += [
+                    "--ptx", ptx_path,
+                    "--gpu", str(nonce % len(VISIBLE_GPUS)),
+                ]
+            if args.verbose:
+                print(f"computing nonce {nonce}: {' '.join(cmd[:1] + [f"'{cmd[1]}'"] + cmd[2:])}")
+            start = now()
+            results[nonce] = (start, None, None)
+            ret = subprocess.run(cmd, capture_output=True, text=True)
+            elapsed = now() - start
+            output_file = f"{temp_dir}/{nonce}.json"
+            ret2 = None
+            elapsed2 = 0
+            if os.path.exists(output_file):
+                cmd2 = [
+                    args.tig_verifier_path,
+                    json.dumps(settings, separators=(',',':')),
+                    args.seed,
+                    str(nonce),
+                    f"{temp_dir}/{nonce}.json",
+                ]
+                if ptx_path is not None:
+                    cmd2 += [
+                        "--ptx", ptx_path,
+                        "--gpu", str(nonce % len(VISIBLE_GPUS)),
+                    ]
+                if args.verbose:
+                    print(f"verifying output for nonce {nonce}: {' '.join(cmd2[:1] + [f"'{cmd2[1]}'"] + cmd2[2:])}")
+                ret2 = subprocess.run(cmd2, capture_output=True, text=True)
+                elapsed2 = now() - start - elapsed
+            if args.verbose:
+                out = f"nonce {nonce} finished:\n\ttig-runtime\n\t\telapsed: {elapsed}ms\n\t\texit code: {ret.returncode}\n\t\tstderr: "
+                if ret.returncode != 0:
+                    if ret.returncode == 87:
+                        out += "out of fuel"
+                    else:
+                        out += ret.stderr.strip()
+                out += f"\n\ttig-verifier\n\t\t"
+                if ret2 is None:
+                    out += "no output to verify"
+                else:
+                    out += f"elapsed: {elapsed2}ms\n\t\texit code: {ret2.returncode}\n\t\tstderr: "
+                    if ret2.returncode != 0:
+                        out += ret2.stderr.strip()
+                print(out)
+            if ret2 is not None:
+                if ret2.returncode == 0:
+                    status = 0 # solution
+                else:
+                    status = 1 # invalid solution
             else:
-                out += f"unhandled exit code {ret.returncode}: {ret.stderr.strip()}"
-            print(out)
+                if ret.returncode in {0, 87}:
+                    status = 2 # no solution
+                else:
+                    status = 3 # runtime error
+            # solution, no solution, error
+            results[nonce] = (start, elapsed, status)
 
     nonces = list(range(args.start, args.start + args.nonces))
     if args.verbose:
