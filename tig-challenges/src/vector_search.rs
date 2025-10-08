@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{anyhow, Result};
 use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
