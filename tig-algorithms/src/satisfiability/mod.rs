@@ -1,6 +1,7 @@
 // c001_a001
 
-// c001_a002
+pub mod cuda_example;
+pub use cuda_example as c001_a002;
 
 // c001_a003
 
