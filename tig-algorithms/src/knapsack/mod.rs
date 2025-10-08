@@ -12,7 +12,8 @@
 
 // c003_a007
 
-// c003_a008
+pub mod relative_opt_fast;
+pub use relative_opt_fast as c003_a008;
 
 // c003_a009
 
