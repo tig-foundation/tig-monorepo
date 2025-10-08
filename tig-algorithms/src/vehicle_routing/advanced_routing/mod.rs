@@ -5,13 +5,11 @@ use rand::{
 use serde_json::{Map, Value};
 use tig_challenges::vehicle_routing::*;
 
-
 pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> anyhow::Result<()>,
     hyperparameters: &Option<Map<String, Value>>,
 ) -> anyhow::Result<()> {
-    let mut best_solution: Option<Solution> = None;
     let mut best_cost = std::i32::MAX;
 
     const INITIAL_TEMPERATURE: f32 = 2.0;
@@ -26,15 +24,6 @@ pub fn solve_challenge(
 
     let mut current_solution = create_solution(challenge, &current_params, &savings_list);
     let mut current_cost = calculate_solution_cost(&current_solution, &challenge.distance_matrix);
-
-    if current_cost <= challenge.baseline_total_distance {
-        let _ = save_solution(&current_solution);
-        return Ok(());
-    }
-
-    if (current_cost as f32 * 0.96) > challenge.baseline_total_distance as f32 {
-        return Ok(());
-    }
 
     let mut temperature = INITIAL_TEMPERATURE;
     let mut rng =
@@ -60,20 +49,17 @@ pub fn solve_challenge(
 
                 if current_cost < best_cost {
                     best_cost = current_cost;
-                    best_solution = Some(Solution {
+                    let _ = save_solution(&Solution {
                         routes: current_solution.routes.clone(),
                     });
                 }
-            }
-            if best_cost <= challenge.baseline_total_distance {
-                return Ok(best_solution);
             }
         }
 
         temperature *= COOLING_RATE;
     }
 
-    Ok(best_solution)
+    Ok(())
 }
 
 #[inline]
