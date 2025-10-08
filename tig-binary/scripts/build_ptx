@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from glob import glob
 import argparse
 import os
 import re
@@ -255,14 +256,11 @@ def main():
             f"Challenge code does not exist @ '{challenge_cu}'. Is the challenge name correct?"
         )
 
-    algorithm_cu = f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}.cu"
-    algorithm_cu2 = f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}/benchmarker_outbound.cu"
-    if not os.path.exists(algorithm_cu) and not os.path.exists(algorithm_cu2):
+    algorithm_cus = glob(f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}/*.cu")
+    if not algorithm_cus:
         raise FileNotFoundError(
-            f"Algorithm code does not exist @ '{algorithm_cu}' or '{algorithm_cu2}'. Is the algorithm name correct?"
+            f"Algorithm code does not exist @ '{algorithm_cus}'. Is the algorithm name correct?"
         )
-    if not os.path.exists(algorithm_cu):
-        algorithm_cu = algorithm_cu2
 
     # Combine .cu source files into a temporary file
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -280,8 +278,9 @@ def main():
                 code += f.read() + "\n"
         kernel_regex = r'(?:extern\s+"C"\s+__global__|__device__)\s+\w+\s+(?P<func>\w+)\s*\('
         kernels_to_ignore = [match.group('func') for match in re.finditer(kernel_regex, code)]
-        with open(algorithm_cu, 'r') as f:
-            code += f.read()
+        for algorithm_cu in algorithm_cus:
+            with open(algorithm_cu, 'r') as f:
+                code += f.read() + "\n\n"
         with open(temp_cu, 'w') as f:
             f.write(code)
 
