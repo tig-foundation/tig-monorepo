@@ -120,8 +120,16 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     RewardsConfig {
+        gamma: GammaConfig,
         distribution: DistributionConfig,
         schedule: Vec<EmissionsConfig>,
+    }
+}
+serializable_struct_with_getters! {
+    GammaConfig {
+        a: f64,
+        b: f64,
+        c: f64,
     }
 }
 serializable_struct_with_getters! {
