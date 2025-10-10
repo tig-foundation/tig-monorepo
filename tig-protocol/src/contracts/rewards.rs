@@ -26,8 +26,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_challenge_ids = &block_data.active_ids[&ActiveType::Challenge];
 
     let zero = PreciseNumber::from(0);
-    block_details.gamma_value =
-        1.0258 * (1.0 - 0.8730 * (-0.0354 * active_challenge_ids.len() as f64).exp());
+    block_details.gamma_value = config.rewards.gamma.a
+        * (1.0
+            - config.rewards.gamma.b
+                * (-config.rewards.gamma.c * active_challenge_ids.len() as f64).exp());
     let block_reward = PreciseNumber::from_f64(
         config
             .rewards
