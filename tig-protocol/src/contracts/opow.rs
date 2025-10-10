@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 use tig_utils::*;
 
+const EPSILON: f64 = 1e-9;
+
 #[time]
 pub(crate) async fn update(cache: &mut AddBlockCache) {
     let AddBlockCache {
@@ -472,12 +474,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 &total_weighted_delegated_deposit,
             ),
         ] {
-            let f = if total == zero {
+            let f = if total.to_f64() <= EPSILON {
                 zero.clone()
             } else {
                 deposit_factor / total
             };
-            factors.push(if weighted_average_challenge_factor == zero {
+            factors.push(if weighted_average_challenge_factor.to_f64() <= EPSILON {
                 zero.clone()
             } else if f / weighted_average_challenge_factor > max_deposit_to_qualifier_ratio {
                 weighted_average_challenge_factor * max_deposit_to_qualifier_ratio
@@ -503,7 +505,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 diff * diff * w
             })
             .sum::<PreciseNumber>();
-        let imbalance = if weighted_average_factor == zero || weighted_average_factor == one {
+        let imbalance = if weighted_variance_factor.to_f64() <= EPSILON
+            || weighted_average_factor.to_f64() <= EPSILON
+            || (1.0 - weighted_average_factor.to_f64()) <= EPSILON
+        {
             zero.clone()
         } else {
             weighted_variance_factor / (weighted_average_factor * (one - weighted_average_factor))
