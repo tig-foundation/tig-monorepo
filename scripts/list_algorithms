@@ -45,7 +45,9 @@ def main():
             status = f"active @ round {a['state']['round_active']}"
         else:
             status = f"pushed @ round {a['state']['round_pushed']}"
-        print(f"id: {a['id']:<12} name: {a['details']['name']:<20} status: {status}")
+        a_name = a['details']['name']
+        git_url = f"https://github.com/tig-foundation/tig-hackathon/blob/{args.challenge}/{a_name}/tig-algorithms/src/{args.challenge}/{a_name}/mod.rs"
+        print(f"id: {a['id']:<12} name: {a_name:<20} status: {status:<20} code: {git_url}")
 
 if __name__ == "__main__":
     main()
