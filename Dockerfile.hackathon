@@ -62,5 +62,3 @@ RUN pip3 install -r tig-benchmarker/slave/requirements.txt --break-system-packag
 RUN rm -rf /tmp/tig-monorepo
 
 WORKDIR /app
-
-ENTRYPOINT ["bash", "entrypoint.sh"]
