@@ -8,7 +8,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
-      - ./db_data:/var/lib/postgresql/data
+      - /tmp/db_data:/var/lib/postgresql/data
     networks:
       - tig-benchmarker
     ports:
@@ -42,6 +42,8 @@ services:
     restart: unless-stopped
     networks:
       - tig-benchmarker
+    ports:
+      - "8080:80"
     expose:
       - 80
     depends_on:
@@ -51,17 +53,28 @@ services:
     image: nginx:alpine
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/ssl:/etc/nginx/ssl:ro
+      - /etc/ssl/hackathon:/etc/nginx/ssl:ro
     ports:
-      - "${UI_PORT}:80"
+      - "80:80"
+      - "443:443"
+      - "2096:2096"
+      - "8443:8443"
     networks:
       - tig-benchmarker
     depends_on:
-      - ui
+      - db
       - master
+      - ui
+      - slave
+      - innovator
 
-  innovator:
+  slave:
     image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    volumes:
+      - ./tig-benchmarker:/app
+    command: python3 slave/main.py
+    networks:
+      - tig-benchmarker
     environment:
       - VERBOSE=${VERBOSE}
       - SLAVE_NAME=${SLAVE_NAME}
@@ -69,6 +82,21 @@ services:
       - MASTER_IP=${MASTER_IP}
       - TTL=${TTL}
       - NUM_WORKERS=${NUM_WORKERS}
+
+  innovator:
+    image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    volumes:
+      - ./:/app
+    command: >
+      jupyter lab
+      --allow-root
+      --ip=0.0.0.0
+      --no-browser
+      --ServerApp.token=''
+      --ServerApp.allow_origin='*'
+      --ServerApp.default_url=/lab/tree/welcome.ipynb
+    networks:
+      - tig-benchmarker
 
 networks:
   tig-benchmarker:

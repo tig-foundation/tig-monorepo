@@ -49,16 +49,18 @@ ENV PATH="/usr/local/bin/tig-scripts:${PATH}"
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
 
-RUN challenges=$(python3 -c "import os; [print(f.name) for f in os.scandir('tig-algorithms/src') if f.is_dir()]") &&
-    cargo build -rp tig-runtime --features "$challenges" && \
-    cargo build -rp tig-verifier --features "$challenges" && \
+RUN cargo build -rp tig-runtime && \
+    cargo build -rp tig-verifier && \
     mv target/release/tig-runtime /usr/local/bin/ && \
     mv target/release/tig-verifier /usr/local/bin/ && \
     chmod +x /usr/local/bin/tig-runtime && \
-    chmod +x /usr/local/bin/tig-verifier && \
-    rm -rf /tmp/tig-monorepo
+    chmod +x /usr/local/bin/tig-verifier
 
 RUN pip3 install -r tig-benchmarker/slave/requirements.txt --break-system-packages && \
     pip3 install jupyterlab==4.4.9 --break-system-packages
 
+RUN rm -rf /tmp/tig-monorepo
+
 WORKDIR /app
+
+ENTRYPOINT ["bash", "entrypoint.sh"]

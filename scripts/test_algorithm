@@ -39,11 +39,6 @@ elif (VISIBLE_GPUS := os.environ.get("CUDA_VISIBLE_DEVICES", None)) is None:
 else:
     VISIBLE_GPUS = list(map(int, VISIBLE_GPUS.split(",")))
 
-CHALLENGE = os.getenv("CHALLENGE")
-if CHALLENGE is None:
-    print("CHALLENGE environment variable must be set!")
-    sys.exit(1)
-
 def now():
     return int(time.time() * 1000)
 
@@ -88,8 +83,8 @@ if __name__ == "__main__":
         print(f"Challenge '{args.challenge}' not found.")
         sys.exit(1)
 
-    so_path = f"{args.lib_dir}/{CHALLENGE}/{CPU_ARCH}/{args.algorithm}.so"
-    ptx_path = f"{args.lib_dir}/{CHALLENGE}/ptx/{args.algorithm}.ptx"
+    so_path = f"{args.lib_dir}/{args.challenge}/{CPU_ARCH}/{args.algorithm}.so"
+    ptx_path = f"{args.lib_dir}/{args.challenge}/ptx/{args.algorithm}.ptx"
 
     if not os.path.exists(so_path):
         print(
