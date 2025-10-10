@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 
 import argparse
-import io
-import os
 import requests
-import sys
-import tarfile
 
 def main():
     parser = argparse.ArgumentParser(description='TIG Challenge Lister')
-    parser.add_argument('--testnet', action='store_true', help="Use testnet API")
     
     args = parser.parse_args()
 
-    api_url = f"https://{'test' if args.testnet else 'main'}net-api.tig.foundation"
+    api_url = f"https://hackathon-api.tig.foundation"
     block = requests.get(f"{api_url}/get-block").json()["block"]
     challenges = requests.get(f"{api_url}/get-challenges?block_id={block['id']}").json()["challenges"]
     

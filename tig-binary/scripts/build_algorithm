@@ -2,52 +2,15 @@
 
 set -e
 
-# Check if CHALLENGE environment variable is set
-if [ -z "$CHALLENGE" ]; then
-  echo "Error: CHALLENGE environment variable is not set."
+# Check if CHALLENGE and ALGORITHM arguments are provided
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Error: CHALLENGE and ALGORITHM arguments are required."
+  echo "Usage: $0 <CHALLENGE> <ALGORITHM>"
   exit 1
 fi
 
-# Check if ALGORITHM argument is provided
-if [ -z "$1" ]; then
-  echo "Error: ALGORITHM argument is required."
-  echo "Usage: $0 <ALGORITHM>"
-  exit 1
-fi
+CHALLENGE="$1"
+ALGORITHM="$2"
 
-ALGORITHM="$1"
-
-# Match CHALLENGE value
-case "$CHALLENGE" in
-  satisfiability)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'satisfiability'"
-    build_so $ALGORITHM
-    ;;
-  vehicle_routing)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'vehicle_routing'"
-    build_so $ALGORITHM
-    ;;
-  knapsack)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'knapsack'"
-    build_so $ALGORITHM
-    ;;
-  vector_search)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'vector_search'"
-    build_so $ALGORITHM
-    build_ptx $ALGORITHM
-    ;;
-  hypergraph)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'hypergraph'"
-    build_so $ALGORITHM
-    build_ptx $ALGORITHM
-    ;;
-  neuralnet_optimizer)
-    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'neuralnet_optimizer'"
-    build_so $ALGORITHM
-    build_ptx $ALGORITHM --extra-cu-files tig-challenges/src/neuralnet/kernels.cu
-    ;;
-  *)
-    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, knapsack, vehicle_routing, vector_search, hypergraph, neuralnet_optimizer"
-    exit 1
-    ;;
-esac
+echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE '$CHALLENGE'"
+build_so $CHALLENGE $ALGORITHM

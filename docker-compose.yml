@@ -1,9 +1,6 @@
 services:
   db:
-    build:
-      context: .
-      dockerfile: postgres/Dockerfile
-    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/postgres:${VERSION}
+    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/postgres:${VERSION}
     container_name: db
     restart: unless-stopped
     environment:
@@ -23,10 +20,7 @@ services:
       retries: 5
 
   master:
-    build:
-      context: .
-      dockerfile: master/Dockerfile
-    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/master:${VERSION}
+    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/master:${VERSION}
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -44,10 +38,7 @@ services:
         condition: service_healthy
 
   ui:
-    build:
-      context: .
-      dockerfile: ui/Dockerfile
-    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/ui:${VERSION}
+    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/ui:${VERSION}
     restart: unless-stopped
     networks:
       - tig-benchmarker
@@ -57,10 +48,10 @@ services:
       - master
 
   nginx:
-    build:
-      context: .
-      dockerfile: nginx/Dockerfile
-    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/nginx:${VERSION}
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/ssl:/etc/nginx/ssl:ro
     ports:
       - "${UI_PORT}:80"
     networks:
@@ -68,6 +59,16 @@ services:
     depends_on:
       - ui
       - master
+
+  innovator:
+    image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    environment:
+      - VERBOSE=${VERBOSE}
+      - SLAVE_NAME=${SLAVE_NAME}
+      - MASTER_PORT=${MASTER_PORT}
+      - MASTER_IP=${MASTER_IP}
+      - TTL=${TTL}
+      - NUM_WORKERS=${NUM_WORKERS}
 
 networks:
   tig-benchmarker:

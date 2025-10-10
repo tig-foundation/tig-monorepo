@@ -77,9 +77,9 @@ class PrecommitManager:
 
         algo_selection = CONFIG["algo_selection"]
 
-        num_pending_benchmarks = num_pending_jobs + self.num_precommits_submitted
-        if  num_pending_benchmarks >= CONFIG["max_concurrent_benchmarks"]:
-            logger.debug(f"number of pending benchmarks has reached max of {CONFIG['max_concurrent_benchmarks']}")
+        num_pending_benchmarks = self.num_precommits_submitted
+        if  num_pending_benchmarks >= 2:
+            logger.debug(f"number of pending benchmarks has reached max of 2")
             return
         logger.debug(f"Selecting algorithm from: {[(x['algorithm_id'], x['weight']) for x in algo_selection]}")
         selection = random.choices(algo_selection, weights=[x["weight"] for x in algo_selection])[0]

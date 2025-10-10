@@ -98,15 +98,23 @@ class SlaveManager:
     def start(self):
         app = FastAPI()
 
+        SLAVES = [
+            {
+            "name_regex": ".*",
+            "algorithm_id_regex": ".*",
+            "max_concurrent_batches": 1
+            }
+        ]
+
         @app.route('/get-batches', methods=['GET'])
         def get_batch(request: Request):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 return "User-Agent header is required", 403
-            if not any(re.match(slave["name_regex"], slave_name) for slave in CONFIG["slaves"]):
+            if not any(re.match(slave["name_regex"], slave_name) for slave in SLAVES):
                 logger.warning(f"slave {slave_name} does not match any regex. rejecting get-batch request")
                 raise HTTPException(status_code=403, detail="Unregistered slave")
 
-            slave = next((slave for slave in CONFIG["slaves"] if re.match(slave["name_regex"], slave_name)), None)
+            slave = next((slave for slave in SLAVES if re.match(slave["name_regex"], slave_name)), None)
 
             concurrent = []
             updates = []
@@ -129,7 +137,7 @@ class SlaveManager:
                     if (
                         b["slave"] is None or
                         b["start_time"] is None or
-                        (now - b["start_time"]) > CONFIG["time_before_batch_retry"]
+                        (now - b["start_time"]) > 60000
                     ):
                         b["slave"] = slave_name
                         b["start_time"] = now
