@@ -45,6 +45,7 @@ pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub demands: Vec<i32>,
+    pub node_positions: Vec<(i32, i32)>,
     pub distance_matrix: Vec<Vec<i32>>,
     #[cfg(not(feature = "hide_verification"))]
     pub baseline_total_distance: i32,
@@ -181,6 +182,7 @@ impl Challenge {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             demands,
+            node_positions,
             distance_matrix,
             baseline_total_distance,
             max_capacity,
