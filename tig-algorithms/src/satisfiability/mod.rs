@@ -146,7 +146,8 @@ pub use better_sat as c001_a061;
 
 // c001_a065
 
-// c001_a066
+pub mod sat_suma;
+pub use sat_suma as c001_a066;
 
 // c001_a067
 
