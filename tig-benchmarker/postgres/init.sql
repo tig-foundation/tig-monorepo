@@ -113,7 +113,7 @@ SELECT '
   "api_url": "https://hackathon-api.tig.foundation",
   "algo_selection": [
     {
-      "algorithm_id": "c001_a001",
+      "algorithm_id": "c001_a000",
       "num_nonces": 40,
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
@@ -122,7 +122,7 @@ SELECT '
       "hyperparameters": null
     },
     {
-      "algorithm_id": "c002_a001",
+      "algorithm_id": "c002_a000",
       "num_nonces": 40,
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
@@ -131,7 +131,7 @@ SELECT '
       "hyperparameters": null
     },
     {
-      "algorithm_id": "c003_a001",
+      "algorithm_id": "c003_a000",
       "num_nonces": 40,
       "difficulty_range": [0, 0.5],
       "selected_difficulties": [],
