@@ -1,0 +1,105 @@
+services:
+  db:
+    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/postgres:${VERSION}
+    container_name: db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - /tmp/db_data:/var/lib/postgresql/data
+    networks:
+      - tig-benchmarker
+    ports:
+      - ${DB_PORT}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  master:
+    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/master:${VERSION}
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - VERBOSE=${VERBOSE}
+    networks:
+      - tig-benchmarker
+    ports:
+      - ${MASTER_PORT}:5115
+    expose:
+      - 3336
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ui:
+    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/ui:${VERSION}
+    restart: unless-stopped
+    networks:
+      - tig-benchmarker
+    ports:
+      - "8080:80"
+    expose:
+      - 80
+    depends_on:
+      - master
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/ssl/hackathon:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2096:2096"
+      - "8443:8443"
+    networks:
+      - tig-benchmarker
+    depends_on:
+      - db
+      - master
+      - ui
+      - slave
+      - innovator
+
+  slave:
+    image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    volumes:
+      - ./tig-benchmarker:/app
+    command: python3 slave/main.py
+    networks:
+      - tig-benchmarker
+    environment:
+      - VERBOSE=${VERBOSE}
+      - SLAVE_NAME=${SLAVE_NAME}
+      - MASTER_PORT=${MASTER_PORT}
+      - MASTER_IP=${MASTER_IP}
+      - TTL=${TTL}
+      - NUM_WORKERS=${NUM_WORKERS}
+
+  innovator:
+    image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    volumes:
+      - ./:/app
+    command: >
+      jupyter lab
+      --allow-root
+      --ip=0.0.0.0
+      --no-browser
+      --ServerApp.token=''
+      --ServerApp.allow_origin='*'
+      --ServerApp.default_url=/lab/tree/welcome.ipynb
+    networks:
+      - tig-benchmarker
+
+networks:
+  tig-benchmarker:
+
+volumes:
+  pgadmin-data:

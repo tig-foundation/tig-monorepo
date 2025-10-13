@@ -2,27 +2,22 @@
 
 set -e
 
-# Check if CHALLENGE environment variable is set
-if [ -z "$CHALLENGE" ]; then
-  echo "Error: CHALLENGE environment variable is not set."
+# Check if CHALLENGE and ALGORITHM arguments are provided
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Error: CHALLENGE and ALGORITHM arguments are required."
+  echo "Usage: $0 <CHALLENGE> <ALGORITHM>"
   exit 1
 fi
 
-# Check if ALGORITHM argument is provided
-if [ -z "$1" ]; then
-  echo "Error: ALGORITHM argument is required."
-  echo "Usage: $0 <ALGORITHM>"
-  exit 1
-fi
-
-ALGORITHM="$1"
+CHALLENGE="$1"
+ALGORITHM="$2"
 
 echo "Compiling .so for $CHALLENGE/$ALGORITHM"
 cp tig-binary/src/entry_point_template.rs tig-binary/src/entry_point.rs
 sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-binary/src/entry_point.rs
 sed -i "s/{ALGORITHM}/$ALGORITHM/g" tig-binary/src/entry_point.rs
 
-FEATURES="entry_point $CHALLENGE"
+FEATURES="entry_point"
 
 ARCH=$(uname -m)
 RUST_TARGET=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then

@@ -3,18 +3,9 @@ name: Build Algorithm
 on: 
   push:
     branches:
-      - 'satisfiability/*'
-      - 'vehicle_routing/*'
-      - 'knapsack/*'
-      - 'vector_search/*'
-      - 'hypergraph/*'
-      - 'neuralnet_optimizer/*'
-      - 'test/satisfiability/*'
-      - 'test/vehicle_routing/*'
-      - 'test/knapsack/*'
-      - 'test/vector_search/*'
-      - 'test/hypergraph/*'
-      - 'test/neuralnet_optimizer/*'
+      - 'balanced_square/*'
+      - 'min_superstring/*'
+      - 'travelling_salesman/*'
 
 jobs:
   init:
@@ -53,7 +44,7 @@ jobs:
           docker run --rm --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/dev:0.0.3 \
+            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/encode2025:latest \
             build_algorithm ${{ needs.init.outputs.ALGORITHM }}
 
       - name: Upload Artifact
@@ -77,7 +68,7 @@ jobs:
           docker run --rm --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/dev:0.0.3 \
+            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/encode2025:latest \
             build_algorithm ${{ needs.init.outputs.ALGORITHM }}
 
       - name: Upload Artifact

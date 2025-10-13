@@ -110,9 +110,7 @@ SELECT '
 {
   "player_id": "0x0000000000000000000000000000000000000000",
   "api_key": "00000000000000000000000000000000",
-  "api_url": "https://mainnet-api.tig.foundation",
-  "time_between_resubmissions": 60000,
-  "max_concurrent_benchmarks": 4,
+  "api_url": "https://hackathon-api.tig.foundation",
   "algo_selection": [
     {
       "algorithm_id": "c001_a001",
@@ -140,32 +138,6 @@ SELECT '
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null
-    },
-    {
-      "algorithm_id": "c004_a001",
-      "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
-      "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null
-    },
-    {
-      "algorithm_id": "c005_a001",
-      "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
-      "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null
-    }
-  ],
-  "time_before_batch_retry": 60000,
-  "slaves": [
-    {
-      "name_regex": ".*",
-      "algorithm_id_regex": ".*",
-      "max_concurrent_batches": 1
     }
   ]
 }'

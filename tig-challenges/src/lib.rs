@@ -102,29 +102,9 @@ macro_rules! impl_base64_serde {
     };
 }
 
-#[cfg(feature = "c001")]
-pub mod satisfiability;
-#[cfg(feature = "c001")]
-pub use satisfiability as c001;
-#[cfg(feature = "c002")]
-pub mod vehicle_routing;
-#[cfg(feature = "c002")]
-pub use vehicle_routing as c002;
-#[cfg(feature = "c003")]
-pub mod knapsack;
-#[cfg(feature = "c003")]
-pub use knapsack as c003;
-#[cfg(feature = "c004")]
-pub mod vector_search;
-#[cfg(feature = "c004")]
-pub use vector_search as c004;
-#[cfg(feature = "c005")]
-pub mod hypergraph;
-#[cfg(feature = "c005")]
-pub use hypergraph as c005;
-#[cfg(feature = "c006")]
-pub(crate) mod neuralnet;
-#[cfg(feature = "c006")]
-pub mod neuralnet_optimizer;
-#[cfg(feature = "c006")]
-pub use neuralnet_optimizer as c006;
+pub mod balanced_square;
+pub use balanced_square as c001;
+pub mod min_superstring;
+pub use min_superstring as c002;
+pub mod travelling_salesman;
+pub use travelling_salesman as c003;

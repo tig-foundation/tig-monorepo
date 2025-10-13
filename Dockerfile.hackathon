@@ -1,12 +1,7 @@
 ARG BASE_IMAGE=ubuntu:24.04
-ARG CHALLENGE
 
 # Development environment stage
 FROM ${BASE_IMAGE}
-
-ARG CHALLENGE
-ENV CHALLENGE=${CHALLENGE}
-RUN if [ -z "$CHALLENGE" ]; then echo "Error: '--build-arg CHALLENGE' must be set." && exit 1; fi
 
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "amd64" ] && [ "$ARCH" != "x86_64" ]; then \
@@ -54,12 +49,16 @@ ENV PATH="/usr/local/bin/tig-scripts:${PATH}"
 COPY . /tmp/tig-monorepo
 WORKDIR /tmp/tig-monorepo
 
-RUN cargo build -r -p tig-runtime --features $CHALLENGE && \
-    cargo build -r -p tig-verifier --features $CHALLENGE && \
+RUN cargo build -rp tig-runtime && \
+    cargo build -rp tig-verifier && \
     mv target/release/tig-runtime /usr/local/bin/ && \
     mv target/release/tig-verifier /usr/local/bin/ && \
     chmod +x /usr/local/bin/tig-runtime && \
-    chmod +x /usr/local/bin/tig-verifier && \
-    rm -rf tig-monorepo
+    chmod +x /usr/local/bin/tig-verifier
+
+RUN pip3 install -r tig-benchmarker/slave/requirements.txt --break-system-packages && \
+    pip3 install jupyterlab==4.4.9 --break-system-packages
+
+RUN rm -rf /tmp/tig-monorepo
 
 WORKDIR /app

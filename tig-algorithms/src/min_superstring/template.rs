@@ -2,7 +2,7 @@
 use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
 use serde_json::{Map, Value};
-use tig_challenges::vehicle_routing::*;
+use tig_challenges::min_superstring::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct Hyperparameters {

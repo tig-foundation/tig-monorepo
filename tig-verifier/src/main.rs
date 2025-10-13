@@ -148,40 +148,13 @@ pub fn verify_solution(
 
     match settings.challenge_id.as_str() {
         "c001" => {
-            #[cfg(not(feature = "c001"))]
-            panic!("tig-verifier was not compiled with '--features c001'");
-            #[cfg(feature = "c001")]
             dispatch_challenge!(c001, cpu)
         }
         "c002" => {
-            #[cfg(not(feature = "c002"))]
-            panic!("tig-verifier was not compiled with '--features c002'");
-            #[cfg(feature = "c002")]
             dispatch_challenge!(c002, cpu)
         }
         "c003" => {
-            #[cfg(not(feature = "c003"))]
-            panic!("tig-verifier was not compiled with '--features c003'");
-            #[cfg(feature = "c003")]
             dispatch_challenge!(c003, cpu)
-        }
-        "c004" => {
-            #[cfg(not(feature = "c004"))]
-            panic!("tig-verifier was not compiled with '--features c004'");
-            #[cfg(feature = "c004")]
-            dispatch_challenge!(c004, gpu)
-        }
-        "c005" => {
-            #[cfg(not(feature = "c005"))]
-            panic!("tig-verifier was not compiled with '--features c005'");
-            #[cfg(feature = "c005")]
-            dispatch_challenge!(c005, gpu)
-        }
-        "c006" => {
-            #[cfg(not(feature = "c006"))]
-            panic!("tig-verifier was not compiled with '--features c006'");
-            #[cfg(feature = "c006")]
-            dispatch_challenge!(c006, gpu)
         }
         _ => panic!("Unsupported challenge"),
     }

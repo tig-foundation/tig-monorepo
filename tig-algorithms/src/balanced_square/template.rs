@@ -1,13 +1,8 @@
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
-use cudarc::{
-    driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
-    runtime::sys::cudaDeviceProp,
-};
 use serde_json::{Map, Value};
-use std::sync::Arc;
-use tig_challenges::vector_search::*;
+use tig_challenges::balanced_square::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct Hyperparameters {
@@ -16,20 +11,14 @@ pub struct Hyperparameters {
     // pub param2: f64,
 }
 
-// when launching kernels, you should not exceed this const or else it may not be deterministic
-const MAX_THREADS_PER_BLOCK: u32 = 1024;
-
 pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
     hyperparameters: &Option<Map<String, Value>>,
-    module: Arc<CudaModule>,
-    stream: Arc<CudaStream>,
-    prop: &cudaDeviceProp,
-) -> anyhow::Result<Option<Solution>> {
+) -> Result<()> {
     // If you need random numbers, recommend using SmallRng with challenge.seed:
-    //      use rand::{rngs::SmallRng, Rng, SeedableRng};
-    //      let mut rng = SmallRng::from_seed(challenge.seed);
+    // use rand::{rngs::SmallRng, Rng, SeedableRng};
+    // let mut rng = SmallRng::from_seed(challenge.seed);
 
     // If you need HashMap or HashSet, make sure to use a deterministic hasher for consistent runtime_signature:
     // use crate::{seeded_hasher, HashMap, HashSet};
@@ -44,14 +33,6 @@ pub fn solve_challenge(
     //     }
     //     None => Hyperparameters { /* set default values here */ },
     // };
-
-    // when launching kernels, you should hardcode the LaunchConfig for determinism:
-    //      Example:
-    //      LaunchConfig {
-    //          grid_dim: (1024, 1, 1), // do not exceed 1024 for compatibility with compute 3.6
-    //          block_dim: ((arr_len + 1023) / 1024, 1, 1),
-    //          shared_mem_bytes: 400,
-    //      }
 
     // use save_solution(&Solution) to save your solution. Overwrites any previous solution
 

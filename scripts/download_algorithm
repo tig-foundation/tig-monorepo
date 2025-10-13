@@ -7,20 +7,16 @@ import requests
 import sys
 import tarfile
 
-CHALLENGE = os.getenv("CHALLENGE")
-if CHALLENGE is None:
-    print("CHALLENGE environment variable must be set!")
-    sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description='TIG Algorithm Downloader')
-    parser.add_argument('algorithm', help="Algorithm name or id")
+    parser.add_argument('challenge', help="Challenge name")
+    parser.add_argument('algorithm', help="Algorithm name")
     parser.add_argument('--out', default="tig-algorithms/lib", help="Output directory (default: tig-algorithms/lib)")
-    parser.add_argument('--testnet', action='store_true', help="Use testnet API")
     
     args = parser.parse_args()
 
-    api_url = f"https://{'test' if args.testnet else 'main'}net-api.tig.foundation"
+    api_url = f"https://hackathon-api.tig.foundation"
     block = requests.get(f"{api_url}/get-block").json()["block"]
     challenges = requests.get(f"{api_url}/get-challenges?block_id={block['id']}").json()["challenges"]
     data = requests.get(f"{api_url}/get-algorithms?block_id={block['id']}").json()
@@ -30,25 +26,25 @@ def main():
     c_id = next(
         (
             c['id'] for c in challenges 
-            if c['details']['name'] == CHALLENGE
+            if c['details']['name'] == args.challenge
         ),
         None
     )
     if c_id is None:
-        print(f"Challenge '{CHALLENGE}' not found.")
+        print(f"Challenge '{args.challenge}' not found.")
         sys.exit(1)
     
     a_id = next(
         (
             a['id'] for a in algorithms
             if (
-                a['details']['name'] == args.algorithm or a['id'] == args.algorithm
+                a['details']['name'] == args.algorithm
             ) and a['details']['challenge_id'] == c_id
         ),
         None
     )
     if a_id is None:
-        print(f"Algorithm '{args.algorithm}' not found for challenge '{CHALLENGE}'.")
+        print(f"Algorithm '{args.algorithm}' not found for challenge '{args.challenge}'.")
         sys.exit(1)
 
     download_url = download_urls.get(a_id)
@@ -58,7 +54,7 @@ def main():
 
     print(f"Downloading algorithm '{args.algorithm}' from {download_url}...")
     resp = requests.get(download_url, stream=True)
-    output_dir = f"{args.out}/{CHALLENGE}"
+    output_dir = f"{args.out}/{args.challenge}"
     os.makedirs(output_dir, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode='r:gz') as tar:
         tar.extractall(path=output_dir)

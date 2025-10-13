@@ -130,7 +130,7 @@ class SubmissionsManager:
             INNER JOIN job_data B
                 ON A.benchmark_id = B.benchmark_id
             """,
-            (CONFIG["time_between_resubmissions"],)
+            (60000,)
         )
 
         if benchmark_to_submit:
@@ -190,7 +190,7 @@ class SubmissionsManager:
             INNER JOIN job_data B
                 ON A.benchmark_id = B.benchmark_id
             """,
-            (CONFIG["time_between_resubmissions"],)
+            (60000,)
         )
 
         if proof_to_submit:

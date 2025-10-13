@@ -63,7 +63,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
     settings = json.dumps(batch["settings"], separators=(',',':'))
     start = now()
     cmd = [
-        "docker", "exec", batch["challenge"], "tig-runtime",
+        "tig-runtime",
         settings,
         batch["rand_hash"],
         str(nonce),
@@ -79,7 +79,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         cmd += [
             "--ptx", ptx_path,
         ]
-    logger.debug(f"computing nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
+    logger.debug(f"computing nonce: {' '.join(cmd[:1] + [f"'{cmd[1]}'"] + cmd[2:])}")
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -113,7 +113,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
             else:
                 start = now()
                 cmd = [
-                    "docker", "exec", batch["challenge"], "tig-verifier",
+                    "tig-verifier",
                     settings,
                     batch["rand_hash"],
                     str(nonce),
@@ -123,7 +123,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
                     cmd += [
                         "--ptx", ptx_path,
                     ]
-                logger.debug(f"verifying nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
+                logger.debug(f"verifying nonce: {' '.join(cmd[:1] + [f"'{cmd[1]}'"] + cmd[2:])}")
                 ret = subprocess.run(cmd, capture_output=True, text=True)
                 if ret.returncode == 0:
                     logger.debug(f"batch {batch['id']}, nonce {nonce} valid solution")
@@ -327,11 +327,6 @@ def process_batch(algorithms_dir, results_dir):
     
     with open(f"{results_dir}/{batch_id}/batch.json") as f:
         batch = json.load(f)
-
-    containers = set(subprocess.check_output(["docker", "ps", "--format", "{{.Names}}"], text=True).splitlines())
-    if batch["challenge"] not in containers:
-        logger.error(f"Error processing batch {batch_id}: Challenge container {batch['challenge']} not found. Did you start it with 'docker-compose up {batch['challenge']}'?")
-        return
     
     q = Queue()
     for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
