@@ -121,15 +121,23 @@ impl Challenge {
             let total_distance = self.calc_total_distance(solution)?;
             let btb = self.difficulty.better_than_baseline as f32 / 1000.0;
             let total_distance_threshold = self.baseline_distance * (1.0 - btb);
+            let actual_btb = (1.0 - total_distance / self.baseline_distance) * 100.0;
             if total_distance > total_distance_threshold {
                 Err(anyhow!(
                     "Total distance ({}) is greater than threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     total_distance,
                     total_distance_threshold,
                     self.baseline_distance,
-                    btb * 100.0
+                    actual_btb
                 ))
             } else {
+                println!(
+                    "Total distance ({}) is less than or equal to threshold ({}) (baseline: {}, better_than_baseline: {}%)",
+                    total_distance,
+                    total_distance_threshold,
+                    self.baseline_distance,
+                    actual_btb
+                );
                 Ok(())
             }
         }

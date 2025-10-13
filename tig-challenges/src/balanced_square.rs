@@ -90,15 +90,23 @@ impl Challenge {
             let variance = self.calc_variance(solution)?;
             let btb = self.difficulty.better_than_baseline as f32 / 1000.0;
             let variance_threshold = self.baseline_variance * (1.0 - btb);
+            let actual_btb = (1.0 - variance / self.baseline_variance) * 100.0;
             if variance > variance_threshold {
                 Err(anyhow!(
                     "Variance ({}) is greater than threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     variance,
                     variance_threshold,
                     self.baseline_variance,
-                    btb * 100.0
+                    actual_btb
                 ))
             } else {
+                println!(
+                    "Variance ({}) is less than or equal to threshold ({}) (baseline: {}, better_than_baseline: {}%)",
+                    variance,
+                    variance_threshold,
+                    self.baseline_variance,
+                    actual_btb
+                );
                 Ok(())
             }
         }

@@ -134,15 +134,24 @@ impl Challenge {
             let superstring_length = superstring.len();
             let btb = self.difficulty.better_than_baseline as f32 / 1000.0;
             let length_threshold = (self.baseline_length as f32 * (1.0 - btb)).floor() as usize;
+            let actual_btb =
+                (1.0 - superstring_length as f32 / self.baseline_length as f32) * 100.0;
             if superstring_length > length_threshold {
                 Err(anyhow!(
                     "Superstring length ({}) is greater than threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     superstring_length,
                     length_threshold,
                     self.baseline_length,
-                    btb * 100.0
+                    actual_btb
                 ))
             } else {
+                println!(
+                    "Superstring length ({}) is less than or equal to threshold ({}) (baseline: {}, better_than_baseline: {}%)",
+                    superstring_length,
+                    length_threshold,
+                    self.baseline_length,
+                    actual_btb
+                );
                 Ok(())
             }
         }
