@@ -44,8 +44,8 @@ jobs:
           docker run --rm --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/encode2025:latest \
-            build_algorithm ${{ needs.init.outputs.ALGORITHM }}
+            ghcr.io/tig-foundation/tig-hackathon/encode2025:latest \
+            build_algorithm ${{ needs.init.outputs.CHALLENGE }} ${{ needs.init.outputs.ALGORITHM }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -55,32 +55,33 @@ jobs:
             tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/arm64
             tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/ptx
 
-  build_amd64:
-    needs: init
-    if: needs.init.outputs.SKIP_JOB == 'false'
-    name: Compile algorithm on amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
+  # build_amd64:
+  #   needs: init
+  #   if: needs.init.outputs.SKIP_JOB == 'false'
+  #   name: Compile algorithm on amd64
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Build Algorithm
-        run: |
-          docker run --rm --user root \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/encode2025:latest \
-            build_algorithm ${{ needs.init.outputs.ALGORITHM }}
+  #     - name: Build Algorithm
+  #       run: |
+  #         docker run --rm --user root \
+  #           -v ${{ github.workspace }}:/workspace \
+  #           -w /workspace \
+  #           ghcr.io/tig-foundation/tig-hackathon/encode2025:latest \
+  #           build_algorithm ${{ needs.init.outputs.CHALLENGE }} ${{ needs.init.outputs.ALGORITHM }}
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: amd64
-          path: |
-            tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/amd64
-            tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/ptx
+  #     - name: Upload Artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: amd64
+  #         path: |
+  #           tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/amd64
+  #           tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/ptx
 
   commit:
-    needs: [init, build_arm64, build_amd64]
+    # needs: [init, build_arm64, build_amd64]
+    needs: [init, build_arm64]
     if: always() && needs.init.outputs.SKIP_JOB != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -94,20 +95,23 @@ jobs:
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
-        if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        # if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        if: needs.build_arm64.result == 'success'
         with:
           path: tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}
           merge-multiple: true
 
       - name: Create Tarball
-        if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        # if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        if: needs.build_arm64.result == 'success'
         run: |
           cd tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}
           tar -czf ${{ needs.init.outputs.ALGORITHM }}.tar.gz */
           rm -rf */
 
       - name: Auto Commit
-        if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        # if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        if: needs.build_arm64.result == 'success'
         id: auto_commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
@@ -115,14 +119,16 @@ jobs:
           file_pattern: tig-algorithms/lib/${{ needs.init.outputs.CHALLENGE }}/${{ needs.init.outputs.ALGORITHM }}.tar.gz
 
       - name: Update Commit Status (Success)
-        if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        # if: needs.build_arm64.result == 'success' && needs.build_amd64.result == 'success'
+        if: needs.build_arm64.result == 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           status: 'success'
           sha: ${{ steps.auto_commit.outputs.commit_hash }}
 
       - name: Update Commit Status (Failure)
-        if: needs.build_arm64.result != 'success' || needs.build_amd64.result != 'success'
+        # if: needs.build_arm64.result != 'success' || needs.build_amd64.result != 'success'
+        if: needs.build_arm64.result != 'success'
         uses: myrotvorets/set-commit-status-action@master
         with:
           status: 'failure'
