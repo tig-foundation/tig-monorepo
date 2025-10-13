@@ -70,7 +70,7 @@ impl Challenge {
         let mut count = 0;
         let half_size = difficulty.size / 2;
         let visited = HashSet::<(usize, usize)>::new();
-        for i in 0..difficulty.size {
+        for i in 0..(difficulty.size - 1) {
             loop {
                 let j = rng.gen_range(0..strings.len());
                 if i == j
@@ -82,6 +82,7 @@ impl Challenge {
                 let overlap = strings[i].union(&strings[j]).count();
                 total_overlap += overlap;
                 count += 1;
+                break;
             }
         }
         let avg_overlap = total_overlap as f32 / count as f32;
