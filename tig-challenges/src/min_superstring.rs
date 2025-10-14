@@ -1,8 +1,7 @@
-use std::collections::HashSet;
-
 use anyhow::{anyhow, Result};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, iter::repeat, usize};
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Difficulty {
@@ -50,58 +49,91 @@ pub struct Challenge {
     pub difficulty: Difficulty,
     pub strings: Vec<String>,
     #[cfg(not(feature = "hide_verification"))]
+    pub baseline_superstring: String,
+    #[cfg(not(feature = "hide_verification"))]
     pub baseline_length: usize,
+    #[cfg(feature = "hide_verification")]
+    baseline_superstring: String,
     #[cfg(feature = "hide_verification")]
     baseline_length: usize,
 }
 
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
+        if difficulty.size < 2 {
+            return Err(anyhow!("Size must at least 2"));
+        }
         let mut rng = SmallRng::from_seed(seed.clone());
         let strings = (0..difficulty.size)
             .map(|_| {
                 (0..5)
                     .map(|_| (b'a' + (rng.gen_range(0..26) as u8)) as char)
-                    .collect::<HashSet<_>>()
+                    .collect::<String>()
             })
-            .collect::<Vec<HashSet<_>>>();
+            .collect::<Vec<String>>();
 
-        let mut total_overlap = 0;
-        let mut count = 0;
-        let half_size = difficulty.size / 2;
-        let visited = HashSet::<(usize, usize)>::new();
-        for i in 0..(difficulty.size - 1) {
-            loop {
-                let j = rng.gen_range(0..strings.len());
-                if i == j
-                    || (i > half_size && visited.contains(&(j, i)))
-                    || (i <= half_size && visited.contains(&(i, j)))
-                {
-                    continue;
+        let mut baseline_superstring = String::new();
+        for _ in 0..difficulty.size {
+            let mut strings2 = strings.clone();
+            strings2.shuffle(&mut rng);
+            let s1 = counter(strings2.pop().unwrap().chars());
+            let s2 = counter(strings2.pop().unwrap().chars());
+            let (left, overlap, right) = overlaps(s1, s2);
+            let mut superstring = left
+                .iter()
+                .flat_map(|(&c, &count)| repeat(c).take(count))
+                .chain(
+                    overlap
+                        .iter()
+                        .flat_map(|(&c, &count)| repeat(c).take(count)),
+                )
+                .chain(right.iter().flat_map(|(&c, &count)| repeat(c).take(count)))
+                .collect::<String>();
+
+            while !strings2.is_empty() {
+                // for each remaining string, add to left or right based on max overlap
+                let mut left = counter(strings2.pop().unwrap().chars());
+                let mut right = left.clone();
+                remove_overlaps(&mut left, superstring[..5].chars());
+                remove_overlaps(
+                    &mut right,
+                    superstring[superstring.len() - 5..].chars().rev(),
+                );
+                if left.values().sum::<usize>() > right.values().sum::<usize>() {
+                    // append right
+                    superstring = format!(
+                        "{}{}",
+                        superstring,
+                        right
+                            .iter()
+                            .flat_map(|(&c, &count)| repeat(c).take(count))
+                            .collect::<String>()
+                    );
+                } else {
+                    // prepend left
+                    superstring = format!(
+                        "{}{}",
+                        left.iter()
+                            .flat_map(|(&c, &count)| repeat(c).take(count))
+                            .collect::<String>(),
+                        superstring
+                    );
                 }
-                let overlap = strings[i].union(&strings[j]).count();
-                total_overlap += overlap;
-                count += 1;
-                break;
+            }
+            if baseline_superstring.len() == 0 || superstring.len() < baseline_superstring.len() {
+                baseline_superstring = superstring;
             }
         }
-        let avg_overlap = total_overlap as f32 / count as f32;
-        let total_length: usize = strings.iter().map(|s| s.len()).sum();
-        let baseline_length = (total_length as f32
-            - (avg_overlap * (difficulty.size as f32 - 1.0)) / 10.0)
-            .ceil() as usize;
 
-        let strings = strings
-            .into_iter()
-            .map(|s| s.into_iter().collect())
-            .collect();
-
-        Ok(Self {
+        let inst = Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             strings,
-            baseline_length,
-        })
+            baseline_length: baseline_superstring.len(),
+            baseline_superstring,
+        };
+        println!("Instance generated: {:?}", inst);
+        Ok(inst)
     }
 
     pub fn calc_superstring(&self, solution: &Solution) -> Result<String> {
@@ -157,6 +189,54 @@ impl Challenge {
             }
         }
     );
+}
+
+fn counter(chars: impl Iterator<Item = char>) -> HashMap<char, usize> {
+    let mut map = HashMap::new();
+    for c in chars {
+        *map.entry(c).or_default() += 1;
+    }
+    map
+}
+
+fn remove_overlaps(counter: &mut HashMap<char, usize>, chars_iter: impl Iterator<Item = char>) {
+    for c in chars_iter {
+        if let Some(count) = counter.get_mut(&c) {
+            if *count > 0 {
+                *count -= 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    counter.retain(|_, count| *count > 0);
+}
+
+fn overlaps(
+    mut counter1: HashMap<char, usize>,
+    mut counter2: HashMap<char, usize>,
+) -> (
+    HashMap<char, usize>,
+    HashMap<char, usize>,
+    HashMap<char, usize>,
+) {
+    let overlap = counter1
+        .iter_mut()
+        .filter_map(|(&c, count1)| match counter2.get_mut(&c) {
+            Some(count2) => {
+                let n = (*count1).min(*count2);
+                *count1 -= n;
+                *count2 -= n;
+                Some((c, n))
+            }
+            None => None,
+        })
+        .collect();
+    counter1.retain(|_, count| *count > 0);
+    counter2.retain(|_, count| *count > 0);
+    (counter1, overlap, counter2)
 }
 
 fn calc_superstring(

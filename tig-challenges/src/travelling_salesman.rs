@@ -47,13 +47,20 @@ pub struct Challenge {
     pub node_positions: Vec<(i32, i32)>,
     pub distance_matrix: Vec<Vec<f32>>,
     #[cfg(not(feature = "hide_verification"))]
+    pub baseline_route: Vec<usize>,
+    #[cfg(not(feature = "hide_verification"))]
     pub baseline_distance: f32,
+    #[cfg(feature = "hide_verification")]
+    baseline_route: Vec<usize>,
     #[cfg(feature = "hide_verification")]
     baseline_distance: f32,
 }
 
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
+        if difficulty.size < 3 {
+            return Err(anyhow!("Size must be at least 3"));
+        }
         let mut rng = SmallRng::from_seed(seed.clone());
         let num_nodes = difficulty.size;
 
@@ -83,10 +90,10 @@ impl Challenge {
             .collect();
 
         let mut unvisited = (0..num_nodes).collect::<HashSet<_>>();
-        let mut route = Vec::with_capacity(num_nodes);
+        let mut baseline_route = Vec::with_capacity(num_nodes);
         let mut current_node = 0;
-        route.push(current_node);
-        while route.len() < num_nodes {
+        baseline_route.push(current_node);
+        while baseline_route.len() < num_nodes {
             unvisited.remove(&current_node);
             let next_node = unvisited
                 .iter()
@@ -97,19 +104,21 @@ impl Challenge {
                 })
                 .cloned()
                 .unwrap();
-            route.push(next_node);
+            baseline_route.push(next_node);
             current_node = next_node;
         }
 
-        let baseline_distance = calc_total_distance(&distance_matrix, &route)?;
-
-        Ok(Self {
+        let baseline_distance = calc_total_distance(&distance_matrix, &baseline_route)?;
+        let inst = Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             node_positions,
             distance_matrix,
+            baseline_route,
             baseline_distance,
-        })
+        };
+        println!("Instance generated: {:?}", inst);
+        Ok(inst)
     }
 
     pub fn calc_total_distance(&self, solution: &Solution) -> Result<f32> {

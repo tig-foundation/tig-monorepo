@@ -44,41 +44,53 @@ pub struct Challenge {
     pub difficulty: Difficulty,
     pub numbers: Vec<i32>,
     #[cfg(not(feature = "hide_verification"))]
+    pub baseline_square: Vec<Vec<i32>>,
+    #[cfg(not(feature = "hide_verification"))]
     pub baseline_variance: f32,
+    #[cfg(feature = "hide_verification")]
+    baseline_square: Vec<Vec<i32>>,
     #[cfg(feature = "hide_verification")]
     baseline_variance: f32,
 }
 
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
+        if difficulty.size == 0 {
+            return Err(anyhow!("Size must be greater than 0"));
+        }
         let mut rng = SmallRng::from_seed(seed.clone());
         let mut numbers = (0..(difficulty.size * difficulty.size))
             .map(|_| rng.gen_range(1..=100))
             .collect::<Vec<i32>>();
 
         // randomly shuffle and find the best variance over `difficulty.size` tries
-        let mut best_variance = f32::MAX;
+        let mut baseline_variance = f32::MAX;
+        let mut baseline_square = Vec::new();
         for _ in 0..difficulty.size {
-            let baseline_square = (0..difficulty.size)
+            let square = (0..difficulty.size)
                 .map(|i| {
                     (0..difficulty.size)
                         .map(|j| numbers[(i * difficulty.size + j) % numbers.len()])
                         .collect::<Vec<i32>>()
                 })
                 .collect::<Vec<Vec<i32>>>();
-            let baseline_variance = calc_variance(difficulty.size, &baseline_square)?;
-            if baseline_variance < best_variance {
-                best_variance = baseline_variance;
+            let variance = calc_variance(difficulty.size, &square)?;
+            if variance < baseline_variance {
+                baseline_variance = variance;
+                baseline_square = square;
             }
             numbers.shuffle(&mut rng);
         }
 
-        Ok(Self {
+        let inst = Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             numbers,
-            baseline_variance: best_variance,
-        })
+            baseline_square,
+            baseline_variance,
+        };
+        println!("Instance generated: {:?}", inst);
+        Ok(inst)
     }
 
     pub fn calc_variance(&self, solution: &Solution) -> Result<f32> {
