@@ -125,15 +125,13 @@ impl Challenge {
             }
         }
 
-        let inst = Self {
+        Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             strings,
             baseline_length: baseline_superstring.len(),
             baseline_superstring,
-        };
-        println!("Instance generated: {:?}", inst);
-        Ok(inst)
+        })
     }
 
     pub fn calc_superstring(&self, solution: &Solution) -> Result<String> {

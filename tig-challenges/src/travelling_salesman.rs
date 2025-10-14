@@ -109,16 +109,14 @@ impl Challenge {
         }
 
         let baseline_distance = calc_total_distance(&distance_matrix, &baseline_route)?;
-        let inst = Self {
+        Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             node_positions,
             distance_matrix,
             baseline_route,
             baseline_distance,
-        };
-        println!("Instance generated: {:?}", inst);
-        Ok(inst)
+        })
     }
 
     pub fn calc_total_distance(&self, solution: &Solution) -> Result<f32> {

@@ -82,15 +82,13 @@ impl Challenge {
             numbers.shuffle(&mut rng);
         }
 
-        let inst = Self {
+        Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             numbers,
             baseline_square,
             baseline_variance,
-        };
-        println!("Instance generated: {:?}", inst);
-        Ok(inst)
+        })
     }
 
     pub fn calc_variance(&self, solution: &Solution) -> Result<f32> {
