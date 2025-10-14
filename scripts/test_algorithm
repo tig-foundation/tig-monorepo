@@ -117,22 +117,21 @@ f"""Library not found at {so_path}:
         start = now()
         while True:
             time.sleep(0.5)
-            num_processing, num_finished, num_solutions, num_invalid, num_no_output, num_errors = 0, 0, 0, 0, 0, 0
+            num_processing, num_finished, num_solutions, num_invalid, num_no_output = 0, 0, 0, 0, 0
             for (_, _, status) in results.values():
                 if status is None:
                     num_processing += 1
                 else:
                     num_finished += 1
                     num_solutions += int(status == 0)
-                    num_invalid += int(status == 1)
-                    num_no_output += int(status == 2)
-                    num_errors += int(status == 3)
+                    num_no_output += int(status == 1)
+                    num_invalid += int(status == 2)
             
             elapsed = (now() - start) / 1000
             solution_ratio = num_solutions / (num_finished or 1)
             solution_rate = num_solutions / elapsed
             score = solution_rate * solution_ratio
-            out = f"#processing: {num_processing}, #finished: {num_finished} - (#solutions: {num_solutions}, #invalid: {num_invalid}, #no_output: {num_no_output}, #errors: {num_errors}), elapsed: {elapsed:.2f}s, solution_ratio: {solution_ratio:.4f}, solution_rate: {solution_rate:.4f}, score: {score:.4f}"
+            out = f"#processing: {num_processing}, #finished: {num_finished} - (#solutions: {num_solutions}, #invalid: {num_invalid}, #no_output: {num_no_output}), elapsed: {elapsed:.2f}s, solution_ratio: {solution_ratio:.4f}, solution_rate: {solution_rate:.4f}, score: {score:.4f}"
             if args.verbose:
                 print(out)
             else:
@@ -174,7 +173,6 @@ f"""Library not found at {so_path}:
             ret.wait()
             elapsed = now() - start
             output_file = f"{temp_dir}/{nonce}.json"
-            ret2 = None
             elapsed2 = 0
 
             cmd2 = [
@@ -206,25 +204,16 @@ f"""Library not found at {so_path}:
                         out += "out of fuel"
                     else:
                         out += ret.stderr.read()
-                out += f"\n\ttig-verifier\n\t\t"
-                if ret2 is None:
-                    out += "no output to verify"
-                else:
-                    out += f"elapsed: {elapsed2}ms\n\t\texit code: {ret2.returncode}\n\t\tstderr: "
-                    if ret2.returncode != 0:
-                        out += ret2.stderr.read()
+                out += f"\n\ttig-verifier\n\t\telapsed: {elapsed2}ms\n\t\texit code: {ret2.returncode}\n\t\tstderr: "
+                if ret2.returncode != 0:
+                    out += ret2.stderr.read()
                 print(out)
-            if ret2 is not None:
-                if ret2.returncode == 0:
-                    status = 0 # solution
-                else:
-                    status = 1 # invalid solution
+            if ret2.returncode == 0:
+                status = 0 # solution
+            elif not os.path.exists(output_file):
+                status = 1 # no solution
             else:
-                if ret.returncode in {0, 87}:
-                    status = 2 # no solution
-                else:
-                    status = 3 # runtime error
-            # solution, no solution, error
+                status = 2 # invalid solution
             results[nonce] = (start, elapsed, status)
 
     nonces = list(range(args.start, args.start + args.nonces))
