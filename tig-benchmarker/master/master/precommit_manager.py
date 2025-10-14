@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Set
 from master.sql import get_db_conn
 from master.client_manager import CONFIG
 
+MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", 8))
+
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 class PrecommitManager:
@@ -78,7 +80,7 @@ class PrecommitManager:
         algo_selection = CONFIG["algo_selection"]
 
         num_pending_benchmarks = num_pending_jobs + self.num_precommits_submitted
-        if  num_pending_benchmarks >= 5:
+        if  num_pending_benchmarks >= MAX_CONCURRENT_JOBS:
             logger.debug(f"number of pending benchmarks has reached max of 5")
             return
         logger.debug(f"Selecting algorithm from: {[(x['algorithm_id'], x['weight']) for x in algo_selection]}")
@@ -95,7 +97,7 @@ class PrecommitManager:
                 difficulty=difficulty_samples[a_id]
             ),
             num_nonces=selection["num_nonces"],
-            hyperparameters=selection["hyperparameters"]
+            hyperparameters=None # selection["hyperparameters"]
         )
         logger.info(f"Created precommit (algorithm_id: {a_id}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters})")
         return req

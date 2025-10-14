@@ -10,6 +10,8 @@ from master.sql import get_db_conn
 from master.client_manager import CONFIG
 import math
 
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 16))
+
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 class JobManager:
@@ -84,13 +86,14 @@ class JobManager:
             if bin.details.download_url is None:
                 logger.error(f"batch {x.benchmark_id}: no download_url found for {bin.algorithm_id}. skipping job")
                 continue
-            batch_size = next(
-                (s["batch_size"] for s in algo_selection if s["algorithm_id"] == x.settings.algorithm_id),
-                None
-            )
-            if batch_size is None:
-                logger.error(f"batch {x.benchmark_id}: no batch size found for {x.settings.algorithm_id}. skipping job")
-                continue
+            batch_size = BATCH_SIZE
+            # batch_size = next(
+            #     (s["batch_size"] for s in algo_selection if s["algorithm_id"] == x.settings.algorithm_id),
+            #     None
+            # )
+            # if batch_size is None:
+            #     logger.error(f"batch {x.benchmark_id}: no batch size found for {x.settings.algorithm_id}. skipping job")
+            #     continue
             num_batches = math.ceil(x.details.num_nonces / batch_size)
             atomic_inserts = [
                 (

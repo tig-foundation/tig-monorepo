@@ -71,11 +71,11 @@ class ClientManager:
         async def update_config(request: Request):
             logger.debug("Received config update")
             new_config = await request.json()
-            for x in new_config["algo_selection"]:
-                if x["batch_size"] == 0:
-                    raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} cannot be 0")
-                if (x["batch_size"] & (x["batch_size"] - 1)) != 0:
-                    raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} must be a power of 2")
+            # for x in new_config["algo_selection"]:
+            #     if x["batch_size"] == 0:
+            #         raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} cannot be 0")
+            #     if (x["batch_size"] & (x["batch_size"] - 1)) != 0:
+            #         raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} must be a power of 2")
             try:
                 new_config["player_id"] = new_config["player_id"].lower()
                 new_config["api_url"] = new_config["api_url"].rstrip('/')
