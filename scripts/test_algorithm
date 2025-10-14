@@ -212,7 +212,7 @@ f"""Library not found at {so_path}:
                 else:
                     out += f"elapsed: {elapsed2}ms\n\t\texit code: {ret2.returncode}\n\t\tstderr: "
                     if ret2.returncode != 0:
-                        out += ret2.stderr.strip()
+                        out += ret2.stderr.read()
                 print(out)
             if ret2 is not None:
                 if ret2.returncode == 0:
