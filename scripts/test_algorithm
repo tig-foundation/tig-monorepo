@@ -176,23 +176,29 @@ f"""Library not found at {so_path}:
             output_file = f"{temp_dir}/{nonce}.json"
             ret2 = None
             elapsed2 = 0
-            if os.path.exists(output_file):
-                cmd2 = [
-                    args.tig_verifier_path,
-                    json.dumps(settings, separators=(',',':')),
-                    args.seed,
-                    str(nonce),
-                    f"{temp_dir}/{nonce}.json",
+
+            cmd2 = [
+                args.tig_verifier_path,
+                json.dumps(settings, separators=(',',':')),
+                args.seed,
+                str(nonce),
+                output_file,
+            ]
+            if ptx_path is not None:
+                cmd2 += [
+                    "--ptx", ptx_path,
+                    "--gpu", str(nonce % len(VISIBLE_GPUS)),
                 ]
-                if ptx_path is not None:
-                    cmd2 += [
-                        "--ptx", ptx_path,
-                        "--gpu", str(nonce % len(VISIBLE_GPUS)),
-                    ]
+            if args.verbose:
+                cmd2 += ["--verbose"]
+                print(f"[nonce {nonce}] {' '.join(cmd2[:1] + [f"'{cmd2[1]}'"] + cmd2[2:])}")
+            ret2 = subprocess.Popen(cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, universal_newlines=True)
+            for line in ret2.stdout:
                 if args.verbose:
-                    print(f"[nonce {nonce}] {' '.join(cmd2[:1] + [f"'{cmd2[1]}'"] + cmd2[2:])}")
-                ret2 = subprocess.run(cmd2, capture_output=True, text=True)
-                elapsed2 = now() - start - elapsed
+                    print(f"[nonce {nonce}] {line.strip()}")
+            ret2.wait()
+            elapsed2 = now() - start - elapsed
+
             if args.verbose:
                 out = f"[nonce {nonce}] finished\n\ttig-runtime\n\t\telapsed: {elapsed}ms\n\t\texit code: {ret.returncode}\n\t\tstderr: "
                 if ret.returncode != 0:

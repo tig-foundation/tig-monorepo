@@ -28,6 +28,7 @@ fn cli() -> Command {
         )
         .arg(arg!(--ptx [PTX] "Path to a CUDA ptx file").value_parser(clap::value_parser!(PathBuf)))
         .arg(arg!(--gpu [GPU] "Which GPU device to use").value_parser(clap::value_parser!(usize)))
+        .arg(arg!(--verbose "Enable verbose output").action(clap::ArgAction::SetTrue))
 }
 
 fn main() {
@@ -40,6 +41,7 @@ fn main() {
         matches.get_one::<String>("SOLUTION").unwrap().clone(),
         matches.get_one::<PathBuf>("ptx").cloned(),
         matches.get_one::<usize>("gpu").cloned(),
+        matches.get_one::<bool>("verbose").cloned().unwrap_or(false),
     ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
@@ -53,9 +55,9 @@ pub fn verify_solution(
     solution_path: String,
     ptx_path: Option<PathBuf>,
     gpu_device: Option<usize>,
+    verbose: bool,
 ) -> Result<()> {
     let settings = load_settings(&settings);
-    let solution = load_solution(&solution_path);
     let seed = settings.calc_seed(&rand_hash, nonce);
 
     let mut err_msg = Option::<String>::None;
@@ -64,12 +66,21 @@ pub fn verify_solution(
         ($c:ident, cpu) => {{
             let challenge =
                 $c::Challenge::generate_instance(&seed, &settings.difficulty.into()).unwrap();
+            if verbose {
+                println!("{:?}", challenge);
+            }
 
+            let solution = load_solution(&solution_path);
             match serde_json::from_str::<$c::Solution>(&solution) {
-                Ok(solution) => match challenge.verify_solution(&solution) {
-                    Ok(_) => println!("Solution is valid"),
-                    Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
-                },
+                Ok(solution) => {
+                    if verbose {
+                        println!("{:?}", solution);
+                    }
+                    match challenge.verify_solution(&solution) {
+                        Ok(_) => println!("Solution is valid"),
+                        Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
+                    }
+                }
                 Err(_) => {
                     err_msg = Some(format!(
                         "Invalid solution. Cannot convert to {}::Solution",
@@ -105,8 +116,12 @@ pub fn verify_solution(
             )
             .unwrap();
 
+            let solution = load_solution(&solution_path);
             match serde_json::from_str::<$c::Solution>(&solution) {
                 Ok(solution) => {
+                    if verbose {
+                        println!("{:?}", solution);
+                    }
                     match challenge.verify_solution(
                         &solution,
                         module.clone(),
