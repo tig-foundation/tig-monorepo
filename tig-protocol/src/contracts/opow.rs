@@ -1,6 +1,9 @@
 use crate::context::*;
 use logging_timer::time;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 use tig_structs::{config::*, core::*};
 use tig_utils::*;
 
@@ -31,6 +34,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_opow_ids = &block_data.active_ids[&ActiveType::OPoW];
 
     // update cutoffs
+    let mut cutoff_challenge_ids: HashSet<String> = HashSet::new();
     let mut phase_in_challenge_ids: HashSet<String> = active_challenge_ids.clone();
     for algorithm_id in active_code_ids.iter() {
         if active_codes_state[algorithm_id]
@@ -39,6 +43,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .is_some_and(|r| *r + 1 <= block_details.round)
         {
             phase_in_challenge_ids.remove(&active_codes_details[algorithm_id].challenge_id);
+        }
+        if active_codes_state[algorithm_id]
+            .round_active
+            .as_ref()
+            .is_some_and(|r| *r <= block_details.round)
+        {
+            cutoff_challenge_ids.insert(active_codes_details[algorithm_id].challenge_id.clone());
         }
     }
     let phase_in_start = (block_details.round - 1) * config.rounds.blocks_per_round;
@@ -55,7 +66,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
     for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-        let min_num_solutions = active_challenge_ids
+        let min_num_solutions = cutoff_challenge_ids
             .iter()
             .map(|id| {
                 num_solutions_by_challenge
@@ -67,7 +78,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .unwrap_or_default();
         let mut cutoff = (min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u64;
         if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
-            let phase_in_min_num_solutions = active_challenge_ids
+            let phase_in_min_num_solutions = cutoff_challenge_ids
                 .iter()
                 .filter(|&id| !phase_in_challenge_ids.contains(id))
                 .map(|id| {
