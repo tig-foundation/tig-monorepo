@@ -1,4 +1,5 @@
 use crate::context::*;
+use core::num;
 use logging_timer::time;
 use std::{
     collections::{HashMap, HashSet},
@@ -46,9 +47,18 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
     for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-        let avg_num_solutions = num_solutions_by_challenge.values().sum::<u64>() as f64
-            / cutoff_challenge_ids.len() as f64;
-        opow_data.cutoff = (avg_num_solutions * config.opow.cutoff_multiplier).ceil() as u64;
+        let min_num_solutions = cutoff_challenge_ids
+            .iter()
+            .map(|id| {
+                num_solutions_by_challenge
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .min()
+            .unwrap_or_default();
+        opow_data.cutoff =
+            10u64.max((min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u64);
     }
 
     // update hash threshold
