@@ -34,28 +34,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let active_opow_ids = &block_data.active_ids[&ActiveType::OPoW];
 
     // update cutoffs
-    let mut cutoff_challenge_ids: HashSet<String> = HashSet::new();
-    let mut phase_in_challenge_ids: HashSet<String> = active_challenge_ids.clone();
-    for algorithm_id in active_code_ids.iter() {
-        if active_codes_state[algorithm_id]
-            .round_active
-            .as_ref()
-            .is_some_and(|r| *r + 1 <= block_details.round)
-        {
-            phase_in_challenge_ids.remove(&active_codes_details[algorithm_id].challenge_id);
-        }
-        if active_codes_state[algorithm_id]
-            .round_active
-            .as_ref()
-            .is_some_and(|r| *r <= block_details.round)
-        {
-            cutoff_challenge_ids.insert(active_codes_details[algorithm_id].challenge_id.clone());
-        }
-    }
-    let phase_in_start = (block_details.round - 1) * config.rounds.blocks_per_round;
-    let phase_in_period = config.opow.cutoff_phase_in_period;
-    let phase_in_end = phase_in_start + phase_in_period;
-
+    let mut cutoff_challenge_ids = HashSet::<String>::new();
     let mut num_solutions_by_player_by_challenge = HashMap::<String, HashMap<String, u64>>::new();
     for (settings, num_solutions, _, _) in active_solutions.iter() {
         *num_solutions_by_player_by_challenge
@@ -63,40 +42,13 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .or_default()
             .entry(settings.challenge_id.clone())
             .or_default() += *num_solutions;
+        cutoff_challenge_ids.insert(settings.challenge_id.clone());
     }
     for (player_id, num_solutions_by_challenge) in num_solutions_by_player_by_challenge.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-        let min_num_solutions = cutoff_challenge_ids
-            .iter()
-            .map(|id| {
-                num_solutions_by_challenge
-                    .get(id)
-                    .cloned()
-                    .unwrap_or_default()
-            })
-            .min()
-            .unwrap_or_default();
-        let mut cutoff = (min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u64;
-        if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
-            let phase_in_min_num_solutions = cutoff_challenge_ids
-                .iter()
-                .filter(|&id| !phase_in_challenge_ids.contains(id))
-                .map(|id| {
-                    num_solutions_by_challenge
-                        .get(id)
-                        .cloned()
-                        .unwrap_or_default()
-                })
-                .min()
-                .unwrap_or_default();
-            let phase_in_cutoff =
-                (phase_in_min_num_solutions as f64 * config.opow.cutoff_multiplier).ceil() as u64;
-            let phase_in_weight =
-                (phase_in_end - block_details.height) as f64 / phase_in_period as f64;
-            cutoff = (phase_in_cutoff as f64 * phase_in_weight
-                + cutoff as f64 * (1.0 - phase_in_weight)) as u64;
-        }
-        opow_data.cutoff = cutoff;
+        let avg_num_solutions = num_solutions_by_challenge.values().sum::<u64>() as f64
+            / cutoff_challenge_ids.len() as f64;
+        opow_data.cutoff = (avg_num_solutions * config.opow.cutoff_multiplier).ceil() as u64;
     }
 
     // update hash threshold
@@ -436,15 +388,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let imbalance_multiplier = PreciseNumber::from_f64(config.opow.imbalance_multiplier);
     let mut factor_weights = active_challenge_ids
         .iter()
-        .map(|challenge_id| {
-            if phase_in_challenge_ids.contains(challenge_id) && block_details.height < phase_in_end
-            {
-                PreciseNumber::from(block_details.height - phase_in_start)
-                    / PreciseNumber::from(config.opow.cutoff_phase_in_period)
-            } else {
-                one.clone()
-            }
-        })
+        .map(|challenge_id| one.clone())
         .collect::<Vec<_>>()
         .normalise()
         .into_iter()
