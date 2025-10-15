@@ -1,6 +1,6 @@
 services:
   db:
-    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/postgres:${VERSION}
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/postgres:${VERSION}
     container_name: db
     restart: unless-stopped
     environment:
@@ -20,7 +20,7 @@ services:
       retries: 5
 
   master:
-    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/master:${VERSION}
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/master:${VERSION}
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -40,7 +40,7 @@ services:
         condition: service_healthy
 
   ui:
-    image: ghcr.io/tig-foundation/tig-hackathon/benchmarker/ui:${VERSION}
+    image: ghcr.io/tig-foundation/tig-monorepo/benchmarker/ui:${VERSION}
     restart: unless-stopped
     networks:
       - tig-benchmarker
@@ -71,7 +71,7 @@ services:
       - innovator
 
   slave:
-    image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    image: ghcr.io/tig-foundation/tig-hackathon/hackathon-challenges:${VERSION}
     volumes:
       - ./tig-benchmarker:/app
     command: python3 slave/main.py
@@ -86,7 +86,7 @@ services:
       - NUM_WORKERS=${NUM_WORKERS}
 
   innovator:
-    image: ghcr.io/tig-foundation/tig-hackathon/${EVENT}:${VERSION}
+    image: ghcr.io/tig-foundation/tig-hackathon/hackathon-challenges:${VERSION}
     volumes:
       - ./:/app
     command: >
