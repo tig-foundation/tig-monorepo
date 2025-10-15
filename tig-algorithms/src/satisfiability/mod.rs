@@ -32,7 +32,8 @@
 
 // c001_a017
 
-// c001_a018
+pub mod inbound;
+pub use inbound as c001_a018;
 
 // c001_a019
 
