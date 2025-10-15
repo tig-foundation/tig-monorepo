@@ -134,7 +134,8 @@
 
 // c002_a068
 
-// c002_a069
+pub mod enhanced_solomon;
+pub use enhanced_solomon as c002_a069;
 
 // c002_a070
 
