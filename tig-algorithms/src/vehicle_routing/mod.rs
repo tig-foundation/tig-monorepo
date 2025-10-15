@@ -136,7 +136,8 @@
 
 // c002_a069
 
-// c002_a070
+pub mod new_improved_routing;
+pub use new_improved_routing as c002_a070;
 
 // c002_a071
 
