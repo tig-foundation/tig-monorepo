@@ -131,12 +131,12 @@ fn calc_variance(size: usize, square: &Vec<Vec<i32>>) -> Result<f32> {
         .flat_map(|i| {
             let h_sum = (0..size).map(|j| square[i][j]).sum::<i32>();
             let v_sum = (0..size).map(|j| square[j][i]).sum::<i32>();
-            let d1_sum = (0..size).map(|j| square[(i + j) % size][j]).sum::<i32>();
-            let d2_sum = (0..size)
-                .map(|j| square[(i + size - j) % size][j])
-                .sum::<i32>();
-            vec![h_sum, v_sum, d1_sum, d2_sum]
+            vec![h_sum, v_sum]
         })
+        .chain(vec![
+            (0..size).map(|i| square[i][i]).sum::<i32>(),
+            (0..size).map(|i| square[i][size - 1 - i]).sum::<i32>(),
+        ])
         .collect::<Vec<i32>>();
     let mean = sums.iter().sum::<i32>() as f32 / sums.len() as f32;
     let variance = sums.iter().map(|&x| (x as f32 - mean).powi(2)).sum::<f32>() / sums.len() as f32;
