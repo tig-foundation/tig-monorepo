@@ -96,7 +96,8 @@
 
 // c001_a049
 
-// c001_a050
+pub mod sat_separate_prob_l;
+pub use sat_separate_prob_l as c001_a050;
 
 // c001_a051
 
