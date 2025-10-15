@@ -70,7 +70,8 @@
 
 // c001_a036
 
-// c001_a037
+pub mod random_hybrid_sat;
+pub use random_hybrid_sat as c001_a037;
 
 // c001_a038
 
