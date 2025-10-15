@@ -4,7 +4,8 @@
 
 // c005_a003
 
-// c005_a004
+pub mod hyper_cluster_memfix;
+pub use hyper_cluster_memfix as c005_a004;
 
 // c005_a005
 
