@@ -36,7 +36,8 @@
 
 // c004_a019
 
-// c004_a020
+pub mod manual_fast_search;
+pub use manual_fast_search as c004_a020;
 
 // c004_a021
 
