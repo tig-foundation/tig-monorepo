@@ -412,6 +412,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
     let total_weighted_delegated_deposit = active_opow_block_data
         .values()
+        .filter(|x| x.cutoff > 0)
         .map(|d| d.weighted_delegated_deposit)
         .sum::<PreciseNumber>();
     let total_weighted_self_deposit = active_opow_block_data
@@ -484,6 +485,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 &total_weighted_delegated_deposit,
             ),
         ] {
+            // if cutoff is 0, then deposit will be limited to 0
             let f = if total.to_f64() <= EPSILON {
                 zero.clone()
             } else {
