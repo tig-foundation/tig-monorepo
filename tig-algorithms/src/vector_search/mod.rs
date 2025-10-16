@@ -66,7 +66,8 @@
 
 // c004_a034
 
-// c004_a035
+pub mod norm_aware_vs;
+pub use norm_aware_vs as c004_a035;
 
 // c004_a036
 
