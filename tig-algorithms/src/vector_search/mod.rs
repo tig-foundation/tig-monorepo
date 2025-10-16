@@ -86,7 +86,8 @@
 
 // c004_a044
 
-// c004_a045
+pub mod invector_opt;
+pub use invector_opt as c004_a045;
 
 // c004_a046
 
