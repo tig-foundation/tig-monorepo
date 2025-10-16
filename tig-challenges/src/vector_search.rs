@@ -52,10 +52,7 @@ pub struct Challenge {
     pub database_size: u32,
     pub d_database_vectors: CudaSlice<f32>,
     pub d_query_vectors: CudaSlice<f32>,
-    #[cfg(not(feature = "hide_verification"))]
     pub max_distance: f32,
-    #[cfg(feature = "hide_verification")]
-    max_distance: f32,
 }
 
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
