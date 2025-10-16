@@ -1,6 +1,7 @@
 // c004_a001
 
-// c004_a002
+pub mod kd_tree;
+pub use kd_tree as c004_a002;
 
 // c004_a003
 
