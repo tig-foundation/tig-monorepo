@@ -128,7 +128,8 @@
 
 // c004_a065
 
-// c004_a066
+pub mod improved_search_cmpt;
+pub use improved_search_cmpt as c004_a066;
 
 // c004_a067
 
