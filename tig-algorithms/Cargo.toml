@@ -7,18 +7,14 @@ repository.workspace = true
 edition.workspace = true
 
 [dependencies]
-ahash = "0.8.12"
 anyhow = "1.0.81"
 cudarc = { git = "https://github.com/tig-foundation/cudarc.git", branch = "runtime-fuel/cudnn-cublas", features = [
     "cuda-version-from-build-system",
 ], optional = true }
-ndarray = "0.15.6"
 rand = { version = "0.8.5", default-features = false, features = [
     "std_rng",
     "small_rng",
 ] }
-serde = { version = "1.0.196", features = ["derive"] }
-serde_json = { version = "1.0.113" }
 tig-challenges = { path = "../tig-challenges", features = [
     "hide_verification",
 ] }
