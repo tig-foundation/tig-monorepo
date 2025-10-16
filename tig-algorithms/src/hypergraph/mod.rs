@@ -1,6 +1,7 @@
 // c005_a001
 
-// c005_a002
+pub mod hyper_adaptive;
+pub use hyper_adaptive as c005_a002;
 
 // c005_a003
 
