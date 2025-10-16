@@ -134,7 +134,8 @@
 
 // c004_a068
 
-// c004_a069
+pub mod is_super_opt;
+pub use is_super_opt as c004_a069;
 
 // c004_a070
 
