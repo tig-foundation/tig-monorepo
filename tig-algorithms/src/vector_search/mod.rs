@@ -50,7 +50,8 @@
 
 // c004_a026
 
-// c004_a027
+pub mod gpu_manual_fast;
+pub use gpu_manual_fast as c004_a027;
 
 // c004_a028
 
