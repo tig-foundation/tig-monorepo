@@ -2,7 +2,8 @@
 
 // c005_a002
 
-// c005_a003
+pub mod hyper_improved;
+pub use hyper_improved as c005_a003;
 
 // c005_a004
 
