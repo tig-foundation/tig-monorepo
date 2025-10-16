@@ -138,7 +138,8 @@
 
 // c004_a070
 
-// c004_a071
+pub mod vector_high;
+pub use vector_high as c004_a071;
 
 // c004_a072
 
