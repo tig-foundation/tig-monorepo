@@ -14,7 +14,8 @@
 
 // c003_a008
 
-// c003_a009
+pub mod tinhat_pete;
+pub use tinhat_pete as c003_a009;
 
 // c003_a010
 
