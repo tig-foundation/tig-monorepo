@@ -82,7 +82,8 @@
 
 // c003_a042
 
-// c003_a043
+pub mod quad_quick;
+pub use quad_quick as c003_a043;
 
 // c003_a044
 
