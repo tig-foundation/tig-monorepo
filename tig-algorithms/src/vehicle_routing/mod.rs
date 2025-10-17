@@ -76,7 +76,8 @@
 
 // c002_a039
 
-// c002_a040
+pub mod cw_domain;
+pub use cw_domain as c002_a040;
 
 // c002_a041
 
