@@ -120,7 +120,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
         let points = solutions
             .iter()
-            .filter(|(_, &num_solutions, _, _)| num_solutions > 0)
+            .filter(|(_, &num_solutions, &num_discarded_solutions, _)| {
+                num_solutions > 0 || num_discarded_solutions > 0
+            })
             .map(|(settings, _, _, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
