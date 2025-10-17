@@ -96,7 +96,7 @@ services:
       --no-browser
       --ServerApp.token=''
       --ServerApp.allow_origin='*'
-      --ServerApp.default_url=/lab/tree/welcome.ipynb
+      --ServerApp.default_url=/lab/tree/notebooks/welcome.ipynb
     networks:
       - tig-benchmarker
 
