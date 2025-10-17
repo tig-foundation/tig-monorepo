@@ -52,7 +52,8 @@
 
 // c003_a027
 
-// c003_a028
+pub mod ultra_fast_knapsack;
+pub use ultra_fast_knapsack as c003_a028;
 
 // c003_a029
 
