@@ -130,7 +130,8 @@
 
 // c002_a066
 
-// c002_a067
+pub mod new_enhanced_cw_high;
+pub use new_enhanced_cw_high as c002_a067;
 
 // c002_a068
 
