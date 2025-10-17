@@ -120,7 +120,8 @@
 
 // c003_a061
 
-// c003_a062
+pub mod kp_heuristics;
+pub use kp_heuristics as c003_a062;
 
 // c003_a063
 
