@@ -34,7 +34,8 @@
 
 // c004_a018
 
-// c004_a019
+pub mod bacalhau_gpu;
+pub use bacalhau_gpu as c004_a019;
 
 // c004_a020
 
