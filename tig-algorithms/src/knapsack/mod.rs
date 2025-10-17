@@ -56,7 +56,8 @@
 
 // c003_a029
 
-// c003_a030
+pub mod knap_zilla;
+pub use knap_zilla as c003_a030;
 
 // c003_a031
 
