@@ -186,7 +186,8 @@
 
 // c003_a094
 
-// c003_a095
+pub mod native_knapsack_fast;
+pub use native_knapsack_fast as c003_a095;
 
 // c003_a096
 
