@@ -206,8 +206,8 @@ class Challenge(FromDict):
 class OPoWBlockData(FromDict):
     num_qualifiers_by_challenge: Dict[str, int]
     cutoff: int
-    delegated_weighted_deposit: PreciseNumber
-    self_deposit: PreciseNumber
+    weighted_delegated_deposit: PreciseNumber
+    weighted_self_deposit: PreciseNumber
     delegators: Set[str]
     coinbase: Dict[str, PreciseNumber]
     solution_ratio_by_challenge: Dict[str, float]
