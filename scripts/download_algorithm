@@ -12,7 +12,7 @@ def main():
     parser = argparse.ArgumentParser(description='TIG Algorithm Downloader')
     parser.add_argument('challenge', help="Challenge name")
     parser.add_argument('algorithm', help="Algorithm name")
-    parser.add_argument('--out', default="tig-algorithms/lib", help="Output directory (default: tig-algorithms/lib)")
+    parser.add_argument('--out', default="/app/tig-algorithms/lib", help="Output directory (default: /app/tig-algorithms/lib)")
     
     args = parser.parse_args()
 

@@ -12,6 +12,7 @@ fi
 CHALLENGE="$1"
 ALGORITHM="$2"
 
+cd /app
 echo "Compiling .so for $CHALLENGE/$ALGORITHM"
 cp tig-binary/src/entry_point_template.rs tig-binary/src/entry_point.rs
 sed -i "s/{CHALLENGE}/$CHALLENGE/g" tig-binary/src/entry_point.rs
