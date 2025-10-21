@@ -172,7 +172,8 @@
 
 // c002_a087
 
-// c002_a088
+pub mod vrptw_sigma;
+pub use vrptw_sigma as c002_a088;
 
 // c002_a089
 
