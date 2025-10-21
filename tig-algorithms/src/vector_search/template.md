@@ -3,7 +3,7 @@
 ## Submission Details
 
 * **Challenge Name:** vector_search
-* **Submission Name:** [name of code submission]
+* **Algorithm Name:** [name of submission]
 * **Copyright:** [year work created] [name of copyright owner]  
 * **Identity of Submitter:** [name of person or entity submitting the work to TIG] 
 * **Identity of Creator of Algorithmic Method:** [if applicable else null]
