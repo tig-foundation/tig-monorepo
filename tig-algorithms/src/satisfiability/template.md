@@ -37,5 +37,5 @@ The files in this folder are under the following licenses:
 * TIG Open Data License
 * TIG THV Game License
 
-Copies of the licenses can be obtained at:  
-https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses  
+Copies of the licenses can be obtained at:
+https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
