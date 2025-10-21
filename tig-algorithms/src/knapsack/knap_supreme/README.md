@@ -3,7 +3,7 @@
 ## Submission Details
 
 * **Challenge Name:** knapsack
-* **Submission Name:** knap_supreme
+* **Algorithm Name:** knap_supreme
 * **Copyright:** 2025 Rootz
 * **Identity of Submitter:** Rootz
 * **Identity of Creator of Algorithmic Method:** Rootz
@@ -19,5 +19,5 @@ The files in this folder are under the following licenses:
 * TIG Open Data License
 * TIG THV Game License
 
-Copies of the licenses can be obtained at:  
+Copies of the licenses can be obtained at:
 https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
