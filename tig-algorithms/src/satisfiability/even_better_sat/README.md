@@ -3,7 +3,7 @@
 ## Submission Details
 
 * **Challenge Name:** satisfiability
-* **Submission Name:** even_better_sat
+* **Algorithm Name:** even_better_sat
 * **Copyright:** 2025 frogmarch
 * **Identity of Submitter:** frogmarch
 * **Identity of Creator of Algorithmic Method:** null
@@ -19,5 +19,5 @@ The files in this folder are under the following licenses:
 * TIG Open Data License
 * TIG THV Game License
 
-Copies of the licenses can be obtained at:  
+Copies of the licenses can be obtained at:
 https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses
