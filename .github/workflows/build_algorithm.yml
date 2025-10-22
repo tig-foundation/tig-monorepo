@@ -42,8 +42,8 @@ jobs:
       - name: Build Algorithm
         run: |
           docker run --rm --user root \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
             ghcr.io/tig-foundation/tig-hackathon/hackathon-challenges:encode2025 \
             build_algorithm ${{ needs.init.outputs.CHALLENGE }} ${{ needs.init.outputs.ALGORITHM }}
 
