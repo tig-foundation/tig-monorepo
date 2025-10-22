@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::{anyhow, Result};
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -28,14 +30,22 @@ impl Into<Vec<i32>> for Difficulty {
 
 impl_base64_serde! {
      Solution {
-        square: Vec<Vec<i32>>,
+        arrangement: Vec<Vec<usize>>,
     }
 }
 
 impl Solution {
     pub fn new() -> Self {
-        Self { square: Vec::new() }
+        Self {
+            arrangement: Vec::new(),
+        }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Baseline {
+    pub arrangement: Vec<Vec<usize>>,
+    pub variance: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -44,13 +54,9 @@ pub struct Challenge {
     pub difficulty: Difficulty,
     pub numbers: Vec<i32>,
     #[cfg(not(feature = "hide_verification"))]
-    pub baseline_square: Vec<Vec<i32>>,
-    #[cfg(not(feature = "hide_verification"))]
-    pub baseline_variance: f32,
+    pub baseline: Baseline,
     #[cfg(feature = "hide_verification")]
-    baseline_square: Vec<Vec<i32>>,
-    #[cfg(feature = "hide_verification")]
-    baseline_variance: f32,
+    baseline: Baseline,
 }
 
 impl Challenge {
@@ -59,54 +65,53 @@ impl Challenge {
             return Err(anyhow!("Size must be greater than 0"));
         }
         let mut rng = SmallRng::from_seed(seed.clone());
-        let mut numbers = (0..(difficulty.size * difficulty.size))
+        let numbers = (0..(difficulty.size * difficulty.size))
             .map(|_| rng.gen_range(1..=100))
             .collect::<Vec<i32>>();
 
         // randomly shuffle and find the best variance over `difficulty.size` tries
-        let mut baseline_variance = f32::MAX;
-        let mut baseline_square = Vec::new();
+        let mut baseline = Baseline {
+            arrangement: Vec::new(),
+            variance: f32::MAX,
+        };
+        let mut indices = (0..numbers.len()).collect::<Vec<usize>>();
         for _ in 0..difficulty.size {
-            let square = (0..difficulty.size)
-                .map(|i| {
-                    (0..difficulty.size)
-                        .map(|j| numbers[(i * difficulty.size + j) % numbers.len()])
-                        .collect::<Vec<i32>>()
-                })
-                .collect::<Vec<Vec<i32>>>();
-            let variance = calc_variance(difficulty.size, &square)?;
-            if variance < baseline_variance {
-                baseline_variance = variance;
-                baseline_square = square;
+            indices.shuffle(&mut rng);
+            let arrangement = indices
+                .chunks(difficulty.size)
+                .map(|chunk| chunk.to_vec())
+                .collect::<Vec<Vec<usize>>>();
+            let variance = calc_variance(&numbers, &arrangement)?;
+            if variance < baseline.variance {
+                baseline.variance = variance;
+                baseline.arrangement = arrangement;
             }
-            numbers.shuffle(&mut rng);
         }
 
         Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             numbers,
-            baseline_square,
-            baseline_variance,
+            baseline,
         })
     }
 
     pub fn calc_variance(&self, solution: &Solution) -> Result<f32> {
-        calc_variance(self.difficulty.size, &solution.square)
+        calc_variance(&self.numbers, &solution.arrangement)
     }
 
     conditional_pub!(
         fn verify_solution(&self, solution: &Solution) -> Result<()> {
             let variance = self.calc_variance(solution)?;
             let btb = self.difficulty.better_than_baseline as f32 / 1000.0;
-            let variance_threshold = self.baseline_variance * (1.0 - btb);
-            let actual_btb = (1.0 - variance / self.baseline_variance) * 100.0;
+            let variance_threshold = self.baseline.variance * (1.0 - btb);
+            let actual_btb = (1.0 - variance / self.baseline.variance) * 100.0;
             if variance > variance_threshold {
                 Err(anyhow!(
                     "Variance ({}) is greater than threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     variance,
                     variance_threshold,
-                    self.baseline_variance,
+                    self.baseline.variance,
                     actual_btb
                 ))
             } else {
@@ -114,7 +119,7 @@ impl Challenge {
                     "Variance ({}) is less than or equal to threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     variance,
                     variance_threshold,
-                    self.baseline_variance,
+                    self.baseline.variance,
                     actual_btb
                 );
                 Ok(())
@@ -123,19 +128,31 @@ impl Challenge {
     );
 }
 
-fn calc_variance(size: usize, square: &Vec<Vec<i32>>) -> Result<f32> {
-    if square.len() != size || square.iter().any(|row| row.len() != size) {
-        return Err(anyhow!("Square size must be exactly {}x{}", size, size));
+fn calc_variance(numbers: &Vec<i32>, arrangement: &Vec<Vec<usize>>) -> Result<f32> {
+    if (0..numbers.len()).collect::<HashSet<_>>()
+        != arrangement
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<HashSet<_>>()
+    {
+        return Err(anyhow!("Arrangement must use all numbers exactly once",));
     }
-    let sums = (0..size)
+    if !arrangement.iter().all(|row| row.len() == arrangement.len()) {
+        return Err(anyhow!("Arrangement must be a square",));
+    }
+    let size = arrangement.len();
+    let sums = (0..arrangement.len())
         .flat_map(|i| {
-            let h_sum = (0..size).map(|j| square[i][j]).sum::<i32>();
-            let v_sum = (0..size).map(|j| square[j][i]).sum::<i32>();
+            let h_sum = (0..size).map(|j| numbers[arrangement[i][j]]).sum::<i32>();
+            let v_sum = (0..size).map(|j| numbers[arrangement[j][i]]).sum::<i32>();
             vec![h_sum, v_sum]
         })
         .chain(vec![
-            (0..size).map(|i| square[i][i]).sum::<i32>(),
-            (0..size).map(|i| square[i][size - 1 - i]).sum::<i32>(),
+            (0..size).map(|i| numbers[arrangement[i][i]]).sum::<i32>(),
+            (0..size)
+                .map(|i| numbers[arrangement[i][size - 1 - i]])
+                .sum::<i32>(),
         ])
         .collect::<Vec<i32>>();
     let mean = sums.iter().sum::<i32>() as f32 / sums.len() as f32;

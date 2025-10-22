@@ -41,19 +41,21 @@ impl Solution {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Baseline {
+    pub route: Vec<usize>,
+    pub distance: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
     pub difficulty: Difficulty,
     pub node_positions: Vec<(i32, i32)>,
     pub distance_matrix: Vec<Vec<f32>>,
     #[cfg(not(feature = "hide_verification"))]
-    pub baseline_route: Vec<usize>,
-    #[cfg(not(feature = "hide_verification"))]
-    pub baseline_distance: f32,
+    pub baseline: Baseline,
     #[cfg(feature = "hide_verification")]
-    baseline_route: Vec<usize>,
-    #[cfg(feature = "hide_verification")]
-    baseline_distance: f32,
+    baseline: Baseline,
 }
 
 impl Challenge {
@@ -90,10 +92,13 @@ impl Challenge {
             .collect();
 
         let mut unvisited = (0..num_nodes).collect::<HashSet<_>>();
-        let mut baseline_route = Vec::with_capacity(num_nodes);
+        let mut baseline = Baseline {
+            route: Vec::with_capacity(num_nodes),
+            distance: 0.0,
+        };
         let mut current_node = 0;
-        baseline_route.push(current_node);
-        while baseline_route.len() < num_nodes {
+        baseline.route.push(current_node);
+        while baseline.route.len() < num_nodes {
             unvisited.remove(&current_node);
             let next_node = unvisited
                 .iter()
@@ -104,18 +109,17 @@ impl Challenge {
                 })
                 .cloned()
                 .unwrap();
-            baseline_route.push(next_node);
+            baseline.route.push(next_node);
             current_node = next_node;
         }
 
-        let baseline_distance = calc_total_distance(&distance_matrix, &baseline_route)?;
+        baseline.distance = calc_total_distance(&distance_matrix, &baseline.route)?;
         Ok(Self {
             seed: seed.clone(),
             difficulty: difficulty.clone(),
             node_positions,
             distance_matrix,
-            baseline_route,
-            baseline_distance,
+            baseline,
         })
     }
 
@@ -127,14 +131,14 @@ impl Challenge {
         fn verify_solution(&self, solution: &Solution) -> Result<()> {
             let total_distance = self.calc_total_distance(solution)?;
             let btb = self.difficulty.better_than_baseline as f32 / 1000.0;
-            let total_distance_threshold = self.baseline_distance * (1.0 - btb);
-            let actual_btb = (1.0 - total_distance / self.baseline_distance) * 100.0;
+            let total_distance_threshold = self.baseline.distance * (1.0 - btb);
+            let actual_btb = (1.0 - total_distance / self.baseline.distance) * 100.0;
             if total_distance > total_distance_threshold {
                 Err(anyhow!(
                     "Total distance ({}) is greater than threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     total_distance,
                     total_distance_threshold,
-                    self.baseline_distance,
+                    self.baseline.distance,
                     actual_btb
                 ))
             } else {
@@ -142,7 +146,7 @@ impl Challenge {
                     "Total distance ({}) is less than or equal to threshold ({}) (baseline: {}, better_than_baseline: {}%)",
                     total_distance,
                     total_distance_threshold,
-                    self.baseline_distance,
+                    self.baseline.distance,
                     actual_btb
                 );
                 Ok(())
@@ -152,19 +156,10 @@ impl Challenge {
 }
 
 fn calc_total_distance(distance_matrix: &Vec<Vec<f32>>, route: &Vec<usize>) -> Result<f32> {
-    if route.len() != distance_matrix.len() {
-        return Err(anyhow!(
-            "Route length ({}) does not match number of nodes ({})",
-            route.len(),
-            distance_matrix.len()
-        ));
-    }
-    let visited = route.iter().cloned().collect::<HashSet<usize>>();
-    if visited.len() != route.len() {
-        return Err(anyhow!("Route contains duplicate nodes"));
-    }
-    if route.iter().any(|&node| node >= distance_matrix.len()) {
-        return Err(anyhow!("Route contains invalid nodes",));
+    if (0..distance_matrix.len()).collect::<HashSet<_>>()
+        != route.iter().cloned().collect::<HashSet<_>>()
+    {
+        return Err(anyhow!("Each node must be visited exactly once",));
     }
     let total_distance = route
         .windows(2)
