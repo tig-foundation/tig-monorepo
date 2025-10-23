@@ -92,16 +92,23 @@ impl Challenge {
             let s2_idx = string_idxs.pop().unwrap();
             let s1 = counter(strings[s1_idx].chars());
             let s2 = counter(strings[s2_idx].chars());
-            let (left, overlap, right) = overlaps(s1, s2);
+            let (mut left, mut overlap, mut right) = overlaps(s1, s2);
+            left.sort_by_key(|x| x.0);
+            overlap.sort_by_key(|x| x.0);
+            right.sort_by_key(|x| x.0);
             let mut superstring = left
-                .iter()
-                .flat_map(|(&c, &count)| repeat(c).take(count))
+                .into_iter()
+                .flat_map(|(c, count)| repeat(c).take(count))
                 .chain(
                     overlap
-                        .iter()
-                        .flat_map(|(&c, &count)| repeat(c).take(count)),
+                        .into_iter()
+                        .flat_map(|(c, count)| repeat(c).take(count)),
                 )
-                .chain(right.iter().flat_map(|(&c, &count)| repeat(c).take(count)))
+                .chain(
+                    right
+                        .into_iter()
+                        .flat_map(|(c, count)| repeat(c).take(count)),
+                )
                 .collect::<String>();
             superstring_idxs.insert(s1_idx, 0);
             superstring_idxs.insert(s2_idx, superstring.len() - Self::N_CHARS);
@@ -120,25 +127,29 @@ impl Challenge {
                 );
                 if left.values().sum::<usize>() > right.values().sum::<usize>() {
                     // append right
+                    let mut right = right.into_iter().collect::<Vec<(char, usize)>>();
+                    right.sort_by_key(|x| x.0);
                     superstring = format!(
                         "{}{}",
                         superstring,
                         right
-                            .iter()
-                            .flat_map(|(&c, &count)| repeat(c).take(count))
+                            .into_iter()
+                            .flat_map(|(c, count)| repeat(c).take(count))
                             .collect::<String>()
                     );
                     superstring_idxs.insert(s_idx, superstring.len() - Self::N_CHARS);
                 } else {
                     // prepend left
+                    let offset = left.values().sum::<usize>();
+                    let mut left = left.into_iter().collect::<Vec<(char, usize)>>();
+                    left.sort_by_key(|x| x.0);
                     superstring = format!(
                         "{}{}",
-                        left.iter()
-                            .flat_map(|(&c, &count)| repeat(c).take(count))
+                        left.into_iter()
+                            .flat_map(|(c, count)| repeat(c).take(count))
                             .collect::<String>(),
                         superstring
                     );
-                    let offset = left.values().sum::<usize>();
                     superstring_idxs.values_mut().for_each(|idx| *idx += offset);
                     superstring_idxs.insert(s_idx, 0);
                 }
@@ -245,12 +256,8 @@ fn remove_overlaps(counter: &mut HashMap<char, usize>, chars_iter: impl Iterator
 fn overlaps(
     mut counter1: HashMap<char, usize>,
     mut counter2: HashMap<char, usize>,
-) -> (
-    HashMap<char, usize>,
-    HashMap<char, usize>,
-    HashMap<char, usize>,
-) {
-    let overlap = counter1
+) -> (Vec<(char, usize)>, Vec<(char, usize)>, Vec<(char, usize)>) {
+    let overlap: HashMap<char, usize> = counter1
         .iter_mut()
         .filter_map(|(&c, count1)| match counter2.get_mut(&c) {
             Some(count2) => {
@@ -264,7 +271,11 @@ fn overlaps(
         .collect();
     counter1.retain(|_, count| *count > 0);
     counter2.retain(|_, count| *count > 0);
-    (counter1, overlap, counter2)
+    (
+        counter1.into_iter().collect(),
+        overlap.into_iter().collect(),
+        counter2.into_iter().collect(),
+    )
 }
 
 fn calc_superstring(

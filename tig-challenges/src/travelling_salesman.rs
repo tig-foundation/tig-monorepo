@@ -156,8 +156,9 @@ impl Challenge {
 }
 
 fn calc_total_distance(distance_matrix: &Vec<Vec<f32>>, route: &Vec<usize>) -> Result<f32> {
-    if (0..distance_matrix.len()).collect::<HashSet<_>>()
-        != route.iter().cloned().collect::<HashSet<_>>()
+    if distance_matrix.len() != route.len()
+        || (0..distance_matrix.len()).collect::<HashSet<_>>()
+            != route.iter().cloned().collect::<HashSet<_>>()
     {
         return Err(anyhow!("Each node must be visited exactly once",));
     }
