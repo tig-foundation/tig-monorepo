@@ -4,6 +4,7 @@ import signal
 import threading
 import uvicorn
 import json
+from copy import deepcopy
 from datetime import datetime
 from master.sql import get_db_conn
 from fastapi import FastAPI, Query, Request, HTTPException, Depends, Header
@@ -49,7 +50,9 @@ class ClientManager:
 
         @self.app.get('/get-config')
         async def get_config_endpoint():
-            return JSONResponse(content=CONFIG)
+            config = deepcopy(CONFIG)
+            config.pop("api_url", None)
+            return JSONResponse(content=config)
         
         @self.app.get('/stop/{benchmark_id}')
         async def stop_benchmark(benchmark_id: str):
