@@ -78,7 +78,7 @@ class ClientManager:
             #         raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} must be a power of 2")
             try:
                 new_config["player_id"] = new_config["player_id"].lower()
-                new_config["api_url"] = new_config["api_url"].rstrip('/')
+                new_config["api_url"] = "https://hackathon-api.tig.foundation"
                 
                 # Update config in database
                 get_db_conn().execute(
