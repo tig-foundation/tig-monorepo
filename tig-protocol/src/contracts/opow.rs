@@ -298,27 +298,27 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     scaling_factor,
                 );
                 base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
-                // find set of points from base_frontier and min_frontier that are dominate or equal to each other
-                base_frontier = base_frontier
-                    .iter()
-                    .filter(|p1| {
-                        min_frontier
-                            .iter()
-                            .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
-                    })
-                    .chain(min_frontier.iter().filter(|p1| {
-                        base_frontier
-                            .iter()
-                            .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
-                    }))
-                    .filter(|p| p.iter().zip(min_difficulty.iter()).all(|(x1, x2)| x1 >= x2))
-                    .cloned()
-                    .collect::<HashSet<Point>>()
-                    .into_iter()
-                    .collect();
                 scaling_factor =
                     (1.0 / scaling_factor).min(challenge_config.difficulty.max_scaling_factor);
             }
+            // find set of points from base_frontier and min_frontier that are dominate or equal to each other
+            base_frontier = base_frontier
+                .iter()
+                .filter(|p1| {
+                    min_frontier
+                        .iter()
+                        .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
+                })
+                .chain(min_frontier.iter().filter(|p1| {
+                    base_frontier
+                        .iter()
+                        .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
+                }))
+                .filter(|p| p.iter().zip(min_difficulty.iter()).all(|(x1, x2)| x1 >= x2))
+                .cloned()
+                .collect::<HashSet<Point>>()
+                .into_iter()
+                .collect();
 
             let mut scaled_frontier = scale_frontier(
                 &base_frontier,
