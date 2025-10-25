@@ -52,6 +52,9 @@ class ClientManager:
         async def get_config_endpoint():
             config = deepcopy(CONFIG)
             config.pop("api_url", None)
+            for x in config["algo_selection"]:
+                x["selected_difficulties"] = x.get("selected_difficulties", [])
+                x.pop("difficulty_range", None)
             return JSONResponse(content=config)
         
         @self.app.get('/stop/{benchmark_id}')
@@ -82,6 +85,9 @@ class ClientManager:
             try:
                 new_config["player_id"] = new_config["player_id"].lower()
                 new_config["api_url"] = "https://hackathon-api.tig.foundation"
+                for x in new_config["algo_selection"]:
+                    x["selected_difficulties"] = x.get("selected_difficulties", [])
+                    x.pop("difficulty_range", None)
                 
                 # Update config in database
                 get_db_conn().execute(

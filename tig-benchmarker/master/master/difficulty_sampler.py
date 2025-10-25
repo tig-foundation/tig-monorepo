@@ -141,38 +141,38 @@ class DifficultySampler:
             c_id = a_id[:4]
             c_name = self.challenge_id_2_name[c_id]
 
-            # if len(selected_difficulties := config["selected_difficulties"]) > 0:
-            #     valid_difficulties = set(tuple(d) for d in self.valid_difficulties[c_id])
-            #     selected_difficulties = [tuple(d) for d in selected_difficulties]
-            #     selected_difficulties = [
-            #         d for d in selected_difficulties if d in valid_difficulties
-            #     ]
+            if len(selected_difficulties := config.get("selected_difficulties", [])) > 0:
+                valid_difficulties = set(tuple(d) for d in self.valid_difficulties[c_id])
+                selected_difficulties = [tuple(d) for d in selected_difficulties]
+                selected_difficulties = [
+                    d for d in selected_difficulties if d in valid_difficulties
+                ]
             
-            # if len(selected_difficulties) > 0:
-            #     samples[a_id] = random.choice(selected_difficulties)
-            #     logger.debug(f"Selected difficulty {samples[a_id]} for algorithm {a_id} in challenge {c_name}")
-            #     found_valid = True
-            # else:
-            #     logger.debug(f"No selected difficulties in valid range for algorithm {a_id}")
+            if len(selected_difficulties) > 0:
+                samples[a_id] = random.choice(selected_difficulties)
+                logger.debug(f"Selected difficulty {samples[a_id]} for algorithm {a_id} in challenge {c_name}")
+                found_valid = True
+            else:
+                logger.debug(f"No selected difficulties in valid range for algorithm {a_id}")
 
             if not found_valid:
-                if (
-                    config["difficulty_range"] is None or
-                    len(config["difficulty_range"]) == 0
-                ):
-                    logger.debug(f"difficulty_range not set for algorithm {a_id} - picking random difficulty from entire range")
-                    valid_difficulties = self.valid_difficulties[c_id]
-                    difficulty = random.choice(valid_difficulties)
-                else:
-                    if self.frontiers[c_id] is None:
-                        logger.debug(f"Calculating frontiers for {c_name}")
-                        self.frontiers[c_id] = calc_all_frontiers(self.valid_difficulties[c_id])
-                    frontiers = self.frontiers[c_id]
-                    difficulty_range = config["difficulty_range"]
-                    idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
-                    idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
-                    difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
-                    difficulty = random.choice(difficulties)
+                # if (
+                #     config["difficulty_range"] is None or
+                #     len(config["difficulty_range"]) == 0
+                # ):
+                logger.debug(f"difficulty_range not set for algorithm {a_id} - picking random difficulty from entire range")
+                valid_difficulties = self.valid_difficulties[c_id]
+                difficulty = random.choice(valid_difficulties)
+                # else:
+                #     if self.frontiers[c_id] is None:
+                #         logger.debug(f"Calculating frontiers for {c_name}")
+                #         self.frontiers[c_id] = calc_all_frontiers(self.valid_difficulties[c_id])
+                #     frontiers = self.frontiers[c_id]
+                #     difficulty_range = config["difficulty_range"]
+                #     idx1 = math.floor(difficulty_range[0] * (len(frontiers) - 1))
+                #     idx2 = math.ceil(difficulty_range[1] * (len(frontiers) - 1))
+                #     difficulties = [p for frontier in frontiers[idx1:idx2 + 1] for p in frontier]
+                #     difficulty = random.choice(difficulties)
                 samples[a_id] = difficulty
                 logger.debug(f"Sampled difficulty {difficulty} for algorithm {a_id} in challenge {c_name}")
                 
