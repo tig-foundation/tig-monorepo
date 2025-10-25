@@ -160,15 +160,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     ..
                 } = settings;
 
-                let min_frontier = &challenge_config.difficulty.min_frontier;
-                let max_frontier = &challenge_config.difficulty.max_frontier;
-                if min_frontier.iter().any(|min_point| {
-                    pareto_compare(difficulty, min_point) == ParetoCompare::BDominatesA
-                }) || max_frontier.iter().any(|max_point| {
-                    pareto_compare(difficulty, max_point) == ParetoCompare::ADominatesB
-                }) {
-                    continue;
-                }
                 *player_code_solutions
                     .entry(player_id.clone())
                     .or_default()
