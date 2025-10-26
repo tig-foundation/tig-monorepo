@@ -198,7 +198,8 @@
 
 // c003_a100
 
-// c003_a101
+pub mod knapsack_sigma;
+pub use knapsack_sigma as c003_a101;
 
 // c003_a102
 
