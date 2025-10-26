@@ -56,6 +56,7 @@ class SlaveManager:
                         ON A.ready IS NULL
                         AND B.merkle_root_ready
                         AND B.stopped IS NULL
+                        AND B.end_time IS NULL
                         AND A.benchmark_id = B.benchmark_id
                     ORDER BY B.block_started, A.benchmark_id, A.batch_idx
                 )
@@ -88,6 +89,7 @@ class SlaveManager:
                     INNER JOIN job B
                         ON A.ready IS NULL
                         AND B.stopped IS NULL
+                        AND B.end_time IS NULL
                         AND A.benchmark_id = B.benchmark_id
                     ORDER BY B.block_started, A.benchmark_id, A.batch_idx
                 )
