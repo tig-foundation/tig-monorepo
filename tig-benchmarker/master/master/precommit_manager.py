@@ -73,6 +73,7 @@ class PrecommitManager:
             SELECT COUNT(*) 
             FROM job
             WHERE merkle_proofs_ready IS NULL
+                AND end_time IS NULL
                 AND stopped IS NULL
             """
         )["count"]
