@@ -51,3 +51,8 @@ services:
     <<: [*common, *common-gpu]
     image: ghcr.io/tig-foundation/tig-monorepo/hypergraph/runtime:${VERSION}
     container_name: hypergraph
+
+  neuralnet_optimizer:
+    <<: [*common, *common-gpu]
+    image: ghcr.io/tig-foundation/tig-monorepo/neuralnet_optimizer/runtime:${VERSION}
+    container_name: neuralnet_optimizer
