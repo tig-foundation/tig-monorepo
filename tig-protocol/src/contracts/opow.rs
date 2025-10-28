@@ -185,15 +185,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     ..
                 } = settings;
 
-                let min_frontier = &challenge_config.difficulty.min_frontier;
-                let max_frontier = &challenge_config.difficulty.max_frontier;
-                if min_frontier.iter().any(|min_point| {
-                    pareto_compare(difficulty, min_point) == ParetoCompare::BDominatesA
-                }) || max_frontier.iter().any(|max_point| {
-                    pareto_compare(difficulty, max_point) == ParetoCompare::ADominatesB
-                }) {
-                    continue;
-                }
                 *player_code_solutions
                     .entry(player_id.clone())
                     .or_default()
@@ -298,7 +289,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .map(|d| d.iter().map(|x| -x).collect()) // mirror the points so easiest difficulties are first
             .collect::<Frontier>();
         let (base_frontier, scaling_factor, scaled_frontier) = if points.len() == 0 {
-            let base_frontier: Frontier = vec![min_difficulty.clone()].into_iter().collect();
+            let base_frontier: Frontier = min_frontier.clone();
             let scaling_factor = 1.0;
             let scaled_frontier = base_frontier.clone();
             (base_frontier, scaling_factor, scaled_frontier)
@@ -323,26 +314,27 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     scaling_factor,
                 );
                 base_frontier = extend_frontier(&base_frontier, &min_difficulty, &max_difficulty);
-                // find set of points from base_frontier and min_frontier that are dominate or equal to each other
-                base_frontier = base_frontier
-                    .iter()
-                    .filter(|p1| {
-                        min_frontier
-                            .iter()
-                            .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
-                    })
-                    .chain(min_frontier.iter().filter(|p1| {
-                        base_frontier
-                            .iter()
-                            .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
-                    }))
-                    .cloned()
-                    .collect::<HashSet<Point>>()
-                    .into_iter()
-                    .collect();
                 scaling_factor =
                     (1.0 / scaling_factor).min(challenge_config.difficulty.max_scaling_factor);
             }
+            // find set of points from base_frontier and min_frontier that are dominate or equal to each other
+            base_frontier = base_frontier
+                .iter()
+                .filter(|p1| {
+                    min_frontier
+                        .iter()
+                        .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
+                })
+                .chain(min_frontier.iter().filter(|p1| {
+                    base_frontier
+                        .iter()
+                        .all(|p2| pareto_compare(p1, p2) != ParetoCompare::BDominatesA)
+                }))
+                .filter(|p| p.iter().zip(min_difficulty.iter()).all(|(x1, x2)| x1 >= x2))
+                .cloned()
+                .collect::<HashSet<Point>>()
+                .into_iter()
+                .collect();
 
             let mut scaled_frontier = scale_frontier(
                 &base_frontier,
@@ -364,6 +356,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                         .iter()
                         .all(|p2| pareto_compare(p1, p2) != ParetoCompare::ADominatesB)
                 }))
+                .filter(|p| p.iter().zip(max_difficulty.iter()).all(|(x1, x2)| x1 <= x2))
                 .cloned()
                 .collect::<HashSet<Point>>()
                 .into_iter()
