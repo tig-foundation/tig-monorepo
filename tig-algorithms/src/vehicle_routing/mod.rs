@@ -190,7 +190,8 @@ pub use simple_ls_zero as c002_a078;
 pub mod vrptw_ultimate;
 pub use vrptw_ultimate as c002_a086;
 
-// c002_a087
+pub mod vrptw_high;
+pub use vrptw_high as c002_a087;
 
 // c002_a088
 

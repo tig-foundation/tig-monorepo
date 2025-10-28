@@ -159,7 +159,8 @@ pub use cluster_improved as c004_a073;
 
 // c004_a074
 
-// c004_a075
+pub mod stat_filter_fixed;
+pub use stat_filter_fixed as c004_a075;
 
 // c004_a076
 
