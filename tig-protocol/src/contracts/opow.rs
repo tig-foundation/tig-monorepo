@@ -147,7 +147,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let solutions = solutions_by_challenge.get_mut(challenge_id).unwrap();
         let points = solutions
             .iter()
-            .filter(|(_, &num_solutions, _, _)| num_solutions > 0)
+            .filter(|(_, &num_solutions, &num_discarded_solutions, _)| {
+                num_solutions > 0 || num_discarded_solutions > 0
+            })
             .map(|(settings, _, _, _)| settings.difficulty.clone())
             .collect::<Frontier>();
         let mut frontier_indexes = HashMap::<Point, usize>::new();
@@ -242,6 +244,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
                     if player_qualifiers[player_id] > 0 {
                         for algorithm_id in player_code_solutions[player_id].keys() {
+                            if !active_code_ids.contains(algorithm_id) {
+                                continue; // algorithm is banned
+                            }
                             let code_data = active_codes_block_data.get_mut(algorithm_id).unwrap();
 
                             code_data.num_qualifiers_by_player.insert(
