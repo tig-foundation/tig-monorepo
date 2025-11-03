@@ -4,6 +4,7 @@ use cudarc::{
     driver::{CudaModule, CudaSlice, CudaStream, LaunchConfig, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tig_challenges::neuralnet_optimizer::*;
