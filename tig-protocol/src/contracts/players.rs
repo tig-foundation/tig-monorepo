@@ -224,6 +224,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         round_timestamps.push(round_timestamps.last().unwrap() + seconds_per_round as u64);
     }
 
+    let token_locker_weight = PreciseNumber::from(config.deposits.token_locker_weight);
     for deposit in active_deposit_details.values() {
         match &deposit.r#type {
             DepositType::Linear {
@@ -256,16 +257,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                         .get_mut(&deposit.player_id)
                         .unwrap();
                     *player_data.deposit_by_locked_period.get_mut(i).unwrap() += amount;
-                    player_data.weighted_deposit += amount * weight;
+                    player_data.weighted_deposit += amount * weight / token_locker_weight;
                 }
             }
             DepositType::Lock { .. } => {
-                let weight = PreciseNumber::from(config.deposits.token_locker_weight);
                 let player_data = active_players_block_data
                     .get_mut(&deposit.player_id)
                     .unwrap();
                 *player_data.deposit_by_locked_period.get_mut(3).unwrap() += deposit.amount;
-                player_data.weighted_deposit += deposit.amount * weight;
+                player_data.weighted_deposit += deposit.amount;
             }
         }
     }
