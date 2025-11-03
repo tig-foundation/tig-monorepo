@@ -5,6 +5,7 @@ use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tig_challenges::hypergraph::*;

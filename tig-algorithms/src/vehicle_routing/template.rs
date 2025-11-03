@@ -1,6 +1,7 @@
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use crate::{seeded_hasher, HashMap, HashSet};
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tig_challenges::vehicle_routing::*;
 
