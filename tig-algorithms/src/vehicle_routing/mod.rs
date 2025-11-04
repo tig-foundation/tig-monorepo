@@ -174,7 +174,8 @@
 
 // c002_a088
 
-// c002_a089
+pub mod hgs_v1;
+pub use hgs_v1 as c002_a089;
 
 // c002_a090
 
