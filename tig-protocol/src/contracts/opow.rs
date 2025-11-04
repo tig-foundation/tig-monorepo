@@ -395,8 +395,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         // self deposit
         if active_opow_ids.contains(player_id) {
             let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-            let self_deposit_fraction =
-                PreciseNumber::from_f64(1.0 - player_data.delegatees.values().sum::<f64>());
+            let self_deposit_fraction = PreciseNumber::from_f64(
+                (1.0 - player_data.delegatees.values().sum::<f64>()).clamp(0.0, 1.0),
+            );
             opow_data.weighted_self_deposit += player_data.weighted_deposit * self_deposit_fraction;
         }
 
