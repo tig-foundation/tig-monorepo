@@ -52,7 +52,8 @@ if __name__ == "__main__":
     tig_verifier_path = shutil.which("tig-verifier")
     parser = argparse.ArgumentParser(description="TIG Algorithm Tester")
     parser.add_argument("algorithm", type=str, help="Algorithm name")
-    parser.add_argument("difficulty", type=str, help="JSON string of difficulty")
+    parser.add_argument("size", type=int, help="Size of the problem instance")
+    parser.add_argument("hyperparameters", type=str, help="JSON string of hyperparameters for the algorithm (can set to null)")
     parser.add_argument("--tig-runtime-path", type=str, default=tig_runtime_path, help=f"Path to tig-runtime executable (default: {tig_runtime_path})")
     parser.add_argument("--tig-verifier-path", type=str, default=tig_verifier_path, help=f"Path to tig-verifier executable (default: {tig_verifier_path})")
     parser.add_argument("--lib-dir", type=str, default="./tig-algorithms/lib", help="Path to the algorithms library folder (default: ./tig-algorithms/lib)")
@@ -60,12 +61,13 @@ if __name__ == "__main__":
     parser.add_argument("--start", type=int, default=0, help="Starting nonce (default: 0)")
     parser.add_argument("--nonces", type=int, default=100, help="Number of nonces to process (default: 100)")
     parser.add_argument("--fuel", type=int, default=int(100e9), help="Max fuel (default: 100 billion)")
-    parser.add_argument("--hyperparameters", type=str, help="Hyperparameters for the algorithm (default: None)")
     parser.add_argument("--workers", type=int, default=1, help="Number of worker threads (default: 1)")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
-    if args.hyperparameters:
+    if args.hyperparameters.lower() == "null":
+        args.hyperparameters = None
+    else:
         try:
             json.loads(args.hyperparameters)
         except Exception as e:
@@ -90,15 +92,6 @@ f"""Library not found at {so_path}:
         print(f"PTX file found at {ptx_path}, but no GPU support detected (failed to run nvidia-smi)")
         sys.exit(1)
 
-    difficulty = json.loads(args.difficulty)
-    if not (
-        isinstance(difficulty, list) and
-        len(difficulty) == 2 and
-        all(isinstance(x, int) for x in difficulty)
-    ):
-        print("Difficulty must be a JSON array of two integers '[x,y]'")
-        sys.exit(1)
-
     challenge_ids = {
         "satisfiability": "c001",
         "vehicle_routing": "c002",
@@ -109,7 +102,7 @@ f"""Library not found at {so_path}:
     }
     challenge_id = challenge_ids[CHALLENGE]
 
-    settings = {"algorithm_id": "", "challenge_id": challenge_id, "difficulty": difficulty, "block_id": "", "player_id": ""}
+    settings = {"algorithm_id": "", "challenge_id": challenge_id, "size": args.size, "block_id": "", "player_id": ""}
     pool = ThreadPoolExecutor(max_workers=args.workers + 1)
 
     results = {}
