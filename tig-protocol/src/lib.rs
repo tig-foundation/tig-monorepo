@@ -13,7 +13,6 @@ pub async fn add_block<T: Context>(ctx: &T) {
     contracts::players::update(&mut cache).await;
     contracts::opow::update(&mut cache).await;
     contracts::algorithms::update(&mut cache).await;
-    contracts::challenges::update(&mut cache).await;
     contracts::rewards::update(&mut cache).await;
     ctx.commit_block_cache(cache).await;
 }

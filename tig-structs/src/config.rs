@@ -60,12 +60,11 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     BenchmarksConfig {
         min_num_nonces: u64,
-        min_num_solutions: u64,
         submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
-        min_per_nonce_fee: PreciseNumber,
-        min_base_fee: PreciseNumber,
+        per_nonce_fee: PreciseNumber,
+        base_fee: PreciseNumber,
         runtime_config: RuntimeConfig,
     }
 }
@@ -83,13 +82,8 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     DifficultyConfig {
-        parameter_names: Vec<String>,
-        min_frontier: Frontier,
-        max_frontier: Frontier,
-        max_scaling_factor: f64,
+        size_range: [u32; 2],
         total_qualifiers_threshold: u64,
-        target_solution_rate: u64,
-        hash_threshold_max_percent_delta: f64,
     }
 }
 serializable_struct_with_getters! {

@@ -22,7 +22,7 @@ fn test_calc_seed() {
         block_id: "some_block".to_string(),
         challenge_id: "some_challenge".to_string(),
         algorithm_id: "some_algorithm".to_string(),
-        difficulty: vec![1, 2, 3],
+        size: 50,
     };
 
     let rand_hash = "random_hash".to_string();

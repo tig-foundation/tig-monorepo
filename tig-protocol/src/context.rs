@@ -1,6 +1,6 @@
 pub use anyhow::Result;
 use serde_json::{Map, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use tig_structs::{config::*, core::*};
 
 #[allow(async_fn_in_trait)]
@@ -12,21 +12,11 @@ pub trait Context {
         evidence: String,
     ) -> Result<String>;
     async fn get_benchmark_details(&self, benchmark_id: &String) -> Option<BenchmarkDetails>;
-    async fn get_benchmark_data(
-        &self,
-        benchmark_id: &String,
-    ) -> Option<(
-        Option<HashSet<u64>>,
-        Option<HashSet<u64>>,
-        Option<HashSet<u64>>,
-    )>;
     async fn add_benchmark_to_mempool(
         &self,
         benchmark_id: String,
         details: BenchmarkDetails,
-        non_solution_nonces: Option<HashSet<u64>>,
-        solution_nonces: Option<HashSet<u64>>,
-        discarded_solution_nonces: Option<HashSet<u64>>,
+        solution_quality: Vec<i32>,
     ) -> Result<()>;
     async fn get_binary_details(&self, code_id: &String) -> Option<BinaryDetails>;
     async fn add_binary_to_mempool(&self, code_id: String, details: BinaryDetails) -> Result<()>;
@@ -97,7 +87,6 @@ pub struct AddBlockCache {
     pub active_players_block_data: HashMap<String, PlayerBlockData>,
     pub active_opow_block_data: HashMap<String, OPoWBlockData>,
     pub active_challenges_block_data: HashMap<String, ChallengeBlockData>,
-    pub active_challenges_prev_block_data: HashMap<String, ChallengeBlockData>,
     pub active_codes_state: HashMap<String, CodeState>,
     pub active_codes_details: HashMap<String, CodeDetails>,
     pub active_codes_block_data: HashMap<String, CodeBlockData>,
@@ -105,6 +94,5 @@ pub struct AddBlockCache {
     pub active_advances_state: HashMap<String, AdvanceState>,
     pub active_advances_details: HashMap<String, AdvanceDetails>,
     pub active_advances_block_data: HashMap<String, AdvanceBlockData>,
-    pub active_solutions: Vec<(BenchmarkSettings, u64, u64, u64)>,
-    pub confirmed_num_solutions: HashMap<String, u64>,
+    pub active_benchmarks: Vec<(BenchmarkSettings, i32, u64)>,
 }
