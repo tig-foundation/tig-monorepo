@@ -158,9 +158,10 @@ impl BenchmarkSettings {
 }
 serializable_struct_with_getters! {
     BenchmarkDetails {
-        average_solution_quality: i32,
-        merkle_root: MerkleHash,
-        sampled_nonces: HashSet<u64>,
+        stopped: bool,
+        average_solution_quality: Option<i32>,
+        merkle_root: Option<MerkleHash>,
+        sampled_nonces: Option<HashSet<u64>>,
     }
 }
 serializable_struct_with_getters! {

@@ -16,7 +16,7 @@ pub trait Context {
         &self,
         benchmark_id: String,
         details: BenchmarkDetails,
-        solution_quality: Vec<i32>,
+        solution_quality: Option<Vec<i32>>,
     ) -> Result<()>;
     async fn get_binary_details(&self, code_id: &String) -> Option<BinaryDetails>;
     async fn add_binary_to_mempool(&self, code_id: String, details: BinaryDetails) -> Result<()>;
