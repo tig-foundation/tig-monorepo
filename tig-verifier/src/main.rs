@@ -64,8 +64,7 @@ pub fn verify_solution(
 
     macro_rules! dispatch_challenge {
         ($c:ident, cpu) => {{
-            let challenge =
-                $c::Challenge::generate_instance(&seed, &settings.difficulty.into()).unwrap();
+            let challenge = $c::Challenge::generate_instance(&seed, settings.size).unwrap();
             if verbose {
                 println!("{:?}", challenge);
             }
@@ -77,7 +76,7 @@ pub fn verify_solution(
                         println!("{:?}", solution);
                     }
                     match challenge.verify_solution(&solution) {
-                        Ok(_) => println!("Solution is valid"),
+                        Ok(quality) => println!("Solution quality: {}", quality),
                         Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
                     }
                 }
@@ -109,7 +108,7 @@ pub fn verify_solution(
 
             let challenge = $c::Challenge::generate_instance(
                 &seed,
-                &settings.difficulty.into(),
+                settings.size,
                 module.clone(),
                 stream.clone(),
                 &prop,
@@ -128,10 +127,10 @@ pub fn verify_solution(
                         stream.clone(),
                         &prop,
                     ) {
-                        Ok(_) => {
+                        Ok(quality) => {
                             stream.synchronize()?;
                             ctx.synchronize()?;
-                            println!("Solution is valid");
+                            println!("Solution quality: {}", quality);
                         }
                         Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
                     }

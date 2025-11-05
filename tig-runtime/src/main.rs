@@ -116,7 +116,7 @@ pub fn compute_solution(
                 ) -> Result<()>>(b"entry_point")?
             };
 
-            let challenge = $c::Challenge::generate_instance(&seed, &settings.difficulty.into())?;
+            let challenge = $c::Challenge::generate_instance(&seed, settings.size)?;
 
             let save_solution_fn = |solution: &$c::Solution| -> Result<()> {
                 let fuel_consumed = (max_fuel
@@ -184,7 +184,7 @@ pub fn compute_solution(
 
             let challenge = $c::Challenge::generate_instance(
                 &seed,
-                &settings.difficulty.into(),
+                settings.size,
                 module.clone(),
                 stream.clone(),
                 &prop,

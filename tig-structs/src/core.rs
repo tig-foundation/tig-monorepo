@@ -148,7 +148,7 @@ serializable_struct_with_getters! {
         block_id: String,
         challenge_id: String,
         algorithm_id: String,
-        size: u32,
+        size: usize,
     }
 }
 impl BenchmarkSettings {
