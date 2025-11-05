@@ -10,9 +10,7 @@ serializable_struct_with_getters! {
         id: String,
         details: BenchmarkDetails,
         state: BenchmarkState,
-        solution_nonces: Option<HashSet<u64>>,
-        discarded_solution_nonces: Option<HashSet<u64>>,
-        non_solution_nonces: Option<HashSet<u64>>,
+        solution_quality: Option<Vec<i32>>,
     }
 }
 serializable_struct_with_getters! {
@@ -150,7 +148,7 @@ serializable_struct_with_getters! {
         block_id: String,
         challenge_id: String,
         algorithm_id: String,
-        difficulty: Vec<i32>,
+        size: u32,
     }
 }
 impl BenchmarkSettings {
@@ -160,9 +158,7 @@ impl BenchmarkSettings {
 }
 serializable_struct_with_getters! {
     BenchmarkDetails {
-        num_solutions: u64,
-        num_discarded_solutions: u64,
-        num_non_solutions: u64,
+        average_solution_quality: i32,
         merkle_root: MerkleHash,
         sampled_nonces: HashSet<u64>,
     }
@@ -293,13 +289,6 @@ serializable_struct_with_getters! {
     ChallengeBlockData {
         num_qualifiers: u64,
         qualifier_difficulties: HashSet<Point>,
-        average_solution_ratio: f64,
-        base_frontier: Frontier,
-        scaled_frontier: Frontier,
-        scaling_factor: f64,
-        base_fee: PreciseNumber,
-        per_nonce_fee: PreciseNumber,
-        hash_threshold: MerkleHash,
     }
 }
 
@@ -376,7 +365,6 @@ serializable_struct_with_getters! {
         delegators: HashSet<String>,
         reward_share: PreciseNumber,
         coinbase: HashMap<String, PreciseNumber>,
-        solution_ratio_by_challenge: HashMap<String, f64>,
         imbalance: PreciseNumber,
         influence: PreciseNumber,
         reward: PreciseNumber,
