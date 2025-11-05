@@ -98,6 +98,44 @@ pub async fn submit_precommit<T: Context>(
 }
 
 #[time]
+pub async fn stop_benchmark<T: Context>(
+    ctx: &T,
+    player_id: String,
+    benchmark_id: String,
+) -> Result<()> {
+    // check benchmark is not duplicate
+    if ctx.get_benchmark_details(&benchmark_id).await.is_some() {
+        return Err(anyhow!("Duplicate benchmark: {}", benchmark_id));
+    }
+
+    // check player owns benchmark
+    let settings = ctx
+        .get_precommit_settings(&benchmark_id)
+        .await
+        .ok_or_else(|| anyhow!("Precommit does not exist: {}", benchmark_id))?;
+    if player_id != settings.player_id {
+        return Err(anyhow!(
+            "Invalid submitting player: {}. Expected: {}",
+            player_id,
+            settings.player_id
+        ));
+    }
+
+    ctx.add_benchmark_to_mempool(
+        benchmark_id,
+        BenchmarkDetails {
+            stopped: true,
+            average_solution_quality: None,
+            merkle_root: None,
+            sampled_nonces: None,
+        },
+        None,
+    )
+    .await?;
+    Ok(())
+}
+
+#[time]
 pub async fn submit_benchmark<T: Context>(
     ctx: &T,
     player_id: String,
@@ -151,11 +189,12 @@ pub async fn submit_benchmark<T: Context>(
     ctx.add_benchmark_to_mempool(
         benchmark_id,
         BenchmarkDetails {
-            average_solution_quality,
-            merkle_root,
-            sampled_nonces,
+            stopped: false,
+            average_solution_quality: Some(average_solution_quality),
+            merkle_root: Some(merkle_root),
+            sampled_nonces: Some(sampled_nonces),
         },
-        solution_quality,
+        Some(solution_quality),
     )
     .await?;
     Ok(())
@@ -179,6 +218,11 @@ pub async fn submit_proof<T: Context>(
         .await
         .ok_or_else(|| anyhow!("Benchmark needs to be submitted first."))?;
 
+    // check benchmark is not stopped
+    if benchmark_details.stopped {
+        return Err(anyhow!("Cannot submit proof for stopped benchmark."));
+    }
+
     // check player owns benchmark
     let settings = ctx.get_precommit_settings(&benchmark_id).await.unwrap();
     if player_id != settings.player_id {
@@ -192,7 +236,7 @@ pub async fn submit_proof<T: Context>(
     // verify
     let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
     let proof_nonces: HashSet<u64> = merkle_proofs.iter().map(|p| p.leaf.nonce).collect();
-    let sampled_nonces = benchmark_details.sampled_nonces;
+    let sampled_nonces = benchmark_details.sampled_nonces.unwrap();
     let num_nonces = precommit_details.num_nonces;
     if sampled_nonces != proof_nonces || sampled_nonces.len() != merkle_proofs.len() {
         return Err(anyhow!(
@@ -203,6 +247,7 @@ pub async fn submit_proof<T: Context>(
     // verify merkle_proofs
     let mut verification_result = Ok(());
     let max_branch_len = (64 - (num_nonces - 1).leading_zeros()) as usize;
+    let merkle_root = benchmark_details.merkle_root.unwrap();
     for merkle_proof in merkle_proofs.iter() {
         if merkle_proof.branch.0.len() > max_branch_len
             || merkle_proof
@@ -222,9 +267,7 @@ pub async fn submit_proof<T: Context>(
         let result = merkle_proof
             .branch
             .calc_merkle_root(&hash, merkle_proof.leaf.nonce as usize);
-        if !result
-            .is_ok_and(|actual_merkle_root| actual_merkle_root == benchmark_details.merkle_root)
-        {
+        if !result.is_ok_and(|actual_merkle_root| actual_merkle_root == merkle_root) {
             verification_result = Err(anyhow!(
                 "Invalid merkle proof for nonce {}. Merkle root does not match",
                 merkle_proof.leaf.nonce
