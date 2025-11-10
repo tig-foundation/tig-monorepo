@@ -202,7 +202,8 @@
 
 // c003_a102
 
-// c003_a103
+pub mod fast_and_fun_v2;
+pub use fast_and_fun_v2 as c003_a103;
 
 // c003_a104
 
