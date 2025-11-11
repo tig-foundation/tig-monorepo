@@ -1,7 +1,7 @@
 use crate::serializable_struct_with_getters;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub use tig_utils::Frontier;
+pub use tig_utils::Point;
 use tig_utils::PreciseNumber;
 
 serializable_struct_with_getters! {
@@ -84,8 +84,8 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     DifficultyConfig {
         parameter_names: Vec<String>,
-        min_frontier: Frontier,
-        max_frontier: Frontier,
+        min_difficulty: Point,
+        max_difficulty: Point,
         max_scaling_factor: f64,
         total_qualifiers_threshold: u64,
         target_solution_rate: u64,

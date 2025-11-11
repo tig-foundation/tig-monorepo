@@ -54,7 +54,16 @@ pub async fn submit_precommit<T: Context>(
     // verify difficulty
     let difficulty = &settings.difficulty;
     let challenge_config = &config.challenges[&settings.challenge_id];
-    if difficulty.len() != challenge_config.difficulty.parameter_names.len() {
+    if difficulty.len() != challenge_config.difficulty.parameter_names.len()
+        || difficulty
+            .iter()
+            .zip(challenge_config.difficulty.min_difficulty.iter())
+            .any(|(d, min_d)| d < min_d)
+        || difficulty
+            .iter()
+            .zip(challenge_config.difficulty.max_difficulty.iter())
+            .any(|(d, max_d)| d > max_d)
+    {
         return Err(anyhow!("Invalid difficulty '{:?}'", difficulty));
     }
 
