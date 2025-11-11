@@ -151,7 +151,8 @@ pub use sat_suma as c001_a066;
 
 // c001_a067
 
-// c001_a068
+pub mod super_sat;
+pub use super_sat as c001_a068;
 
 // c001_a069
 

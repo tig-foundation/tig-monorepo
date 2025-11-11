@@ -3,7 +3,8 @@ pub use neural_alchemist as c006_a001;
 
 // c006_a002
 
-// c006_a003
+pub mod adamlaterrt;
+pub use adamlaterrt as c006_a003;
 
 // c006_a004
 
