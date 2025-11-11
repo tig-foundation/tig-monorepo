@@ -86,7 +86,6 @@ serializable_struct_with_getters! {
         details: PrecommitDetails,
         settings: BenchmarkSettings,
         state: PrecommitState,
-        hyperparameters: Option<Map<String, Value>>,
     }
 }
 serializable_struct_with_getters! {
@@ -405,11 +404,19 @@ serializable_struct_with_getters! {
 
 // Precommit child structs
 serializable_struct_with_getters! {
+    Runtime {
+        memory: u64,
+        fuel: u64,
+    }
+}
+serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
         num_nonces: u64,
         rand_hash: String,
         fee_paid: PreciseNumber,
+        runtime: Runtime,
+        hyperparameters: Option<Map<String, Value>>,
     }
 }
 serializable_struct_with_getters! {

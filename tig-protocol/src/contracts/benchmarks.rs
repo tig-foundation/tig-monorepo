@@ -12,6 +12,7 @@ pub async fn submit_precommit<T: Context>(
     player_id: String,
     settings: BenchmarkSettings,
     hyperparameters: Option<Map<String, Value>>,
+    runtime: Runtime,
     num_nonces: u64,
     seed: u64,
 ) -> Result<String> {
@@ -90,8 +91,9 @@ pub async fn submit_precommit<T: Context>(
                 num_nonces,
                 rand_hash: hex::encode(StdRng::seed_from_u64(seed).gen::<[u8; 16]>()),
                 fee_paid: submission_fee,
+                hyperparameters,
+                runtime,
             },
-            hyperparameters,
         )
         .await?;
     Ok(benchmark_id)
@@ -162,8 +164,14 @@ pub async fn submit_benchmark<T: Context>(
         ));
     }
 
-    // check at least 2 sets of nonces are provided
+    // check solution_quality length
     let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
+    if solution_quality.len() != precommit_details.num_nonces as usize {
+        return Err(anyhow!(
+            "Invalid solution_quality length. Should match number of nonces {}",
+            precommit_details.num_nonces
+        ));
+    }
 
     // random sample nonces
     let config = ctx.get_config().await;
