@@ -176,7 +176,8 @@
 
 // c002_a089
 
-// c002_a090
+pub mod more_vrp;
+pub use more_vrp as c002_a090;
 
 // c002_a091
 
