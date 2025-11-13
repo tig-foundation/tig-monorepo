@@ -1,4 +1,7 @@
-use crate::{config::ProtocolConfig, serializable_struct_with_getters};
+use crate::{
+    config::{ProtocolConfig, RuntimeConfig},
+    serializable_struct_with_getters,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -404,18 +407,12 @@ serializable_struct_with_getters! {
 
 // Precommit child structs
 serializable_struct_with_getters! {
-    Runtime {
-        memory: u64,
-        fuel: u64,
-    }
-}
-serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
         num_nonces: u64,
         rand_hash: String,
         fee_paid: PreciseNumber,
-        runtime: Runtime,
+        runtime_config: RuntimeConfig,
         hyperparameters: Option<Map<String, Value>>,
     }
 }

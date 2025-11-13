@@ -1,5 +1,4 @@
 pub use anyhow::Result;
-use serde_json::{Map, Value};
 use std::collections::HashMap;
 use tig_structs::{config::*, core::*};
 
@@ -23,11 +22,6 @@ pub trait Context {
     async fn get_latest_block_id(&self) -> String;
     async fn get_block_details(&self, block_id: &String) -> Option<BlockDetails>;
     async fn get_challenge_state(&self, challenge_id: &String) -> Option<ChallengeState>;
-    async fn get_challenge_block_data(
-        &self,
-        challenge_id: &String,
-        block_id: &String,
-    ) -> Option<ChallengeBlockData>;
     async fn get_code_state(&self, code_id: &String) -> Option<CodeState>;
     async fn add_code_to_mempool(
         &self,

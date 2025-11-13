@@ -68,7 +68,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         batch["rand_hash"],
         str(nonce),
         so_path,
-        "--fuel", str(batch["runtime_config"]["fuel"]),
+        "--fuel", str(batch["runtime_config"]["max_fuel"]),
         "--output", output_dir,
     ]
     if batch["hyperparameters"] is not None:
