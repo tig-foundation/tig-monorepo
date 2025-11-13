@@ -101,7 +101,7 @@ class JobManager:
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,
-                        json.dumps(x.details.runtime),
+                        json.dumps(x.details.runtime_config),
                         batch_size,
                         c_name,
                         a_name,

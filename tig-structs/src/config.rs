@@ -65,7 +65,7 @@ serializable_struct_with_getters! {
         lifespan_period: u32,
         per_nonce_fee: PreciseNumber,
         base_fee: PreciseNumber,
-        runtime_config: RuntimeConfig,
+        runtime_config_limits: RuntimeConfig,
     }
 }
 serializable_struct_with_getters! {

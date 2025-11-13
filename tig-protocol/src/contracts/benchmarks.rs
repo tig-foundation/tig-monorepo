@@ -4,7 +4,7 @@ use logging_timer::time;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_json::{Map, Value};
 use std::collections::HashSet;
-use tig_structs::core::*;
+use tig_structs::{config::*, core::*};
 
 #[time]
 pub async fn submit_precommit<T: Context>(
@@ -12,7 +12,7 @@ pub async fn submit_precommit<T: Context>(
     player_id: String,
     settings: BenchmarkSettings,
     hyperparameters: Option<Map<String, Value>>,
-    runtime: Runtime,
+    runtime_config: RuntimeConfig,
     num_nonces: u64,
     seed: u64,
 ) -> Result<String> {
@@ -74,6 +74,22 @@ pub async fn submit_precommit<T: Context>(
         ));
     }
 
+    if runtime_config.max_memory > challenge_config.benchmarks.runtime_config_limits.max_memory {
+        return Err(anyhow!(
+            "Invalid runtime_config.max_memory '{}'. Must be <= {}",
+            runtime_config.max_memory,
+            challenge_config.benchmarks.runtime_config_limits.max_memory
+        ));
+    }
+
+    if runtime_config.max_fuel > challenge_config.benchmarks.runtime_config_limits.max_fuel {
+        return Err(anyhow!(
+            "Invalid runtime_config.max_fuel '{}'. Must be <= {}",
+            runtime_config.max_fuel,
+            challenge_config.benchmarks.runtime_config_limits.max_fuel
+        ));
+    }
+
     // verify player has sufficient balance
     let submission_fee = challenge_config.benchmarks.base_fee
         + challenge_config.benchmarks.per_nonce_fee * PreciseNumber::from(num_nonces);
@@ -94,7 +110,7 @@ pub async fn submit_precommit<T: Context>(
                 rand_hash: hex::encode(StdRng::seed_from_u64(seed).gen::<[u8; 16]>()),
                 fee_paid: submission_fee,
                 hyperparameters,
-                runtime,
+                runtime_config,
             },
         )
         .await?;

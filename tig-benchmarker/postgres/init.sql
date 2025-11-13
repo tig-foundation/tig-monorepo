@@ -120,8 +120,9 @@ SELECT '
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime": {
-        "fuel": 100000000000
+      "runtime_config": {
+        "max_fuel": 100000000000,
+        "max_memory": 0
       }
     },
     {
@@ -131,8 +132,9 @@ SELECT '
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime": {
-        "fuel": 100000000000
+      "runtime_config": {
+        "max_fuel": 100000000000,
+        "max_memory": 0
       }
     },
     {
@@ -142,8 +144,9 @@ SELECT '
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime": {
-        "fuel": 100000000000
+      "runtime_config": {
+        "max_fuel": 100000000000,
+        "max_memory": 0
       }
     },
     {
@@ -153,8 +156,9 @@ SELECT '
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime": {
-        "fuel": 100000000000
+      "runtime_config": {
+        "max_fuel": 100000000000,
+        "max_memory": 0
       }
     },
     {
@@ -164,8 +168,21 @@ SELECT '
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime": {
-        "fuel": 100000000000
+      "runtime_config": {
+        "max_fuel": 100000000000,
+        "max_memory": 0
+      }
+    },
+    {
+      "algorithm_id": "c006_a001",
+      "num_nonces": 40,
+      "selected_sizes": [],
+      "weight": 1,
+      "batch_size": 8,
+      "hyperparameters": null,
+      "runtime_config": {
+        "max_fuel": 100000000000,
+        "max_memory": 0
       }
     }
   ],
