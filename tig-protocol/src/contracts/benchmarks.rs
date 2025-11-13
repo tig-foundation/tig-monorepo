@@ -53,14 +53,16 @@ pub async fn submit_precommit<T: Context>(
 
     // verify size
     let challenge_config = &config.challenges[&settings.challenge_id];
-    if settings.size < challenge_config.difficulty.size_range[0]
-        || settings.size > challenge_config.difficulty.size_range[1]
+    if challenge_config
+        .difficulty
+        .allowed_sizes
+        .binary_search(&settings.size)
+        .is_err()
     {
         return Err(anyhow!(
-            "Invalid size '{}'. Must be in range [{}, {}]",
+            "Invalid size '{}'. Must be one of {:?}",
             settings.size,
-            challenge_config.difficulty.size_range[0],
-            challenge_config.difficulty.size_range[1]
+            challenge_config.difficulty.allowed_sizes
         ));
     }
 
