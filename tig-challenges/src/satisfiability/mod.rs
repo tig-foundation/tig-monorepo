@@ -1,3 +1,4 @@
+use crate::QUALITY_PRECISION;
 use anyhow::{anyhow, Result};
 use ndarray::{Array2, Axis};
 use rand::{
@@ -6,30 +7,6 @@ use rand::{
     Rng, SeedableRng,
 };
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct Difficulty {
-    pub num_variables: usize,
-    pub clauses_to_variables_percent: u32,
-}
-
-impl From<Vec<i32>> for Difficulty {
-    fn from(arr: Vec<i32>) -> Self {
-        Self {
-            num_variables: arr[0] as usize,
-            clauses_to_variables_percent: arr[1] as u32,
-        }
-    }
-}
-
-impl Into<Vec<i32>> for Difficulty {
-    fn into(self) -> Vec<i32> {
-        vec![
-            self.num_variables as i32,
-            self.clauses_to_variables_percent as i32,
-        ]
-    }
-}
 
 impl_base64_serde! {
     Solution {
@@ -48,19 +25,16 @@ impl Solution {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
-    pub difficulty: Difficulty,
+    pub num_variables: usize,
     pub clauses: Vec<Vec<i32>>,
 }
 
 impl Challenge {
-    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
+    pub fn generate_instance(seed: &[u8; 32], num_variables: usize) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).gen());
-        let num_clauses = (difficulty.num_variables as f64
-            * difficulty.clauses_to_variables_percent as f64
-            / 100.0)
-            .floor() as usize;
+        let num_clauses = (num_variables as f64 * 4.267).floor() as usize;
 
-        let var_distr = Uniform::new(1, difficulty.num_variables as i32 + 1);
+        let var_distr = Uniform::new(1, num_variables as i32 + 1);
         // Create a uniform distribution for negations.
         let neg_distr = Uniform::new(0, 2);
 
@@ -87,31 +61,31 @@ impl Challenge {
 
         Ok(Self {
             seed: seed.clone(),
-            difficulty: difficulty.clone(),
+            num_variables,
             clauses,
         })
     }
 
     conditional_pub!(
-        fn verify_solution(&self, solution: &Solution) -> Result<()> {
-            if solution.variables.len() != self.difficulty.num_variables {
+        fn evaluate_solution(&self, solution: &Solution) -> Result<i32> {
+            if solution.variables.len() != self.num_variables {
                 return Err(anyhow!(
                     "Invalid number of variables. Expected: {}, Actual: {}",
-                    self.difficulty.num_variables,
+                    self.num_variables,
                     solution.variables.len()
                 ));
             }
 
-            if let Some((idx, _)) = self.clauses.iter().enumerate().find(|(_, clause)| {
-                !clause.iter().any(|&literal| {
+            if self.clauses.iter().all(|clause| {
+                clause.iter().any(|&literal| {
                     let var_idx = literal.abs() as usize - 1;
                     let var_value = solution.variables[var_idx];
                     (literal > 0 && var_value) || (literal < 0 && !var_value)
                 })
             }) {
-                Err(anyhow!("Clause '{}' not satisfied", idx))
+                Ok(QUALITY_PRECISION)
             } else {
-                Ok(())
+                Ok(0)
             }
         }
     );
