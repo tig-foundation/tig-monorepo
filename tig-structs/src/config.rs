@@ -82,7 +82,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     DifficultyConfig {
-        size_range: [usize; 2],
+        allowed_sizes: Vec<usize>,
         total_qualifiers_threshold: u64,
     }
 }
