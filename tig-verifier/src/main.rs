@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{arg, Command};
 use serde_json::{Map, Value};
 use std::{fs, io::Read, panic, path::PathBuf};
@@ -75,8 +75,8 @@ pub fn verify_solution(
                     if verbose {
                         println!("{:?}", solution);
                     }
-                    match challenge.verify_solution(&solution) {
-                        Ok(quality) => println!("Solution quality: {}", quality),
+                    match challenge.evaluate_solution(&solution) {
+                        Ok(quality) => println!("quality: {}", quality),
                         Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
                     }
                 }
@@ -121,7 +121,7 @@ pub fn verify_solution(
                     if verbose {
                         println!("{:?}", solution);
                     }
-                    match challenge.verify_solution(
+                    match challenge.evaluate_solution(
                         &solution,
                         module.clone(),
                         stream.clone(),
@@ -130,7 +130,7 @@ pub fn verify_solution(
                         Ok(quality) => {
                             stream.synchronize()?;
                             ctx.synchronize()?;
-                            println!("Solution quality: {}", quality);
+                            println!("quality: {}", quality);
                         }
                         Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
                     }

@@ -1,32 +1,11 @@
+use crate::QUALITY_PRECISION;
+mod baselines;
 use anyhow::{anyhow, Result};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use statrs::function::erf::{erf, erf_inv};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct Difficulty {
-    pub num_nodes: usize,
-    #[cfg(not(feature = "hide_verification"))]
-    pub better_than_baseline: u32,
-    #[cfg(feature = "hide_verification")]
-    better_than_baseline: u32,
-}
-
-impl From<Vec<i32>> for Difficulty {
-    fn from(arr: Vec<i32>) -> Self {
-        Self {
-            num_nodes: arr[0] as usize,
-            better_than_baseline: arr[1] as u32,
-        }
-    }
-}
-
-impl Into<Vec<i32>> for Difficulty {
-    fn into(self) -> Vec<i32> {
-        vec![self.num_nodes as i32, self.better_than_baseline as i32]
-    }
-}
 
 impl_base64_serde! {
      Solution {
@@ -43,14 +22,10 @@ impl Solution {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
-    pub difficulty: Difficulty,
+    pub num_nodes: usize,
     pub demands: Vec<i32>,
     pub node_positions: Vec<(i32, i32)>,
     pub distance_matrix: Vec<Vec<i32>>,
-    #[cfg(not(feature = "hide_verification"))]
-    pub baseline_total_distance: i32,
-    #[cfg(feature = "hide_verification")]
-    baseline_total_distance: i32,
     pub max_capacity: i32,
     pub fleet_size: usize,
     pub service_time: i32,
@@ -59,9 +34,8 @@ pub struct Challenge {
 }
 
 impl Challenge {
-    pub fn generate_instance(seed: &[u8; 32], difficulty: &Difficulty) -> Result<Self> {
+    pub fn generate_instance(seed: &[u8; 32], num_nodes: usize) -> Result<Self> {
         let mut rng = SmallRng::from_seed(seed.clone());
-        let num_nodes = difficulty.num_nodes;
         let max_capacity = 200;
 
         let num_clusters = rng.gen_range(3..=8);
@@ -157,43 +131,21 @@ impl Challenge {
             }
         }
 
-        let baseline_routes = calc_baseline_routes(
-            num_nodes,
-            max_capacity,
-            &demands,
-            &distance_matrix,
-            service_time,
-            &ready_times,
-            &due_times,
-        )?;
-
-        let baseline_total_distance = calc_routes_total_distance(
-            num_nodes,
-            max_capacity,
-            &demands,
-            &distance_matrix,
-            &baseline_routes,
-            service_time,
-            &ready_times,
-            &due_times,
-        )?;
-
         Ok(Challenge {
             seed: seed.clone(),
-            difficulty: difficulty.clone(),
+            num_nodes,
             demands,
             node_positions,
             distance_matrix,
-            baseline_total_distance,
             max_capacity,
-            fleet_size: baseline_routes.len(),
+            fleet_size: 0, // FIXME
             service_time,
             ready_times,
             due_times,
         })
     }
 
-    pub fn calc_routes_total_distance(&self, solution: &Solution) -> Result<i32> {
+    pub fn evaluate_total_distance(&self, solution: &Solution) -> Result<i32> {
         if solution.routes.len() > self.fleet_size {
             return Err(anyhow!(
                 "Number of routes ({}) exceeds fleet size ({})",
@@ -201,36 +153,96 @@ impl Challenge {
                 self.fleet_size
             ));
         }
-        let total_distance = calc_routes_total_distance(
-            self.difficulty.num_nodes,
-            self.max_capacity,
-            &self.demands,
-            &self.distance_matrix,
-            &solution.routes,
-            self.service_time,
-            &self.ready_times,
-            &self.due_times,
-        )?;
+        let mut total_distance = 0;
+        let mut visited = vec![false; self.num_nodes];
+        visited[0] = true;
+
+        for route in &solution.routes {
+            if route.len() <= 2 || route[0] != 0 || route[route.len() - 1] != 0 {
+                return Err(anyhow!("Each route must start and end at node 0 (the depot), and visit at least one non-depot node"));
+            }
+
+            let mut capacity = self.max_capacity;
+            let mut current_node = 0;
+            let mut curr_time = 0;
+            for &node in &route[1..route.len() - 1] {
+                if visited[node] {
+                    return Err(anyhow!(
+                        "The same non-depot node cannot be visited more than once"
+                    ));
+                }
+                if self.demands[node] > capacity {
+                    return Err(anyhow!(
+                        "The total demand on each route must not exceed max capacity"
+                    ));
+                }
+                curr_time += self.distance_matrix[current_node][node];
+                if curr_time > self.due_times[node] {
+                    return Err(anyhow!("Node must be visited before due time"));
+                }
+                if curr_time < self.ready_times[node] {
+                    curr_time = self.ready_times[node];
+                }
+                curr_time += self.service_time;
+                visited[node] = true;
+                capacity -= self.demands[node];
+                total_distance += self.distance_matrix[current_node][node];
+                current_node = node;
+            }
+
+            curr_time += self.distance_matrix[current_node][0];
+            if curr_time > self.due_times[0] {
+                return Err(anyhow!("Must return to depot before due time"));
+            }
+            total_distance += self.distance_matrix[current_node][0];
+        }
+
+        if visited.iter().any(|&v| !v) {
+            return Err(anyhow!("All nodes must be visited"));
+        }
+
         Ok(total_distance)
     }
 
     conditional_pub!(
-        fn verify_solution(&self, solution: &Solution) -> Result<()> {
-            let total_distance = self.calc_routes_total_distance(solution)?;
-            let btb = self.difficulty.better_than_baseline as f64 / 1000.0;
-            let total_distance_threshold =
-                (self.baseline_total_distance as f64 * (1.0 - btb)).ceil() as i32;
-            if total_distance > total_distance_threshold {
-                Err(anyhow!(
-                    "Total distance {} is greater than threshold {} (baseline: {}, better_than_baseline: {}%)",
-                    total_distance,
-                    total_distance_threshold,
-                    self.baseline_total_distance,
-                    btb * 100.0
-                ))
-            } else {
+        fn compute_greedy_baseline(&self) -> Result<Solution> {
+            let solution = RefCell::new(Solution::new());
+            let save_solution_fn = |s: &Solution| -> Result<()> {
+                *solution.borrow_mut() = s.clone();
                 Ok(())
-            }
+            };
+            baselines::solomon::solve_challenge(self, &save_solution_fn, &None)?;
+            Ok(solution.into_inner())
+        }
+    );
+
+    conditional_pub!(
+        fn compute_sota_baseline(&self) -> Result<Solution> {
+            Err(anyhow!("Not implemented yet"))
+        }
+    );
+
+    conditional_pub!(
+        fn evaluate_solution(&self, solution: &Solution) -> Result<i32> {
+            let total_distance = self.evaluate_total_distance(solution)?;
+            let greedy_solution = self.compute_greedy_baseline()?;
+            let greedy_total_distance = self.evaluate_total_distance(&greedy_solution)?;
+            // TODO: implement SOTA baseline
+            let sota_total_distance = greedy_total_distance;
+            // if total_distance > greedy_total_distance {
+            //     return Err(anyhow!(
+            //         "Total distance {} is greater than greedy baseline distance {}",
+            //         total_distance,
+            //         greedy_total_distance
+            //     ));
+            // }
+            // let sota_solution = self.compute_sota_baseline()?;
+            // let sota_total_distance = self.evaluate_total_distance(&sota_solution)?;
+            let quality = ((sota_total_distance - total_distance) as f64
+                / sota_total_distance as f64
+                * QUALITY_PRECISION as f64)
+                .round() as i32;
+            Ok(quality)
         }
     );
 }
@@ -246,206 +258,4 @@ fn truncated_normal_sample<T: Rng>(
     let cdf_max = 0.5 * (1.0 + erf((max_val - mean) / (std_dev * (2.0_f64).sqrt())));
     let sample = rng.gen::<f64>() * (cdf_max - cdf_min) + cdf_min;
     mean + std_dev * (2.0_f64).sqrt() * erf_inv(2.0 * sample - 1.0)
-}
-
-fn is_feasible(
-    route: &Vec<usize>,
-    distance_matrix: &Vec<Vec<i32>>,
-    service_time: i32,
-    ready_times: &Vec<i32>,
-    due_times: &Vec<i32>,
-    mut curr_node: usize,
-    mut curr_time: i32,
-    start_pos: usize,
-) -> bool {
-    let mut valid = true;
-    for pos in start_pos..route.len() {
-        let next_node = route[pos];
-        curr_time += distance_matrix[curr_node][next_node];
-        if curr_time > due_times[route[pos]] {
-            valid = false;
-            break;
-        }
-        curr_time = curr_time.max(ready_times[next_node]) + service_time;
-        curr_node = next_node;
-    }
-    valid
-}
-
-fn find_best_insertion(
-    route: &Vec<usize>,
-    remaining_nodes: Vec<usize>,
-    distance_matrix: &Vec<Vec<i32>>,
-    service_time: i32,
-    ready_times: &Vec<i32>,
-    due_times: &Vec<i32>,
-) -> Option<(usize, usize)> {
-    let alpha1 = 1;
-    let alpha2 = 0;
-    let lambda = 1;
-
-    let mut best_c2 = None;
-    let mut best = None;
-    for insert_node in remaining_nodes {
-        let mut best_c1 = None;
-
-        let mut curr_time = 0;
-        let mut curr_node = 0;
-        for pos in 1..route.len() {
-            let next_node = route[pos];
-            let new_arrival_time =
-                ready_times[insert_node].max(curr_time + distance_matrix[curr_node][insert_node]);
-            if new_arrival_time > due_times[insert_node] {
-                continue;
-            }
-            let old_arrival_time =
-                ready_times[next_node].max(curr_time + distance_matrix[curr_node][next_node]);
-
-            // Distance criterion: c11 = d(i,u) + d(u,j) - mu * d(i,j)
-            let c11 = distance_matrix[curr_node][insert_node]
-                + distance_matrix[insert_node][next_node]
-                - distance_matrix[curr_node][next_node];
-
-            // Time criterion: c12 = b_ju - b_j (the shift in arrival time at position 'pos').
-            let c12 = new_arrival_time - old_arrival_time;
-
-            let c1 = -(alpha1 * c11 + alpha2 * c12);
-            let c2 = lambda * distance_matrix[0][insert_node] + c1;
-
-            if best_c1.is_none_or(|x| c1 > x)
-                && best_c2.is_none_or(|x| c2 > x)
-                && is_feasible(
-                    route,
-                    distance_matrix,
-                    service_time,
-                    ready_times,
-                    due_times,
-                    insert_node,
-                    new_arrival_time + service_time,
-                    pos,
-                )
-            {
-                best_c1 = Some(c1);
-                best_c2 = Some(c2);
-                best = Some((insert_node, pos));
-            }
-
-            curr_time = ready_times[next_node]
-                .max(curr_time + distance_matrix[curr_node][next_node])
-                + service_time;
-            curr_node = next_node;
-        }
-    }
-    best
-}
-
-fn calc_baseline_routes(
-    num_nodes: usize,
-    max_capacity: i32,
-    demands: &Vec<i32>,
-    distance_matrix: &Vec<Vec<i32>>,
-    service_time: i32,
-    ready_times: &Vec<i32>,
-    due_times: &Vec<i32>,
-) -> Result<Vec<Vec<usize>>> {
-    let mut routes = Vec::new();
-
-    let mut nodes: Vec<usize> = (1..num_nodes).collect();
-    nodes.sort_by(|&a, &b| distance_matrix[0][a].cmp(&distance_matrix[0][b]));
-
-    let mut remaining: Vec<bool> = vec![true; num_nodes];
-    remaining[0] = false;
-
-    // popping furthest node from depot
-    while let Some(node) = nodes.pop() {
-        if !remaining[node] {
-            continue;
-        }
-        remaining[node] = false;
-        let mut route = vec![0, node, 0];
-        let mut route_demand = demands[node];
-
-        while let Some((best_node, best_pos)) = find_best_insertion(
-            &route,
-            remaining
-                .iter()
-                .enumerate()
-                .filter(|(n, &flag)| flag && route_demand + demands[*n] <= max_capacity)
-                .map(|(n, _)| n)
-                .collect(),
-            distance_matrix,
-            service_time,
-            ready_times,
-            due_times,
-        ) {
-            remaining[best_node] = false;
-            route_demand += demands[best_node];
-            route.insert(best_pos, best_node);
-        }
-
-        routes.push(route);
-    }
-
-    Ok(routes)
-}
-
-pub fn calc_routes_total_distance(
-    num_nodes: usize,
-    max_capacity: i32,
-    demands: &Vec<i32>,
-    distance_matrix: &Vec<Vec<i32>>,
-    routes: &Vec<Vec<usize>>,
-    service_time: i32,
-    ready_times: &Vec<i32>,
-    due_times: &Vec<i32>,
-) -> Result<i32> {
-    let mut total_distance = 0;
-    let mut visited = vec![false; num_nodes];
-    visited[0] = true;
-
-    for route in routes {
-        if route.len() <= 2 || route[0] != 0 || route[route.len() - 1] != 0 {
-            return Err(anyhow!("Each route must start and end at node 0 (the depot), and visit at least one non-depot node"));
-        }
-
-        let mut capacity = max_capacity;
-        let mut current_node = 0;
-        let mut curr_time = 0;
-        for &node in &route[1..route.len() - 1] {
-            if visited[node] {
-                return Err(anyhow!(
-                    "The same non-depot node cannot be visited more than once"
-                ));
-            }
-            if demands[node] > capacity {
-                return Err(anyhow!(
-                    "The total demand on each route must not exceed max capacity"
-                ));
-            }
-            curr_time += distance_matrix[current_node][node];
-            if curr_time > due_times[node] {
-                return Err(anyhow!("Node must be visited before due time"));
-            }
-            if curr_time < ready_times[node] {
-                curr_time = ready_times[node];
-            }
-            curr_time += service_time;
-            visited[node] = true;
-            capacity -= demands[node];
-            total_distance += distance_matrix[current_node][node];
-            current_node = node;
-        }
-
-        curr_time += distance_matrix[current_node][0];
-        if curr_time > due_times[0] {
-            return Err(anyhow!("Must return to depot before due time"));
-        }
-        total_distance += distance_matrix[current_node][0];
-    }
-
-    if visited.iter().any(|&v| !v) {
-        return Err(anyhow!("All nodes must be visited"));
-    }
-
-    Ok(total_distance)
 }
