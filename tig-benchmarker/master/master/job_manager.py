@@ -13,10 +13,6 @@ import math
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 class JobManager:
-    def __init__(self):
-        self.hash_thresholds = {}
-        self.average_solution_ratio = {}
-
     def on_new_block(
         self,
         block: Block,
@@ -61,22 +57,6 @@ class JobManager:
             c_name = challenge_id_2_name[x.settings.challenge_id]
             a_name = algorithm_id_2_name[x.settings.algorithm_id]
 
-            if x.details.block_started not in self.hash_thresholds:
-                logger.info(f"fetching hash threshold for block {x.details.block_started}")
-                d = requests.get(f"{api_url}/get-challenges?block_id={x.settings.block_id}").json()
-                self.hash_thresholds[x.details.block_started] = {
-                    c['id']: c['block_data']['hash_threshold']
-                    for c in d["challenges"]
-                    if c['state']['round_active'] <= block.details.round
-                }
-                self.average_solution_ratio[x.details.block_started] = {
-                    c['id']: c['block_data']['average_solution_ratio']
-                    for c in d["challenges"]
-                    if c['state']['round_active'] <= block.details.round
-                }
-            hash_threshold = self.hash_thresholds[x.details.block_started][x.settings.challenge_id]
-            average_solution_ratio = self.average_solution_ratio[x.details.block_started][x.settings.challenge_id]
-
             bin = binarys.get(x.settings.algorithm_id, None)
             if bin is None:
                 logger.error(f"batch {x.benchmark_id}: no binary-blob found for {x.settings.algorithm_id}. skipping job")
@@ -109,8 +89,6 @@ class JobManager:
                         algorithm,
                         download_url,
                         block_started,
-                        hash_threshold,
-                        average_solution_ratio,
                         start_time
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
@@ -119,18 +97,16 @@ class JobManager:
                     (
                         benchmark_id,
                         json.dumps(asdict(x.settings)),
-                        json.dumps(x.hyperparameters),
+                        None if x.details.hyperparameters is None else json.dumps(x.details.hyperparameters),
                         x.details.num_nonces,
                         num_batches,
                         x.details.rand_hash,
-                        json.dumps(block.config["challenges"][x.settings.challenge_id]["benchmarks"]["runtime_config"]),
+                        json.dumps(x.details.runtime),
                         batch_size,
                         c_name,
                         a_name,
                         bin.details.download_url,
                         x.details.block_started,
-                        hash_threshold.lower(),
-                        average_solution_ratio,
                     )
                 ),
                 (
@@ -171,6 +147,7 @@ class JobManager:
                     FROM job
                     WHERE benchmark_id = %s
                         AND sampled_nonces IS NULL
+                        AND stopped IS NULL
                     """,
                     (benchmark_id,)
                 )) is None
@@ -178,34 +155,55 @@ class JobManager:
                 continue
 
             logger.info(f"updating job from confirmed benchmark {benchmark_id}")
-            atomic_update = [
-                (
-                    """
-                    UPDATE job
-                    SET sampled_nonces = %s
-                    WHERE benchmark_id = %s
-                    """,
-                    (json.dumps(x.details.sampled_nonces), benchmark_id)
-                )
-            ]
-
-            batch_sampled_nonces = {}
-            for nonce in x.details.sampled_nonces:
-                batch_idx = nonce // result["batch_size"]
-                batch_sampled_nonces.setdefault(batch_idx, []).append(nonce)
-
-            for batch_idx, sampled_nonces in batch_sampled_nonces.items():
-                atomic_update += [
+            if x.details.stopped:
+                atomic_update = [
                     (
                         """
-                        INSERT INTO proofs_batch (sampled_nonces, benchmark_id, batch_idx, slave, start_time)
-                        SELECT %s, A.benchmark_id, A.batch_idx, A.slave, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
-                        FROM root_batch A
-                        WHERE A.benchmark_id = %s AND A.batch_idx = %s
+                        UPDATE job
+                        SET stopped = true,
+                            end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                        WHERE benchmark_id = %s
                         """,
-                        (json.dumps(sampled_nonces), benchmark_id, batch_idx)
+                        (benchmark_id,)
                     )
                 ]
+            else:
+                atomic_update = [
+                    (
+                        """
+                        UPDATE job
+                        SET sampled_nonces = %s
+                        WHERE benchmark_id = %s
+                        """,
+                        (json.dumps(x.details.sampled_nonces), benchmark_id)
+                    ),
+                    (
+                        """
+                        UPDATE job_data
+                        SET average_solution_quality = %s
+                        WHERE benchmark_id = %s
+                        """,
+                        (x.details.average_solution_quality, benchmark_id)
+                    )
+                ]
+
+                batch_sampled_nonces = {}
+                for nonce in x.details.sampled_nonces:
+                    batch_idx = nonce // result["batch_size"]
+                    batch_sampled_nonces.setdefault(batch_idx, []).append(nonce)
+
+                for batch_idx, sampled_nonces in batch_sampled_nonces.items():
+                    atomic_update += [
+                        (
+                            """
+                            INSERT INTO proofs_batch (sampled_nonces, benchmark_id, batch_idx, slave, start_time)
+                            SELECT %s, A.benchmark_id, A.batch_idx, A.slave, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                            FROM root_batch A
+                            WHERE A.benchmark_id = %s AND A.batch_idx = %s
+                            """,
+                            (json.dumps(sampled_nonces), benchmark_id, batch_idx)
+                        )
+                    ]
             
             get_db_conn().execute_many(*atomic_update)
 
@@ -232,11 +230,6 @@ class JobManager:
             """,
             (block.details.height,)
         )
-
-        # prune old hash thresholds
-        for height in list(self.hash_thresholds.keys()):
-            if block.details.height - height >= 120:
-                del self.hash_thresholds[height]
         
                 
     def run(self):
@@ -250,72 +243,32 @@ class JobManager:
                 FROM root_batch A
                 INNER JOIN job B
                     ON B.merkle_root_ready IS NULL
+                    AND B.stopped IS NULL
                     AND A.benchmark_id = B.benchmark_id
                 GROUP BY A.benchmark_id
                 HAVING COUNT(*) = COUNT(A.ready)
-            ),
-            agg_batches AS (
-                SELECT 
-                    A.benchmark_id, 
-                    JSONB_AGG(B.merkle_root ORDER BY B.batch_idx) AS batch_merkle_roots,
-                    JSONB_AGG(B.solution_nonces) AS solution_nonces,
-                    JSONB_AGG(B.discarded_solution_nonces) AS discarded_solution_nonces,
-                    JSONB_AGG(B.hashes) AS hashes
-                FROM ready A
-                INNER JOIN batch_data B
-                    ON A.benchmark_id = B.benchmark_id
-                GROUP BY A.benchmark_id
             )
-            SELECT
-                A.*,
-                B.hash_threshold,
-                B.average_solution_ratio,
-                B.num_nonces
-            FROM agg_batches A
-            INNER JOIN job B
+            SELECT 
+                A.benchmark_id, 
+                JSONB_AGG(B.merkle_root ORDER BY B.batch_idx) AS batch_merkle_roots,
+                JSONB_AGG(B.solution_quality) AS solution_quality
+            FROM ready A
+            INNER JOIN batch_data B
                 ON A.benchmark_id = B.benchmark_id
+            GROUP BY A.benchmark_id
             """
         )
 
         # Calculate merkle roots for completed jobs
         for row in rows:
             benchmark_id = row['benchmark_id']
-            solution_nonces = [x for y in row['solution_nonces'] for x in y]
-            discarded_solution_nonces = [x for y in row['discarded_solution_nonces'] for x in y]
-            hashes = [x for y in row['hashes'] for x in y]
-
-            # calc hash threshold based on reliability
-            num_solutions = len(solution_nonces) + len(discarded_solution_nonces)
-            num_nonces = row["num_nonces"]
-            solution_ratio = num_solutions / num_nonces if num_nonces > 0 else 0
-            average_solution_ratio = row["average_solution_ratio"]
-            if average_solution_ratio == 0:
-                reliability = 1.0
-            elif solution_ratio == 0:
-                reliability = 0.0
-            else:
-                reliability = min(1.0, solution_ratio / average_solution_ratio)
-            # FIXME floating point representation may result in very very minor differences..
-            assert 0 <= reliability <= 1.0
-            denominator = 1000
-            numerator = int(reliability * denominator)
-            hash_threshold = (
-                int(row["hash_threshold"], 16) // denominator * numerator
-            ).to_bytes(32, 'big').hex()
-            assert hash_threshold <= row["hash_threshold"]
-
-            # discard solutions
-            discarded_solution_nonces = set(discarded_solution_nonces)
-            for n, h in zip(solution_nonces, hashes):
-                if h > hash_threshold:
-                    discarded_solution_nonces.add(n)
-            solution_nonces = list(set(solution_nonces) - discarded_solution_nonces)
-            discarded_solution_nonces = list(discarded_solution_nonces)
+            solution_quality = [x for y in row['solution_quality'] for x in y]
+            average_solution_quality = sum(solution_quality) // len(solution_quality)
 
             batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
             num_batches = len(batch_merkle_roots)
             
-            logger.info(f"job {benchmark_id}: (benchmark ready, #solution_nonces: {len(solution_nonces)}, #discarded_solution_nonces: {len(discarded_solution_nonces)})")
+            logger.info(f"job {benchmark_id}: (benchmark ready, average_solution_nonces: {average_solution_quality}")
 
             tree = MerkleTree(
                 batch_merkle_roots,
@@ -329,24 +282,23 @@ class JobManager:
                     """
                     UPDATE job_data
                     SET merkle_root = %s, 
-                        solution_nonces = %s,
-                        discarded_solution_nonces = %s
+                        solution_quality = %s
                     WHERE benchmark_id = %s
                     """, 
                     (
                         merkle_root.to_str(), 
-                        json.dumps(solution_nonces),
-                        json.dumps(discarded_solution_nonces),
+                        json.dumps(solution_quality),
                         benchmark_id
                     )
                 ),
                 (
                     """
                     UPDATE job
-                    SET merkle_root_ready = true
+                    SET merkle_root_ready = true,
+                        average_solution_quality = %s
                     WHERE benchmark_id = %s
                     """,
-                    (benchmark_id,)
+                    (average_solution_quality, benchmark_id)
                 )
             ])
             
@@ -396,7 +348,7 @@ class JobManager:
                 SELECT JSONB_AGG(merkle_root ORDER BY batch_idx) as batch_merkle_roots
                 FROM batch_data
                 WHERE benchmark_id = %s
-                """, 
+                """,
                 (benchmark_id,)
             )
 

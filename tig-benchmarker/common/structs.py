@@ -43,7 +43,7 @@ class BenchmarkSettings(FromDict):
     block_id: str
     challenge_id: str
     algorithm_id: str
-    difficulty: Point
+    size: int
 
     def calc_seed(self, rand_hash: str, nonce: int) -> bytes:
         return u8s_from_str(f"{jsonify(self)}_{rand_hash}_{nonce}")
@@ -54,6 +54,8 @@ class PrecommitDetails(FromDict):
     num_nonces: int
     rand_hash: str
     fee_paid: PreciseNumber
+    hyperparameters: Optional[dict]
+    runtime: dict
 
 @dataclass
 class PrecommitState(FromDict):
@@ -65,13 +67,13 @@ class Precommit(FromDict):
     details: PrecommitDetails
     settings: BenchmarkSettings
     state: PrecommitState
-    hyperparameters: Optional[dict]
 
 @dataclass
 class BenchmarkDetails(FromDict):
-    num_solutions: int
-    merkle_root: MerkleHash
-    sampled_nonces: List[int]
+    stopped: bool
+    merkle_root: Optional[MerkleHash]
+    average_solution_quality: Optional[int]
+    sampled_nonces: Optional[List[int]]
 
 @dataclass
 class BenchmarkState(FromDict):
@@ -82,9 +84,7 @@ class Benchmark(FromDict):
     id: str
     details: BenchmarkDetails
     state: BenchmarkState
-    non_solution_nonces: Optional[Set[int]]
-    discarded_solution_nonces: Optional[Set[int]]
-    solution_nonces: Optional[Set[int]]
+    solution_quality: Optional[List[int]]
 
 @dataclass
 class OutputMetaData(FromDict):
@@ -187,13 +187,6 @@ class ChallengeState(FromDict):
 class ChallengeBlockData(FromDict):
     num_qualifiers: int
     qualifier_difficulties: Set[Point]
-    average_solution_ratio: float
-    base_frontier: Frontier
-    scaled_frontier: Frontier
-    scaling_factor: float
-    base_fee: PreciseNumber
-    per_nonce_fee: PreciseNumber
-    hash_threshold: MerkleHash
 
 @dataclass
 class Challenge(FromDict):
@@ -210,7 +203,6 @@ class OPoWBlockData(FromDict):
     weighted_self_deposit: PreciseNumber
     delegators: Set[str]
     coinbase: Dict[str, PreciseNumber]
-    solution_ratio_by_challenge: Dict[str, float]
     reward_share: PreciseNumber
     imbalance: PreciseNumber
     influence: PreciseNumber

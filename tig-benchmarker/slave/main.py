@@ -68,7 +68,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         batch["rand_hash"],
         str(nonce),
         so_path,
-        "--fuel", str(batch["runtime_config"]["max_fuel"]),
+        "--fuel", str(batch["runtime_config"]["fuel"]),
         "--output", output_dir,
     ]
     if batch["hyperparameters"] is not None:
@@ -96,44 +96,42 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
                 87: "out of fuel",
             }
 
-            if ret not in exit_codes:
-                logger.error(f"batch {batch['id']}, nonce {nonce} failed with exit code {ret}: {process.stderr.read().decode()}")
-            else:
-                logger.debug(f"batch {batch['id']}, nonce {nonce} finished with exit code {ret}: {exit_codes[ret]}")
-
             if not os.path.exists(output_file):
-                with open(output_file, "w") as f:
-                    json.dump(dict(
-                        nonce=nonce,
-                        runtime_signature=0,
-                        fuel_consumed=(ret == 87) and (batch["runtime_config"]["max_fuel"] + 1),
-                        solution="",
-                        cpu_arch=CPU_ARCH
-                    ), f)
-            else:
-                start = now()
-                cmd = [
-                    "docker", "exec", batch["challenge"], "tig-verifier",
-                    settings,
-                    batch["rand_hash"],
-                    str(nonce),
-                    output_file,
-                ]
-                if ptx_path is not None:
-                    cmd += [
-                        "--ptx", ptx_path,
-                    ]
-                logger.debug(f"verifying nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
-                ret = subprocess.run(cmd, capture_output=True, text=True)
-                if ret.returncode == 0:
-                    logger.debug(f"batch {batch['id']}, nonce {nonce} valid solution")
+                if ret == 0:
+                    raise Exception(f"no output")
                 else:
-                    logger.debug(f"batch {batch['id']}, nonce {nonce} invalid solution (exit code: {ret.returncode}, stderr: {ret.stderr.strip()})")
-                    with open(output_file, "r") as f:
-                        d = json.load(f)
-                        d["solution"] = ""
-                    with open(output_file, "w") as f:
-                        json.dump(d, f)
+                    raise Exception(f"failed with exit code {ret}: {process.stderr.read().decode()}")
+                
+            start = now()
+            cmd = [
+                "docker", "exec", batch["challenge"], "tig-verifier",
+                settings,
+                batch["rand_hash"],
+                str(nonce),
+                output_file,
+            ]
+            if ptx_path is not None:
+                cmd += [
+                    "--ptx", ptx_path,
+                ]
+            logger.debug(f"verifying nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
+            ret = subprocess.run(cmd, capture_output=True, text=True)
+            if ret.returncode != 0:
+                raise Exception(f"invalid solution (exit code: {ret.returncode}, stderr: {ret.stderr.strip()})")
+            
+            last_line = ret.stdout.strip().splitlines()[-1]
+            if not last_line.startswith("quality: "):
+                raise Exception(f"failed to find quality in tig-verifier output")
+            try:
+                quality = int(last_line[len("quality: "):])
+            except:
+                raise Exception(f"failed to parse quality from tig-verifier output")
+            logger.debug(f"batch {batch['id']}, nonce {nonce} valid solution with quality {quality}")
+            with open(output_file, "r") as f:
+                d = json.load(f)
+                d["quality"] = quality
+            with open(output_file, "w") as f:
+                json.dump(d, f)
             break
 
         elif batch["id"] not in PROCESSING_BATCH_IDS:
@@ -160,19 +158,13 @@ def compute_merkle_roots(results_dir):
             continue
 
         try:
+            solution_quality = []
             hashes = []
-            solution_nonces = []
-            discarded_solution_nonces = []
             for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"]):
                 with open(f"{results_dir}/{batch['id']}/{n}.json", "r") as f:
-                    d = OutputData.from_dict(json.load(f))
-                    h = d.to_merkle_hash()
-                    if len(d.solution) > 0:
-                        if h.to_str() <= batch["hash_threshold"]:
-                            solution_nonces.append(n)
-                        else:
-                            discarded_solution_nonces.append(n)
-                    hashes.append(d.to_merkle_hash())
+                    d = json.load(f)
+                    solution_quality.append(d.pop("quality"))
+                    hashes.append(OutputData.from_dict(d).to_merkle_hash())
 
             merkle_tree = MerkleTree(hashes, batch["batch_size"])
             with open(f"{results_dir}/{batch['id']}/hashes.zlib", "wb") as f:
@@ -180,11 +172,9 @@ def compute_merkle_roots(results_dir):
                 f.write(zlib.compress(json.dumps(hashes).encode()))
             with open(f"{results_dir}/{batch['id']}/result.json", "w") as f:
                 result = {
-                    "solution_nonces": solution_nonces,
-                    "discarded_solution_nonces": discarded_solution_nonces,
+                    "solution_quality": solution_quality,
                     "merkle_root": merkle_tree.calc_merkle_root().to_str(),
                 }
-                logger.debug(f"batch {batch['id']} result: {result}")
                 json.dump(result, f)
             logger.info(f"batch {batch['id']} done, took: {now() - start}ms")
             
@@ -231,31 +221,28 @@ def send_results(headers, master_ip, master_port, results_dir):
     output_folder = f"{results_dir}/{batch_id}"
     with open(f"{output_folder}/batch.json") as f:
         batch = json.load(f)
+    with open(f"{output_folder}/result.json") as f:
+        result = json.load(f)
 
-    if (
-        not os.path.exists(f"{output_folder}/result.json")
-        or not all(
-            os.path.exists(f"{output_folder}/{n}.json") 
-            for n in range(batch["start_nonce"], batch["start_nonce"] + batch["num_nonces"])
-        )
-        or not os.path.exists(f"{output_folder}/hashes.zlib")
-    ):
-        if os.path.exists(f"{output_folder}/result.json"):
+    if result.get("error") is not None:
+        if batch["sampled_nonces"] is None:
+            submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
+        else:
+            submit_url = f"http://{master_ip}:{master_port}/submit-batch-proofs/{batch_id}"
+        logger.info(f"posting error for failed batch to {submit_url}")
+        resp = requests.post(submit_url, headers=headers, json=result)
+        if resp.status_code == 200:
             os.remove(f"{output_folder}/result.json")
-        logger.debug(f"batch {batch_id} flagged as ready, but missing nonce files")
-        PENDING_BATCH_IDS.add(batch_id)
-        return
+            logger.info(f"successfully posted error for batch {batch_id}")
+        elif resp.status_code == 408: # took too long
+            os.remove(f"{output_folder}/result.json")
+            logger.error(f"status {resp.status_code} when posting error for batch {batch_id} to master: {resp.text}")
+        else:
+            logger.error(f"status {resp.status_code} when posting error for batch {batch_id} to master: {resp.text}")
+            READY_BATCH_IDS.add(batch_id) # requeue
+            time.sleep(2)
 
-    if batch["sampled_nonces"] is None:
-        with open(f"{output_folder}/result.json") as f:
-            result = json.load(f)
-        with open(f"{output_folder}/hashes.zlib", "rb") as f:
-            hashes = json.loads(zlib.decompress(f.read()).decode())
-        result["hashes"] = [
-            hashes[n - batch["start_nonce"]].lower()
-            for n in result["solution_nonces"]
-        ]
-
+    elif batch["sampled_nonces"] is None:
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
         logger.info(f"posting root to {submit_url}")
         resp = requests.post(submit_url, headers=headers, json=result)
@@ -367,11 +354,14 @@ def process_nonces(results_dir):
     logger.debug(f"batch {batch_id}, nonce {nonce} started")
     try:
         run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir)
-    except Exception as e:
-        logger.error(f"batch {batch_id}, nonce {nonce}, runtime error: {e}")
-    finally:
         job["finished"].add(nonce)
-
+    except Exception as e:
+        msg = f"batch {batch_id}, nonce {nonce}, runtime error: {e}"
+        logger.error(msg)
+        with open(f"{results_dir}/{batch['id']}/result.json", "w") as f:
+            json.dump({"error": msg}, f)
+        READY_BATCH_IDS.add(batch["id"])
+        PROCESSING_BATCH_IDS.pop(batch["id"], None)
 
 def poll_batches(headers, master_ip, master_port, results_dir):    
     get_batches_url = f"http://{master_ip}:{master_port}/get-batches"
