@@ -65,7 +65,7 @@ class PrecommitManager:
             avg_nonces_per_solution = (x["nonces"] // x["solutions"]) if x["solutions"] > 0 else 0
             logger.info(f"global qualifier difficulty stats for {challenges[c_id].details.name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
 
-    def run(self, difficulty_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
+    def run(self, size_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
         num_pending_jobs = get_db_conn().fetch_one(
             """
             SELECT COUNT(*) 
@@ -92,10 +92,11 @@ class PrecommitManager:
                 algorithm_id=a_id,
                 player_id=CONFIG["player_id"],
                 block_id=self.last_block_id,
-                difficulty=difficulty_samples[a_id]
+                size=size_samples[a_id]
             ),
             num_nonces=selection["num_nonces"],
-            hyperparameters=selection["hyperparameters"]
+            hyperparameters=selection["hyperparameters"],
+            runtime=selection["runtime"],
         )
-        logger.info(f"Created precommit (algorithm_id: {a_id}, difficulty: {req.settings.difficulty}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters})")
+        logger.info(f"Created precommit (algorithm_id: {a_id}, size: {req.settings.size}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters}, runtime: {req.runtime})")
         return req

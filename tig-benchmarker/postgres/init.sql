@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS job (
     challenge TEXT NOT NULL,
     algorithm TEXT NOT NULL,
     download_url TEXT NOT NULL,
-    hash_threshold TEXT NOT NULL,
-    average_solution_ratio FLOAT NOT NULL,
     block_started INTEGER NOT NULL,
     sampled_nonces JSONB,
     benchmark_submit_time BIGINT,
@@ -43,8 +41,8 @@ CREATE INDEX idx_job_stopped ON job(stopped);
 CREATE TABLE IF NOT EXISTS job_data (
     benchmark_id TEXT PRIMARY KEY,
     merkle_root TEXT,
-    solution_nonces JSONB,
-    discarded_solution_nonces JSONB,
+    solution_quality JSONB,
+    average_solution_quality INTEGER,
     merkle_proofs JSONB,
 
     FOREIGN KEY (benchmark_id) REFERENCES job(benchmark_id)
@@ -57,6 +55,7 @@ CREATE TABLE IF NOT EXISTS root_batch (
     start_time BIGINT,
     end_time BIGINT,
     ready BOOLEAN,
+    num_attempts INTEGER DEFAULT 0,
 
     PRIMARY KEY (benchmark_id, batch_idx),
     FOREIGN KEY (benchmark_id) REFERENCES job(benchmark_id)
@@ -77,6 +76,7 @@ CREATE TABLE IF NOT EXISTS proofs_batch (
     end_time BIGINT,
     sampled_nonces JSONB,
     ready BOOLEAN,
+    num_attempts INTEGER DEFAULT 0,
 
     PRIMARY KEY (benchmark_id, batch_idx),
     FOREIGN KEY (benchmark_id, batch_idx) REFERENCES root_batch(benchmark_id, batch_idx)
@@ -93,9 +93,8 @@ CREATE TABLE IF NOT EXISTS batch_data (
     benchmark_id TEXT,
     batch_idx INTEGER,
     merkle_root TEXT,
-    solution_nonces JSONB,
-    discarded_solution_nonces JSONB,
-    hashes JSONB,
+    solution_quality JSONB,
+    average_solution_quality INTEGER,
     merkle_proofs JSONB,
 
     PRIMARY KEY (benchmark_id, batch_idx),
@@ -117,50 +116,61 @@ SELECT '
     {
       "algorithm_id": "c001_a001",
       "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
+      "selected_sizes": [],
       "weight": 1,
       "batch_size": 8,
-      "hyperparameters": null
+      "hyperparameters": null,
+      "runtime": {
+        "fuel": 100000000000
+      }
     },
     {
       "algorithm_id": "c002_a001",
       "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
+      "selected_sizes": [],
       "weight": 1,
       "batch_size": 8,
-      "hyperparameters": null
+      "hyperparameters": null,
+      "runtime": {
+        "fuel": 100000000000
+      }
     },
     {
       "algorithm_id": "c003_a001",
       "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
+      "selected_sizes": [],
       "weight": 1,
       "batch_size": 8,
-      "hyperparameters": null
+      "hyperparameters": null,
+      "runtime": {
+        "fuel": 100000000000
+      }
     },
     {
       "algorithm_id": "c004_a001",
       "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
+      "selected_sizes": [],
       "weight": 1,
       "batch_size": 8,
-      "hyperparameters": null
+      "hyperparameters": null,
+      "runtime": {
+        "fuel": 100000000000
+      }
     },
     {
       "algorithm_id": "c005_a001",
       "num_nonces": 40,
-      "difficulty_range": [0, 0.5],
-      "selected_difficulties": [],
+      "selected_sizes": [],
       "weight": 1,
       "batch_size": 8,
-      "hyperparameters": null
+      "hyperparameters": null,
+      "runtime": {
+        "fuel": 100000000000
+      }
     }
   ],
   "time_before_batch_retry": 60000,
+  "max_batch_attempts": 3,
   "slaves": [
     {
       "name_regex": ".*",

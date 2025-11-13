@@ -88,19 +88,20 @@
         <th pSortableColumn="algorithm" class="tig-dark text-center">
           ALGORITHM
         </th>
-        <th pSortableColumn="difficulty " class="tig-dark text-center">
-          DIFFICULTY
+        <th pSortableColumn="size" class="tig-dark text-center">
+          INST. SIZE
         </th>
         <th pSortableColumn="batch_size" class="tig-dark text-center">
           BATCH SIZE
         </th>
 
         <th pSortableColumn="nonces" class="tig-dark text-center">#NONCES</th>
-        <th pSortableColumn="solutions" class="tig-dark text-center">
-          #SOLUTIONS (KEPT/DISCARDED)
+        <th pSortableColumn="quality" class="tig-dark text-center">
+          AVG SOLUTION QUALITY
         </th>
 
         <th pSortableColumn="status" class="tig-dark text-center">STATUS</th>
+        <th pSortableColumn="num_attempts" class="tig-dark text-center">#ATTEMPTS</th>
         <th pSortableColumn="time_elapsed" class="tig-dark text-center">
           ELAPSED
         </th>
@@ -142,7 +143,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
-            [{{ benchmark.difficulty }}]
+            [{{ benchmark.size }}]
           </div>
         </td>
         <td class="row-cell">
@@ -157,7 +158,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
-            {{ benchmark.num_solutions != null ? benchmark.num_solutions + ' / ' + benchmark.num_discarded_solutions : '' }}
+            {{ benchmark.average_solution_quality }}
           </div>
         </td>
 
@@ -217,7 +218,7 @@
                   </th>
 
                   <th pSortableColumn="amount" class="tig-dark text-center">
-                    #SOLUTIONS (KEPT/DISCARDED)
+                    AVG SOLUTION QUALITY
                   </th>
                   <th pSortableColumn="status" class="tig-dark text-center">
                     STATUS
@@ -255,7 +256,7 @@
                     <div
                       class="flex justify-content-center align-items-center tig-dark"
                     >
-                      {{ batch.end_time ? batch.num_solutions + ' / ' + batch.num_discarded_solutions : "" }}
+                      {{ batch.end_time ? batch.average_solution_quality : "" }}
                     </div>
                   </td>
                   <td>
@@ -273,6 +274,13 @@
                         [rounded]="true"
                         [value]="batch.status"
                       />
+                    </div>
+                  </td>
+                  <td>
+                    <div
+                      class="flex justify-content-center align-items-center tig-dark"
+                    >
+                      {{ batch.num_attempts }}
                     </div>
                   </td>
                   <td>

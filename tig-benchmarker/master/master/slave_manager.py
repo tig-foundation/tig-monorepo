@@ -34,6 +34,7 @@ class SlaveManager:
                         A.slave,
                         A.start_time,
                         A.end_time,
+                        A.num_attempts,
                         JSONB_BUILD_OBJECT(
                             'id', A.benchmark_id || '_' || A.batch_idx,
                             'benchmark_id', A.benchmark_id,
@@ -48,8 +49,7 @@ class SlaveManager:
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
                             'challenge', B.challenge,
-                            'algorithm', B.algorithm,
-                            'hash_threshold', B.hash_threshold
+                            'algorithm', B.algorithm
                         ) AS batch
                     FROM proofs_batch A
                     INNER JOIN job B
@@ -67,6 +67,7 @@ class SlaveManager:
                         A.slave,
                         A.start_time,
                         A.end_time,
+                        A.num_attempts,
                         JSONB_BUILD_OBJECT(
                             'id', A.benchmark_id || '_' || A.batch_idx,
                             'benchmark_id', A.benchmark_id,
@@ -81,8 +82,7 @@ class SlaveManager:
                             'batch_size', B.batch_size,
                             'batch_idx', A.batch_idx,
                             'challenge', B.challenge,
-                            'algorithm', B.algorithm,
-                            'hash_threshold', B.hash_threshold
+                            'algorithm', B.algorithm
                         ) AS batch
                     FROM root_batch A
                     INNER JOIN job B
@@ -133,16 +133,18 @@ class SlaveManager:
                     ):
                         b["slave"] = slave_name
                         b["start_time"] = now
+                        b["num_attempts"] += 1
                         table = "root_batch" if batch["sampled_nonces"] is None else "proofs_batch"
                         updates.append((
                             f"""
                             UPDATE {table}
                             SET slave = %s,
-                                start_time = %s
+                                start_time = %s,
+                                num_attempts = %s
                             WHERE benchmark_id = %s
                                 AND batch_idx = %s
                             """,
-                            (slave_name, now, batch["benchmark_id"], batch["batch_idx"])
+                            (slave_name, now, b["num_attempts"], batch["benchmark_id"], batch["batch_idx"])
                         ))
                         concurrent.append(batch)
             if len(concurrent) == 0:
@@ -170,68 +172,89 @@ class SlaveManager:
                         status_code=408, 
                         detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch."
                     )
-                b["end_time"] = time.time() * 1000
 
-            try:
-                result = await request.json()
-                merkle_root = MerkleHash.from_str(result["merkle_root"])
-                solution_nonces = result["solution_nonces"]
-                discarded_solution_nonces = result["discarded_solution_nonces"]
-                assert isinstance(solution_nonces, list) and all(isinstance(x, int) for x in solution_nonces)
-                assert isinstance(discarded_solution_nonces, list) and all(isinstance(x, int) for x in discarded_solution_nonces)
-                hashes = result["hashes"]
-                assert (
-                    isinstance(hashes, list) and 
-                    len(hashes) == len(solution_nonces) and
-                    all(
-                        isinstance(x, str) and 
-                        len(x) == 64 and
-                        x <= b["batch"]["hash_threshold"]
-                        for x in hashes
-                    )
-                )
-                logger.debug(f"slave {slave_name} submitted root for {batch_id}")
-            except Exception as e:
-                logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
-                raise HTTPException(status_code=400, detail="INVALID root")
+                try:
+                    result = await request.json()
+                    if (err := result.get("error")):
+                        b["slave"] = None
+                        logger.warning(f"slave {slave_name} reported failure for root {batch_id}: {err}")
+                    else:
+                        b["end_time"] = time.time() * 1000
+                        merkle_root = MerkleHash.from_str(result["merkle_root"])
+                        solution_quality = result["solution_quality"]
+                        assert isinstance(solution_quality, list) and all(isinstance(x, int) for x in solution_quality)
+                        logger.debug(f"slave {slave_name} submitted root for {batch_id}")
+                except Exception as e:
+                    logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
+                    raise HTTPException(status_code=400, detail="INVALID root")
             
-            # Update roots table with merkle root and solution nonces
+            # Update roots table with merkle root and solution quality
             benchmark_id, batch_idx = batch_id.split("_")
             batch_idx = int(batch_idx)
-            get_db_conn().execute_many(*[
-                (
-                    """
-                    UPDATE root_batch
-                    SET ready = true,
-                        end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
-                    WHERE benchmark_id = %s 
-                        AND batch_idx = %s
-                    """, 
+            queries = []
+            if err:
+                if b["num_attempts"] < CONFIG["max_batch_attempts"]:
+                    queries += [
+                        (
+                            """
+                            UPDATE root_batch
+                            SET slave = NULL
+                            WHERE benchmark_id = %s 
+                                AND batch_idx = %s
+                            """, 
+                            (
+                                benchmark_id,
+                                batch_idx
+                            )
+                        )
+                    ]
+                else:
+                    queries += [
+                        (
+                            """
+                            UPDATE job
+                            SET stopped = True
+                            WHERE benchmark_id = %s 
+                            """, 
+                            (
+                                benchmark_id,
+                            )
+                        )
+                    ]
+            else:
+                queries += [
                     (
-                        benchmark_id,
-                        batch_idx
-                    )
-                ),
-                (
-                    """
-                    UPDATE batch_data
-                    SET merkle_root = %s,
-                        solution_nonces = %s,
-                        discarded_solution_nonces = %s,
-                        hashes = %s
-                    WHERE benchmark_id = %s 
-                        AND batch_idx = %s                    
-                    """,
+                        """
+                        UPDATE root_batch
+                        SET ready = true,
+                            end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                        WHERE benchmark_id = %s 
+                            AND batch_idx = %s
+                        """, 
+                        (
+                            benchmark_id,
+                            batch_idx
+                        )
+                    ),
                     (
-                        merkle_root.to_str(),
-                        json.dumps(solution_nonces),
-                        json.dumps(discarded_solution_nonces),
-                        json.dumps(hashes),
-                        benchmark_id,
-                        batch_idx
+                        """
+                        UPDATE batch_data
+                        SET merkle_root = %s,
+                            solution_quality = %s,
+                            average_solution_quality = %s
+                        WHERE benchmark_id = %s 
+                            AND batch_idx = %s                    
+                        """,
+                        (
+                            merkle_root.to_str(),
+                            json.dumps(solution_quality),
+                            sum(solution_quality) // len(solution_quality),
+                            benchmark_id,
+                            batch_idx
+                        )
                     )
-                )
-            ])
+                ]
+            get_db_conn().execute_many(*queries)
 
             return {"status": "OK"}
 
@@ -254,44 +277,64 @@ class SlaveManager:
                         status_code=408, 
                         detail=f"Slave submitted proofs for {batch_id}, but either took too long, or was not assigned this batch."
                     )
-                b["end_time"] = time.time() * 1000
 
-            try:
-                result = await request.json()
-                merkle_proofs = [MerkleProof.from_dict(x) for x in result["merkle_proofs"]]
-                logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
-            except Exception as e:
-                logger.error(f"slave {slave_name} submitted INVALID proofs for {batch_id}: {e}")
-                raise HTTPException(status_code=400, detail="INVALID proofs")
+                try:
+                    result = await request.json()
+                    if (err := result.get("error")):
+                        b["slave"] = None
+                        logger.warning(f"slave {slave_name} reported failure for proofs {batch_id}: {err}")
+                    else:
+                        b["end_time"] = time.time() * 1000
+                        merkle_proofs = [MerkleProof.from_dict(x) for x in result["merkle_proofs"]]
+                        logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
+                except Exception as e:
+                    logger.error(f"slave {slave_name} submitted INVALID proofs for {batch_id}: {e}")
+                    raise HTTPException(status_code=400, detail="INVALID proofs")
 
             # Update proofs table with merkle proofs
             benchmark_id, batch_idx = batch_id.split("_")
             batch_idx = int(batch_idx)
-            get_db_conn().execute_many(*[
-                (
-                    """
-                    UPDATE proofs_batch
-                    SET ready = true,
-                        end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
-                    WHERE benchmark_id = %s 
-                        AND batch_idx = %s
-                    """, 
-                    (benchmark_id, batch_idx)
-                ),
-                (
-                    """
-                    UPDATE batch_data
-                    SET merkle_proofs = %s
-                    WHERE benchmark_id = %s 
-                        AND batch_idx = %s
-                    """, 
+            if err:
+                get_db_conn().execute_many(*[
                     (
-                        json.dumps([x.to_dict() for x in merkle_proofs]), 
-                        benchmark_id, 
-                        batch_idx
+                        """
+                        UPDATE proofs_batch
+                        SET slave = NULL
+                        WHERE benchmark_id = %s 
+                            AND batch_idx = %s
+                        """, 
+                        (
+                            benchmark_id,
+                            batch_idx
+                        )
                     )
-                )
-            ])
+                ])
+            else:
+                get_db_conn().execute_many(*[
+                    (
+                        """
+                        UPDATE proofs_batch
+                        SET ready = true,
+                            end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                        WHERE benchmark_id = %s 
+                            AND batch_idx = %s
+                        """, 
+                        (benchmark_id, batch_idx)
+                    ),
+                    (
+                        """
+                        UPDATE batch_data
+                        SET merkle_proofs = %s
+                        WHERE benchmark_id = %s 
+                            AND batch_idx = %s
+                        """, 
+                        (
+                            json.dumps([x.to_dict() for x in merkle_proofs]), 
+                            benchmark_id, 
+                            batch_idx
+                        )
+                    )
+                ])
 
             return {"status": "OK"}
             

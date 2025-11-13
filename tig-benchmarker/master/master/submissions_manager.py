@@ -16,14 +16,14 @@ class SubmitPrecommitRequest(FromDict):
     settings: BenchmarkSettings
     num_nonces: int
     hyperparameters: Optional[dict]
+    runtime: dict
 
 @dataclass
 class SubmitBenchmarkRequest(FromDict):
     benchmark_id: str
-    merkle_root: MerkleHash
-    non_solution_nonces: Optional[List[int]]
-    discarded_solution_nonces: Optional[List[int]]
-    solution_nonces: Optional[List[int]]
+    stopped: bool
+    merkle_root: Optional[MerkleHash]
+    solution_quality: Optional[List[int]]
 
 @dataclass
 class SubmitProofRequest(FromDict):
@@ -108,8 +108,8 @@ class SubmissionsManager:
                 WHERE benchmark_id IN (
                     SELECT benchmark_id 
                     FROM job
-                    WHERE merkle_root_ready
-                        AND stopped IS NULL
+                    WHERE (merkle_root_ready OR stopped)
+                        AND end_time IS NULL
                         AND benchmark_submitted IS NULL
                         AND (
                             benchmark_submit_time IS NULL 
@@ -118,14 +118,13 @@ class SubmissionsManager:
                     ORDER BY block_started
                     LIMIT 1
                 )
-                RETURNING benchmark_id, num_nonces
+                RETURNING benchmark_id, stopped
             )
             SELECT
                 A.benchmark_id, 
-                A.num_nonces,
+                A.stopped,
                 B.merkle_root,
-                B.solution_nonces,
-                B.discarded_solution_nonces
+                B.solution_quality
             FROM updated A
             INNER JOIN job_data B
                 ON A.benchmark_id = B.benchmark_id
@@ -135,31 +134,23 @@ class SubmissionsManager:
 
         if benchmark_to_submit:
             benchmark_id = benchmark_to_submit["benchmark_id"]
-            num_nonces = benchmark_to_submit["num_nonces"]
             merkle_root = benchmark_to_submit["merkle_root"] 
-            non_solution_nonces = list(
-                set(range(num_nonces)) - 
-                set(benchmark_to_submit["solution_nonces"]) - 
-                set(benchmark_to_submit["discarded_solution_nonces"])
-            )
-            solution_nonces = benchmark_to_submit["solution_nonces"]
-            discarded_solution_nonces = benchmark_to_submit["discarded_solution_nonces"]
+            solution_quality = benchmark_to_submit["solution_quality"]
 
-            max_size = max(len(non_solution_nonces), len(solution_nonces), len(discarded_solution_nonces))
-            if len(solution_nonces) == max_size:
-                solution_nonces = None
-            elif len(discarded_solution_nonces) == max_size:
-                discarded_solution_nonces = None
+            if benchmark_to_submit["stopped"]:
+                self._post_thread("benchmark", SubmitBenchmarkRequest(
+                    benchmark_id=benchmark_id,
+                    stopped=True,
+                    merkle_root=None,
+                    solution_quality=None,
+                ))
             else:
-                non_solution_nonces = None
-
-            self._post_thread("benchmark", SubmitBenchmarkRequest(
-                benchmark_id=benchmark_id,
-                merkle_root=merkle_root,
-                non_solution_nonces=non_solution_nonces,
-                solution_nonces=solution_nonces,
-                discarded_solution_nonces=discarded_solution_nonces,
-            ))
+                self._post_thread("benchmark", SubmitBenchmarkRequest(
+                    benchmark_id=benchmark_id,
+                    stopped=False,
+                    merkle_root=merkle_root,
+                    solution_quality=solution_quality,
+                ))
         else:
             logger.debug("no benchmark to submit")
 
