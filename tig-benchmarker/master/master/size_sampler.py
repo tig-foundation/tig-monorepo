@@ -27,7 +27,7 @@ class SizeSampler:
             c_id = a_id[:4]
             allowed_sizes = self.allowed_sizes[c_id]
 
-            selected_sizes = list(set(config["selected_sizes"]) & set(allowed_sizes))
+            selected_sizes = sorted(set(config["selected_sizes"]) & set(allowed_sizes))
             if len(selected_sizes) == 0:
                 selected_sizes = list(allowed_sizes)
             config["selected_sizes"] = selected_sizes

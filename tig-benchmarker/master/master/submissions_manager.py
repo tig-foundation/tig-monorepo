@@ -16,7 +16,7 @@ class SubmitPrecommitRequest(FromDict):
     settings: BenchmarkSettings
     num_nonces: int
     hyperparameters: Optional[dict]
-    runtime: dict
+    runtime_config: dict
 
 @dataclass
 class SubmitBenchmarkRequest(FromDict):

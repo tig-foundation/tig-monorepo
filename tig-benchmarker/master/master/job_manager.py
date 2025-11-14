@@ -91,7 +91,7 @@ class JobManager:
                         block_started,
                         start_time
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT)
                     ON CONFLICT (benchmark_id) DO NOTHING;
                     """,
                     (
@@ -282,23 +282,24 @@ class JobManager:
                     """
                     UPDATE job_data
                     SET merkle_root = %s, 
-                        solution_quality = %s
+                        solution_quality = %s,
+                        average_solution_quality = %s
                     WHERE benchmark_id = %s
                     """, 
                     (
                         merkle_root.to_str(), 
                         json.dumps(solution_quality),
+                        average_solution_quality,
                         benchmark_id
                     )
                 ),
                 (
                     """
                     UPDATE job
-                    SET merkle_root_ready = true,
-                        average_solution_quality = %s
+                    SET merkle_root_ready = true
                     WHERE benchmark_id = %s
                     """,
-                    (average_solution_quality, benchmark_id)
+                    (benchmark_id,)
                 )
             ])
             

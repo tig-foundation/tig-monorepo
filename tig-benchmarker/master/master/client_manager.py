@@ -167,8 +167,8 @@ class ClientManager:
                         benchmark_id,
                         JSONB_AGG(batch_data ORDER BY batch_idx) AS batches,
                         (
-                            SUM((batch_data->>'num_nonces')::INTEGER * (batch_data->>'average_solution_quality')::INTEGER) / 
-                            SUM((batch_data->>'num_nonces')::INTEGER)
+                            SUM((batch_data->>'num_nonces')::BIGINT * (batch_data->>'average_solution_quality')::BIGINT) / 
+                            SUM((batch_data->>'num_nonces')::BIGINT)
                         )::INTEGER AS average_solution_quality
                     FROM recent_batches
                     GROUP BY benchmark_id
