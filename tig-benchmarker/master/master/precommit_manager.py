@@ -96,7 +96,7 @@ class PrecommitManager:
             ),
             num_nonces=selection["num_nonces"],
             hyperparameters=selection["hyperparameters"],
-            runtime=selection["runtime"],
+            runtime_config=selection["runtime_config"],
         )
-        logger.info(f"Created precommit (algorithm_id: {a_id}, size: {req.settings.size}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters}, runtime: {req.runtime})")
+        logger.info(f"Created precommit (algorithm_id: {a_id}, size: {req.settings.size}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
         return req
