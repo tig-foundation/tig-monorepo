@@ -53,7 +53,7 @@ jobs:
           docker run --rm --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/dev:0.0.3 \
+            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/dev:0.0.4 \
             build_algorithm ${{ needs.init.outputs.ALGORITHM }}
 
       - name: Upload Artifact
@@ -77,7 +77,7 @@ jobs:
           docker run --rm --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/dev:0.0.3 \
+            ghcr.io/tig-foundation/tig-monorepo/${{ needs.init.outputs.CHALLENGE }}/dev:0.0.4 \
             build_algorithm ${{ needs.init.outputs.ALGORITHM }}
 
       - name: Upload Artifact
