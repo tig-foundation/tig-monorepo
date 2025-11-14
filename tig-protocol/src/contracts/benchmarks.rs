@@ -118,50 +118,13 @@ pub async fn submit_precommit<T: Context>(
 }
 
 #[time]
-pub async fn stop_benchmark<T: Context>(
-    ctx: &T,
-    player_id: String,
-    benchmark_id: String,
-) -> Result<()> {
-    // check benchmark is not duplicate
-    if ctx.get_benchmark_details(&benchmark_id).await.is_some() {
-        return Err(anyhow!("Duplicate benchmark: {}", benchmark_id));
-    }
-
-    // check player owns benchmark
-    let settings = ctx
-        .get_precommit_settings(&benchmark_id)
-        .await
-        .ok_or_else(|| anyhow!("Precommit does not exist: {}", benchmark_id))?;
-    if player_id != settings.player_id {
-        return Err(anyhow!(
-            "Invalid submitting player: {}. Expected: {}",
-            player_id,
-            settings.player_id
-        ));
-    }
-
-    ctx.add_benchmark_to_mempool(
-        benchmark_id,
-        BenchmarkDetails {
-            stopped: true,
-            average_solution_quality: None,
-            merkle_root: None,
-            sampled_nonces: None,
-        },
-        None,
-    )
-    .await?;
-    Ok(())
-}
-
-#[time]
 pub async fn submit_benchmark<T: Context>(
     ctx: &T,
     player_id: String,
     benchmark_id: String,
-    merkle_root: MerkleHash,
-    solution_quality: Vec<i32>,
+    stopped: bool,
+    merkle_root: Option<MerkleHash>,
+    solution_quality: Option<Vec<i32>>,
     seed: u64,
 ) -> Result<()> {
     // check benchmark is not duplicate
@@ -181,6 +144,29 @@ pub async fn submit_benchmark<T: Context>(
             settings.player_id
         ));
     }
+
+    if stopped {
+        ctx.add_benchmark_to_mempool(
+            benchmark_id,
+            BenchmarkDetails {
+                stopped: true,
+                average_solution_quality: None,
+                merkle_root: None,
+                sampled_nonces: None,
+            },
+            None,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    if merkle_root.is_none() || solution_quality.is_none() {
+        return Err(anyhow!(
+            "If you are not stopping the benchmark, the merkle root and solution quality must be submitted",
+        ));
+    }
+    let merkle_root = merkle_root.unwrap();
+    let solution_quality = solution_quality.unwrap();
 
     // check solution_quality length
     let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
