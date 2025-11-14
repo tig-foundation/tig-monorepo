@@ -238,10 +238,10 @@ impl Challenge {
             // }
             // let sota_solution = self.compute_sota_baseline()?;
             // let sota_total_distance = self.evaluate_total_distance(&sota_solution)?;
-            let quality = ((sota_total_distance - total_distance) as f64
-                / sota_total_distance as f64
-                * QUALITY_PRECISION as f64)
-                .round() as i32;
+            let quality =
+                (sota_total_distance as f64 - total_distance as f64) / sota_total_distance as f64;
+            let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
+            let quality = quality.round() as i32;
             Ok(quality)
         }
     );

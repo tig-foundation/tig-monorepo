@@ -164,9 +164,9 @@ impl Challenge {
             // }
             // let sota_solution = self.compute_sota_baseline()?;
             // let sota_total_value = self.evaluate_total_value(&sota_solution)?;
-            let quality = ((total_value - sota_total_value) as f64 / sota_total_value as f64
-                * QUALITY_PRECISION as f64)
-                .round() as i32;
+            let quality = (total_value as f64 - sota_total_value as f64) / sota_total_value as f64;
+            let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
+            let quality = quality.round() as i32;
             Ok(quality)
         }
     );
