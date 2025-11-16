@@ -62,6 +62,7 @@ if __name__ == "__main__":
     parser.add_argument("--nonces", type=int, default=100, help="Number of nonces to process (default: 100)")
     parser.add_argument("--fuel", type=int, default=int(100e9), help="Max fuel (default: 100 billion)")
     parser.add_argument("--workers", type=int, default=1, help="Number of worker threads (default: 1)")
+    parser.add_argument("--ignore-invalid", action='store_true', help="Continue testing even if invalid solutions are encountered")
     parser.add_argument("--verbose", action='store_true', help="Print debug logs")
     
     args = parser.parse_args()
@@ -110,27 +111,32 @@ f"""Library not found at {so_path}:
         start = now()
         while True:
             time.sleep(0.5)
-            num_processing, num_finished, num_solutions, num_invalid, num_no_output = 0, 0, 0, 0, 0
-            for (_, _, status) in results.values():
-                if status is None:
+            num_processing, num_finished, num_invalid = 0, 0, 0
+            total_quality = 0
+            for (_, _, ok, quality) in results.values():
+                if ok is None:
                     num_processing += 1
-                else:
+                elif ok:
                     num_finished += 1
-                    num_solutions += int(status == 0)
-                    num_no_output += int(status == 1)
-                    num_invalid += int(status == 2)
+                    total_quality += quality
+                else:
+                    num_invalid += 1
             
             elapsed = (now() - start) / 1000
-            solution_ratio = num_solutions / (num_finished or 1)
-            solution_rate = num_solutions / elapsed
-            score = solution_rate * solution_ratio
-            out = f"#processing: {num_processing}, #finished: {num_finished} - (#solutions: {num_solutions}, #invalid: {num_invalid}, #no_output: {num_no_output}), elapsed: {elapsed:.2f}s, solution_ratio: {solution_ratio:.4f}, solution_rate: {solution_rate:.4f}, score: {score:.4f}"
+            avg_quality = (total_quality // num_finished) if num_finished > 0 else 0
+            out = f"#processing: {num_processing}, #finished: {num_finished}, #invalid: {num_invalid}, elapsed: {elapsed:.2f}s, avg_quality: {avg_quality:,}       "
             if args.verbose:
                 print(out)
             else:
                 print(f"\r{out}", end="")
             
             if num_finished == args.nonces:
+                break
+            if num_invalid > 0 and not args.ignore_invalid:
+                print()
+                print("Invalid solution encountered. Stopping tests")
+                print("To continue testing despite invalid solutions, use the --ignore-invalid flag.")
+                print("Note: Invalid solutions will cause actual benchmarks to fail")
                 break
         if not args.verbose:
             print("\n")
@@ -158,7 +164,7 @@ f"""Library not found at {so_path}:
             if args.verbose:
                 print(f"[nonce {nonce}]: {' '.join(cmd[:1] + [f"'{cmd[1]}'"] + cmd[2:])}")
             start = now()
-            results[nonce] = (start, None, None)
+            results[nonce] = (start, None, None, None)
             ret = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, universal_newlines=True)
             for line in ret.stdout:
                 if args.verbose:
@@ -201,16 +207,21 @@ f"""Library not found at {so_path}:
                 if ret2.returncode != 0:
                     out += ret2.stderr.read()
                 print(out)
-            if ret2.returncode == 0:
-                status = 0 # solution
-            elif not os.path.exists(output_file):
-                status = 1 # no solution
-            else:
-                status = 2 # invalid solution
-            results[nonce] = (start, elapsed, status)
+            ok = ret2.returncode == 0
+            quality = None
+            if ok:
+                line = line.strip()
+                assert line.startswith("quality: ")
+                quality = int(line[len("quality: "):])
+            results[nonce] = (start, elapsed, ok, quality)
+            if not ok and not args.ignore_invalid:
+                raise RuntimeError
 
     nonces = list(range(args.start, args.start + args.nonces))
     if args.verbose:
         print(f"Processing {len(nonces)} nonces with {args.workers} workers...")
     pool.submit(print_results)
-    list(pool.map(run_tig_runtime, nonces))
+    try:
+        list(pool.map(run_tig_runtime, nonces))
+    except RuntimeError as e:
+        pass
