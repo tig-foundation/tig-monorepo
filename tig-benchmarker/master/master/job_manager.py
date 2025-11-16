@@ -223,9 +223,9 @@ class JobManager:
         get_db_conn().execute(
             """
             UPDATE job
-            SET stopped = true
-            WHERE end_time IS NULL
-                AND stopped IS NULL
+            SET stopped = true,
+                end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+            WHERE (stopped IS NULL OR end_time IS NULL)
                 AND %s >= block_started + 120
             """,
             (block.details.height,)
