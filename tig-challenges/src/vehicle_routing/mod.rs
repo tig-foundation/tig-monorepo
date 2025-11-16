@@ -131,7 +131,7 @@ impl Challenge {
             }
         }
 
-        Ok(Challenge {
+        let mut c = Challenge {
             seed: seed.clone(),
             num_nodes,
             demands,
@@ -142,7 +142,10 @@ impl Challenge {
             service_time,
             ready_times,
             due_times,
-        })
+        };
+
+        c.fleet_size = c.compute_greedy_baseline()?.routes.len() + 2;
+        Ok(c)
     }
 
     pub fn evaluate_total_distance(&self, solution: &Solution) -> Result<i32> {
