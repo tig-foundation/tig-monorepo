@@ -18,54 +18,11 @@ class PrecommitManager:
         self.algorithm_name_2_id = {}
         self.challenge_name_2_id = {}
 
-    def on_new_block(
-        self,
-        block: Block,
-        precommits: Dict[str, Precommit],
-        benchmarks: Dict[str, Benchmark],
-        challenges: Dict[str, Challenge],
-        difficulty_data: Dict[str, List[DifficultyData]],
-        **kwargs
-    ):
+    def on_new_block(self, block: Block, **kwargs):
         self.last_block_id = block.id
         self.num_precommits_submitted = 0
-        benchmark_stats_by_challenge = {
-            c.details.name: {
-                "solutions": 0,
-                "nonces": 0,
-                "qualifiers": 0
-            }
-            for c in challenges.values()
-            if c.block_data is not None
-        }
-        for benchmark in benchmarks.values():
-            precommit = precommits[benchmark.id]
-            c_name = challenges[precommit.settings.challenge_id].details.name
-            benchmark_stats_by_challenge[c_name]["solutions"] += benchmark.details.num_solutions
-            benchmark_stats_by_challenge[c_name]["nonces"] += precommit.details.num_nonces
 
-        for c_name, x in benchmark_stats_by_challenge.items():
-            avg_nonces_per_solution = (x["nonces"] // x["solutions"]) if x["solutions"] > 0 else 0
-            logger.info(f"benchmark stats for {c_name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, #qualifiers: {x['qualifiers']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
-
-        aggregate_difficulty_data = {
-            c_id: {
-                "nonces": sum(
-                    x.num_nonces if x.difficulty in challenges[c_id].block_data.qualifier_difficulties else 0
-                    for x in difficulty_data
-                ),
-                "solutions": sum(
-                    x.num_solutions if x.difficulty in challenges[c_id].block_data.qualifier_difficulties else 0
-                    for x in difficulty_data
-                ),
-            }
-            for c_id, difficulty_data in difficulty_data.items()
-        }
-        for c_id, x in aggregate_difficulty_data.items():
-            avg_nonces_per_solution = (x["nonces"] // x["solutions"]) if x["solutions"] > 0 else 0
-            logger.info(f"global qualifier difficulty stats for {challenges[c_id].details.name}: (#nonces: {x['nonces']}, #solutions: {x['solutions']}, avg_nonces_per_solution: {avg_nonces_per_solution})")
-
-    def run(self, size_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
+    def run(self, race_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
         num_pending_jobs = get_db_conn().fetch_one(
             """
             SELECT COUNT(*) 
@@ -92,11 +49,11 @@ class PrecommitManager:
                 algorithm_id=a_id,
                 player_id=CONFIG["player_id"],
                 block_id=self.last_block_id,
-                size=size_samples[a_id]
+                race_id=race_samples[a_id]
             ),
             num_nonces=selection["num_nonces"],
             hyperparameters=selection["hyperparameters"],
             runtime_config=selection["runtime_config"],
         )
-        logger.info(f"Created precommit (algorithm_id: {a_id}, size: {req.settings.size}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
+        logger.info(f"Created precommit (algorithm_id: {a_id}, race: {req.settings.race_id}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
         return req

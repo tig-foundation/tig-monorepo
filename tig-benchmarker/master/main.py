@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from master.data_fetcher import *
-from master.size_sampler import *
+from master.race_sampler import *
 from master.job_manager import *
 from master.precommit_manager import *
 from master.slave_manager import *
@@ -19,7 +19,7 @@ def main():
     client_manager.start()
 
     data_fetcher = DataFetcher()
-    size_sampler = SizeSampler()
+    race_sampler = RaceSampler()
     job_manager = JobManager()
     precommit_manager = PrecommitManager()
     submissions_manager = SubmissionsManager()
@@ -33,12 +33,12 @@ def main():
             if data["block"].id != last_block_id:
                 last_block_id = data["block"].id
                 client_manager.on_new_block(**data)
-                size_sampler.on_new_block(**data)
+                race_sampler.on_new_block(**data)
                 job_manager.on_new_block(**data)
                 submissions_manager.on_new_block(**data)
                 precommit_manager.on_new_block(**data)
             job_manager.run()
-            samples = size_sampler.run()
+            samples = race_sampler.run()
             submit_precommit_req = precommit_manager.run(samples)
             submissions_manager.run(submit_precommit_req)
             slave_manager.run()
