@@ -1,7 +1,7 @@
 use crate::context::*;
 use logging_timer::time;
 use std::collections::{HashMap, HashSet};
-use tig_structs::{config::*, core::*};
+use tig_structs::core::*;
 use tig_utils::*;
 
 const EPSILON: f64 = 1e-9;
@@ -77,18 +77,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     // update qualifiers
-    let mut benchmarks_by_challenge =
-        HashMap::<String, Vec<(&BenchmarkSettings, &i32, &u64, Point)>>::new();
+    let mut benchmarks_by_challenge_by_race =
+        HashMap::<String, HashMap<String, Vec<(&BenchmarkSettings, &i32, &u64)>>>::new();
     for (settings, average_solution_quality, num_nonces) in active_benchmarks.iter() {
-        benchmarks_by_challenge
+        benchmarks_by_challenge_by_race
             .entry(settings.challenge_id.clone())
             .or_default()
-            .push((
-                settings,
-                average_solution_quality,
-                num_nonces,
-                vec![settings.size as i32, average_solution_quality.clone()],
-            ));
+            .entry(settings.race_id.clone())
+            .or_default()
+            .push((settings, average_solution_quality, num_nonces));
     }
 
     let max_qualifiers_by_player = active_opow_ids
@@ -102,41 +99,30 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         .collect::<HashMap<String, u64>>();
 
     for challenge_id in active_challenge_ids.iter() {
-        if !benchmarks_by_challenge.contains_key(challenge_id) {
+        if !benchmarks_by_challenge_by_race.contains_key(challenge_id) {
             continue;
         }
         let challenge_config = &config.challenges[challenge_id];
-        let benchmarks = benchmarks_by_challenge.get_mut(challenge_id).unwrap();
-        let points = benchmarks
-            .iter()
-            .map(|(_, _, _, difficulty)| difficulty.clone())
-            .collect::<Frontier>();
-        let mut frontier_indexes = HashMap::<Point, usize>::new();
-        for (frontier_index, frontier) in pareto_algorithm(&points, false).into_iter().enumerate() {
-            for point in frontier {
-                frontier_indexes.insert(point, frontier_index);
-            }
-        }
-        let mut benchmarks_by_frontier_idx =
-            HashMap::<usize, Vec<&(&BenchmarkSettings, &i32, &u64, Point)>>::new();
-        for x in benchmarks.iter() {
-            benchmarks_by_frontier_idx
-                .entry(frontier_indexes[&x.3])
-                .or_default()
-                .push(x);
-        }
+        let benchmarks = benchmarks_by_challenge_by_race
+            .get_mut(challenge_id)
+            .unwrap();
+        benchmarks
+            .values_mut()
+            .for_each(|v| v.sort_by_key(|(_, &quality, _)| -quality));
+        let max_frontier_idx = benchmarks.values().map(|v| v.len()).max().unwrap();
 
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
         let mut player_code_nonces = HashMap::<String, HashMap<String, u64>>::new();
         let mut player_nonces = HashMap::<String, u64>::new();
 
-        for frontier_idx in 0..benchmarks_by_frontier_idx.len() {
-            for (settings, _, &num_nonces, difficulty) in
-                benchmarks_by_frontier_idx[&frontier_idx].iter()
+        for frontier_idx in 0..max_frontier_idx {
+            for (settings, &quality, &num_nonces) in
+                benchmarks.values().filter_map(|v| v.get(frontier_idx))
             {
                 let BenchmarkSettings {
                     player_id,
                     algorithm_id,
+                    race_id,
                     ..
                 } = settings;
 
@@ -148,8 +134,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 *player_nonces.entry(player_id.clone()).or_default() += num_nonces;
 
                 challenge_data
-                    .qualifier_difficulties
-                    .insert(difficulty.clone());
+                    .qualifier_qualities
+                    .entry(race_id.clone())
+                    .or_default()
+                    .push(quality);
             }
 
             // check if we have enough qualifiers
@@ -164,8 +152,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .collect();
 
             let num_qualifiers = player_qualifiers.values().sum::<u64>();
-            if num_qualifiers >= challenge_config.difficulty.total_qualifiers_threshold
-                || frontier_idx == benchmarks_by_frontier_idx.len() - 1
+            if num_qualifiers >= challenge_config.total_qualifiers_threshold
+                || frontier_idx == max_frontier_idx - 1
             {
                 for player_id in player_qualifiers.keys() {
                     let opow_data = active_opow_block_data.get_mut(player_id).unwrap();

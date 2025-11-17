@@ -53,46 +53,37 @@ pub async fn submit_precommit<T: Context>(
 
     // verify size
     let challenge_config = &config.challenges[&settings.challenge_id];
-    if challenge_config
-        .difficulty
-        .allowed_sizes
-        .binary_search(&settings.size)
-        .is_err()
-    {
-        return Err(anyhow!(
-            "Invalid size '{}'. Must be one of {:?}",
-            settings.size,
-            challenge_config.difficulty.allowed_sizes
-        ));
+    if !challenge_config.active_race_ids.contains(&settings.race_id) {
+        return Err(anyhow!("Invalid race_id '{}'", settings.race_id));
     }
 
-    if num_nonces < challenge_config.benchmarks.min_num_nonces {
+    if num_nonces < challenge_config.min_num_nonces {
         return Err(anyhow!(
             "Invalid num_nonces '{}'. Must be >= {}",
             num_nonces,
-            challenge_config.benchmarks.min_num_nonces
+            challenge_config.min_num_nonces
         ));
     }
 
-    if runtime_config.max_memory > challenge_config.benchmarks.runtime_config_limits.max_memory {
+    if runtime_config.max_memory > challenge_config.runtime_config_limits.max_memory {
         return Err(anyhow!(
             "Invalid runtime_config.max_memory '{}'. Must be <= {}",
             runtime_config.max_memory,
-            challenge_config.benchmarks.runtime_config_limits.max_memory
+            challenge_config.runtime_config_limits.max_memory
         ));
     }
 
-    if runtime_config.max_fuel > challenge_config.benchmarks.runtime_config_limits.max_fuel {
+    if runtime_config.max_fuel > challenge_config.runtime_config_limits.max_fuel {
         return Err(anyhow!(
             "Invalid runtime_config.max_fuel '{}'. Must be <= {}",
             runtime_config.max_fuel,
-            challenge_config.benchmarks.runtime_config_limits.max_fuel
+            challenge_config.runtime_config_limits.max_fuel
         ));
     }
 
     // verify player has sufficient balance
-    let submission_fee = challenge_config.benchmarks.base_fee
-        + challenge_config.benchmarks.per_nonce_fee * PreciseNumber::from(num_nonces);
+    let submission_fee = challenge_config.base_fee
+        + challenge_config.per_nonce_fee * PreciseNumber::from(num_nonces);
     if !ctx
         .get_player_state(&player_id)
         .await
@@ -180,9 +171,7 @@ pub async fn submit_benchmark<T: Context>(
     // random sample nonces
     let config = ctx.get_config().await;
     let mut rng = StdRng::seed_from_u64(seed);
-    let max_samples = config.challenges[&settings.challenge_id]
-        .benchmarks
-        .max_samples;
+    let max_samples = config.challenges[&settings.challenge_id].max_samples;
     let mut sampled_nonces = HashSet::new();
     for _ in 0..25 {
         if sampled_nonces.len() == max_samples {

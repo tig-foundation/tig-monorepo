@@ -8,6 +8,13 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 
+impl_kv_string_serde! {
+    Race {
+        num_variables: usize,
+        clauses_to_variables_percent: u32
+    }
+}
+
 impl_base64_serde! {
     Solution {
         variables: Vec<bool>,
@@ -30,11 +37,13 @@ pub struct Challenge {
 }
 
 impl Challenge {
-    pub fn generate_instance(seed: &[u8; 32], num_variables: usize) -> Result<Self> {
+    pub fn generate_instance(seed: &[u8; 32], race: &Race) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).gen());
-        let num_clauses = (num_variables as f64 * 4.267).floor() as usize;
+        let num_clauses = (race.num_variables as f64 * race.clauses_to_variables_percent as f64
+            / 100.0)
+            .floor() as usize;
 
-        let var_distr = Uniform::new(1, num_variables as i32 + 1);
+        let var_distr = Uniform::new(1, race.num_variables as i32 + 1);
         // Create a uniform distribution for negations.
         let neg_distr = Uniform::new(0, 2);
 
@@ -61,7 +70,7 @@ impl Challenge {
 
         Ok(Self {
             seed: seed.clone(),
-            num_variables,
+            num_variables: race.num_variables.clone(),
             clauses,
         })
     }
