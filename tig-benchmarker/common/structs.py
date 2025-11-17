@@ -43,7 +43,7 @@ class BenchmarkSettings(FromDict):
     block_id: str
     challenge_id: str
     algorithm_id: str
-    size: int
+    race_id: str
 
     def calc_seed(self, rand_hash: str, nonce: int) -> bytes:
         return u8s_from_str(f"{jsonify(self)}_{rand_hash}_{nonce}")
@@ -274,9 +274,9 @@ class TopUp(FromDict):
 
 @dataclass
 class DifficultyData(FromDict):
-    num_solutions: int
+    average_solution_quality: int
     num_nonces: int
-    difficulty: Point
+    algorithm_id: str
 
 @dataclass
 class DepositDetails(FromDict):

@@ -71,7 +71,10 @@ class DataFetcher:
             difficulty_responses = list(executor.map(_get, difficulty_urls))
         
         difficulty_data = {
-            c_id: [DifficultyData.from_dict(d) for d in resp.get("data", [])]
+            c_id: {
+                race_id: [DifficultyData.from_dict(x) for x in v]
+                for race_id, v in resp["data"].items()
+            }
             for c_id, resp in zip(challenges, difficulty_responses)
         }
 
