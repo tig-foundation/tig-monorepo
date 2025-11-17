@@ -2,7 +2,8 @@
 
 // c003_a002
 
-// c003_a003
+pub mod quadkp_improved;
+pub use quadkp_improved as c003_a003;
 
 // c003_a004
 
