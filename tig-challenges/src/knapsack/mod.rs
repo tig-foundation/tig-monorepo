@@ -6,6 +6,12 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashSet;
 
+impl_kv_string_serde! {
+    Race {
+        num_items: usize,
+    }
+}
+
 impl_base64_serde! {
     Solution {
         items: Vec<usize>,
@@ -29,16 +35,16 @@ pub struct Challenge {
 }
 
 impl Challenge {
-    pub fn generate_instance(seed: &[u8; 32], num_items: usize) -> Result<Self> {
+    pub fn generate_instance(seed: &[u8; 32], race: &Race) -> Result<Self> {
         let mut rng = SmallRng::from_seed(seed.clone());
         // Set constant density for value generation
         let density = 0.25;
 
         // Generate weights w_i in the range [1, 50]
-        let weights: Vec<u32> = (0..num_items).map(|_| rng.gen_range(1..=50)).collect();
+        let weights: Vec<u32> = (0..race.num_items).map(|_| rng.gen_range(1..=50)).collect();
 
         // Generate values v_i in the range [1, 100] with density probability, 0 otherwise
-        let values: Vec<u32> = (0..num_items)
+        let values: Vec<u32> = (0..race.num_items)
             .map(|_| {
                 if rng.gen_bool(density) {
                     rng.gen_range(1..=100)
@@ -52,10 +58,10 @@ impl Challenge {
         // - V_ij == V_ji (symmetric matrix)
         // - V_ii == 0 (diagonal is zero)
         // - Values are in range [1, 100] with density probability, 0 otherwise
-        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; num_items]; num_items];
+        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; race.num_items]; race.num_items];
 
-        for i in 0..num_items {
-            for j in (i + 1)..num_items {
+        for i in 0..race.num_items {
+            for j in (i + 1)..race.num_items {
                 let value = if rng.gen_bool(density) {
                     rng.gen_range(1..=100)
                 } else {
@@ -72,7 +78,7 @@ impl Challenge {
 
         Ok(Challenge {
             seed: seed.clone(),
-            num_items,
+            num_items: race.num_items.clone(),
             weights,
             values,
             interaction_values,

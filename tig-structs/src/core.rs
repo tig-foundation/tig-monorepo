@@ -150,7 +150,7 @@ serializable_struct_with_getters! {
         block_id: String,
         challenge_id: String,
         algorithm_id: String,
-        size: usize,
+        race_id: String,
     }
 }
 impl BenchmarkSettings {
@@ -291,7 +291,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     ChallengeBlockData {
         num_qualifiers: u64,
-        qualifier_difficulties: HashSet<Point>,
+        qualifier_qualities: HashMap<String, Vec<i32>>,
     }
 }
 

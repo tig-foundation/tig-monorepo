@@ -64,7 +64,14 @@ pub fn verify_solution(
 
     macro_rules! dispatch_challenge {
         ($c:ident, cpu) => {{
-            let challenge = $c::Challenge::generate_instance(&seed, settings.size).unwrap();
+            let race = dejsonify(&settings.race_id).map_err(|_| {
+                anyhow::anyhow!(
+                    "Failed to parse race_id '{}' as {}::Race",
+                    settings.race_id,
+                    stringify!($c)
+                )
+            })?;
+            let challenge = $c::Challenge::generate_instance(&seed, &race).unwrap();
             if verbose {
                 println!("{:?}", challenge);
             }

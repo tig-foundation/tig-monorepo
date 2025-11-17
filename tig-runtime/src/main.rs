@@ -116,7 +116,14 @@ pub fn compute_solution(
                 ) -> Result<()>>(b"entry_point")?
             };
 
-            let challenge = $c::Challenge::generate_instance(&seed, settings.size)?;
+            let race = dejsonify(&settings.race_id).map_err(|_| {
+                anyhow::anyhow!(
+                    "Failed to parse race_id '{}' as {}::Race",
+                    settings.race_id,
+                    stringify!($c)
+                )
+            })?;
+            let challenge = $c::Challenge::generate_instance(&seed, &race)?;
 
             let save_solution_fn = |solution: &$c::Solution| -> Result<()> {
                 let fuel_consumed = (max_fuel
