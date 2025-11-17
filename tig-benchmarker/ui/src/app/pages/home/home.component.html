@@ -142,11 +142,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
-            {{ benchmark.race_id
-                | replace('=', ': ')
-                | replace(',', '<br>') 
-                | safe
-            }}
+            [innerHTML]="formatRaceId(benchmark.race_id)">
           </div>
         </td>
         <td class="row-cell">
