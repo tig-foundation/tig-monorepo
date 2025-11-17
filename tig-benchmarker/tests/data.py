@@ -27,7 +27,7 @@ class TestData(unittest.TestCase):
             block_id="some_block",
             challenge_id="some_challenge",
             algorithm_id="some_algorithm",
-            difficulty=[1, 2, 3]
+            race_id="a=1,b=2"
         )
 
         rand_hash = "random_hash"
@@ -35,8 +35,8 @@ class TestData(unittest.TestCase):
 
         # Assert same as Rust version: tig-structs/tests/core.rs
         expected = bytes([
-            135, 168, 152, 35, 57, 28, 184, 91, 10, 189, 139, 111, 171, 82, 156, 14, 
-            165, 68, 80, 41, 169, 236, 42, 41, 198, 73, 124, 78, 130, 216, 168, 67
+            122, 94, 247, 46, 146, 71, 140, 234, 78, 160, 235, 180, 79, 32, 69, 205, 247, 91, 94,
+            43, 231, 184, 120, 114, 182, 226, 24, 176, 227, 170, 72, 31
         ])
         self.assertEqual(settings.calc_seed(rand_hash, nonce), expected)
 

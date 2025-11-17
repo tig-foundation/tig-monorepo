@@ -88,8 +88,8 @@
         <th pSortableColumn="algorithm" class="tig-dark text-center">
           ALGORITHM
         </th>
-        <th pSortableColumn="size" class="tig-dark text-center">
-          INST. SIZE
+        <th pSortableColumn="race_id" class="tig-dark text-center">
+          RACE
         </th>
         <th pSortableColumn="batch_size" class="tig-dark text-center">
           BATCH SIZE
@@ -142,7 +142,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
-            [{{ benchmark.size }}]
+            [innerHTML]="formatRaceId(benchmark.race_id)">
           </div>
         </td>
         <td class="row-cell">

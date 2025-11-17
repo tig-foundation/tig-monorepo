@@ -116,7 +116,7 @@ SELECT '
     {
       "algorithm_id": "c001_a001",
       "num_nonces": 40,
-      "selected_sizes": [],
+      "selected_races": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -128,7 +128,7 @@ SELECT '
     {
       "algorithm_id": "c002_a001",
       "num_nonces": 40,
-      "selected_sizes": [],
+      "selected_races": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -140,7 +140,7 @@ SELECT '
     {
       "algorithm_id": "c003_a001",
       "num_nonces": 40,
-      "selected_sizes": [],
+      "selected_races": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -152,7 +152,7 @@ SELECT '
     {
       "algorithm_id": "c004_a001",
       "num_nonces": 40,
-      "selected_sizes": [],
+      "selected_races": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -164,7 +164,7 @@ SELECT '
     {
       "algorithm_id": "c005_a001",
       "num_nonces": 40,
-      "selected_sizes": [],
+      "selected_races": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -176,7 +176,7 @@ SELECT '
     {
       "algorithm_id": "c006_a001",
       "num_nonces": 40,
-      "selected_sizes": [],
+      "selected_races": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,

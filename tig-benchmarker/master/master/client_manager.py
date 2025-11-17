@@ -177,7 +177,7 @@ class ClientManager:
                     B.benchmark_id,
                     B.challenge,
                     B.algorithm,
-                    (B.settings->>'size')::INTEGER AS size,
+                    B.settings->>'race_id' as race_id,
                     B.batch_size,
                     B.num_nonces,
                     COALESCE(C.average_solution_quality, A.average_solution_quality) AS average_solution_quality,
