@@ -123,11 +123,4 @@ export class HomeComponent {
       clearInterval(this.interval);
     }
   }
-  
-  formatRaceId(value: string): string {
-    if (!value) return '';
-    return value
-      .replace(/=/g, ': ')
-      .replace(/,/g, '<br>');
-  }
 }

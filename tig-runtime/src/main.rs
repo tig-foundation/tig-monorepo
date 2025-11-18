@@ -116,7 +116,12 @@ pub fn compute_solution(
                 ) -> Result<()>>(b"entry_point")?
             };
 
-            let race = dejsonify(&settings.race_id).map_err(|_| {
+            let race_id = if settings.race_id.starts_with('"') && settings.race_id.ends_with('"') {
+                settings.race_id.clone()
+            } else {
+                format!(r#""{}""#, settings.race_id)
+            };
+            let race = serde_json::from_str(&race_id).map_err(|_| {
                 anyhow::anyhow!(
                     "Failed to parse race_id '{}' as {}::Race",
                     settings.race_id,
