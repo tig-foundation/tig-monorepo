@@ -1,7 +1,8 @@
 pub mod neural_alchemist;
 pub use neural_alchemist as c006_a001;
 
-// c006_a002
+pub mod nn_iza;
+pub use nn_iza as c006_a002;
 
 pub mod adamlaterrt;
 pub use adamlaterrt as c006_a003;
