@@ -186,7 +186,7 @@ class ChallengeState(FromDict):
 @dataclass
 class ChallengeBlockData(FromDict):
     num_qualifiers: int
-    qualifier_difficulties: Set[Point]
+    qualifier_qualities: Dict[str, List[int]]
 
 @dataclass
 class Challenge(FromDict):
