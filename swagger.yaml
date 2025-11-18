@@ -651,6 +651,10 @@ components:
       type: string
       pattern: ^c[0-9]{3}_a[0-9]{3}$
       example: c002_a001
+    RaceId:
+      type: string
+      pattern: ^\w+=\w+(,\w+=\w+)*$
+      example: num_variables=100,clauses_to_variables_percent=426
     Name:
       type: string
       pattern: ^[a-z][a-z_]{4,19}$
@@ -732,8 +736,8 @@ components:
           $ref: '#/components/schemas/ChallengeId'
         algorithm_id:
           $ref: '#/components/schemas/AlgorithmId'
-        difficulty:
-          $ref: '#/components/schemas/Difficulty'
+        race_id:
+          $ref: '#/components/schemas/RaceId'
     BenchmarkState:
       type: object
       properties:
@@ -1019,26 +1023,13 @@ components:
         num_qualifiers:
           type: integer
           format: uint64
-        average_solution_ratio:
-          type: number
-          format: double
-        qualifier_difficulties:
-          type: array
-          items:
-            $ref: '#/components/schemas/Difficulty'
-        base_frontier:
-          $ref: '#/components/schemas/Frontier'
-        scaled_frontier:
-          $ref: '#/components/schemas/Frontier'
-        scaling_factor:
-          type: number
-          format: double
-        base_fee:
-          $ref: '#/components/schemas/PreciseNumber'
-        per_nonce_fee:
-          $ref: '#/components/schemas/PreciseNumber'
-        hash_threshold:
-          $ref: '#/components/schemas/MerkleHash' 
+        qualifier_qualities:
+          description: "Map<RaceId, int32[]>"
+          additionalProperties:
+            type: array
+            items:
+              type: integer
+              format: int32
     ChallengeDetails:
       type: object
       properties:
@@ -1104,14 +1095,9 @@ components:
         num_nonces:
           type: integer
           format: uint64
-        num_solutions:
+        average_solution_quality:
           type: integer
-          format: uint64
-        difficulty:
-          type: array
-          items:
-            type: integer
-            format: uint32
+          format: int32
     Fraud:
       type: object
       properties:
@@ -1469,10 +1455,13 @@ components:
     GetDifficultyDataResponse:
       type: object
       properties:
-        difficulty_data:
-          type: array
-          items:
-            $ref: '#/components/schemas/DifficultyData'
+        data:
+          type: object
+          description: "Map<RaceId, DifficultyData[]>"
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/DifficultyData'
     GetOPoWResponse:
       type: object
       properties:
@@ -1643,18 +1632,15 @@ components:
       properties:
         benchmark_id:
           $ref: '#/components/schemas/MD5'
+        stopped:
+          type: boolean
         merkle_root:
           $ref: '#/components/schemas/MerkleHash'
-        solution_nonces:
+        solution_quality:
           type: array
           items:
             type: integer
-            format: uint64
-        discarded_solution_nonces:
-          type: array
-          items:
-            type: integer
-            format: uint64
+            format: int32
     SubmitBenchmarkResponse:
       type: object
       properties:
@@ -1668,6 +1654,11 @@ components:
         num_nonces:
           type: integer
           format: uint32
+        hyperparameters:
+          type: object
+          nullable: true
+        runtime_config:
+          type: object
     SubmitPrecommitResponse:
       type: object
       properties:
