@@ -169,23 +169,28 @@ pub async fn submit_benchmark<T: Context>(
     }
 
     // random sample nonces
+    let median_idx = (solution_quality.len() / 2) as u64;
+
     let config = ctx.get_config().await;
     let mut rng = StdRng::seed_from_u64(seed);
     let max_samples = config.challenges[&settings.challenge_id].max_samples;
     let mut sampled_nonces = HashSet::new();
+    sampled_nonces.insert(median_idx as u64);
     for _ in 0..25 {
         if sampled_nonces.len() == max_samples {
             break;
         }
-        let nonce = rng.gen_range(0..precommit_details.num_nonces);
+        let nonce = rng.gen_range(median_idx..precommit_details.num_nonces);
         if sampled_nonces.contains(&nonce) {
             continue;
         }
         sampled_nonces.insert(nonce);
     }
 
-    let average_solution_quality =
-        solution_quality.iter().sum::<i32>() / (solution_quality.len() as i32);
+    // Calculate median solution quality
+    let mut sorted_quality = solution_quality.clone();
+    sorted_quality.sort_unstable();
+    let average_solution_quality = sorted_quality[median_idx as usize];
 
     ctx.add_benchmark_to_mempool(
         benchmark_id,
