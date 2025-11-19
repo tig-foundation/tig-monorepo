@@ -114,6 +114,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
         let mut player_code_nonces = HashMap::<String, HashMap<String, u64>>::new();
         let mut player_nonces = HashMap::<String, u64>::new();
+        let mut qualifier_qualities = HashMap::<String, HashSet<i32>>::new();
 
         for frontier_idx in 0..max_frontier_idx {
             for (settings, &quality, &num_nonces) in
@@ -133,11 +134,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     .or_default() += num_nonces;
                 *player_nonces.entry(player_id.clone()).or_default() += num_nonces;
 
-                challenge_data
-                    .qualifier_qualities
+                qualifier_qualities
                     .entry(race_id.clone())
                     .or_default()
-                    .push(quality);
+                    .insert(quality);
             }
 
             // check if we have enough qualifiers
@@ -182,6 +182,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 break;
             }
         }
+
+        challenge_data.qualifier_qualities = qualifier_qualities
+            .into_iter()
+            .map(|(race_id, qualifier_qualities)| {
+                let mut qualifier_qualities = qualifier_qualities.into_iter().collect::<Vec<_>>();
+                qualifier_qualities.sort_by(|a, b| b.cmp(a));
+                (race_id, qualifier_qualities)
+            })
+            .collect();
     }
 
     // update influence
