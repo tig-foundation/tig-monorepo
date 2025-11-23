@@ -25,7 +25,7 @@ jobs:
       ALGORITHM: ${{ steps.check.outputs.ALGORITHM }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Check challenge and algorithm
         id: check
@@ -47,6 +47,19 @@ jobs:
     runs-on: ${{ !github.event.repository.private && 'ubuntu-24.04-arm' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free up disk space for Docker
+        run: |
+          echo "=== Disk usage BEFORE cleanup ==="
+          df -h
+
+          echo "Removing unused SDKs..."
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+
+          echo "=== Disk usage AFTER cleanup ==="
+          df -h
 
       - name: Build Algorithm
         run: |
@@ -72,6 +85,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free up disk space for Docker
+        run: |
+          echo "=== Disk usage BEFORE cleanup ==="
+          df -h
+
+          echo "Removing unused SDKs..."
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+
+          echo "=== Disk usage AFTER cleanup ==="
+          df -h
+
       - name: Build Algorithm
         run: |
           docker run --rm --user root \
@@ -96,7 +122,7 @@ jobs:
       contents: write
       statuses: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - run: |
           git config --global --add safe.directory $(realpath .)
