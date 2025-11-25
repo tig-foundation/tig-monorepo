@@ -1,5 +1,5 @@
 use crate::{
-    config::{ProtocolConfig, RuntimeConfig},
+    config::{ChallengeConfig, ProtocolConfig, RuntimeConfig},
     serializable_struct_with_getters,
 };
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     Challenge {
         id: String,
-        details: ChallengeDetails,
+        config: ChallengeConfig,
         state: ChallengeState,
         block_data: Option<ChallengeBlockData>,
     }
@@ -271,18 +271,6 @@ serializable_struct_with_getters! {
 }
 
 // Challenge child structs
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum ChallengeType {
-    CPU,
-    GPU,
-}
-serializable_struct_with_getters! {
-    ChallengeDetails {
-        name: String,
-        r#type: ChallengeType,
-    }
-}
 serializable_struct_with_getters! {
     ChallengeState {
         round_active: u32,

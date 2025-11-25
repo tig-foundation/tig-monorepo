@@ -61,10 +61,11 @@ pub async fn submit_precommit<T: Context>(
     }
     let track_config = &challenge_config.active_tracks[&settings.track_id];
 
-    if num_bundles == 0 {
+    if num_bundles < track_config.min_num_bundles {
         return Err(anyhow!(
-            "Invalid num_bundles '{}'. Must at least 1",
+            "Invalid num_bundles '{}'. Must be at least {}",
             num_bundles,
+            track_config.min_num_bundles,
         ));
     }
 
@@ -173,6 +174,8 @@ pub async fn submit_benchmark<T: Context>(
     }
 
     // random sample nonces
+    let challenge_config = &ctx.get_config().await.challenges[&settings.challenge_id];
+    let track_config = &challenge_config.active_tracks[&settings.track_id];
     let mut rng = StdRng::seed_from_u64(seed);
     let mut nonce_quality = solution_quality
         .iter()
@@ -200,19 +203,42 @@ pub async fn submit_benchmark<T: Context>(
         let group = &mut nonce_quality[start_idx..end_idx];
         group.sort_unstable_by_key(|&(_, quality)| quality);
 
-        average_quality_by_group.push(group[num_nonces_per_group / 2].1);
-        sampled_nonces.extend(
-            group
-                .iter()
-                .skip(num_nonces_per_group / 2)
-                .map(|&(idx, _)| idx as u64),
-        );
+        match challenge_config.quality_type {
+            QualityType::Continuous => {
+                let median = group[num_nonces_per_group / 2].1;
+                average_quality_by_group.push(median);
+                if median >= track_config.min_active_quality {
+                    sampled_nonces.extend(
+                        group
+                            .iter()
+                            .skip(num_nonces_per_group / 2)
+                            .map(|&(idx, _)| idx as u64),
+                    );
+                }
+            }
+            QualityType::Binary => {
+                let mean =
+                    (group.iter().map(|&(_, q)| q as i64).sum::<i64>() / group.len() as i64) as i32;
+                average_quality_by_group.push(mean);
+                if mean >= track_config.min_active_quality {
+                    sampled_nonces.extend(
+                        group
+                            .iter()
+                            .filter(|&(_, quality)| *quality != 0)
+                            .map(|&(idx, _)| idx as u64),
+                    );
+                }
+            }
+        }
     }
 
-    let max_samples = ctx.get_config().await.challenges[&settings.challenge_id].max_samples;
+    for i in 0..sampled_nonces.len().min(challenge_config.max_samples) {
+        let j = rng.gen_range(i..sampled_nonces.len());
+        sampled_nonces.swap(i, j);
+    }
     let sampled_nonces = sampled_nonces
         .into_iter()
-        .take(max_samples)
+        .take(challenge_config.max_samples)
         .collect::<HashSet<u64>>();
 
     ctx.add_benchmark_to_mempool(

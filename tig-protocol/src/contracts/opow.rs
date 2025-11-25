@@ -55,7 +55,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .entry(settings.challenge_id.clone())
                 .or_default() += average_quality_by_bundle
                 .iter()
-                .filter(|&&x| x >= track_config.min_quality_threshold)
+                .filter(|&&x| x >= track_config.min_active_quality)
                 .count() as u64;
         }
     }
@@ -142,7 +142,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .enumerate()
                 .flat_map(|(i, x)| {
                     x.1.iter()
-                        .filter(|&&quality| quality >= track_config.min_quality_threshold)
+                        .filter(|&&quality| quality >= track_config.min_active_quality)
                         .map(move |&quality| (i, quality))
                 })
                 .collect::<Vec<_>>();

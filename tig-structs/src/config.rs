@@ -63,15 +63,31 @@ serializable_struct_with_getters! {
         min_topup_amount: PreciseNumber,
     }
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum ChallengeType {
+    CPU,
+    GPU,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityType {
+    Continuous,
+    Binary,
+}
 serializable_struct_with_getters! {
     TrackConfig {
         num_nonces_per_bundle: u64,
+        min_num_bundles: u64,
         runtime_config_limits: RuntimeConfig,
-        min_quality_threshold: i32,
+        min_active_quality: i32,
     }
 }
 serializable_struct_with_getters! {
     ChallengeConfig {
+        name: String,
+        r#type: ChallengeType,
+        quality_type: QualityType,
         submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
