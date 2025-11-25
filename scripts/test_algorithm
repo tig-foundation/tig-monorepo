@@ -52,7 +52,7 @@ if __name__ == "__main__":
     tig_verifier_path = shutil.which("tig-verifier")
     parser = argparse.ArgumentParser(description="TIG Algorithm Tester")
     parser.add_argument("algorithm", type=str, help="Algorithm name")
-    parser.add_argument("race_id", type=str, help="Race Id of the problem instance, comma separated key-values (e.g. a=1,b=2)")
+    parser.add_argument("track_id", type=str, help="Track Id of the problem instance, comma separated key-values (e.g. a=1,b=2)")
     parser.add_argument("hyperparameters", type=str, help="JSON string of hyperparameters for the algorithm (can set to null)")
     parser.add_argument("--tig-runtime-path", type=str, default=tig_runtime_path, help=f"Path to tig-runtime executable (default: {tig_runtime_path})")
     parser.add_argument("--tig-verifier-path", type=str, default=tig_verifier_path, help=f"Path to tig-verifier executable (default: {tig_verifier_path})")
@@ -103,7 +103,7 @@ f"""Library not found at {so_path}:
     }
     challenge_id = challenge_ids[CHALLENGE]
 
-    settings = {"algorithm_id": "", "challenge_id": challenge_id, "race_id": args.race_id, "block_id": "", "player_id": ""}
+    settings = {"algorithm_id": "", "challenge_id": challenge_id, "track_id": args.track_id, "block_id": "", "player_id": ""}
     pool = ThreadPoolExecutor(max_workers=args.workers + 1)
 
     results = {}

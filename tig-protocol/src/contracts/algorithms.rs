@@ -196,18 +196,44 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         };
 
         let mut weights = Vec::<PreciseNumber>::new();
+        let num_qualifiers_by_challenge_by_player = active_challenge_ids
+            .iter()
+            .map(|challenge_id| {
+                (
+                    challenge_id.clone(),
+                    active_opow_block_data
+                        .iter()
+                        .map(|(player_id, opow_data)| {
+                            (
+                                player_id.clone(),
+                                opow_data.num_qualifiers_by_challenge_by_track[challenge_id]
+                                    .values()
+                                    .sum::<u64>(),
+                            )
+                        })
+                        .collect::<HashMap<String, u64>>(),
+                )
+            })
+            .collect::<HashMap<String, _>>();
         for algorithm_id in algorithm_ids.iter() {
             let mut weight = PreciseNumber::from(0);
-            for (player_id, &num_qualifiers) in active_codes_block_data[algorithm_id]
-                .num_qualifiers_by_player
-                .iter()
-            {
+            let num_qualifiers_by_player = active_codes_block_data[algorithm_id]
+                .num_qualifiers_by_track_by_player
+                .values()
+                .fold(HashMap::new(), |mut acc, qualifiers_by_player| {
+                    for (player_id, &num_qualifiers) in qualifiers_by_player.iter() {
+                        *acc.entry(player_id.clone()).or_insert(0) += num_qualifiers;
+                    }
+                    acc
+                });
+            for (player_id, num_qualifiers) in num_qualifiers_by_player {
+                let opow_data = &active_opow_block_data[&player_id];
                 let num_qualifiers = PreciseNumber::from(num_qualifiers);
-                let opow_data = &active_opow_block_data[player_id];
-                let player_num_qualifiers =
-                    PreciseNumber::from(opow_data.num_qualifiers_by_challenge[challenge_id]);
+                let player_num_qualifiers = PreciseNumber::from(
+                    num_qualifiers_by_challenge_by_player[challenge_id][&player_id],
+                );
 
-                weight = weight + opow_data.influence * num_qualifiers / player_num_qualifiers;
+                weight += opow_data.influence * num_qualifiers / player_num_qualifiers;
             }
             weights.push(weight);
         }

@@ -64,19 +64,20 @@ pub fn verify_solution(
 
     macro_rules! dispatch_challenge {
         ($c:ident, cpu) => {{
-            let race_id = if settings.race_id.starts_with('"') && settings.race_id.ends_with('"') {
-                settings.race_id.clone()
+            let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
+            {
+                settings.track_id.clone()
             } else {
-                format!(r#""{}""#, settings.race_id)
+                format!(r#""{}""#, settings.track_id)
             };
-            let race = serde_json::from_str(&race_id).map_err(|_| {
+            let track = serde_json::from_str(&track_id).map_err(|_| {
                 anyhow::anyhow!(
-                    "Failed to parse race_id '{}' as {}::Race",
-                    settings.race_id,
+                    "Failed to parse track_id '{}' as {}::Track",
+                    settings.track_id,
                     stringify!($c)
                 )
             })?;
-            let challenge = $c::Challenge::generate_instance(&seed, &race).unwrap();
+            let challenge = $c::Challenge::generate_instance(&seed, &track).unwrap();
             if verbose {
                 println!("{:?}", challenge);
             }

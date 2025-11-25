@@ -1,4 +1,3 @@
-use serde_json::json;
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData};
 use tig_utils::MerkleHash;
 
@@ -23,7 +22,7 @@ fn test_calc_seed() {
         block_id: "some_block".to_string(),
         challenge_id: "some_challenge".to_string(),
         algorithm_id: "some_algorithm".to_string(),
-        race_id: "a=1,b=2".to_string(),
+        track_id: "a=1,b=2".to_string(),
     };
 
     let rand_hash = "random_hash".to_string();
@@ -33,8 +32,8 @@ fn test_calc_seed() {
     assert_eq!(
         settings.calc_seed(&rand_hash, nonce),
         [
-            122, 94, 247, 46, 146, 71, 140, 234, 78, 160, 235, 180, 79, 32, 69, 205, 247, 91, 94,
-            43, 231, 184, 120, 114, 182, 226, 24, 176, 227, 170, 72, 31
+            84, 136, 44, 57, 142, 50, 248, 37, 94, 195, 254, 190, 222, 27, 136, 115, 229, 136, 19,
+            207, 7, 208, 15, 193, 111, 99, 209, 131, 27, 189, 226, 175
         ]
     );
 }

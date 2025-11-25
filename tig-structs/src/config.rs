@@ -1,6 +1,6 @@
 use crate::serializable_struct_with_getters;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 pub use tig_utils::Frontier;
 use tig_utils::PreciseNumber;
 
@@ -64,16 +64,21 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    TrackConfig {
+        num_nonces_per_bundle: u64,
+        runtime_config_limits: RuntimeConfig,
+        min_quality_threshold: i32,
+    }
+}
+serializable_struct_with_getters! {
     ChallengeConfig {
-        min_num_nonces: u64,
         submission_delay_multiplier: f64,
         max_samples: usize,
         lifespan_period: u32,
         per_nonce_fee: PreciseNumber,
         base_fee: PreciseNumber,
-        runtime_config_limits: RuntimeConfig,
-        active_race_ids: HashSet<String>,
-        total_qualifiers_threshold: u64,
+        active_tracks: HashMap<String, TrackConfig>,
+        max_qualifiers_per_track: u64,
     }
 }
 serializable_struct_with_getters! {

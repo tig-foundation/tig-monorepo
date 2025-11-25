@@ -1,7 +1,7 @@
 use crate::context::*;
 use anyhow::{anyhow, Result};
 use logging_timer::time;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 use tig_structs::{config::*, core::*};
@@ -13,7 +13,7 @@ pub async fn submit_precommit<T: Context>(
     settings: BenchmarkSettings,
     hyperparameters: Option<Map<String, Value>>,
     runtime_config: RuntimeConfig,
-    num_nonces: u64,
+    num_bundles: u64,
     seed: u64,
 ) -> Result<String> {
     if player_id != settings.player_id {
@@ -53,37 +53,40 @@ pub async fn submit_precommit<T: Context>(
 
     // verify size
     let challenge_config = &config.challenges[&settings.challenge_id];
-    if !challenge_config.active_race_ids.contains(&settings.race_id) {
-        return Err(anyhow!("Invalid race_id '{}'", settings.race_id));
+    if !challenge_config
+        .active_tracks
+        .contains_key(&settings.track_id)
+    {
+        return Err(anyhow!("Invalid track_id '{}'", settings.track_id));
     }
+    let track_config = &challenge_config.active_tracks[&settings.track_id];
 
-    if num_nonces < challenge_config.min_num_nonces {
+    if num_bundles == 0 {
         return Err(anyhow!(
-            "Invalid num_nonces '{}'. Must be >= {}",
-            num_nonces,
-            challenge_config.min_num_nonces
+            "Invalid num_bundles '{}'. Must at least 1",
+            num_bundles,
         ));
     }
 
-    if runtime_config.max_memory > challenge_config.runtime_config_limits.max_memory {
+    if runtime_config.max_memory > track_config.runtime_config_limits.max_memory {
         return Err(anyhow!(
             "Invalid runtime_config.max_memory '{}'. Must be <= {}",
             runtime_config.max_memory,
-            challenge_config.runtime_config_limits.max_memory
+            track_config.runtime_config_limits.max_memory
         ));
     }
 
-    if runtime_config.max_fuel > challenge_config.runtime_config_limits.max_fuel {
+    if runtime_config.max_fuel > track_config.runtime_config_limits.max_fuel {
         return Err(anyhow!(
             "Invalid runtime_config.max_fuel '{}'. Must be <= {}",
             runtime_config.max_fuel,
-            challenge_config.runtime_config_limits.max_fuel
+            track_config.runtime_config_limits.max_fuel
         ));
     }
 
     // verify player has sufficient balance
     let submission_fee = challenge_config.base_fee
-        + challenge_config.per_nonce_fee * PreciseNumber::from(num_nonces);
+        + challenge_config.per_nonce_fee * PreciseNumber::from(num_bundles);
     if !ctx
         .get_player_state(&player_id)
         .await
@@ -97,7 +100,8 @@ pub async fn submit_precommit<T: Context>(
             settings,
             PrecommitDetails {
                 block_started: block_details.height,
-                num_nonces,
+                num_nonces: num_bundles * track_config.num_nonces_per_bundle,
+                num_bundles,
                 rand_hash: hex::encode(StdRng::seed_from_u64(seed).gen::<[u8; 16]>()),
                 fee_paid: submission_fee,
                 hyperparameters,
@@ -141,7 +145,7 @@ pub async fn submit_benchmark<T: Context>(
             benchmark_id,
             BenchmarkDetails {
                 stopped: true,
-                average_solution_quality: None,
+                average_quality_by_bundle: None,
                 merkle_root: None,
                 sampled_nonces: None,
             },
@@ -169,34 +173,53 @@ pub async fn submit_benchmark<T: Context>(
     }
 
     // random sample nonces
-    let median_idx = (solution_quality.len() / 2) as u64;
-
-    let config = ctx.get_config().await;
     let mut rng = StdRng::seed_from_u64(seed);
-    let max_samples = config.challenges[&settings.challenge_id].max_samples;
-    let mut sampled_nonces = HashSet::new();
-    sampled_nonces.insert(median_idx as u64);
-    for _ in 0..25 {
-        if sampled_nonces.len() == max_samples {
-            break;
-        }
-        let nonce = rng.gen_range(median_idx..precommit_details.num_nonces);
-        if sampled_nonces.contains(&nonce) {
-            continue;
-        }
-        sampled_nonces.insert(nonce);
+    let mut nonce_quality = solution_quality
+        .iter()
+        .cloned()
+        .enumerate()
+        .collect::<Vec<(usize, i32)>>();
+    nonce_quality.shuffle(&mut rng);
+    let num_nonces_per_group =
+        (precommit_details.num_nonces / precommit_details.num_bundles) as usize;
+    let rem = nonce_quality.len() % num_nonces_per_group;
+    let num_groups = (nonce_quality.len() + num_nonces_per_group - 1) / num_nonces_per_group;
+    let mut average_quality_by_group = Vec::new();
+    let mut sampled_nonces = Vec::new();
+    for i in 0..num_groups {
+        let start_idx = if i < rem {
+            i * (num_nonces_per_group + 1)
+        } else {
+            i * num_nonces_per_group + rem
+        };
+        let end_idx = if i < rem {
+            start_idx + num_nonces_per_group + 1
+        } else {
+            start_idx + num_nonces_per_group
+        };
+        let group = &mut nonce_quality[start_idx..end_idx];
+        group.sort_unstable_by_key(|&(_, quality)| quality);
+
+        average_quality_by_group.push(group[num_nonces_per_group / 2].1);
+        sampled_nonces.extend(
+            group
+                .iter()
+                .skip(num_nonces_per_group / 2)
+                .map(|&(idx, _)| idx as u64),
+        );
     }
 
-    // Calculate median solution quality
-    let mut sorted_quality = solution_quality.clone();
-    sorted_quality.sort_unstable();
-    let average_solution_quality = sorted_quality[median_idx as usize];
+    let max_samples = ctx.get_config().await.challenges[&settings.challenge_id].max_samples;
+    let sampled_nonces = sampled_nonces
+        .into_iter()
+        .take(max_samples)
+        .collect::<HashSet<u64>>();
 
     ctx.add_benchmark_to_mempool(
         benchmark_id,
         BenchmarkDetails {
             stopped: false,
-            average_solution_quality: Some(average_solution_quality),
+            average_quality_by_bundle: Some(average_quality_by_group),
             merkle_root: Some(merkle_root),
             sampled_nonces: Some(sampled_nonces),
         },

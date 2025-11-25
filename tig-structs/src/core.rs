@@ -150,7 +150,7 @@ serializable_struct_with_getters! {
         block_id: String,
         challenge_id: String,
         algorithm_id: String,
-        race_id: String,
+        track_id: String,
     }
 }
 impl BenchmarkSettings {
@@ -161,7 +161,7 @@ impl BenchmarkSettings {
 serializable_struct_with_getters! {
     BenchmarkDetails {
         stopped: bool,
-        average_solution_quality: Option<i32>,
+        average_quality_by_bundle: Option<Vec<i32>>,
         merkle_root: Option<MerkleHash>,
         sampled_nonces: Option<HashSet<u64>>,
     }
@@ -290,8 +290,8 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ChallengeBlockData {
-        num_qualifiers: u64,
-        qualifier_qualities: HashMap<String, Vec<i32>>,
+        num_qualifiers_by_track: HashMap<String, u64>,
+        qualifier_qualities_by_track: HashMap<String, HashSet<i32>>,
     }
 }
 
@@ -317,7 +317,7 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     CodeBlockData {
-        num_qualifiers_by_player: HashMap<String, u64>,
+        num_qualifiers_by_track_by_player: HashMap<String, HashMap<String, u64>>,
         adoption: PreciseNumber,
         merge_points: u32,
         reward: PreciseNumber,
@@ -361,7 +361,7 @@ serializable_struct_with_getters! {
 // OPoW child structs
 serializable_struct_with_getters! {
     OPoWBlockData {
-        num_qualifiers_by_challenge: HashMap<String, u64>,
+        num_qualifiers_by_challenge_by_track: HashMap<String, HashMap<String, u64>>,
         cutoff: u64,
         weighted_self_deposit: PreciseNumber,
         weighted_delegated_deposit: PreciseNumber,
@@ -410,6 +410,7 @@ serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
         num_nonces: u64,
+        num_bundles: u64,
         rand_hash: String,
         fee_paid: PreciseNumber,
         runtime_config: RuntimeConfig,

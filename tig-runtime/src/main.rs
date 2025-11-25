@@ -116,19 +116,20 @@ pub fn compute_solution(
                 ) -> Result<()>>(b"entry_point")?
             };
 
-            let race_id = if settings.race_id.starts_with('"') && settings.race_id.ends_with('"') {
-                settings.race_id.clone()
+            let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
+            {
+                settings.track_id.clone()
             } else {
-                format!(r#""{}""#, settings.race_id)
+                format!(r#""{}""#, settings.track_id)
             };
-            let race = serde_json::from_str(&race_id).map_err(|_| {
+            let track = serde_json::from_str(&track_id).map_err(|_| {
                 anyhow::anyhow!(
-                    "Failed to parse race_id '{}' as {}::Race",
-                    settings.race_id,
+                    "Failed to parse track_id '{}' as {}::Track",
+                    settings.track_id,
                     stringify!($c)
                 )
             })?;
-            let challenge = $c::Challenge::generate_instance(&seed, &race)?;
+            let challenge = $c::Challenge::generate_instance(&seed, &track)?;
 
             let save_solution_fn = |solution: &$c::Solution| -> Result<()> {
                 let fuel_consumed = (max_fuel

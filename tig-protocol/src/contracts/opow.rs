@@ -43,31 +43,49 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let phase_in_period = config.opow.cutoff_phase_in_period;
     let phase_in_end = phase_in_start + phase_in_period;
 
-    let mut num_nonces_by_player_by_challenge = HashMap::<String, HashMap<String, u64>>::new();
-    for (settings, _, num_nonces) in active_benchmarks.iter() {
-        *num_nonces_by_player_by_challenge
-            .entry(settings.player_id.clone())
-            .or_default()
-            .entry(settings.challenge_id.clone())
-            .or_default() += *num_nonces;
+    let mut num_bundles_by_player_by_challenge = HashMap::<String, HashMap<String, u64>>::new();
+    for (settings, average_quality_by_bundle) in active_benchmarks.iter() {
+        if let Some(track_config) = config.challenges[&settings.challenge_id]
+            .active_tracks
+            .get(&settings.track_id)
+        {
+            *num_bundles_by_player_by_challenge
+                .entry(settings.player_id.clone())
+                .or_default()
+                .entry(settings.challenge_id.clone())
+                .or_default() += average_quality_by_bundle
+                .iter()
+                .filter(|&&x| x >= track_config.min_quality_threshold)
+                .count() as u64;
+        }
     }
-    for (player_id, num_nonces_by_challenge) in num_nonces_by_player_by_challenge.iter() {
+    for (player_id, player_bundles_by_challenge) in num_bundles_by_player_by_challenge.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-        let min_num_nonces = active_challenge_ids
+        let min_num_bundles = active_challenge_ids
             .iter()
-            .map(|id| num_nonces_by_challenge.get(id).cloned().unwrap_or_default())
+            .map(|id| {
+                player_bundles_by_challenge
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_default()
+            })
             .min()
             .unwrap_or_default();
-        let mut cutoff = (min_num_nonces as f64 * config.opow.cutoff_multiplier).ceil() as u64;
+        let mut cutoff = (min_num_bundles as f64 * config.opow.cutoff_multiplier).ceil() as u64;
         if phase_in_challenge_ids.len() > 0 && phase_in_end > block_details.height {
-            let phase_in_min_num_nonces = active_challenge_ids
+            let phase_in_min_num_groups = active_challenge_ids
                 .iter()
                 .filter(|&id| !phase_in_challenge_ids.contains(id))
-                .map(|id| num_nonces_by_challenge.get(id).cloned().unwrap_or_default())
+                .map(|id| {
+                    player_bundles_by_challenge
+                        .get(id)
+                        .cloned()
+                        .unwrap_or_default()
+                })
                 .min()
                 .unwrap_or_default();
             let phase_in_cutoff =
-                (phase_in_min_num_nonces as f64 * config.opow.cutoff_multiplier).ceil() as u64;
+                (phase_in_min_num_groups as f64 * config.opow.cutoff_multiplier).ceil() as u64;
             let phase_in_weight =
                 (phase_in_end - block_details.height) as f64 / phase_in_period as f64;
             cutoff = (phase_in_cutoff as f64 * phase_in_weight
@@ -77,15 +95,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     }
 
     // update qualifiers
-    let mut benchmarks_by_challenge_by_race =
-        HashMap::<String, HashMap<String, Vec<(&BenchmarkSettings, &i32, &u64)>>>::new();
-    for (settings, average_solution_quality, num_nonces) in active_benchmarks.iter() {
-        benchmarks_by_challenge_by_race
+    let mut benchmarks_by_challenge_by_track =
+        HashMap::<String, HashMap<String, Vec<(&BenchmarkSettings, &Vec<i32>)>>>::new();
+    for (settings, average_quality_by_bundle) in active_benchmarks.iter() {
+        benchmarks_by_challenge_by_track
             .entry(settings.challenge_id.clone())
             .or_default()
-            .entry(settings.race_id.clone())
+            .entry(settings.track_id.clone())
             .or_default()
-            .push((settings, average_solution_quality, num_nonces));
+            .push((settings, average_quality_by_bundle));
     }
 
     let max_qualifiers_by_player = active_opow_ids
@@ -99,98 +117,89 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         .collect::<HashMap<String, u64>>();
 
     for challenge_id in active_challenge_ids.iter() {
-        if !benchmarks_by_challenge_by_race.contains_key(challenge_id) {
+        if !benchmarks_by_challenge_by_track.contains_key(challenge_id) {
             continue;
         }
+        let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
         let challenge_config = &config.challenges[challenge_id];
-        let benchmarks = benchmarks_by_challenge_by_race
+        let benchmarks = benchmarks_by_challenge_by_track
             .get_mut(challenge_id)
             .unwrap();
-        benchmarks
-            .values_mut()
-            .for_each(|v| v.sort_by_key(|(_, &quality, _)| -quality));
-        let max_frontier_idx = benchmarks.values().map(|v| v.len()).max().unwrap();
 
-        let challenge_data = active_challenges_block_data.get_mut(challenge_id).unwrap();
-        let mut player_code_nonces = HashMap::<String, HashMap<String, u64>>::new();
-        let mut player_nonces = HashMap::<String, u64>::new();
-        let mut qualifier_qualities = HashMap::<String, HashSet<i32>>::new();
+        let mut qualifier_qualities_by_track = HashMap::<String, HashSet<i32>>::new();
+        let mut code_qualifiers_by_track_by_player =
+            HashMap::<String, HashMap<String, HashMap<String, u64>>>::new();
+        let mut player_qualifiers_by_track = HashMap::<String, HashMap<String, u64>>::new();
+        let mut challenge_qualifiers_by_track = HashMap::<String, u64>::new();
 
-        for frontier_idx in 0..max_frontier_idx {
-            for (settings, &quality, &num_nonces) in
-                benchmarks.values().filter_map(|v| v.get(frontier_idx))
-            {
+        for (track_id, track_config) in challenge_config.active_tracks.iter() {
+            if !benchmarks.contains_key(track_id) {
+                continue;
+            }
+            let benchmarks = benchmarks.get_mut(track_id).unwrap();
+            let mut sorted_average_quality = benchmarks
+                .iter()
+                .enumerate()
+                .flat_map(|(i, x)| {
+                    x.1.iter()
+                        .filter(|&&quality| quality >= track_config.min_quality_threshold)
+                        .map(move |&quality| (i, quality))
+                })
+                .collect::<Vec<_>>();
+            sorted_average_quality.sort_by_key(|&(_, quality)| -quality);
+
+            let qualifier_qualities = qualifier_qualities_by_track
+                .entry(track_id.clone())
+                .or_default();
+            let code_qualifiers_by_player = code_qualifiers_by_track_by_player
+                .entry(track_id.clone())
+                .or_default();
+            let player_qualifiers = player_qualifiers_by_track
+                .entry(track_id.clone())
+                .or_default();
+            let num_qualifiers = challenge_qualifiers_by_track
+                .entry(track_id.clone())
+                .or_default();
+
+            for &(i, quality) in sorted_average_quality.iter() {
+                if *num_qualifiers >= challenge_config.max_qualifiers_per_track
+                    && !qualifier_qualities.contains(&quality)
+                {
+                    break;
+                }
                 let BenchmarkSettings {
                     player_id,
                     algorithm_id,
-                    race_id,
                     ..
-                } = settings;
+                } = &benchmarks[i].0;
 
-                *player_code_nonces
-                    .entry(player_id.clone())
-                    .or_default()
-                    .entry(algorithm_id.clone())
-                    .or_default() += num_nonces;
-                *player_nonces.entry(player_id.clone()).or_default() += num_nonces;
-
-                qualifier_qualities
-                    .entry(race_id.clone())
-                    .or_default()
-                    .insert(quality);
-            }
-
-            // check if we have enough qualifiers
-            let player_qualifiers: HashMap<String, u64> = player_nonces
-                .keys()
-                .map(|player_id| {
-                    (
-                        player_id.clone(),
-                        max_qualifiers_by_player[player_id].min(player_nonces[player_id]),
-                    )
-                })
-                .collect();
-
-            let num_qualifiers = player_qualifiers.values().sum::<u64>();
-            if num_qualifiers >= challenge_config.total_qualifiers_threshold
-                || frontier_idx == max_frontier_idx - 1
-            {
-                for player_id in player_qualifiers.keys() {
-                    let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
-                    opow_data
-                        .num_qualifiers_by_challenge
-                        .insert(challenge_id.clone(), player_qualifiers[player_id]);
-
-                    if player_qualifiers[player_id] > 0 {
-                        for algorithm_id in player_code_nonces[player_id].keys() {
-                            if !active_code_ids.contains(algorithm_id) {
-                                continue; // algorithm is banned
-                            }
-                            let code_data = active_codes_block_data.get_mut(algorithm_id).unwrap();
-
-                            code_data.num_qualifiers_by_player.insert(
-                                player_id.clone(),
-                                (player_qualifiers[player_id] as f64
-                                    * player_code_nonces[player_id][algorithm_id] as f64
-                                    / player_nonces[player_id] as f64)
-                                    .ceil() as u64,
-                            );
-                        }
-                    }
+                let q = player_qualifiers.entry(player_id.clone()).or_default();
+                if *q < max_qualifiers_by_player[player_id] {
+                    *q += 1;
+                    *num_qualifiers += 1;
+                    *code_qualifiers_by_player
+                        .entry(algorithm_id.clone())
+                        .or_default()
+                        .entry(player_id.clone())
+                        .or_default() += 1;
+                    qualifier_qualities.insert(quality);
                 }
-                challenge_data.num_qualifiers = num_qualifiers;
-                break;
             }
         }
 
-        challenge_data.qualifier_qualities = qualifier_qualities
-            .into_iter()
-            .map(|(race_id, qualifier_qualities)| {
-                let mut qualifier_qualities = qualifier_qualities.into_iter().collect::<Vec<_>>();
-                qualifier_qualities.sort_by(|a, b| b.cmp(a));
-                (race_id, qualifier_qualities)
-            })
-            .collect();
+        challenge_data.qualifier_qualities_by_track = qualifier_qualities_by_track;
+        challenge_data.num_qualifiers_by_track = challenge_qualifiers_by_track;
+        for (player_id, num_qualifiers_by_track) in player_qualifiers_by_track {
+            let opow_data = active_opow_block_data.get_mut(&player_id).unwrap();
+            opow_data
+                .num_qualifiers_by_challenge_by_track
+                .insert(challenge_id.clone(), num_qualifiers_by_track);
+        }
+        for (algorithm_id, num_qualifiers_by_track_by_player) in code_qualifiers_by_track_by_player
+        {
+            let code_data = active_codes_block_data.get_mut(&algorithm_id).unwrap();
+            code_data.num_qualifiers_by_track_by_player = num_qualifiers_by_track_by_player;
+        }
     }
 
     // update influence
@@ -271,15 +280,17 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         let mut factors = Vec::<PreciseNumber>::new();
         for challenge_id in active_challenge_ids.iter() {
             let challenge_data = active_challenges_block_data.get(challenge_id).unwrap();
-            factors.push(if challenge_data.num_qualifiers == 0 {
+            let total_qualifiers = challenge_data.num_qualifiers_by_track.values().sum::<u64>();
+            factors.push(if total_qualifiers == 0 {
                 zero.clone()
             } else {
                 PreciseNumber::from(
-                    *opow_data
-                        .num_qualifiers_by_challenge
+                    opow_data
+                        .num_qualifiers_by_challenge_by_track
                         .get(challenge_id)
-                        .unwrap_or(&0),
-                ) / PreciseNumber::from(challenge_data.num_qualifiers)
+                        .map(|x| x.values().sum())
+                        .unwrap_or(0),
+                ) / PreciseNumber::from(total_qualifiers)
             });
         }
 
