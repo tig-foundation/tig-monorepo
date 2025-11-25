@@ -88,8 +88,8 @@
         <th pSortableColumn="algorithm" class="tig-dark text-center">
           ALGORITHM
         </th>
-        <th pSortableColumn="race_id" class="tig-dark text-center">
-          RACE
+        <th pSortableColumn="track_id" class="tig-dark text-center">
+          TRACK
         </th>
         <th pSortableColumn="batch_size" class="tig-dark text-center">
           BATCH SIZE
@@ -97,7 +97,7 @@
 
         <th pSortableColumn="nonces" class="tig-dark text-center">#NONCES</th>
         <th pSortableColumn="quality" class="tig-dark text-center">
-          AVG SOLUTION QUALITY
+          AVERAGE QUALITY
         </th>
 
         <th pSortableColumn="status" class="tig-dark text-center">STATUS</th>
@@ -142,7 +142,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center multiline">
-            {{ benchmark.race_id_display }}
+            {{ benchmark.track_id_display }}
           </div>
         </td>
         <td class="row-cell">
@@ -157,7 +157,7 @@
         </td>
         <td class="row-cell">
           <div class="flex justify-content-center align-items-center">
-            {{ benchmark.average_solution_quality }}
+            {{ benchmark.average_quality }}
           </div>
         </td>
 
@@ -256,7 +256,7 @@
                     <div
                       class="flex justify-content-center align-items-center tig-dark"
                     >
-                      {{ batch.end_time ? batch.average_solution_quality : "" }}
+                      {{ batch.end_time ? batch.average_quality : "" }}
                     </div>
                   </td>
                   <td>

@@ -122,7 +122,7 @@ class ClientManager:
                                 B.batch_size,
                                 B.num_nonces - B.batch_size * C.batch_idx
                             ),
-                            'average_solution_quality', D.average_solution_quality,
+                            'average_quality', D.average_quality,
                             'num_attempts', COALESCE(E.num_attempts, C.num_attempts),
                             'status', CASE
                                 WHEN B.stopped IS NOT NULL THEN 'STOPPED'
@@ -167,9 +167,9 @@ class ClientManager:
                         benchmark_id,
                         JSONB_AGG(batch_data ORDER BY batch_idx) AS batches,
                         (
-                            SUM((batch_data->>'num_nonces')::BIGINT * (batch_data->>'average_solution_quality')::BIGINT) / 
+                            SUM((batch_data->>'num_nonces')::BIGINT * (batch_data->>'average_quality')::BIGINT) / 
                             SUM((batch_data->>'num_nonces')::BIGINT)
-                        )::INTEGER AS average_solution_quality
+                        )::INTEGER AS average_quality
                     FROM recent_batches
                     GROUP BY benchmark_id
                 )
@@ -180,7 +180,7 @@ class ClientManager:
                     B.settings->>'race_id' as race_id,
                     B.batch_size,
                     B.num_nonces,
-                    COALESCE(C.average_solution_quality, A.average_solution_quality) AS average_solution_quality,
+                    COALESCE(C.average_quality, A.average_quality) AS average_quality,
                     CASE
                         WHEN B.end_time IS NOT NULL THEN 'COMPLETED'
                         WHEN B.stopped IS NOT NULL THEN 'STOPPED'

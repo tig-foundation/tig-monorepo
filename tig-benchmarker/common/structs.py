@@ -25,7 +25,7 @@ class CodeState(FromDict):
 
 @dataclass
 class CodeBlockData(FromDict):
-    num_qualifiers_by_player: Dict[str, int]
+    num_qualifiers_by_track_by_player: Dict[str, int]
     adoption: PreciseNumber
     merge_points: int
     reward: PreciseNumber
@@ -43,7 +43,7 @@ class BenchmarkSettings(FromDict):
     block_id: str
     challenge_id: str
     algorithm_id: str
-    race_id: str
+    track_id: str
 
     def calc_seed(self, rand_hash: str, nonce: int) -> bytes:
         return u8s_from_str(f"{jsonify(self)}_{rand_hash}_{nonce}")
@@ -52,6 +52,7 @@ class BenchmarkSettings(FromDict):
 class PrecommitDetails(FromDict):
     block_started: int
     num_nonces: int
+    num_bundles: int
     rand_hash: str
     fee_paid: PreciseNumber
     hyperparameters: Optional[dict]
@@ -72,7 +73,7 @@ class Precommit(FromDict):
 class BenchmarkDetails(FromDict):
     stopped: bool
     merkle_root: Optional[MerkleHash]
-    average_solution_quality: Optional[int]
+    average_quality_by_bundle: Optional[List[int]]
     sampled_nonces: Optional[List[int]]
 
 @dataclass
@@ -176,28 +177,24 @@ class Block(FromDict):
     data: Optional[BlockData]
 
 @dataclass
-class ChallengeDetails(FromDict):
-    name: str
-
-@dataclass
 class ChallengeState(FromDict):
     round_active: int
 
 @dataclass
 class ChallengeBlockData(FromDict):
-    num_qualifiers: int
+    num_qualifiers_by_track: int
     qualifier_qualities: Dict[str, List[int]]
 
 @dataclass
 class Challenge(FromDict):
     id: str
-    details: ChallengeDetails
+    config: dict
     state: ChallengeState
     block_data: Optional[ChallengeBlockData]
 
 @dataclass
 class OPoWBlockData(FromDict):
-    num_qualifiers_by_challenge: Dict[str, int]
+    num_qualifiers_by_challenge_by_track: Dict[str, int]
     cutoff: int
     weighted_delegated_deposit: PreciseNumber
     weighted_self_deposit: PreciseNumber
@@ -274,8 +271,8 @@ class TopUp(FromDict):
 
 @dataclass
 class DifficultyData(FromDict):
-    average_solution_quality: int
-    num_nonces: int
+    average_quality: int
+    num_bundles: int
     algorithm_id: str
 
 @dataclass

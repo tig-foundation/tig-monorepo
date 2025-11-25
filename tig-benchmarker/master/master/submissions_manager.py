@@ -14,7 +14,7 @@ logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 @dataclass
 class SubmitPrecommitRequest(FromDict):
     settings: BenchmarkSettings
-    num_nonces: int
+    num_bundles: int
     hyperparameters: Optional[dict]
     runtime_config: dict
 

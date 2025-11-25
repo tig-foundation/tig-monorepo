@@ -172,15 +172,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetDelegatorsResponse'
-  /get-difficulty-data:
+  /get-tracks-data:
     get:
       tags:
         - GET
-      summary: Get latest difficulty data for a specific challenge id
+      summary: Get latest tracks data for a specific challenge id
       description: |-
         # Notes
 
-        * Returns aggregated num_nonces, num_solutions, difficulty data from benchmarks in the last 120 blocks. 
+        * Returns aggregated algorithm_id, average_quality, num_bundles data from benchmarks in the last 120 blocks. 
 
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
 
@@ -202,7 +202,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetDifficultyDataResponse'
+                $ref: '#/components/schemas/GetTracksDataResponse'
   /get-challenges:
     get:
       tags:
@@ -651,7 +651,7 @@ components:
       type: string
       pattern: ^c[0-9]{3}_a[0-9]{3}$
       example: c002_a001
-    RaceId:
+    TrackId:
       type: string
       pattern: ^\w+=\w+(,\w+=\w+)*$
       example: num_variables=100,clauses_to_variables_percent=426
@@ -736,8 +736,8 @@ components:
           $ref: '#/components/schemas/ChallengeId'
         algorithm_id:
           $ref: '#/components/schemas/AlgorithmId'
-        race_id:
-          $ref: '#/components/schemas/RaceId'
+        track_id:
+          $ref: '#/components/schemas/TrackId'
     BenchmarkState:
       type: object
       properties:
@@ -1011,8 +1011,8 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/ChallengeId'
-        details:
-          $ref: '#/components/schemas/ChallengeDetails'
+        config:
+          type: object
         state:
           $ref: '#/components/schemas/ChallengeState'
         block_data:
@@ -1024,20 +1024,12 @@ components:
           type: integer
           format: uint64
         qualifier_qualities:
-          description: "Map<RaceId, int32[]>"
+          description: "Map<TrackId, int32[]>"
           additionalProperties:
             type: array
             items:
               type: integer
               format: int32
-    ChallengeDetails:
-      type: object
-      properties:
-        name:
-          type: string
-        type:
-          type: string
-          enum: [cpu, gpu]
     ChallengeId:
           type: string
           pattern: ^c[0-9]{3}$
@@ -1081,21 +1073,15 @@ components:
         block_confirmed:
           type: integer
           format: uint32
-    Difficulty:
-      type: array
-      items:
-        type: integer
-        format: int32
-      example: [40, 250]
-    DifficultyData:
+    TracksData:
       type: object
       properties:
         algorithm_id:
           $ref: '#/components/schemas/AlgorithmId'
-        num_nonces:
+        num_bundles:
           type: integer
           format: uint64
-        average_solution_quality:
+        average_quality:
           type: integer
           format: int32
     Fraud:
@@ -1114,10 +1100,6 @@ components:
         block_confirmed:
           type: integer
           format: uint32
-    Frontier:
-      type: array
-      items:
-        $ref: '#/components/schemas/Difficulty'
     MD5:
       type: string
       pattern: ^[a-f0-9]{32}$
@@ -1452,16 +1434,16 @@ components:
                   format: double
               reward:
                 $ref: '#/components/schemas/PreciseNumber'
-    GetDifficultyDataResponse:
+    GetTracksDataResponse:
       type: object
       properties:
         data:
           type: object
-          description: "Map<RaceId, DifficultyData[]>"
+          description: "Map<TrackId, TracksData[]>"
           additionalProperties:
             type: array
             items:
-              $ref: '#/components/schemas/DifficultyData'
+              $ref: '#/components/schemas/TracksData'
     GetOPoWResponse:
       type: object
       properties:

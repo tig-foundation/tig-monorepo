@@ -241,7 +241,7 @@ class SlaveManager:
                         UPDATE batch_data
                         SET merkle_root = %s,
                             solution_quality = %s,
-                            average_solution_quality = %s
+                            average_quality = %s
                         WHERE benchmark_id = %s 
                             AND batch_idx = %s                    
                         """,

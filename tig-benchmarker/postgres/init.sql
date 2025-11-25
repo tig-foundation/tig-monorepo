@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS job_data (
     benchmark_id TEXT PRIMARY KEY,
     merkle_root TEXT,
     solution_quality JSONB,
-    average_solution_quality INTEGER,
+    average_quality INTEGER,
     merkle_proofs JSONB,
 
     FOREIGN KEY (benchmark_id) REFERENCES job(benchmark_id)
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS batch_data (
     batch_idx INTEGER,
     merkle_root TEXT,
     solution_quality JSONB,
-    average_solution_quality INTEGER,
+    average_quality INTEGER,
     merkle_proofs JSONB,
 
     PRIMARY KEY (benchmark_id, batch_idx),
@@ -115,8 +115,8 @@ SELECT '
   "algo_selection": [
     {
       "algorithm_id": "c001_a001",
-      "num_nonces": 40,
-      "selected_races": [],
+      "num_bundles": 1,
+      "selected_track": null,
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -127,8 +127,8 @@ SELECT '
     },
     {
       "algorithm_id": "c002_a001",
-      "num_nonces": 40,
-      "selected_races": [],
+      "num_bundles": 1,
+      "selected_track": null,
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -139,8 +139,8 @@ SELECT '
     },
     {
       "algorithm_id": "c003_a001",
-      "num_nonces": 40,
-      "selected_races": [],
+      "num_bundles": 1,
+      "selected_track": null,
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -151,8 +151,8 @@ SELECT '
     },
     {
       "algorithm_id": "c004_a001",
-      "num_nonces": 40,
-      "selected_races": [],
+      "num_bundles": 1,
+      "selected_track": null,
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -163,8 +163,8 @@ SELECT '
     },
     {
       "algorithm_id": "c005_a001",
-      "num_nonces": 40,
-      "selected_races": [],
+      "num_bundles": 1,
+      "selected_track": null,
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
@@ -175,8 +175,8 @@ SELECT '
     },
     {
       "algorithm_id": "c006_a001",
-      "num_nonces": 40,
-      "selected_races": [],
+      "num_bundles": 1,
+      "selected_track": null,
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,

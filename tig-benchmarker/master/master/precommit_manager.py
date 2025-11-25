@@ -22,7 +22,7 @@ class PrecommitManager:
         self.last_block_id = block.id
         self.num_precommits_submitted = 0
 
-    def run(self, race_samples: Dict[str, List[int]]) -> SubmitPrecommitRequest:
+    def run(self) -> SubmitPrecommitRequest:
         num_pending_jobs = get_db_conn().fetch_one(
             """
             SELECT COUNT(*) 
@@ -49,11 +49,11 @@ class PrecommitManager:
                 algorithm_id=a_id,
                 player_id=CONFIG["player_id"],
                 block_id=self.last_block_id,
-                race_id=race_samples[a_id]
+                track_id=selection["selected_track"]
             ),
-            num_nonces=selection["num_nonces"],
+            num_bundles=selection["num_bundles"],
             hyperparameters=selection["hyperparameters"],
             runtime_config=selection["runtime_config"],
         )
-        logger.info(f"Created precommit (algorithm_id: {a_id}, race: {req.settings.race_id}, num_nonces: {req.num_nonces}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
+        logger.info(f"Created precommit (algorithm_id: {a_id}, track: {req.settings.track_id}, num_bundles: {req.num_bundles}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
         return req

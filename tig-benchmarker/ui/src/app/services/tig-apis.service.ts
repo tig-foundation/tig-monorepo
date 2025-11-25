@@ -100,13 +100,13 @@ export class TigApisService {
             };
           });
 
-          const race_id_display = b.race_id
+          const track_id_display = b.track_id
             .replace(/=/g, ': ')
             .replace(/,/g, '\n');
 
           return {
             ...b,
-            race_id_display,
+            track_id_display,
             time_elapsed,
             benchmark_id_display,
             batches,

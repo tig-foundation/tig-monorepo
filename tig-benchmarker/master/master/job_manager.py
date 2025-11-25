@@ -28,7 +28,7 @@ class JobManager:
         algo_selection = CONFIG["algo_selection"]
         # create jobs from confirmed precommits
         challenge_id_2_name = {
-            c.id: c.details.name
+            c.id: c["config"]["name"]
             for c in challenges.values()
         }
         algorithm_id_2_name = {
@@ -180,10 +180,10 @@ class JobManager:
                     (
                         """
                         UPDATE job_data
-                        SET average_solution_quality = %s
-                        WHERE benchmark_id = %s
+                        SET average_quality = %s
+                        WHERE benchmark_id = %s AND average_quality IS NULL
                         """,
-                        (x.details.average_solution_quality, benchmark_id)
+                        (sum(x.details.average_quality_by_bundle) // len(x.details.average_quality_by_bundle), benchmark_id)
                     )
                 ]
 
@@ -263,12 +263,12 @@ class JobManager:
         for row in rows:
             benchmark_id = row['benchmark_id']
             solution_quality = [x for y in row['solution_quality'] for x in y]
-            average_solution_quality = sum(solution_quality) // len(solution_quality)
+            average_quality = sum(solution_quality) // len(solution_quality)
 
             batch_merkle_roots = [MerkleHash.from_str(root) for root in row['batch_merkle_roots']]
             num_batches = len(batch_merkle_roots)
             
-            logger.info(f"job {benchmark_id}: (benchmark ready, average_solution_nonces: {average_solution_quality}")
+            logger.info(f"job {benchmark_id}: (benchmark ready, average_solution_nonces: {average_quality}")
 
             tree = MerkleTree(
                 batch_merkle_roots,
@@ -283,13 +283,13 @@ class JobManager:
                     UPDATE job_data
                     SET merkle_root = %s, 
                         solution_quality = %s,
-                        average_solution_quality = %s
+                        average_quality = %s
                     WHERE benchmark_id = %s
                     """, 
                     (
                         merkle_root.to_str(), 
                         json.dumps(solution_quality),
-                        average_solution_quality,
+                        average_quality,
                         benchmark_id
                     )
                 ),
