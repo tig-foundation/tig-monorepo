@@ -165,17 +165,24 @@ pub async fn submit_benchmark<T: Context>(
     let solution_quality = solution_quality.unwrap();
 
     // check solution_quality length
-    let precommit_details = ctx.get_precommit_details(&benchmark_id).await.unwrap();
-    if solution_quality.len() != precommit_details.num_nonces as usize {
+    let PrecommitDetails {
+        num_nonces,
+        num_bundles,
+        ..
+    } = ctx.get_precommit_details(&benchmark_id).await.unwrap();
+    let num_nonces = num_nonces as usize;
+    let num_bundles = num_bundles as usize;
+    if solution_quality.len() != num_nonces {
         return Err(anyhow!(
             "Invalid solution_quality length. Should match number of nonces {}",
-            precommit_details.num_nonces
+            num_nonces
         ));
     }
 
     // random sample nonces
     let challenge_config = &ctx.get_config().await.challenges[&settings.challenge_id];
     let track_config = &challenge_config.active_tracks[&settings.track_id];
+    let num_nonces_per_bundle = num_nonces / num_bundles;
     let mut rng = StdRng::seed_from_u64(seed);
     let mut nonce_quality = solution_quality
         .iter()
@@ -183,71 +190,93 @@ pub async fn submit_benchmark<T: Context>(
         .enumerate()
         .collect::<Vec<(usize, i32)>>();
     nonce_quality.shuffle(&mut rng);
-    let num_nonces_per_group =
-        (precommit_details.num_nonces / precommit_details.num_bundles) as usize;
-    let rem = nonce_quality.len() % num_nonces_per_group;
-    let num_groups = (nonce_quality.len() + num_nonces_per_group - 1) / num_nonces_per_group;
-    let mut average_quality_by_group = Vec::new();
-    let mut sampled_nonces = Vec::new();
-    for i in 0..num_groups {
-        let start_idx = if i < rem {
-            i * (num_nonces_per_group + 1)
-        } else {
-            i * num_nonces_per_group + rem
-        };
-        let end_idx = if i < rem {
-            start_idx + num_nonces_per_group + 1
-        } else {
-            start_idx + num_nonces_per_group
-        };
-        let group = &mut nonce_quality[start_idx..end_idx];
-        group.sort_unstable_by_key(|&(_, quality)| quality);
+    let bundles = nonce_quality
+        .chunks_mut(num_nonces_per_bundle)
+        .map(|chunk| {
+            chunk.sort_unstable_by_key(|&(_, quality)| quality);
+            chunk.to_vec()
+        })
+        .collect::<Vec<_>>();
+    let average_quality_by_bundle = bundles
+        .iter()
+        .map(|bundle| {
+            match challenge_config.quality_type {
+                QualityType::Continuous => {
+                    // median
+                    bundle[num_nonces_per_bundle / 2].1
+                }
+                QualityType::Binary => {
+                    // mean
+                    (bundle.iter().map(|&(_, q)| q as i64).sum::<i64>()
+                        / num_nonces_per_bundle as i64) as i32
+                }
+            }
+        })
+        .collect::<Vec<i32>>();
+    let active_bundles = average_quality_by_bundle
+        .iter()
+        .zip(bundles)
+        .filter_map(|(&q, bundle)| {
+            if q >= track_config.min_active_quality {
+                Some(bundle)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
-        match challenge_config.quality_type {
-            QualityType::Continuous => {
-                let median = group[num_nonces_per_group / 2].1;
-                average_quality_by_group.push(median);
-                if median >= track_config.min_active_quality {
-                    sampled_nonces.extend(
-                        group
-                            .iter()
-                            .skip(num_nonces_per_group / 2)
-                            .map(|&(idx, _)| idx as u64),
-                    );
-                }
+    let mut sampled_nonces = HashSet::new();
+    if !active_bundles.is_empty() {
+        let mut gte_average_samples = HashSet::new();
+        for _ in 0..25 {
+            if gte_average_samples.len() == challenge_config.num_samples_gte_average {
+                break;
             }
-            QualityType::Binary => {
-                let mean =
-                    (group.iter().map(|&(_, q)| q as i64).sum::<i64>() / group.len() as i64) as i32;
-                average_quality_by_group.push(mean);
-                if mean >= track_config.min_active_quality {
-                    sampled_nonces.extend(
-                        group
-                            .iter()
-                            .filter(|&(_, quality)| *quality != 0)
-                            .map(|&(idx, _)| idx as u64),
-                    );
+            let bundle = &active_bundles[rng.gen_range(0..active_bundles.len())];
+            let start = match challenge_config.quality_type {
+                QualityType::Continuous => num_nonces_per_bundle / 2,
+                QualityType::Binary => {
+                    if let Some(idx) = bundle.iter().position(|&(_, q)| q != 0) {
+                        idx
+                    } else {
+                        continue;
+                    }
                 }
-            }
+            };
+            let idx = rng.gen_range(start..num_nonces_per_bundle);
+            gte_average_samples.insert(bundle[idx].0 as u64);
         }
-    }
+        sampled_nonces.extend(gte_average_samples);
 
-    for i in 0..sampled_nonces.len().min(challenge_config.max_samples) {
-        let j = rng.gen_range(i..sampled_nonces.len());
-        sampled_nonces.swap(i, j);
+        let mut lt_average_samples = HashSet::new();
+        for _ in 0..25 {
+            if lt_average_samples.len() == challenge_config.num_samples_lt_average {
+                break;
+            }
+            let bundle = &active_bundles[rng.gen_range(0..active_bundles.len())];
+            let end = match challenge_config.quality_type {
+                QualityType::Continuous => num_nonces_per_bundle / 2,
+                QualityType::Binary => {
+                    if let Some(idx) = bundle.iter().position(|&(_, q)| q != 0) {
+                        idx
+                    } else {
+                        continue;
+                    }
+                }
+            };
+            let idx = rng.gen_range(0..end);
+            lt_average_samples.insert(bundle[idx].0 as u64);
+        }
+        sampled_nonces.extend(lt_average_samples);
     }
-    let sampled_nonces = sampled_nonces
-        .into_iter()
-        .take(challenge_config.max_samples)
-        .collect::<HashSet<u64>>();
 
     ctx.add_benchmark_to_mempool(
         benchmark_id,
         BenchmarkDetails {
-            stopped: false,
-            average_quality_by_bundle: Some(average_quality_by_group),
+            stopped: active_bundles.is_empty(),
+            average_quality_by_bundle: Some(average_quality_by_bundle),
             merkle_root: Some(merkle_root),
-            sampled_nonces: Some(sampled_nonces),
+            sampled_nonces: (!active_bundles.is_empty()).then_some(sampled_nonces),
         },
         Some(solution_quality),
     )
