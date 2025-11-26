@@ -61,27 +61,27 @@ pub async fn submit_precommit<T: Context>(
     }
     let track_config = &challenge_config.active_tracks[&settings.track_id];
 
-    if num_bundles < track_config.min_num_bundles {
+    if num_bundles < challenge_config.min_num_bundles {
         return Err(anyhow!(
             "Invalid num_bundles '{}'. Must be at least {}",
             num_bundles,
-            track_config.min_num_bundles,
+            challenge_config.min_num_bundles,
         ));
     }
 
-    if runtime_config.max_memory > track_config.runtime_config_limits.max_memory {
+    if runtime_config.max_memory > challenge_config.runtime_config_limits.max_memory {
         return Err(anyhow!(
             "Invalid runtime_config.max_memory '{}'. Must be <= {}",
             runtime_config.max_memory,
-            track_config.runtime_config_limits.max_memory
+            challenge_config.runtime_config_limits.max_memory
         ));
     }
 
-    if runtime_config.max_fuel > track_config.runtime_config_limits.max_fuel {
+    if runtime_config.max_fuel > challenge_config.runtime_config_limits.max_fuel {
         return Err(anyhow!(
             "Invalid runtime_config.max_fuel '{}'. Must be <= {}",
             runtime_config.max_fuel,
-            track_config.runtime_config_limits.max_fuel
+            challenge_config.runtime_config_limits.max_fuel
         ));
     }
 

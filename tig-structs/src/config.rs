@@ -78,8 +78,6 @@ pub enum QualityType {
 serializable_struct_with_getters! {
     TrackConfig {
         num_nonces_per_bundle: u64,
-        min_num_bundles: u64,
-        runtime_config_limits: RuntimeConfig,
         min_active_quality: i32,
     }
 }
@@ -95,7 +93,9 @@ serializable_struct_with_getters! {
         per_nonce_fee: PreciseNumber,
         base_fee: PreciseNumber,
         active_tracks: HashMap<String, TrackConfig>,
+        runtime_config_limits: RuntimeConfig,
         max_qualifiers_per_track: u64,
+        min_num_bundles: u64,
     }
 }
 serializable_struct_with_getters! {
