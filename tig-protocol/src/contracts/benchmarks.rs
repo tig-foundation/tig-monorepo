@@ -264,6 +264,9 @@ pub async fn submit_benchmark<T: Context>(
                     }
                 }
             };
+            if end == 0 {
+                continue;
+            }
             let idx = rng.gen_range(0..end);
             lt_average_samples.insert(bundle[idx].0 as u64);
         }
