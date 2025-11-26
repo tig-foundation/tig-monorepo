@@ -206,9 +206,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                         .map(|(player_id, opow_data)| {
                             (
                                 player_id.clone(),
-                                opow_data.num_qualifiers_by_challenge_by_track[challenge_id]
-                                    .values()
-                                    .sum::<u64>(),
+                                opow_data
+                                    .num_qualifiers_by_challenge_by_track
+                                    .get(challenge_id)
+                                    .map(|x| x.values().sum::<u64>())
+                                    .unwrap_or_default(),
                             )
                         })
                         .collect::<HashMap<String, u64>>(),

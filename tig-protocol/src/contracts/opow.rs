@@ -127,10 +127,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             .unwrap();
 
         let mut qualifier_qualities_by_track = HashMap::<String, HashSet<i32>>::new();
-        let mut code_qualifiers_by_track_by_player =
+        let mut num_qualifiers_by_code_by_track_by_player =
             HashMap::<String, HashMap<String, HashMap<String, u64>>>::new();
-        let mut player_qualifiers_by_track = HashMap::<String, HashMap<String, u64>>::new();
-        let mut challenge_qualifiers_by_track = HashMap::<String, u64>::new();
+        let mut num_qualifiers_by_player_by_track = HashMap::<String, HashMap<String, u64>>::new();
+        let mut num_qualifiers_by_track = HashMap::<String, u64>::new();
 
         for (track_id, track_config) in challenge_config.active_tracks.iter() {
             if !benchmarks.contains_key(track_id) {
@@ -151,15 +151,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let qualifier_qualities = qualifier_qualities_by_track
                 .entry(track_id.clone())
                 .or_default();
-            let code_qualifiers_by_player = code_qualifiers_by_track_by_player
-                .entry(track_id.clone())
-                .or_default();
-            let player_qualifiers = player_qualifiers_by_track
-                .entry(track_id.clone())
-                .or_default();
-            let num_qualifiers = challenge_qualifiers_by_track
-                .entry(track_id.clone())
-                .or_default();
+            let num_qualifiers = num_qualifiers_by_track.entry(track_id.clone()).or_default();
 
             for &(i, quality) in sorted_average_quality.iter() {
                 if *num_qualifiers >= challenge_config.max_qualifiers_per_track
@@ -173,12 +165,20 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     ..
                 } = &benchmarks[i].0;
 
-                let q = player_qualifiers.entry(player_id.clone()).or_default();
-                if *q < max_qualifiers_by_player[player_id] {
-                    *q += 1;
+                let player_qualifiers_by_track = num_qualifiers_by_player_by_track
+                    .entry(player_id.clone())
+                    .or_default();
+                if player_qualifiers_by_track.values().sum::<u64>()
+                    < max_qualifiers_by_player[player_id]
+                {
+                    *player_qualifiers_by_track
+                        .entry(track_id.clone())
+                        .or_default() += 1;
                     *num_qualifiers += 1;
-                    *code_qualifiers_by_player
+                    *num_qualifiers_by_code_by_track_by_player
                         .entry(algorithm_id.clone())
+                        .or_default()
+                        .entry(track_id.clone())
                         .or_default()
                         .entry(player_id.clone())
                         .or_default() += 1;
@@ -188,14 +188,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
 
         challenge_data.qualifier_qualities_by_track = qualifier_qualities_by_track;
-        challenge_data.num_qualifiers_by_track = challenge_qualifiers_by_track;
-        for (player_id, num_qualifiers_by_track) in player_qualifiers_by_track {
+        challenge_data.num_qualifiers_by_track = num_qualifiers_by_track;
+        for (player_id, num_qualifiers_by_track) in num_qualifiers_by_player_by_track {
             let opow_data = active_opow_block_data.get_mut(&player_id).unwrap();
             opow_data
                 .num_qualifiers_by_challenge_by_track
                 .insert(challenge_id.clone(), num_qualifiers_by_track);
         }
-        for (algorithm_id, num_qualifiers_by_track_by_player) in code_qualifiers_by_track_by_player
+        for (algorithm_id, num_qualifiers_by_track_by_player) in
+            num_qualifiers_by_code_by_track_by_player
         {
             let code_data = active_codes_block_data.get_mut(&algorithm_id).unwrap();
             code_data.num_qualifiers_by_track_by_player = num_qualifiers_by_track_by_player;
@@ -288,8 +289,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     opow_data
                         .num_qualifiers_by_challenge_by_track
                         .get(challenge_id)
-                        .map(|x| x.values().sum())
-                        .unwrap_or(0),
+                        .map(|x| x.values().sum::<u64>())
+                        .unwrap_or_default(),
                 ) / PreciseNumber::from(total_qualifiers)
             });
         }
