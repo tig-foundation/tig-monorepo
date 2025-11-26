@@ -20,7 +20,7 @@ def main():
     challenges = sorted(challenges, key=lambda x: x['id'])
     for c in challenges:
         status = f"active @ round {c['state']['round_active']}"
-        print(f"id: {c['id']:<7} name: {c['details']['name']:<20} status: {status}")
+        print(f"id: {c['id']:<7} name: {c['config']['name']:<20} status: {status}")
         
 if __name__ == "__main__":
     main()

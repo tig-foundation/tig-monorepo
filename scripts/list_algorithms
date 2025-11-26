@@ -26,7 +26,7 @@ def main():
     c_id = next(
         (
             c['id'] for c in challenges
-            if c['details']['name'] == CHALLENGE
+            if c['config']['name'] == CHALLENGE
         ),
         None
     )
