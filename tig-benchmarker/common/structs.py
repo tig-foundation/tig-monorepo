@@ -25,7 +25,7 @@ class CodeState(FromDict):
 
 @dataclass
 class CodeBlockData(FromDict):
-    num_qualifiers_by_track_by_player: Dict[str, int]
+    num_qualifiers_by_track_by_player: Dict[str, Dict[str, int]]
     adoption: PreciseNumber
     merge_points: int
     reward: PreciseNumber
@@ -182,8 +182,8 @@ class ChallengeState(FromDict):
 
 @dataclass
 class ChallengeBlockData(FromDict):
-    num_qualifiers_by_track: int
-    qualifier_qualities: Dict[str, List[int]]
+    num_qualifiers_by_track: Dict[str, int]
+    qualifier_qualities_by_track: Dict[str, List[int]]
 
 @dataclass
 class Challenge(FromDict):
@@ -194,7 +194,7 @@ class Challenge(FromDict):
 
 @dataclass
 class OPoWBlockData(FromDict):
-    num_qualifiers_by_challenge_by_track: Dict[str, int]
+    num_qualifiers_by_challenge_by_track: Dict[str, Dict[str, int]]
     cutoff: int
     weighted_delegated_deposit: PreciseNumber
     weighted_self_deposit: PreciseNumber
@@ -270,7 +270,7 @@ class TopUp(FromDict):
     state: TopUpState
 
 @dataclass
-class DifficultyData(FromDict):
+class TrackData(FromDict):
     average_quality: int
     num_bundles: int
     algorithm_id: str

@@ -24,11 +24,10 @@ class JobManager:
         binarys: Dict[str, Binary],
         **kwargs
     ):
-        api_url = CONFIG["api_url"]
         algo_selection = CONFIG["algo_selection"]
         # create jobs from confirmed precommits
         challenge_id_2_name = {
-            c.id: c["config"]["name"]
+            c.id: c.config["name"]
             for c in challenges.values()
         }
         algorithm_id_2_name = {

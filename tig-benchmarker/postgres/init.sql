@@ -116,74 +116,56 @@ SELECT '
     {
       "algorithm_id": "c001_a001",
       "num_bundles": 1,
-      "selected_track": null,
+      "selected_track_ids": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime_config": {
-        "max_fuel": 100000000000,
-        "max_memory": 0
-      }
+      "runtime_config": {}
     },
     {
       "algorithm_id": "c002_a001",
       "num_bundles": 1,
-      "selected_track": null,
+      "selected_track_ids": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime_config": {
-        "max_fuel": 100000000000,
-        "max_memory": 0
-      }
+      "runtime_config": {}
     },
     {
       "algorithm_id": "c003_a001",
       "num_bundles": 1,
-      "selected_track": null,
+      "selected_track_ids": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime_config": {
-        "max_fuel": 100000000000,
-        "max_memory": 0
-      }
+      "runtime_config": {}
     },
     {
       "algorithm_id": "c004_a001",
       "num_bundles": 1,
-      "selected_track": null,
+      "selected_track_ids": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime_config": {
-        "max_fuel": 100000000000,
-        "max_memory": 0
-      }
+      "runtime_config": {}
     },
     {
       "algorithm_id": "c005_a001",
       "num_bundles": 1,
-      "selected_track": null,
+      "selected_track_ids": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime_config": {
-        "max_fuel": 100000000000,
-        "max_memory": 0
-      }
+      "runtime_config": {}
     },
     {
       "algorithm_id": "c006_a001",
       "num_bundles": 1,
-      "selected_track": null,
+      "selected_track_ids": [],
       "weight": 1,
       "batch_size": 8,
       "hyperparameters": null,
-      "runtime_config": {
-        "max_fuel": 100000000000,
-        "max_memory": 0
-      }
+      "runtime_config": {}
     }
   ],
   "time_before_batch_retry": 60000,

@@ -62,20 +62,20 @@ class DataFetcher:
         }
         
         # Fetch difficulty data for each challenge
-        difficulty_urls = [
-            f"{config['api_url']}/get-difficulty-data?block_id={block.id}&challenge_id={c_id}"
+        tracks_urls = [
+            f"{config['api_url']}/get-tracks-data?block_id={block.id}&challenge_id={c_id}"
             for c_id in challenges
         ]
         
         with ThreadPoolExecutor(max_workers=4) as executor:
-            difficulty_responses = list(executor.map(_get, difficulty_urls))
+            tracks_responses = list(executor.map(_get, tracks_urls))
         
-        difficulty_data = {
+        tracks_data = {
             c_id: {
-                race_id: [DifficultyData.from_dict(x) for x in v]
-                for race_id, v in resp["data"].items()
+                track_id: [TrackData.from_dict(x) for x in v]
+                for track_id, v in resp["data"].items()
             }
-            for c_id, resp in zip(challenges, difficulty_responses)
+            for c_id, resp in zip(challenges, tracks_responses)
         }
 
         self._cache = {
@@ -87,6 +87,6 @@ class DataFetcher:
             "proofs": proofs,
             "frauds": frauds,
             "challenges": challenges,
-            "difficulty_data": difficulty_data
+            "tracks_data": tracks_data
         }
         return self._cache

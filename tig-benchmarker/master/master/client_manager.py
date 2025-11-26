@@ -177,7 +177,7 @@ class ClientManager:
                     B.benchmark_id,
                     B.challenge,
                     B.algorithm,
-                    B.settings->>'race_id' as race_id,
+                    B.settings->>'track_id' as track_id,
                     B.batch_size,
                     B.num_nonces,
                     COALESCE(C.average_quality, A.average_quality) AS average_quality,
