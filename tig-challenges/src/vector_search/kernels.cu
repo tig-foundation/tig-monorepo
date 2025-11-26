@@ -131,7 +131,7 @@ extern "C" __global__ void generate_vectors(
     }
 }
 
-extern "C" __global__ void calc_total_distance(
+extern "C" __global__ void evaluate_total_distance(
     const uint32_t vector_dims,
     const uint32_t database_size,
     const uint32_t num_queries,

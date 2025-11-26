@@ -107,15 +107,6 @@ pub fn compute_solution(
 
     macro_rules! dispatch_challenge {
         ($c:ident, cpu) => {{
-            // library function may exit 87 if it runs out of fuel
-            let solve_challenge_fn = unsafe {
-                library.get::<fn(
-                    &$c::Challenge,
-                    &dyn Fn(&$c::Solution) -> Result<()>,
-                    Option<String>,
-                ) -> Result<()>>(b"entry_point")?
-            };
-
             let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
             {
                 settings.track_id.clone()
@@ -129,6 +120,16 @@ pub fn compute_solution(
                     stringify!($c)
                 )
             })?;
+
+            // library function may exit 87 if it runs out of fuel
+            let solve_challenge_fn = unsafe {
+                library.get::<fn(
+                    &$c::Challenge,
+                    &dyn Fn(&$c::Solution) -> Result<()>,
+                    Option<String>,
+                ) -> Result<()>>(b"entry_point")?
+            };
+
             let challenge = $c::Challenge::generate_instance(&seed, &track)?;
 
             let save_solution_fn = |solution: &$c::Solution| -> Result<()> {
@@ -161,6 +162,20 @@ pub fn compute_solution(
         }};
 
         ($c:ident, gpu) => {{
+            let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
+            {
+                settings.track_id.clone()
+            } else {
+                format!(r#""{}""#, settings.track_id)
+            };
+            let track = serde_json::from_str(&track_id).map_err(|_| {
+                anyhow::anyhow!(
+                    "Failed to parse track_id '{}' as {}::Track",
+                    settings.track_id,
+                    stringify!($c)
+                )
+            })?;
+
             if ptx_path.is_none() {
                 panic!("PTX file is required for GPU challenges.");
             }
@@ -197,7 +212,7 @@ pub fn compute_solution(
 
             let challenge = $c::Challenge::generate_instance(
                 &seed,
-                settings.size,
+                &track,
                 module.clone(),
                 stream.clone(),
                 &prop,

@@ -1,33 +1,15 @@
+use crate::QUALITY_PRECISION;
 use anyhow::{anyhow, Result};
 use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
-use serde_json::{from_value, Map, Value};
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct Difficulty {
-    pub num_queries: u32,
-    #[cfg(not(feature = "hide_verification"))]
-    pub better_than_baseline: u32,
-    #[cfg(feature = "hide_verification")]
-    better_than_baseline: u32,
-}
-
-impl From<Vec<i32>> for Difficulty {
-    fn from(arr: Vec<i32>) -> Self {
-        Self {
-            num_queries: arr[0] as u32,
-            better_than_baseline: arr[1] as u32,
-        }
-    }
-}
-impl Into<Vec<i32>> for Difficulty {
-    fn into(self) -> Vec<i32> {
-        vec![self.num_queries as i32, self.better_than_baseline as i32]
+impl_kv_string_serde! {
+    Track {
+        num_queries: u32,
     }
 }
 
@@ -47,12 +29,11 @@ impl Solution {
 
 pub struct Challenge {
     pub seed: [u8; 32],
-    pub difficulty: Difficulty,
+    pub num_queries: u32,
     pub vector_dims: u32,
     pub database_size: u32,
     pub d_database_vectors: CudaSlice<f32>,
     pub d_query_vectors: CudaSlice<f32>,
-    pub max_distance: f32,
 }
 
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
@@ -60,16 +41,14 @@ pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
 impl Challenge {
     pub fn generate_instance(
         seed: &[u8; 32],
-        difficulty: &Difficulty,
+        track: &Track,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
         let mut rng = StdRng::from_seed(seed.clone());
-        let better_than_baseline = difficulty.better_than_baseline;
-        let max_distance = 11.0 - (better_than_baseline as f32) / 1000.0;
         let vector_dims = 250;
-        let database_size = 100 * difficulty.num_queries;
+        let database_size = 100 * track.num_queries;
         let avg_cluster_size: f32 = 700.0;
         let num_clusters: u32 = ((1.0 + rng.gen::<f32>() * 0.05)
             + database_size as f32 / avg_cluster_size)
@@ -126,14 +105,14 @@ impl Challenge {
         let mut d_database_vectors =
             stream.alloc_zeros::<f32>((database_size * vector_dims) as usize)?;
         let mut d_query_vectors =
-            stream.alloc_zeros::<f32>((difficulty.num_queries * vector_dims) as usize)?;
+            stream.alloc_zeros::<f32>((track.num_queries * vector_dims) as usize)?;
 
         unsafe {
             stream
                 .launch_builder(&generate_vectors_kernel)
                 .arg(&d_seed)
                 .arg(&database_size)
-                .arg(&difficulty.num_queries)
+                .arg(&track.num_queries)
                 .arg(&vector_dims)
                 .arg(&num_clusters)
                 .arg(&d_cluster_cum_prob)
@@ -151,117 +130,87 @@ impl Challenge {
 
         return Ok(Self {
             seed: seed.clone(),
-            difficulty: difficulty.clone(),
+            num_queries: track.num_queries.clone(),
             vector_dims,
             database_size,
             d_database_vectors,
             d_query_vectors,
-            max_distance,
         });
     }
 
-    pub fn calc_average_distance(
+    pub fn evaluate_average_distance(
         &self,
         solution: &Solution,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
-        prop: &cudaDeviceProp,
+        _prop: &cudaDeviceProp,
     ) -> Result<f32> {
-        calc_average_distance(
-            self.difficulty.num_queries,
-            self.vector_dims,
-            self.database_size,
-            &self.d_query_vectors,
-            &self.d_database_vectors,
-            &solution.indexes,
-            module.clone(),
-            stream.clone(),
-            prop,
-        )
+        if solution.indexes.len() != self.num_queries as usize {
+            return Err(anyhow!(
+                "Invalid number of indexes. Expected: {}, Actual: {}",
+                self.num_queries,
+                solution.indexes.len()
+            ));
+        }
+
+        let evaluate_total_distance_kernel = module.load_function("evaluate_total_distance")?;
+
+        let d_solution_indexes = stream.memcpy_stod(&solution.indexes)?;
+        let mut d_total_distance = stream.alloc_zeros::<f32>(1)?;
+        let mut errorflag = stream.alloc_zeros::<u32>(1)?;
+
+        let cfg = LaunchConfig {
+            grid_dim: (1, 1, 1),
+            block_dim: (1, 1, 1),
+            shared_mem_bytes: 0,
+        };
+
+        unsafe {
+            stream
+                .launch_builder(&evaluate_total_distance_kernel)
+                .arg(&self.vector_dims)
+                .arg(&self.database_size)
+                .arg(&self.num_queries)
+                .arg(&self.d_query_vectors)
+                .arg(&self.d_database_vectors)
+                .arg(&d_solution_indexes)
+                .arg(&mut d_total_distance)
+                .arg(&mut errorflag)
+                .launch(cfg)?;
+        }
+
+        stream.synchronize()?;
+
+        let total_distance = stream.memcpy_dtov(&d_total_distance)?[0];
+        let error_flag = stream.memcpy_dtov(&errorflag)?[0];
+
+        match error_flag {
+            0 => {}
+            1 => {
+                return Err(anyhow!("Invalid index in solution"));
+            }
+            _ => {
+                return Err(anyhow!("Unknown error code: {}", error_flag));
+            }
+        }
+
+        let avg_dist = total_distance / self.num_queries as f32;
+        Ok(avg_dist)
     }
 
     conditional_pub!(
-        fn verify_solution(
+        fn evaluate_solution(
             &self,
             solution: &Solution,
             module: Arc<CudaModule>,
             stream: Arc<CudaStream>,
             prop: &cudaDeviceProp,
-        ) -> Result<()> {
-            let avg_dist = self.calc_average_distance(solution, module, stream, prop)?;
-            if avg_dist > self.max_distance {
-                return Err(anyhow!(
-                    "Average query vector distance is '{}'. Max dist: '{}'",
-                    avg_dist,
-                    self.max_distance
-                ));
-            } else {
-                Ok(())
-            }
+        ) -> Result<i32> {
+            let avg_dist = self.evaluate_average_distance(solution, module, stream, prop)?;
+            let quality = (11.0 - avg_dist as f64) / 11.0;
+            let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
+            let quality = quality.round() as i32;
+            Ok(quality)
         }
     );
-}
-
-pub fn calc_average_distance(
-    num_queries: u32,
-    vector_dims: u32,
-    database_size: u32,
-    d_query_vectors: &CudaSlice<f32>,
-    d_database_vectors: &CudaSlice<f32>,
-    indexes: &Vec<usize>,
-    module: Arc<CudaModule>,
-    stream: Arc<CudaStream>,
-    _prop: &cudaDeviceProp,
-) -> Result<f32> {
-    if indexes.len() != num_queries as usize {
-        return Err(anyhow!(
-            "Invalid number of indexes. Expected: {}, Actual: {}",
-            num_queries,
-            indexes.len()
-        ));
-    }
-
-    let calc_total_distance_kernel = module.load_function("calc_total_distance")?;
-
-    let d_solution_indexes = stream.memcpy_stod(indexes)?;
-    let mut d_total_distance = stream.alloc_zeros::<f32>(1)?;
-    let mut errorflag = stream.alloc_zeros::<u32>(1)?;
-
-    let cfg = LaunchConfig {
-        grid_dim: (1, 1, 1),
-        block_dim: (1, 1, 1),
-        shared_mem_bytes: 0,
-    };
-
-    unsafe {
-        stream
-            .launch_builder(&calc_total_distance_kernel)
-            .arg(&vector_dims)
-            .arg(&database_size)
-            .arg(&num_queries)
-            .arg(d_query_vectors)
-            .arg(d_database_vectors)
-            .arg(&d_solution_indexes)
-            .arg(&mut d_total_distance)
-            .arg(&mut errorflag)
-            .launch(cfg)?;
-    }
-
-    stream.synchronize()?;
-
-    let total_distance = stream.memcpy_dtov(&d_total_distance)?[0];
-    let error_flag = stream.memcpy_dtov(&errorflag)?[0];
-
-    match error_flag {
-        0 => {}
-        1 => {
-            return Err(anyhow!("Invalid index in solution"));
-        }
-        _ => {
-            return Err(anyhow!("Unknown error code: {}", error_flag));
-        }
-    }
-
-    let avg_dist = total_distance / num_queries as f32;
-    Ok(avg_dist)
 }

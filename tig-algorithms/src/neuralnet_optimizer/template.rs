@@ -28,8 +28,9 @@ pub fn solve_challenge(
 ) -> Result<()> {
     // boilerplate for training loop
     // recommend not modifying this function unless you have a good reason
-    let (solution, train_losses, val_losses) = training_loop(
+    training_loop(
         challenge,
+        save_solution,
         module,
         stream,
         prop,
@@ -37,9 +38,8 @@ pub fn solve_challenge(
         optimizer_query_at_params,
         optimizer_step,
     )?;
-    save_solution(&solution)?;
 
-    Ok()
+    Ok(())
 }
 
 #[derive(Clone)]

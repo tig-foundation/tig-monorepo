@@ -37,6 +37,10 @@ pub struct Challenge {
     pub service_time: i32,
     pub ready_times: Vec<i32>,
     pub due_times: Vec<i32>,
+    #[cfg(not(feature = "hide_verification"))]
+    pub greedy_baseline_total_distance: u32,
+    #[cfg(feature = "hide_verification")]
+    greedy_baseline_total_distance: u32,
 }
 
 impl Challenge {
@@ -146,13 +150,18 @@ impl Challenge {
             node_positions,
             distance_matrix,
             max_capacity,
-            fleet_size: 0,
+            fleet_size: u32::MAX as usize,
             service_time,
             ready_times,
             due_times,
+            greedy_baseline_total_distance: 0,
         };
 
-        c.fleet_size = c.compute_greedy_baseline()?.routes.len() + 2;
+        let greedy_baseline_solution = c.compute_greedy_baseline()?;
+        c.greedy_baseline_total_distance =
+            c.evaluate_total_distance(&greedy_baseline_solution)? as u32;
+        c.fleet_size = greedy_baseline_solution.routes.len() + 2;
+
         Ok(c)
     }
 
@@ -236,10 +245,8 @@ impl Challenge {
     conditional_pub!(
         fn evaluate_solution(&self, solution: &Solution) -> Result<i32> {
             let total_distance = self.evaluate_total_distance(solution)?;
-            let greedy_solution = self.compute_greedy_baseline()?;
-            let greedy_total_distance = self.evaluate_total_distance(&greedy_solution)?;
             // TODO: implement SOTA baseline
-            let sota_total_distance = greedy_total_distance;
+            let sota_total_distance = self.greedy_baseline_total_distance;
             // if total_distance > greedy_total_distance {
             //     return Err(anyhow!(
             //         "Total distance {} is greater than greedy baseline distance {}",

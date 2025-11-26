@@ -9,6 +9,7 @@ use std::collections::HashSet;
 impl_kv_string_serde! {
     Track {
         num_items: usize,
+        density: u32,
     }
 }
 
@@ -38,7 +39,7 @@ impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], track: &Track) -> Result<Self> {
         let mut rng = SmallRng::from_seed(seed.clone());
         // Set constant density for value generation
-        let density = 0.25;
+        let density = track.density as f64 / 100.0;
 
         // Generate weights w_i in the range [1, 50]
         let weights: Vec<u32> = (0..track.num_items)

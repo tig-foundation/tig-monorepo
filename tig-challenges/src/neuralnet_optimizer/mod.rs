@@ -1,49 +1,22 @@
-use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use crate::QUALITY_PRECISION;
+use anyhow::Result;
 use cudarc::{
     cublas::CudaBlas,
     cudnn::Cudnn,
     driver::{CudaModule, CudaSlice, CudaStream, CudaView, LaunchConfig, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use rand::{prelude::*, rngs::StdRng};
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-use serde_json::{from_value, Map, Value};
-use std::{
-    any::Any,
-    fmt,
-    io::{Read, Write},
-    sync::Arc,
-};
+use std::{any::Any, sync::Arc};
 
-use crate::neuralnet::MLP;
+mod nn;
+use nn::MLP;
 
 const THREADS_PER_BLOCK: u32 = 1024;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Difficulty {
-    pub num_hidden_layers: usize,
-    #[cfg(not(feature = "hide_verification"))]
-    pub accuracy_factor: u32,
-    #[cfg(feature = "hide_verification")]
-    accuracy_factor: u32,
-}
-
-impl From<Vec<i32>> for Difficulty {
-    fn from(arr: Vec<i32>) -> Self {
-        Self {
-            num_hidden_layers: arr[0] as usize,
-            accuracy_factor: arr[1] as u32,
-        }
-    }
-}
-impl Into<Vec<i32>> for Difficulty {
-    fn into(self) -> Vec<i32> {
-        vec![self.num_hidden_layers as i32, self.accuracy_factor as i32]
+impl_kv_string_serde! {
+    Track {
+        num_hidden_layers: usize,
     }
 }
 
@@ -87,48 +60,48 @@ pub struct Dataset {
 }
 
 impl Dataset {
-    pub fn train_inputs(&self) -> CudaView<f32> {
+    pub fn train_inputs(&self) -> CudaView<'_, f32> {
         self.inputs.slice(0..self.train_size * self.input_dims)
     }
-    pub fn train_targets_noisy(&self) -> CudaView<f32> {
+    pub fn train_targets_noisy(&self) -> CudaView<'_, f32> {
         self.targets_noisy
             .slice(0..self.train_size * self.output_dims)
     }
-    pub fn train_targets_true_f(&self) -> CudaView<f32> {
+    pub fn train_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f
             .slice(0..self.train_size * self.output_dims)
     }
-    pub fn validation_inputs(&self) -> CudaView<f32> {
+    pub fn validation_inputs(&self) -> CudaView<'_, f32> {
         self.inputs.slice(
             self.train_size * self.input_dims
                 ..(self.train_size + self.validation_size) * self.input_dims,
         )
     }
-    pub fn validation_targets_noisy(&self) -> CudaView<f32> {
+    pub fn validation_targets_noisy(&self) -> CudaView<'_, f32> {
         self.targets_noisy.slice(
             self.train_size * self.output_dims
                 ..(self.train_size + self.validation_size) * self.output_dims,
         )
     }
-    pub fn validation_targets_true_f(&self) -> CudaView<f32> {
+    pub fn validation_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f.slice(
             self.train_size * self.output_dims
                 ..(self.train_size + self.validation_size) * self.output_dims,
         )
     }
-    pub fn test_inputs(&self) -> CudaView<f32> {
+    pub fn test_inputs(&self) -> CudaView<'_, f32> {
         self.inputs.slice(
             (self.train_size + self.validation_size) * self.input_dims
                 ..(self.train_size + self.validation_size + self.test_size) * self.input_dims,
         )
     }
-    pub fn test_targets_noisy(&self) -> CudaView<f32> {
+    pub fn test_targets_noisy(&self) -> CudaView<'_, f32> {
         self.targets_noisy.slice(
             (self.train_size + self.validation_size) * self.output_dims
                 ..(self.train_size + self.validation_size + self.test_size) * self.output_dims,
         )
     }
-    pub fn test_targets_true_f(&self) -> CudaView<f32> {
+    pub fn test_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f.slice(
             (self.train_size + self.validation_size) * self.output_dims
                 ..(self.train_size + self.validation_size + self.test_size) * self.output_dims,
@@ -138,7 +111,7 @@ impl Dataset {
 
 pub struct Challenge {
     pub seed: [u8; 32],
-    pub difficulty: Difficulty,
+    pub num_hidden_layers: usize,
     pub hidden_layers_dims: usize,
     pub batch_size: usize,
     pub max_epochs: usize,
@@ -151,7 +124,7 @@ pub struct Challenge {
 impl Challenge {
     pub fn generate_instance(
         seed: &[u8; 32],
-        difficulty: &Difficulty,
+        track: &Track,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
@@ -235,7 +208,7 @@ impl Challenge {
 
         Ok(Self {
             seed: *seed,
-            difficulty: difficulty.clone(),
+            num_hidden_layers: track.num_hidden_layers.clone(),
             hidden_layers_dims: 256,
             batch_size: 128,
             max_epochs: 1000,
@@ -256,13 +229,13 @@ impl Challenge {
     }
 
     conditional_pub!(
-        fn verify_solution(
+        fn evaluate_solution(
             &self,
             solution: &Solution,
             module: Arc<CudaModule>,
             stream: Arc<CudaStream>,
             _prop: &cudaDeviceProp,
-        ) -> Result<()> {
+        ) -> Result<i32> {
             let cublas = CudaBlas::new(stream.clone())?;
             let cudnn = Cudnn::new(stream.clone())?;
 
@@ -288,8 +261,6 @@ impl Challenge {
             let avg_model_loss_on_test = stream.memcpy_dtov(&loss)?[0];
 
             // Calculate baseline error epsilon_star_squared
-            let alpha = 4.0 - self.difficulty.accuracy_factor as f32 / 1000.0;
-
             let y_h = stream.memcpy_dtov(&self.dataset.test_targets_noisy())?;
             let f_h = stream.memcpy_dtov(&self.dataset.test_targets_true_f())?;
             stream.synchronize()?;
@@ -301,22 +272,18 @@ impl Challenge {
                 .sum();
 
             let epsilon_star_squared =
-                (alpha / self.dataset.test_size as f32) * sum_sq_diff_true_vs_noisy;
+                (4.0 / self.dataset.test_size as f32) * sum_sq_diff_true_vs_noisy;
 
-            if avg_model_loss_on_test <= epsilon_star_squared {
-                Ok(())
-            } else {
-                Err(anyhow!(
-                "Model test loss ({:.4e}) exceeds target baseline epsilon_star_squared ({:.4e})",
-                avg_model_loss_on_test,
-                epsilon_star_squared
-            ))
-            }
+            let quality = (epsilon_star_squared as f64 - avg_model_loss_on_test as f64)
+                / epsilon_star_squared as f64;
+            let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
+            let quality = quality.round() as i32;
+            Ok(quality)
         }
     );
 
     pub fn layer_dims(&self) -> Vec<usize> {
-        let mut layer_dims = vec![self.hidden_layers_dims; self.difficulty.num_hidden_layers];
+        let mut layer_dims = vec![self.hidden_layers_dims; self.num_hidden_layers];
         layer_dims.insert(0, self.dataset.input_dims);
         layer_dims.push(self.dataset.output_dims);
         layer_dims
@@ -370,13 +337,14 @@ pub type OptimizerStepFn = fn(
 
 pub fn training_loop(
     challenge: &Challenge,
+    save_solution: &dyn Fn(&Solution) -> Result<()>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
     optimizer_init_state: OptimizerInitStateFn,
     optimizer_query_at_params: OptimizerQueryAtParamsFn,
     optimizer_step: OptimizerStepFn,
-) -> Result<(Solution, Vec<f32>, Vec<f32>)> {
+) -> Result<()> {
     let Challenge {
         batch_size,
         max_epochs,
@@ -415,7 +383,6 @@ pub fn training_loop(
     let mut lowest_loss = f32::INFINITY;
     let mut _best_epoch = 0;
     let mut epochs_no_improvement = 0;
-    let mut best_model_solution: Option<Solution> = None;
     let mut prev_train_loss = None;
     let mut prev_validation_loss = None;
     let mut train_losses = Vec::with_capacity(max_epochs);
@@ -601,7 +568,7 @@ pub fn training_loop(
         if avg_val_loss < lowest_loss - min_loss_delta {
             lowest_loss = avg_val_loss;
             _best_epoch = epoch;
-            best_model_solution = Some(to_solution(&model, epoch + 1, stream.clone())?);
+            save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
             epochs_no_improvement = 0;
         } else {
             epochs_no_improvement += 1;
@@ -613,8 +580,7 @@ pub fn training_loop(
 
     stream.synchronize()?;
 
-    let solution = best_model_solution.ok_or_else(|| anyhow!("No valid solution found during training. Validation loss may have been NaN or never improved."))?;
-    Ok((solution, train_losses, validation_losses))
+    Ok(())
 }
 
 pub fn load_solution(mlp: &mut MLP, solution: &Solution, stream: Arc<CudaStream>) -> Result<()> {

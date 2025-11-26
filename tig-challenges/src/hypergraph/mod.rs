@@ -1,30 +1,13 @@
+use crate::QUALITY_PRECISION;
 use anyhow::{anyhow, Result};
 use cudarc::driver::*;
 use cudarc::runtime::sys::cudaDeviceProp;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Difficulty {
-    pub num_hyperedges: u32,
-    #[cfg(not(feature = "hide_verification"))]
-    pub better_than_baseline: u32,
-    #[cfg(feature = "hide_verification")]
-    better_than_baseline: u32,
-}
-
-impl From<Vec<i32>> for Difficulty {
-    fn from(arr: Vec<i32>) -> Self {
-        Self {
-            num_hyperedges: arr[0] as u32,
-            better_than_baseline: arr[1] as u32,
-        }
-    }
-}
-impl Into<Vec<i32>> for Difficulty {
-    fn into(self) -> Vec<i32> {
-        vec![self.num_hyperedges as i32, self.better_than_baseline as i32]
+impl_kv_string_serde! {
+    Track {
+        num_hyperedges: u32,
     }
 }
 
@@ -44,7 +27,7 @@ impl Solution {
 
 pub struct Challenge {
     pub seed: [u8; 32],
-    pub difficulty: Difficulty,
+    pub num_hyperedges: u32,
     pub num_nodes: u32,
     pub num_parts: u32,
     pub max_part_size: u32,
@@ -60,9 +43,9 @@ pub struct Challenge {
     pub d_node_offsets: CudaSlice<i32>,
     pub d_node_hyperedges: CudaSlice<i32>,
     #[cfg(not(feature = "hide_verification"))]
-    pub baseline_connectivity_metric: u32,
+    pub greedy_baseline_connectivity_metric: u32,
     #[cfg(feature = "hide_verification")]
-    baseline_connectivity_metric: u32,
+    greedy_baseline_connectivity_metric: u32,
 }
 
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
@@ -70,14 +53,14 @@ pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
 impl Challenge {
     pub fn generate_instance(
         seed: &[u8; 32],
-        difficulty: &Difficulty,
+        track: &Track,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
         let mut rng = StdRng::from_seed(seed.clone());
-        let num_hyperedges = difficulty.num_hyperedges;
-        let target_num_nodes = difficulty.num_hyperedges; // actual number may be around 8% less
+        let num_hyperedges = track.num_hyperedges;
+        let target_num_nodes = track.num_hyperedges; // actual number may be around 8% less
         let depth = 6;
         let num_parts = 1 << depth; // 2^6 = 64 partitions
         let level_weights: Vec<f32> = vec![
@@ -371,7 +354,7 @@ impl Challenge {
 
         Ok(Self {
             seed: *seed,
-            difficulty: difficulty.clone(),
+            num_hyperedges: track.num_hyperedges,
             num_nodes: target_num_nodes - num_prune,
             num_parts,
             max_part_size,
@@ -382,11 +365,11 @@ impl Challenge {
             d_node_degrees: d_shuffled_node_degrees,
             d_node_offsets: d_shuffled_node_offsets,
             d_node_hyperedges: d_shuffled_node_hyperedges,
-            baseline_connectivity_metric: connectivity_metric,
+            greedy_baseline_connectivity_metric: connectivity_metric,
         })
     }
 
-    pub fn calc_connectivity_metric(
+    pub fn evaluate_connectivity_metric(
         &self,
         solution: &Solution,
         module: Arc<CudaModule>,
@@ -407,7 +390,7 @@ impl Challenge {
         let count_nodes_in_part_kernel = module.load_function("count_nodes_in_part")?;
 
         let block_size = MAX_THREADS_PER_BLOCK;
-        let grid_size = (self.difficulty.num_hyperedges + block_size - 1) / block_size;
+        let grid_size = (self.num_hyperedges + block_size - 1) / block_size;
 
         let cfg = LaunchConfig {
             grid_dim: (grid_size, 1, 1),
@@ -466,7 +449,7 @@ impl Challenge {
         unsafe {
             stream
                 .launch_builder(&calc_connectivity_metric_kernel)
-                .arg(&self.difficulty.num_hyperedges)
+                .arg(&self.num_hyperedges)
                 .arg(&self.d_hyperedge_offsets)
                 .arg(&self.d_hyperedge_nodes)
                 .arg(&d_partition)
@@ -480,29 +463,33 @@ impl Challenge {
     }
 
     conditional_pub!(
-        fn verify_solution(
+        fn compute_greedy_baseline(&self) -> Result<Solution> {
+            Err(anyhow!("Not implemented yet"))
+        }
+    );
+
+    conditional_pub!(
+        fn compute_sota_baseline(&self) -> Result<Solution> {
+            Err(anyhow!("Not implemented yet"))
+        }
+    );
+
+    conditional_pub!(
+        fn evaluate_solution(
             &self,
             solution: &Solution,
             module: Arc<CudaModule>,
             stream: Arc<CudaStream>,
             _prop: &cudaDeviceProp,
-        ) -> Result<()> {
+        ) -> Result<i32> {
             let connectivity_metric =
-                self.calc_connectivity_metric(solution, module, stream, _prop)?;
-            let btb = self.difficulty.better_than_baseline as f64 / 1000.0;
-            let connectivity_metric_threshold =
-                (self.baseline_connectivity_metric as f64 * (1.0 - btb)).ceil() as u32;
-            if connectivity_metric > connectivity_metric_threshold {
-                Err(anyhow!(
-                    "connectivity_metric {} is greater than threshold {} (baseline: {}, better_than_baseline: {}%)",
-                    connectivity_metric,
-                    connectivity_metric_threshold,
-                    self.baseline_connectivity_metric,
-                    btb * 100.0
-                ))
-            } else {
-                Ok(())
-            }
+                self.evaluate_connectivity_metric(solution, module, stream, _prop)?;
+            let baseline_connectivity_metric = self.greedy_baseline_connectivity_metric;
+            let quality = (baseline_connectivity_metric as f64 - connectivity_metric as f64)
+                / baseline_connectivity_metric as f64;
+            let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
+            let quality = quality.round() as i32;
+            Ok(quality)
         }
     );
 }

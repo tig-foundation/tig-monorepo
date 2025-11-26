@@ -250,16 +250,18 @@ def main():
             f"Framework code does not exist @ '{framework_cu}'. This script must be run from the root of tig-monorepo"
         )
 
-    challenge_cu = f"tig-challenges/src/{CHALLENGE}.cu"
-    if not os.path.exists(challenge_cu):
+    challenge_cus_pattern = f"tig-challenges/src/{CHALLENGE}/**/*.cu"
+    challenge_cus = glob(challenge_cus_pattern, recursive=True)
+    if not challenge_cus:
         raise FileNotFoundError(
-            f"Challenge code does not exist @ '{challenge_cu}'. Is the challenge name correct?"
+            f"Challenge code does not exist @ '{challenge_cus_pattern}'. Is the challenge name correct?"
         )
 
-    algorithm_cus = glob(f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}/*.cu")
+    algorithm_cus_pattern = f"tig-algorithms/src/{CHALLENGE}/{args.algorithm}/*.cu"
+    algorithm_cus = glob(algorithm_cus_pattern)
     if not algorithm_cus:
         raise FileNotFoundError(
-            f"Algorithm code does not exist @ '{algorithm_cus}'. Is the algorithm name correct?"
+            f"Algorithm code does not exist @ '{algorithm_cus_pattern}'. Is the algorithm name correct?"
         )
 
     # Combine .cu source files into a temporary file
@@ -269,12 +271,8 @@ def main():
         
         with open(framework_cu, 'r') as f:
             code = f.read() + "\n"
-        with open(challenge_cu, 'r') as f:
-            code += f.read() + "\n"
-        for extra_cu in args.extra_cu_files:
-            if not os.path.exists(extra_cu):
-                raise FileNotFoundError(f"Extra .cu file does not exist: {extra_cu}")
-            with open(extra_cu, 'r') as f:
+        for cu_path in challenge_cus:
+            with open(cu_path, 'r') as f:
                 code += f.read() + "\n"
         kernel_regex = r'(?:extern\s+"C"\s+__global__|__device__)\s+\w+\s+(?P<func>\w+)\s*\('
         kernels_to_ignore = [match.group('func') for match in re.finditer(kernel_regex, code)]
