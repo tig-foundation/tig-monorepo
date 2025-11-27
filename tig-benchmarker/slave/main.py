@@ -225,12 +225,9 @@ def send_results(headers, master_ip, master_port, results_dir):
         result = json.load(f)
 
     if result.get("error") is not None:
-        if batch["sampled_nonces"] is None:
-            submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
-        else:
-            submit_url = f"http://{master_ip}:{master_port}/submit-batch-proofs/{batch_id}"
+        submit_url = f"http://{master_ip}:{master_port}/submit-batch-error/{batch_id}"
         logger.info(f"posting error for failed batch to {submit_url}")
-        resp = requests.post(submit_url, headers=headers, json=result)
+        resp = requests.post(submit_url, headers=headers, json={"error": result["error"]}, timeout=60)
         if resp.status_code == 200:
             os.remove(f"{output_folder}/result.json")
             logger.info(f"successfully posted error for batch {batch_id}")
@@ -245,7 +242,7 @@ def send_results(headers, master_ip, master_port, results_dir):
     elif batch["sampled_nonces"] is None:
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-root/{batch_id}"
         logger.info(f"posting root to {submit_url}")
-        resp = requests.post(submit_url, headers=headers, json=result)
+        resp = requests.post(submit_url, headers=headers, json=result, timeout=60)
         if resp.status_code == 200:
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted root for batch {batch_id}")
@@ -280,7 +277,7 @@ def send_results(headers, master_ip, master_port, results_dir):
         
         submit_url = f"http://{master_ip}:{master_port}/submit-batch-proofs/{batch_id}"
         logger.info(f"posting proofs to {submit_url}")
-        resp = requests.post(submit_url, headers=headers, json={"merkle_proofs": proofs_to_submit})
+        resp = requests.post(submit_url, headers=headers, json={"merkle_proofs": proofs_to_submit}, timeout=60)
         if resp.status_code == 200:
             FINISHED_BATCH_IDS[batch_id] = now()
             logger.info(f"successfully posted proofs for batch {batch_id}")

@@ -153,152 +153,45 @@ class SlaveManager:
                 get_db_conn().execute_many(*updates)
             return JSONResponse(content=jsonable_encoder(concurrent))
 
-        @app.post('/submit-batch-root/{batch_id}')
-        async def submit_batch_root(batch_id: str, request: Request):
+        def find_batch(batch_id: str, request: Request):
             if (slave_name := request.headers.get('User-Agent', None)) is None:
                 raise HTTPException(status_code=403, detail="User-Agent header is required")
-
-            with self.lock:
-                b = next((
-                    b for b in self.batches
-                    if (
-                        b["batch"]["id"] == batch_id and 
-                        b["batch"]["sampled_nonces"] is None and
-                        b["slave"] == slave_name
-                    )
-                ), None)
-                if b is None:
-                    raise HTTPException(
-                        status_code=408, 
-                        detail=f"Slave submitted roots for {batch_id}, but either took too long, or was not assigned this batch."
-                    )
-
-                try:
-                    result = await request.json()
-                    if (err := result.get("error")):
-                        b["slave"] = None
-                        logger.warning(f"slave {slave_name} reported failure for root {batch_id}: {err}")
-                    else:
-                        b["end_time"] = time.time() * 1000
-                        merkle_root = MerkleHash.from_str(result["merkle_root"])
-                        solution_quality = result["solution_quality"]
-                        assert isinstance(solution_quality, list) and all(isinstance(x, int) for x in solution_quality)
-                        logger.debug(f"slave {slave_name} submitted root for {batch_id}")
-                except Exception as e:
-                    logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
-                    raise HTTPException(status_code=400, detail="INVALID root")
             
-            # Update roots table with merkle root and solution quality
-            benchmark_id, batch_idx = batch_id.split("_")
-            batch_idx = int(batch_idx)
-            queries = []
-            if err:
-                if b["num_attempts"] < CONFIG["max_batch_attempts"]:
-                    queries += [
-                        (
-                            """
-                            UPDATE root_batch
-                            SET slave = NULL
-                            WHERE benchmark_id = %s 
-                                AND batch_idx = %s
-                            """, 
-                            (
-                                benchmark_id,
-                                batch_idx
-                            )
-                        )
-                    ]
-                else:
-                    queries += [
-                        (
-                            """
-                            UPDATE job
-                            SET stopped = True
-                            WHERE benchmark_id = %s 
-                            """, 
-                            (
-                                benchmark_id,
-                            )
-                        )
-                    ]
-            else:
-                queries += [
-                    (
-                        """
-                        UPDATE root_batch
-                        SET ready = true,
-                            end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
-                        WHERE benchmark_id = %s 
-                            AND batch_idx = %s
-                        """, 
-                        (
-                            benchmark_id,
-                            batch_idx
-                        )
-                    ),
-                    (
-                        """
-                        UPDATE batch_data
-                        SET merkle_root = %s,
-                            solution_quality = %s,
-                            average_quality = %s
-                        WHERE benchmark_id = %s 
-                            AND batch_idx = %s                    
-                        """,
-                        (
-                            merkle_root.to_str(),
-                            json.dumps(solution_quality),
-                            sum(solution_quality) // len(solution_quality),
-                            benchmark_id,
-                            batch_idx
-                        )
-                    )
-                ]
-            get_db_conn().execute_many(*queries)
-
-            return {"status": "OK"}
-
-        @app.post('/submit-batch-proofs/{batch_id}')
-        async def submit_batch_proofs(batch_id: str, request: Request):
-            if (slave_name := request.headers.get('User-Agent', None)) is None:
-                raise HTTPException(status_code=403, detail="User-Agent header is required")
-
             with self.lock:
                 b = next((
                     b for b in self.batches
                     if (
                         b["batch"]["id"] == batch_id and 
-                        b["batch"]["sampled_nonces"] is not None and
-                        b["slave"] == slave_name
+                        b["slave"] == slave_name and
+                        b["end_time"] is None and
+                        (
+                            'error' in request.url.path or
+                            (b["batch"]["sampled_nonces"] is None) == ('root' in request.url.path)
+                        )
                     )
                 ), None)
                 if b is None:
                     raise HTTPException(
                         status_code=408, 
-                        detail=f"Slave submitted proofs for {batch_id}, but either took too long, or was not assigned this batch."
+                        detail=f"Slave {slave_name} posted to {request.url.path}, but either took too long, or was not assigned this batch."
                     )
+            
+            return slave_name, b
 
-                try:
-                    result = await request.json()
-                    if (err := result.get("error")):
-                        b["slave"] = None
-                        logger.warning(f"slave {slave_name} reported failure for proofs {batch_id}: {err}")
-                    else:
-                        b["end_time"] = time.time() * 1000
-                        merkle_proofs = [MerkleProof.from_dict(x) for x in result["merkle_proofs"]]
-                        logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
-                except Exception as e:
-                    logger.error(f"slave {slave_name} submitted INVALID proofs for {batch_id}: {e}")
-                    raise HTTPException(status_code=400, detail="INVALID proofs")
+        @app.post('/submit-batch-error/{batch_id}')
+        async def submit_batch_error(batch_id: str, request: Request):
+            slave_name, b = find_batch(batch_id, request)
+            result = await request.json()
+            logger.warning(f"slave {slave_name} reported failure for {batch_id}: {result['error']}")
 
-            # Update proofs table with merkle proofs
             benchmark_id, batch_idx = batch_id.split("_")
             batch_idx = int(batch_idx)
-            if err:
-                get_db_conn().execute_many(*[
+            if b["num_attempts"] < CONFIG["max_batch_attempts"]:
+                table_name = "root_batch" if b["batch"]["sampled_nonces"] is None else "proofs_batch"
+                queries = [
                     (
-                        """
-                        UPDATE proofs_batch
+                        f"""
+                        UPDATE {table_name}
                         SET slave = NULL
                         WHERE benchmark_id = %s 
                             AND batch_idx = %s
@@ -308,33 +201,113 @@ class SlaveManager:
                             batch_idx
                         )
                     )
-                ])
+                ]
             else:
-                get_db_conn().execute_many(*[
+                queries = [
                     (
                         """
-                        UPDATE proofs_batch
-                        SET ready = true,
-                            end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                        UPDATE job
+                        SET stopped = True
                         WHERE benchmark_id = %s 
-                            AND batch_idx = %s
-                        """, 
-                        (benchmark_id, batch_idx)
-                    ),
-                    (
-                        """
-                        UPDATE batch_data
-                        SET merkle_proofs = %s
-                        WHERE benchmark_id = %s 
-                            AND batch_idx = %s
                         """, 
                         (
-                            json.dumps([x.to_dict() for x in merkle_proofs]), 
-                            benchmark_id, 
-                            batch_idx
+                            benchmark_id,
                         )
                     )
-                ])
+                ]
+            get_db_conn().execute_many(*queries)
+
+            return {"status": "OK"}
+
+        @app.post('/submit-batch-root/{batch_id}')
+        async def submit_batch_root(batch_id: str, request: Request):
+            slave_name, b = find_batch(batch_id, request)
+            try:
+                result = await request.json()
+                merkle_root = MerkleHash.from_str(result["merkle_root"])
+                solution_quality = result["solution_quality"]
+                assert isinstance(solution_quality, list) and all(isinstance(x, int) for x in solution_quality)
+                logger.debug(f"slave {slave_name} submitted root for {batch_id}")
+            except Exception as e:
+                logger.error(f"slave {slave_name} submitted INVALID root for {batch_id}: {e}")
+                raise HTTPException(status_code=400, detail="INVALID root")
+            # Update roots table with merkle root and solution quality
+            benchmark_id, batch_idx = batch_id.split("_")
+            batch_idx = int(batch_idx)
+            queries = [
+                (
+                    """
+                    UPDATE root_batch
+                    SET ready = true,
+                        end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                    WHERE benchmark_id = %s 
+                        AND batch_idx = %s
+                    """, 
+                    (
+                        benchmark_id,
+                        batch_idx
+                    )
+                ),
+                (
+                    """
+                    UPDATE batch_data
+                    SET merkle_root = %s,
+                        solution_quality = %s,
+                        average_quality = %s
+                    WHERE benchmark_id = %s 
+                        AND batch_idx = %s                    
+                    """,
+                    (
+                        merkle_root.to_str(),
+                        json.dumps(solution_quality),
+                        sum(solution_quality) // len(solution_quality),
+                        benchmark_id,
+                        batch_idx
+                    )
+                )
+            ]
+            get_db_conn().execute_many(*queries)
+
+            return {"status": "OK"}
+
+        @app.post('/submit-batch-proofs/{batch_id}')
+        async def submit_batch_proofs(batch_id: str, request: Request):
+            slave_name, b = find_batch(batch_id, request)
+            try:
+                result = await request.json()
+                merkle_proofs = [MerkleProof.from_dict(x) for x in result["merkle_proofs"]]
+                logger.debug(f"slave {slave_name} submitted proofs for {batch_id}")
+            except Exception as e:
+                logger.error(f"slave {slave_name} submitted INVALID proofs for {batch_id}: {e}")
+                raise HTTPException(status_code=400, detail="INVALID proofs")
+            # Update proofs table with merkle proofs
+            benchmark_id, batch_idx = batch_id.split("_")
+            batch_idx = int(batch_idx)
+            get_db_conn().execute_many(*[
+                (
+                    """
+                    UPDATE proofs_batch
+                    SET ready = true,
+                        end_time = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+                    WHERE benchmark_id = %s 
+                        AND batch_idx = %s
+                    """, 
+                    (benchmark_id, batch_idx)
+                ),
+                (
+                    """
+                    UPDATE batch_data
+                    SET merkle_proofs = %s
+                    WHERE benchmark_id = %s 
+                        AND batch_idx = %s
+                    """, 
+                    (
+                        json.dumps([x.to_dict() for x in merkle_proofs]), 
+                        benchmark_id, 
+                        batch_idx
+                    )
+                )
+            ])
 
             return {"status": "OK"}
             
