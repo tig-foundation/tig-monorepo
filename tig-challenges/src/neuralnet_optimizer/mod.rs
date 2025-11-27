@@ -381,7 +381,7 @@ pub fn training_loop(
     )?;
 
     let mut lowest_loss = f32::INFINITY;
-    let mut _best_epoch = 0;
+    let mut last_save_epoch = None;
     let mut epochs_no_improvement = 0;
     let mut prev_train_loss = None;
     let mut prev_validation_loss = None;
@@ -567,12 +567,18 @@ pub fn training_loop(
         // --- Early Stopping ---
         if avg_val_loss < lowest_loss - min_loss_delta {
             lowest_loss = avg_val_loss;
-            _best_epoch = epoch;
-            save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
             epochs_no_improvement = 0;
+            if !last_save_epoch
+                .as_ref()
+                .is_some_and(|&x| epoch - x < max_epochs / 20)
+            {
+                last_save_epoch = Some(epoch);
+                save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
+            }
         } else {
             epochs_no_improvement += 1;
             if epochs_no_improvement >= patience {
+                save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
                 break;
             }
         }
