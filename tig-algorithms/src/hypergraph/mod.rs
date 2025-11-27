@@ -1,4 +1,5 @@
-// c005_a001
+pub mod local_search;
+pub use local_search as c005_a001;
 
 // c005_a002
 
