@@ -48,3 +48,8 @@ pub fn entry_point(
         Err(anyhow!("Panic occurred calling solve_challenge"))
     })
 }
+
+#[no_mangle]
+pub extern "C" fn help() {
+    {ALGORITHM}::help();
+}

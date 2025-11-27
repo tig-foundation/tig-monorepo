@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+
+import argparse
+import ctypes
+import os
+import platform
+import sys
+
+if (CPU_ARCH := platform.machine().lower()) in ["x86_64", "amd64"]:
+    CPU_ARCH = "amd64"
+elif CPU_ARCH in ["arm64", "aarch64"]:
+    CPU_ARCH = "arm64"
+else:
+    print(f"Unsupported CPU architecture: {CPU_ARCH}")
+    sys.exit(1)
+
+CHALLENGE = os.getenv("CHALLENGE")
+if CHALLENGE is None:
+    print("CHALLENGE environment variable must be set!")
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="TIG Algorithm Tester")
+    parser.add_argument("algorithm", type=str, help="Algorithm name")
+    parser.add_argument("--lib-dir", type=str, default="./tig-algorithms/lib", help="Path to the algorithms library folder (default: ./tig-algorithms/lib)")
+    
+    args = parser.parse_args()
+    
+    so_path = f"{args.lib_dir}/{CHALLENGE}/{CPU_ARCH}/{args.algorithm}.so"
+
+    if not os.path.exists(so_path):
+        print(
+f"""Library not found at {so_path}:
+    * To download: use download_algorithm
+    * To build: use build_algorithm
+    * To set the lib folder: set --lib-dir <path_to_folder>
+""")
+        sys.exit(1)
+
+    try:
+        lib = ctypes.CDLL(so_path)
+        lib.help()
+    except Exception as e:
+        print(f"Failed to load {so_path}: {e}")
+        sys.exit(1)

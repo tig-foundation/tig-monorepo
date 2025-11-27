@@ -220,6 +220,7 @@ echo "Linking into shared library '$output'"
 cat > export_symbols.map << 'EOF'
 {
   global:
+    help;
     entry_point;
     __fuel_remaining;
     __runtime_signature;
