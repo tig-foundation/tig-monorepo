@@ -4,7 +4,8 @@
 
 // c001_a003
 
-// c001_a004
+pub mod sat_global_opt;
+pub use sat_global_opt as c001_a004;
 
 // c001_a005
 
