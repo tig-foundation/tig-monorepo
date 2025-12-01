@@ -12,7 +12,8 @@
 
 // c003_a007
 
-// c003_a008
+pub mod better_in_twos;
+pub use better_in_twos as c003_a008;
 
 // c003_a009
 
