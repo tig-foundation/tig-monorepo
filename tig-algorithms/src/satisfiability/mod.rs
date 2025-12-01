@@ -60,7 +60,8 @@
 
 // c001_a031
 
-// c001_a032
+pub mod sat_ultra;
+pub use sat_ultra as c001_a032;
 
 // c001_a033
 
