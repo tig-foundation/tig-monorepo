@@ -8,7 +8,8 @@
 
 // c001_a005
 
-// c001_a006
+pub mod genetic_sat;
+pub use genetic_sat as c001_a006;
 
 // c001_a007
 
