@@ -38,7 +38,8 @@
 
 // c001_a020
 
-// c001_a021
+pub mod hybrid_ultra_fast;
+pub use hybrid_ultra_fast as c001_a021;
 
 // c001_a022
 
