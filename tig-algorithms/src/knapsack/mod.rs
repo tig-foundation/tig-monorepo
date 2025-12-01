@@ -6,7 +6,8 @@
 
 // c003_a004
 
-// c003_a005
+pub mod genetic;
+pub use genetic as c003_a005;
 
 // c003_a006
 
