@@ -70,7 +70,8 @@
 
 // c003_a036
 
-// c003_a037
+pub mod hybrid_greedy_dp;
+pub use hybrid_greedy_dp as c003_a037;
 
 // c003_a038
 
