@@ -102,7 +102,8 @@
 
 // c003_a052
 
-// c003_a053
+pub mod greedy_quadkp;
+pub use greedy_quadkp as c003_a053;
 
 // c003_a054
 
