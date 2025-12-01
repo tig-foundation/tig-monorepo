@@ -18,7 +18,8 @@
 
 // c003_a010
 
-// c003_a011
+pub mod dual_descent;
+pub use dual_descent as c003_a011;
 
 // c003_a012
 
