@@ -48,7 +48,8 @@
 
 // c002_a025
 
-// c002_a026
+pub mod enhanced_annealing;
+pub use enhanced_annealing as c002_a026;
 
 // c002_a027
 
