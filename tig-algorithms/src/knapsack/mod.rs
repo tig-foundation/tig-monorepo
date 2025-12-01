@@ -62,7 +62,8 @@
 
 // c003_a032
 
-// c003_a033
+pub mod optimism_dollop;
+pub use optimism_dollop as c003_a033;
 
 // c003_a034
 
