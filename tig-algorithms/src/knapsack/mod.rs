@@ -208,7 +208,8 @@
 
 // c003_a105
 
-// c003_a106
+pub mod catknap;
+pub use catknap as c003_a106;
 
 // c003_a107
 
