@@ -72,7 +72,8 @@
 
 // c003_a037
 
-// c003_a038
+pub mod bounded_greedy_dp;
+pub use bounded_greedy_dp as c003_a038;
 
 // c003_a039
 
