@@ -72,7 +72,8 @@
 
 // c002_a037
 
-// c002_a038
+pub mod quick_cw;
+pub use quick_cw as c002_a038;
 
 // c002_a039
 
