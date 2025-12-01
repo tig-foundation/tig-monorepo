@@ -24,7 +24,8 @@
 
 // c002_a013
 
-// c002_a014
+pub mod fast_exit_clarke;
+pub use fast_exit_clarke as c002_a014;
 
 // c002_a015
 
