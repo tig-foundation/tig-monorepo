@@ -8,7 +8,8 @@
 
 // c002_a005
 
-// c002_a006
+pub mod ant_colony;
+pub use ant_colony as c002_a006;
 
 // c002_a007
 
