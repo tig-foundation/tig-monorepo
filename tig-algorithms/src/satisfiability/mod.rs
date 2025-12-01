@@ -48,7 +48,8 @@
 
 // c001_a025
 
-// c001_a026
+pub mod manual_sat;
+pub use manual_sat as c001_a026;
 
 // c001_a027
 
