@@ -46,7 +46,8 @@
 
 // c001_a024
 
-// c001_a025
+pub mod heuristics_gsat;
+pub use heuristics_gsat as c001_a025;
 
 // c001_a026
 
