@@ -100,7 +100,8 @@
 
 // c003_a051
 
-// c003_a052
+pub mod ultra_quadkp;
+pub use ultra_quadkp as c003_a052;
 
 // c003_a053
 
