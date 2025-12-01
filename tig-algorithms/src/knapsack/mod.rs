@@ -60,7 +60,8 @@
 
 // c003_a031
 
-// c003_a032
+pub mod quick_knap;
+pub use quick_knap as c003_a032;
 
 // c003_a033
 
