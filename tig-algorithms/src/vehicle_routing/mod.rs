@@ -120,7 +120,8 @@
 
 // c002_a061
 
-// c002_a062
+pub mod new_enhanced_cw;
+pub use new_enhanced_cw as c002_a062;
 
 // c002_a063
 
