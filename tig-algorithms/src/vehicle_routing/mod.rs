@@ -152,7 +152,8 @@
 
 // c002_a077
 
-// c002_a078
+pub mod simple_ls_zero;
+pub use simple_ls_zero as c002_a078;
 
 // c002_a079
 
