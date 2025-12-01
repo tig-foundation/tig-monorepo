@@ -178,7 +178,8 @@
 
 // c003_a090
 
-// c003_a091
+pub mod better_knapsack;
+pub use better_knapsack as c003_a091;
 
 // c003_a092
 
