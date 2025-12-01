@@ -140,7 +140,8 @@
 
 // c003_a071
 
-// c003_a072
+pub mod new_relative_high;
+pub use new_relative_high as c003_a072;
 
 // c003_a073
 
