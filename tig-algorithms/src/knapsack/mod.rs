@@ -66,7 +66,8 @@
 
 // c003_a034
 
-// c003_a035
+pub mod knap_super_bb;
+pub use knap_super_bb as c003_a035;
 
 // c003_a036
 
