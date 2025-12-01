@@ -42,7 +42,8 @@
 
 // c002_a022
 
-// c002_a023
+pub mod clarke_wright_who;
+pub use clarke_wright_who as c002_a023;
 
 // c002_a024
 
