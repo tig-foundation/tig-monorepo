@@ -92,7 +92,8 @@
 
 // c002_a047
 
-// c002_a048
+pub mod cw_test_wasm;
+pub use cw_test_wasm as c002_a048;
 
 // c002_a049
 
