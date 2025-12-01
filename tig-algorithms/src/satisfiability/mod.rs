@@ -90,7 +90,8 @@
 
 // c001_a046
 
-// c001_a047
+pub mod sat_separate;
+pub use sat_separate as c001_a047;
 
 // c001_a048
 
