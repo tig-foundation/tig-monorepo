@@ -126,7 +126,8 @@
 
 // c003_a064
 
-// c003_a065
+pub mod relative_quad_fast;
+pub use relative_quad_fast as c003_a065;
 
 // c003_a066
 
