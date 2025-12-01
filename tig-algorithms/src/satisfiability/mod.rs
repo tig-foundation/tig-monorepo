@@ -84,7 +84,8 @@
 
 // c001_a043
 
-// c001_a044
+pub mod sat_adaptive_opt;
+pub use sat_adaptive_opt as c001_a044;
 
 // c001_a045
 
