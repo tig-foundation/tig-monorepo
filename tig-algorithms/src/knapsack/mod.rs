@@ -130,7 +130,8 @@
 
 // c003_a066
 
-// c003_a067
+pub mod relative_quad_high;
+pub use relative_quad_high as c003_a067;
 
 // c003_a068
 
