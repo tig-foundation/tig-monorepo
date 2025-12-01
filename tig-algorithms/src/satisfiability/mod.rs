@@ -52,7 +52,8 @@
 
 // c001_a027
 
-// c001_a028
+pub mod sat_opaa;
+pub use sat_opaa as c001_a028;
 
 // c001_a029
 
