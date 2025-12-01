@@ -122,7 +122,8 @@
 
 // c003_a062
 
-// c003_a063
+pub mod kp_annealing;
+pub use kp_annealing as c003_a063;
 
 // c003_a064
 
