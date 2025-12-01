@@ -204,7 +204,8 @@
 
 // c003_a103
 
-// c003_a104
+pub mod fig_roll;
+pub use fig_roll as c003_a104;
 
 // c003_a105
 
