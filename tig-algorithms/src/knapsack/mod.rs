@@ -184,7 +184,8 @@
 
 // c003_a093
 
-// c003_a094
+pub mod native_knapsack;
+pub use native_knapsack as c003_a094;
 
 // c003_a095
 
