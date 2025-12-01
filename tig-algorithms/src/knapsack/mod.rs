@@ -80,7 +80,8 @@
 
 // c003_a041
 
-// c003_a042
+pub mod just_good_knapsack;
+pub use just_good_knapsack as c003_a042;
 
 // c003_a043
 
