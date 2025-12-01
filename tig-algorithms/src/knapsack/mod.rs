@@ -16,7 +16,8 @@
 
 // c003_a009
 
-// c003_a010
+pub mod knapsplorify;
+pub use knapsplorify as c003_a010;
 
 // c003_a011
 
