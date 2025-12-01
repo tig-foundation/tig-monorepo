@@ -158,7 +158,8 @@
 
 // c002_a080
 
-// c002_a081
+pub mod routing_exact_fast;
+pub use routing_exact_fast as c002_a081;
 
 // c002_a082
 
