@@ -128,7 +128,8 @@
 
 // c003_a065
 
-// c003_a066
+pub mod relative_quad_mid;
+pub use relative_quad_mid as c003_a066;
 
 // c003_a067
 
