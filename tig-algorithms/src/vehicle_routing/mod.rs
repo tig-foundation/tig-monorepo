@@ -20,7 +20,8 @@
 
 // c002_a011
 
-// c002_a012
+pub mod guided_clarke_wright;
+pub use guided_clarke_wright as c002_a012;
 
 // c002_a013
 
