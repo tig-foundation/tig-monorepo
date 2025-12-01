@@ -1,6 +1,7 @@
 // c003_a001
 
-// c003_a002
+pub mod greedy;
+pub use greedy as c003_a002;
 
 // c003_a003
 
