@@ -70,7 +70,8 @@
 
 // c002_a036
 
-// c002_a037
+pub mod cw_super_gpu;
+pub use cw_super_gpu as c002_a037;
 
 // c002_a038
 
