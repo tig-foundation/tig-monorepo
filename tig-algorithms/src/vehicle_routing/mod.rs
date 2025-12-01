@@ -86,7 +86,8 @@
 
 // c002_a044
 
-// c002_a045
+pub mod cw_ultimate;
+pub use cw_ultimate as c002_a045;
 
 // c002_a046
 
