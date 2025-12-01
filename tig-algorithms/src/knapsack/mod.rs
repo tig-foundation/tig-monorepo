@@ -190,7 +190,8 @@
 
 // c003_a096
 
-// c003_a097
+pub mod fast_and_fun;
+pub use fast_and_fun as c003_a097;
 
 // c003_a098
 
