@@ -10,7 +10,8 @@
 
 // c002_a006
 
-// c002_a007
+pub mod genetic_algorithm;
+pub use genetic_algorithm as c002_a007;
 
 // c002_a008
 
