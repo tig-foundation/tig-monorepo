@@ -50,7 +50,8 @@
 
 // c003_a026
 
-// c003_a027
+pub mod quantum_knapsack;
+pub use quantum_knapsack as c003_a027;
 
 // c003_a028
 
