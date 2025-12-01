@@ -194,7 +194,8 @@
 
 // c003_a098
 
-// c003_a099
+pub mod super_knap;
+pub use super_knap as c003_a099;
 
 // c003_a100
 
