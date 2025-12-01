@@ -142,7 +142,8 @@
 
 // c003_a072
 
-// c003_a073
+pub mod new_relative_optima;
+pub use new_relative_optima as c003_a073;
 
 // c003_a074
 
