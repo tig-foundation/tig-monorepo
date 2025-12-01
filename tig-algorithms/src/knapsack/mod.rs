@@ -84,7 +84,8 @@
 
 // c003_a043
 
-// c003_a044
+pub mod qknap_optimize;
+pub use qknap_optimize as c003_a044;
 
 // c003_a045
 
