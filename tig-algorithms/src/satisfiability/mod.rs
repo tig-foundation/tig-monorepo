@@ -1,6 +1,7 @@
 // c001_a001
 
-// c001_a002
+pub mod dpll_backtracking;
+pub use dpll_backtracking as c001_a002;
 
 // c001_a003
 
