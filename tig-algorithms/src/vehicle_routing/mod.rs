@@ -80,7 +80,8 @@
 
 // c002_a041
 
-// c002_a042
+pub mod clarker_fastest;
+pub use clarker_fastest as c002_a042;
 
 // c002_a043
 
