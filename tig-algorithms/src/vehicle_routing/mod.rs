@@ -108,7 +108,8 @@
 
 // c002_a055
 
-// c002_a056
+pub mod rerouting_fast;
+pub use rerouting_fast as c002_a056;
 
 // c002_a057
 
