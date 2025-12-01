@@ -154,7 +154,8 @@
 
 // c002_a078
 
-// c002_a079
+pub mod routing_fast;
+pub use routing_fast as c002_a079;
 
 // c002_a080
 
