@@ -2,7 +2,8 @@
 
 // c003_a002
 
-// c003_a003
+pub mod branch_and_bound;
+pub use branch_and_bound as c003_a003;
 
 // c003_a004
 
