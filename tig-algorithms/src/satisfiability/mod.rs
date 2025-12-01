@@ -116,7 +116,8 @@
 
 // c001_a059
 
-// c001_a060
+pub mod sat_unified_opt;
+pub use sat_unified_opt as c001_a060;
 
 // c001_a061
 
