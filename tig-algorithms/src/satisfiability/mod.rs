@@ -126,7 +126,8 @@
 
 // c001_a064
 
-// c001_a065
+pub mod sat_lossless;
+pub use sat_lossless as c001_a065;
 
 // c001_a066
 
