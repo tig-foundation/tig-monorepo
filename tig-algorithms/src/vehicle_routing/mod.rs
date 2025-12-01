@@ -62,7 +62,8 @@
 
 // c002_a032
 
-// c002_a033
+pub mod compact_gcw_turbo;
+pub use compact_gcw_turbo as c002_a033;
 
 // c002_a034
 
