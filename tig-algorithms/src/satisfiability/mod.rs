@@ -78,7 +78,8 @@
 
 // c001_a040
 
-// c001_a041
+pub mod sat_global_opt;
+pub use sat_global_opt as c001_a041;
 
 // c001_a042
 
