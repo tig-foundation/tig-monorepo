@@ -126,7 +126,8 @@
 
 // c002_a064
 
-// c002_a065
+pub mod new_enhanced_cw_low;
+pub use new_enhanced_cw_low as c002_a065;
 
 // c002_a066
 
