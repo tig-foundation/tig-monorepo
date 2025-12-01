@@ -192,7 +192,8 @@
 
 // c003_a097
 
-// c003_a098
+pub mod knapsplatt;
+pub use knapsplatt as c003_a098;
 
 // c003_a099
 
