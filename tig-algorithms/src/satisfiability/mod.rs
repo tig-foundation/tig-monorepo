@@ -54,7 +54,8 @@
 
 // c001_a028
 
-// c001_a029
+pub mod satisfactory;
+pub use satisfactory as c001_a029;
 
 // c001_a030
 
