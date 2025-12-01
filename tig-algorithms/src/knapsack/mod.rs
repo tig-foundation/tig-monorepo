@@ -134,7 +134,8 @@
 
 // c003_a068
 
-// c003_a069
+pub mod new_relative_ultra;
+pub use new_relative_ultra as c003_a069;
 
 // c003_a070
 
