@@ -134,7 +134,8 @@
 
 // c001_a068
 
-// c001_a069
+pub mod sat_sigma;
+pub use sat_sigma as c001_a069;
 
 // c001_a070
 
