@@ -50,7 +50,8 @@
 
 // c002_a026
 
-// c002_a027
+pub mod optimized_clarke;
+pub use optimized_clarke as c002_a027;
 
 // c002_a028
 
