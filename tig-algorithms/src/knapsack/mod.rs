@@ -40,7 +40,8 @@
 
 // c003_a021
 
-// c003_a022
+pub mod needaknap;
+pub use needaknap as c003_a022;
 
 // c003_a023
 
