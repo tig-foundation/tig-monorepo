@@ -150,7 +150,8 @@
 
 // c003_a076
 
-// c003_a077
+pub mod relative_opt_high;
+pub use relative_opt_high as c003_a077;
 
 // c003_a078
 
