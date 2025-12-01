@@ -100,7 +100,8 @@
 
 // c001_a051
 
-// c001_a052
+pub mod sat_maximize_max;
+pub use sat_maximize_max as c001_a052;
 
 // c001_a053
 
