@@ -122,7 +122,8 @@
 
 // c001_a062
 
-// c001_a063
+pub mod native_sat;
+pub use native_sat as c001_a063;
 
 // c001_a064
 
