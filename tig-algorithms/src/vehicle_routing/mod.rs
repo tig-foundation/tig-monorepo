@@ -84,7 +84,8 @@
 
 // c002_a043
 
-// c002_a044
+pub mod clarke_wright_mvrp;
+pub use clarke_wright_mvrp as c002_a044;
 
 // c002_a045
 
