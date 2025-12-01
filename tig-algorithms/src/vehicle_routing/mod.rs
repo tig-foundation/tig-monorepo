@@ -78,7 +78,8 @@
 
 // c002_a040
 
-// c002_a041
+pub mod clarke_wright_gpu;
+pub use clarke_wright_gpu as c002_a041;
 
 // c002_a042
 
