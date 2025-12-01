@@ -16,7 +16,8 @@
 
 // c002_a009
 
-// c002_a010
+pub mod dynamic_colonies;
+pub use dynamic_colonies as c002_a010;
 
 // c002_a011
 
