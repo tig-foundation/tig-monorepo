@@ -132,7 +132,8 @@
 
 // c003_a067
 
-// c003_a068
+pub mod quadkp_improved_opt;
+pub use quadkp_improved_opt as c003_a068;
 
 // c003_a069
 
