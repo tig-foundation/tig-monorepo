@@ -118,7 +118,8 @@
 
 // c003_a060
 
-// c003_a061
+pub mod quadkp_heuristics;
+pub use quadkp_heuristics as c003_a061;
 
 // c003_a062
 
