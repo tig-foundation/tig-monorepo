@@ -200,7 +200,8 @@
 
 // c003_a101
 
-// c003_a102
+pub mod knapsplat_hyper_s;
+pub use knapsplat_hyper_s as c003_a102;
 
 // c003_a103
 
