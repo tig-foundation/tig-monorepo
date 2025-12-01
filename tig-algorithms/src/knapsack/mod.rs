@@ -138,7 +138,8 @@
 
 // c003_a070
 
-// c003_a071
+pub mod new_relative_mid;
+pub use new_relative_mid as c003_a071;
 
 // c003_a072
 
