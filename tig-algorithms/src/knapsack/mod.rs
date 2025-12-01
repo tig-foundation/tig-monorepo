@@ -136,7 +136,8 @@
 
 // c003_a069
 
-// c003_a070
+pub mod new_relative_fast;
+pub use new_relative_fast as c003_a070;
 
 // c003_a071
 
