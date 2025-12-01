@@ -74,7 +74,8 @@
 
 // c002_a038
 
-// c002_a039
+pub mod cw_super_too;
+pub use cw_super_too as c002_a039;
 
 // c002_a040
 
