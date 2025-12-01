@@ -140,7 +140,8 @@
 
 // c002_a071
 
-// c002_a072
+pub mod better_routing;
+pub use better_routing as c002_a072;
 
 // c002_a073
 
