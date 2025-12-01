@@ -154,7 +154,8 @@
 
 // c003_a078
 
-// c003_a079
+pub mod justatestonmyendher;
+pub use justatestonmyendher as c003_a079;
 
 // c003_a080
 
