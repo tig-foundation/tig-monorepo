@@ -116,7 +116,8 @@
 
 // c002_a059
 
-// c002_a060
+pub mod advanced_cw_adp;
+pub use advanced_cw_adp as c002_a060;
 
 // c002_a061
 
