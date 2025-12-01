@@ -18,7 +18,8 @@
 
 // c002_a010
 
-// c002_a011
+pub mod lazier_cw;
+pub use lazier_cw as c002_a011;
 
 // c002_a012
 
