@@ -170,7 +170,8 @@
 
 // c002_a086
 
-// c002_a087
+pub mod vrptw_high;
+pub use vrptw_high as c002_a087;
 
 // c002_a088
 
