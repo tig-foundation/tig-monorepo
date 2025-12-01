@@ -88,7 +88,8 @@
 
 // c001_a045
 
-// c001_a046
+pub mod sat_maximize;
+pub use sat_maximize as c001_a046;
 
 // c001_a047
 
