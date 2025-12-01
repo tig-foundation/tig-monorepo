@@ -144,7 +144,8 @@
 
 // c002_a073
 
-// c002_a074
+pub mod sausage;
+pub use sausage as c002_a074;
 
 // c002_a075
 
