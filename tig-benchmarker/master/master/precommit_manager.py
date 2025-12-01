@@ -55,13 +55,13 @@ class PrecommitManager:
         if selection["num_bundles"] < challenge_config["min_num_bundles"]:
             selection["num_bundles"] = challenge_config["min_num_bundles"]
 
-        for k, v in challenge_config["runtime_config_limits"].items():
-            if (
-                selection["runtime_config"].get(k) is None or 
-                selection["runtime_config"][k] < 0 or
-                selection["runtime_config"][k] > v
-            ):
-                selection["runtime_config"][k] = v
+        if (
+            len(selection["runtime_config"]) > 1 or
+            selection["runtime_config"].get("max_fuel") is None or 
+            selection["runtime_config"]["max_fuel"] < 0 or
+            selection["runtime_config"]["max_fuel"] > challenge_config["runtime_config_limits"]["max_fuel"]
+        ):
+            selection["runtime_config"] = {"max_fuel": challenge_config["runtime_config_limits"]["max_fuel"]}
 
         self.num_precommits_submitted += 1
         req = SubmitPrecommitRequest(
@@ -74,7 +74,10 @@ class PrecommitManager:
             ),
             num_bundles=selection["num_bundles"],
             hyperparameters=selection["hyperparameters"],
-            runtime_config=selection["runtime_config"],
+            runtime_config={
+                **challenge_config["runtime_config_limits"],
+                **selection["runtime_config"]
+            },
         )
         logger.info(f"Created precommit (algorithm_id: {a_id}, track: {req.settings.track_id}, num_bundles: {req.num_bundles}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
         return req
