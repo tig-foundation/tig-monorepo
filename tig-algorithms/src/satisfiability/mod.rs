@@ -82,7 +82,8 @@
 
 // c001_a042
 
-// c001_a043
+pub mod sat_foundation;
+pub use sat_foundation as c001_a043;
 
 // c001_a044
 
