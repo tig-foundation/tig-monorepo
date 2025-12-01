@@ -60,7 +60,8 @@
 
 // c002_a031
 
-// c002_a032
+pub mod inbound;
+pub use inbound as c002_a032;
 
 // c002_a033
 
