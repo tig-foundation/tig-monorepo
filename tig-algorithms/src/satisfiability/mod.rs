@@ -40,7 +40,8 @@
 
 // c001_a021
 
-// c001_a022
+pub mod optimized_sprint_sat;
+pub use optimized_sprint_sat as c001_a022;
 
 // c001_a023
 
