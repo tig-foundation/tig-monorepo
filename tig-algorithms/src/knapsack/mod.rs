@@ -196,7 +196,8 @@
 
 // c003_a099
 
-// c003_a100
+pub mod knap_supreme;
+pub use knap_supreme as c003_a100;
 
 // c003_a101
 
