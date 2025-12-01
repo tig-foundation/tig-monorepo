@@ -64,7 +64,8 @@
 
 // c003_a033
 
-// c003_a034
+pub mod optimized_aa;
+pub use optimized_aa as c003_a034;
 
 // c003_a035
 
