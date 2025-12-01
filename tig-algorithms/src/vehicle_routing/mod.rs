@@ -128,7 +128,8 @@
 
 // c002_a065
 
-// c002_a066
+pub mod new_enhanced_cw_mid;
+pub use new_enhanced_cw_mid as c002_a066;
 
 // c002_a067
 
