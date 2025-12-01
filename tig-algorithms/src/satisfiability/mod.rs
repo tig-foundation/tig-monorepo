@@ -130,7 +130,8 @@
 
 // c001_a066
 
-// c001_a067
+pub mod sat_supreme;
+pub use sat_supreme as c001_a067;
 
 // c001_a068
 
