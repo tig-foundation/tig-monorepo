@@ -56,7 +56,8 @@
 
 // c002_a029
 
-// c002_a030
+pub mod compact_gcw;
+pub use compact_gcw as c002_a030;
 
 // c002_a031
 
