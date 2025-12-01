@@ -124,7 +124,8 @@
 
 // c002_a063
 
-// c002_a064
+pub mod new_enhanced_cw_opt;
+pub use new_enhanced_cw_opt as c002_a064;
 
 // c002_a065
 
