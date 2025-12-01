@@ -96,7 +96,8 @@
 
 // c002_a049
 
-// c002_a050
+pub mod clarke_kent;
+pub use clarke_kent as c002_a050;
 
 // c002_a051
 
