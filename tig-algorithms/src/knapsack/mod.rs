@@ -110,7 +110,8 @@
 
 // c003_a056
 
-// c003_a057
+pub mod knap_heuristics;
+pub use knap_heuristics as c003_a057;
 
 // c003_a058
 
