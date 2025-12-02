@@ -30,7 +30,8 @@
 
 // c004_a016
 
-// c004_a017
+pub mod vector_finder_multi;
+pub use vector_finder_multi as c004_a017;
 
 // c004_a018
 
