@@ -102,7 +102,8 @@
 
 // c004_a052
 
-// c004_a053
+pub mod invector_adj;
+pub use invector_adj as c004_a053;
 
 // c004_a054
 
