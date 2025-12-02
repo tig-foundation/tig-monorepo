@@ -68,7 +68,8 @@
 
 // c004_a035
 
-// c004_a036
+pub mod optimax_turbo_gpu;
+pub use optimax_turbo_gpu as c004_a036;
 
 // c004_a037
 
