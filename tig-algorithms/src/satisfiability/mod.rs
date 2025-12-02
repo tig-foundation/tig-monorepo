@@ -156,7 +156,8 @@ pub use super_sat as c001_a068;
 
 // c001_a069
 
-// c001_a070
+pub mod sat_excelled;
+pub use sat_excelled as c001_a070;
 
 // c001_a071
 
