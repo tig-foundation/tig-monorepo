@@ -88,7 +88,8 @@
 
 // c004_a045
 
-// c004_a046
+pub mod invector_hybrid_adp;
+pub use invector_hybrid_adp as c004_a046;
 
 // c004_a047
 
