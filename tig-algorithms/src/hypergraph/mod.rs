@@ -1,4 +1,5 @@
-// c005_a001
+pub mod hyper_cluster;
+pub use hyper_cluster as c005_a001;
 
 // c005_a002
 
