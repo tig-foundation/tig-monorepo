@@ -92,7 +92,8 @@
 
 // c004_a047
 
-// c004_a048
+pub mod invector_revisited_m;
+pub use invector_revisited_m as c004_a048;
 
 // c004_a049
 
