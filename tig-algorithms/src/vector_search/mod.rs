@@ -44,7 +44,8 @@
 
 // c004_a023
 
-// c004_a024
+pub mod hyperplanejane;
+pub use hyperplanejane as c004_a024;
 
 // c004_a025
 
