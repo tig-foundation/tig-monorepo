@@ -62,7 +62,8 @@
 
 // c004_a032
 
-// c004_a033
+pub mod smart_kd_tree_multi;
+pub use smart_kd_tree_multi as c004_a033;
 
 // c004_a034
 
