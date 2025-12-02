@@ -54,7 +54,8 @@
 
 // c004_a028
 
-// c004_a029
+pub mod optimax_search;
+pub use optimax_search as c004_a029;
 
 // c004_a030
 
