@@ -84,7 +84,8 @@
 
 // c004_a043
 
-// c004_a044
+pub mod vector_maximize;
+pub use vector_maximize as c004_a044;
 
 // c004_a045
 
