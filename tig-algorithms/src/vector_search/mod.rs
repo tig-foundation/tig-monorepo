@@ -126,7 +126,8 @@
 
 // c004_a064
 
-// c004_a065
+pub mod improved_search_ivf;
+pub use improved_search_ivf as c004_a065;
 
 // c004_a066
 
