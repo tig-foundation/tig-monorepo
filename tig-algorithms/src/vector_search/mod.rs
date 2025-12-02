@@ -82,7 +82,8 @@
 
 // c004_a042
 
-// c004_a043
+pub mod blox_vec_search;
+pub use blox_vec_search as c004_a043;
 
 // c004_a044
 
