@@ -12,7 +12,8 @@
 
 // c005_a007
 
-// c005_a008
+pub mod hyper_advanced;
+pub use hyper_advanced as c005_a008;
 
 // c005_a009
 
