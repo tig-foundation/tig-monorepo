@@ -32,7 +32,8 @@
 
 // c004_a017
 
-// c004_a018
+pub mod fasterer_search;
+pub use fasterer_search as c004_a018;
 
 // c004_a019
 
