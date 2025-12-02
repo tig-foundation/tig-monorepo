@@ -142,7 +142,8 @@
 
 // c002_a072
 
-// c002_a073
+pub mod routing_redone;
+pub use routing_redone as c002_a073;
 
 // c002_a074
 
