@@ -72,7 +72,8 @@
 
 // c004_a037
 
-// c004_a038
+pub mod optimax_filter;
+pub use optimax_filter as c004_a038;
 
 // c004_a039
 
