@@ -70,7 +70,8 @@
 
 // c004_a036
 
-// c004_a037
+pub mod norm_filtered_search;
+pub use norm_filtered_search as c004_a037;
 
 // c004_a038
 
