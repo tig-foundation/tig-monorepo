@@ -116,7 +116,8 @@
 
 // c004_a059
 
-// c004_a060
+pub mod even_better_vector;
+pub use even_better_vector as c004_a060;
 
 // c004_a061
 
