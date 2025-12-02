@@ -122,7 +122,8 @@
 
 // c004_a062
 
-// c004_a063
+pub mod improved_search;
+pub use improved_search as c004_a063;
 
 // c004_a064
 
