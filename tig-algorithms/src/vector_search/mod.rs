@@ -78,7 +78,8 @@
 
 // c004_a040
 
-// c004_a041
+pub mod vs_test_wasm;
+pub use vs_test_wasm as c004_a041;
 
 // c004_a042
 
