@@ -8,7 +8,8 @@
 
 // c005_a005
 
-// c005_a006
+pub mod sith_lord;
+pub use sith_lord as c005_a006;
 
 // c005_a007
 
