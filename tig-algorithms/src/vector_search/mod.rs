@@ -118,7 +118,8 @@
 
 // c004_a060
 
-// c004_a061
+pub mod much_better_vector;
+pub use much_better_vector as c004_a061;
 
 // c004_a062
 
