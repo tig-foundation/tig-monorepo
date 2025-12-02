@@ -52,7 +52,8 @@
 
 // c004_a027
 
-// c004_a028
+pub mod gpu_manual_fastest;
+pub use gpu_manual_fastest as c004_a028;
 
 // c004_a029
 
