@@ -46,7 +46,8 @@
 
 // c004_a024
 
-// c004_a025
+pub mod cudamatata;
+pub use cudamatata as c004_a025;
 
 // c004_a026
 
