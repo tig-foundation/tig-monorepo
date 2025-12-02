@@ -120,7 +120,8 @@
 
 // c004_a061
 
-// c004_a062
+pub mod invector_faster;
+pub use invector_faster as c004_a062;
 
 // c004_a063
 
