@@ -114,7 +114,8 @@
 
 // c004_a058
 
-// c004_a059
+pub mod invector_adj_sp;
+pub use invector_adj_sp as c004_a059;
 
 // c004_a060
 
