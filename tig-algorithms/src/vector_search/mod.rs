@@ -112,7 +112,8 @@
 
 // c004_a057
 
-// c004_a058
+pub mod invector_adj_opt_s;
+pub use invector_adj_opt_s as c004_a058;
 
 // c004_a059
 
