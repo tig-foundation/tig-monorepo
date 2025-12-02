@@ -130,13 +130,15 @@ f"""Library not found at {so_path}:
             else:
                 print(f"\r{out}", end="")
             
-            if num_finished == args.nonces:
+            if (num_finished + num_invalid) == args.nonces:
+                print()
+                print("Warning: Invalid solutions encountered. This will cause actual benchmarks to fail.")
                 break
             if num_invalid > 0 and not args.ignore_invalid:
                 print()
                 print("Invalid solution encountered. Stopping tests")
                 print("To continue testing despite invalid solutions, use the --ignore-invalid flag.")
-                print("Note: Invalid solutions will cause actual benchmarks to fail")
+                print("Warning: Invalid solutions will cause actual benchmarks to fail.")
                 break
         if not args.verbose:
             print("\n")
