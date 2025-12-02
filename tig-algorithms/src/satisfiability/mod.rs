@@ -140,7 +140,8 @@
 
 // c001_a071
 
-// c001_a072
+pub mod beeesat;
+pub use beeesat as c001_a072;
 
 // c001_a073
 
