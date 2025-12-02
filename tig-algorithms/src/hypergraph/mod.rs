@@ -10,7 +10,8 @@
 
 // c005_a006
 
-// c005_a007
+pub mod hypeman;
+pub use hypeman as c005_a007;
 
 // c005_a008
 
