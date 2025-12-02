@@ -100,7 +100,8 @@
 
 // c004_a051
 
-// c004_a052
+pub mod vector_alldiff_dyna;
+pub use vector_alldiff_dyna as c004_a052;
 
 // c004_a053
 
