@@ -40,7 +40,8 @@
 
 // c004_a021
 
-// c004_a022
+pub mod cudabefaster;
+pub use cudabefaster as c004_a022;
 
 // c004_a023
 
