@@ -56,7 +56,8 @@
 
 // c004_a029
 
-// c004_a030
+pub mod fast_search_cuda;
+pub use fast_search_cuda as c004_a030;
 
 // c004_a031
 
