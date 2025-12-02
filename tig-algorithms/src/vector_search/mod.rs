@@ -98,7 +98,8 @@
 
 // c004_a050
 
-// c004_a051
+pub mod kdtree_truemean;
+pub use kdtree_truemean as c004_a051;
 
 // c004_a052
 
