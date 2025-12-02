@@ -104,7 +104,8 @@
 
 // c004_a053
 
-// c004_a054
+pub mod reliable_vector;
+pub use reliable_vector as c004_a054;
 
 // c004_a055
 
