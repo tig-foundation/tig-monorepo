@@ -46,18 +46,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     let mut num_bundles_by_player_by_challenge = HashMap::<String, HashMap<String, u64>>::new();
     for (settings, average_quality_by_bundle) in active_benchmarks.iter() {
-        if let Some(track_config) = config.challenges[&settings.challenge_id]
+        if config.challenges[&settings.challenge_id]
             .active_tracks
-            .get(&settings.track_id)
+            .contains_key(&settings.track_id)
         {
             *num_bundles_by_player_by_challenge
                 .entry(settings.player_id.clone())
                 .or_default()
                 .entry(settings.challenge_id.clone())
-                .or_default() += average_quality_by_bundle
-                .iter()
-                .filter(|&&x| x >= track_config.min_active_quality)
-                .count() as u64;
+                .or_default() += average_quality_by_bundle.len() as u64;
         }
     }
     for (player_id, player_bundles_by_challenge) in num_bundles_by_player_by_challenge.iter() {
@@ -99,9 +96,9 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
     let mut bundles_by_challenge_by_track =
         HashMap::<String, HashMap<String, Vec<(&BenchmarkSettings, i32)>>>::new();
     for (settings, average_quality_by_bundle) in active_benchmarks.iter() {
-        if let Some(track_config) = config.challenges[&settings.challenge_id]
+        if config.challenges[&settings.challenge_id]
             .active_tracks
-            .get(&settings.track_id)
+            .contains_key(&settings.track_id)
         {
             bundles_by_challenge_by_track
                 .entry(settings.challenge_id.clone())
@@ -111,7 +108,6 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 .extend(
                     average_quality_by_bundle
                         .iter()
-                        .filter(|&&x| x >= track_config.min_active_quality)
                         .map(|&quality| (settings, quality)),
                 );
         }

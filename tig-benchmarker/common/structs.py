@@ -72,6 +72,7 @@ class Precommit(FromDict):
 @dataclass
 class BenchmarkDetails(FromDict):
     stopped: bool
+    num_active_bundles: int
     merkle_root: Optional[MerkleHash]
     average_quality_by_bundle: Optional[List[int]]
     sampled_nonces: Optional[List[int]]

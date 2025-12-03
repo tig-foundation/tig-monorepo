@@ -161,6 +161,7 @@ impl BenchmarkSettings {
 serializable_struct_with_getters! {
     BenchmarkDetails {
         stopped: bool,
+        num_active_bundles: u64,
         average_quality_by_bundle: Option<Vec<i32>>,
         merkle_root: Option<MerkleHash>,
         sampled_nonces: Option<HashSet<u64>>,
