@@ -144,7 +144,8 @@
 
 // c004_a073
 
-// c004_a074
+pub mod stat_filter_opt;
+pub use stat_filter_opt as c004_a074;
 
 // c004_a075
 
