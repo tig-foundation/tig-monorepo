@@ -131,8 +131,9 @@ f"""Library not found at {so_path}:
                 print(f"\r{out}", end="")
             
             if (num_finished + num_invalid) == args.nonces:
-                print()
-                print("Warning: Invalid solutions encountered. This will cause actual benchmarks to fail.")
+                if num_invalid > 0:
+                    print()
+                    print("Warning: Invalid solutions encountered. This will cause actual benchmarks to fail.")
                 break
             if num_invalid > 0 and not args.ignore_invalid:
                 print()
