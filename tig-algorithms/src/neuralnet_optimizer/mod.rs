@@ -4,7 +4,8 @@
 
 // c006_a003
 
-// c006_a004
+pub mod neural_scientist;
+pub use neural_scientist as c006_a004;
 
 // c006_a005
 
