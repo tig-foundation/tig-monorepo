@@ -152,7 +152,8 @@
 
 // c004_a077
 
-// c004_a078
+pub mod autovector_native_v2;
+pub use autovector_native_v2 as c004_a078;
 
 // c004_a079
 
