@@ -1,4 +1,4 @@
-use crate::context::*;
+use crate::{context::*, contracts::players};
 use logging_timer::time;
 use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
@@ -152,25 +152,43 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let mut num_qualifiers_by_player_by_track =
                 HashMap::<String, HashMap<String, u64>>::new();
             let mut num_qualifiers_by_player = HashMap::<String, u64>::new();
+            let mut cutoff_reached_by_player = max_qualifiers_by_player
+                .iter()
+                .map(|(k, v)| (k.clone(), *v == 0))
+                .collect::<HashMap<_, _>>();
 
-            let mut rank = 0;
+            let mut track_rank = bundles_by_track
+                .keys()
+                .map(|k| (k.clone(), 0))
+                .collect::<HashMap<_, _>>();
             let mut track_ids = bundles_by_track.keys().cloned().collect::<Vec<_>>();
             while !track_ids.is_empty() {
                 track_ids.shuffle(&mut rng);
                 track_ids.retain(|track_id| {
-                    let (
-                        BenchmarkSettings {
-                            player_id,
-                            algorithm_id,
-                            ..
-                        },
-                        quality,
-                    ) = &bundles_by_track[track_id][rank];
-
-                    let player_qualifiers = num_qualifiers_by_player
-                        .entry(player_id.clone())
-                        .or_default();
-                    if *player_qualifiers < max_qualifiers_by_player[player_id] {
+                    let rank = track_rank.get_mut(track_id).unwrap();
+                    if let Some(idx) = (*rank..bundles_by_track[track_id].len()).find(|&i| {
+                        let player_id = &bundles_by_track[track_id][i].0.player_id;
+                        if cutoff_reached_by_player[player_id] {
+                            false
+                        } else {
+                            let player_num_qualifiers = num_qualifiers_by_player
+                                .entry(player_id.clone())
+                                .or_default();
+                            *player_num_qualifiers += 1;
+                            if *player_num_qualifiers >= max_qualifiers_by_player[player_id] {
+                                *cutoff_reached_by_player.get_mut(player_id).unwrap() = true;
+                            }
+                            true
+                        }
+                    }) {
+                        let (
+                            BenchmarkSettings {
+                                player_id,
+                                algorithm_id,
+                                ..
+                            },
+                            quality,
+                        ) = &bundles_by_track[track_id][idx];
                         challenge_data
                             .qualifier_qualities_by_track
                             .get_mut(track_id)
@@ -193,15 +211,15 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                             .or_default()
                             .entry(track_id.clone())
                             .or_default() += 1;
-                        *player_qualifiers += 1;
+                        *num_qualifiers_by_player.get_mut(player_id).unwrap() += 1;
 
+                        *rank = idx;
                         *num_qualifiers < challenge_config.max_qualifiers_per_track
-                            && rank + 1 < bundles_by_track[track_id].len()
+                            && *rank + 1 < bundles_by_track[track_id].len()
                     } else {
-                        rank + 1 < bundles_by_track[track_id].len()
+                        false
                     }
                 });
-                rank += 1;
             }
 
             for (player_id, num_qualifiers_by_track) in num_qualifiers_by_player_by_track {
