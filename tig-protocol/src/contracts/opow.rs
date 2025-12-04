@@ -152,10 +152,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let mut num_qualifiers_by_player_by_track =
                 HashMap::<String, HashMap<String, u64>>::new();
             let mut num_qualifiers_by_player = HashMap::<String, u64>::new();
-            let mut cutoff_reached_by_player = max_qualifiers_by_player
-                .iter()
-                .map(|(k, v)| (k.clone(), *v == 0))
-                .collect::<HashMap<_, _>>();
+            let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
 
             let mut track_rank = bundles_by_track
                 .keys()
@@ -166,18 +163,12 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 track_ids.shuffle(&mut rng);
                 track_ids.retain(|track_id| {
                     let rank = track_rank.get_mut(track_id).unwrap();
-                    if let Some(idx) = (*rank..bundles_by_track[track_id].len()).find(|&i| {
-                        let player_id = &bundles_by_track[track_id][i].0.player_id;
-                        if cutoff_reached_by_player[player_id] {
+                    if let Some(idx) = (*rank..bundles_by_track[track_id].len()).find(|&idx| {
+                        let player_id = &bundles_by_track[track_id][idx].0.player_id;
+                        if max_qualifiers_by_player[player_id] == 0 {
                             false
                         } else {
-                            let player_num_qualifiers = num_qualifiers_by_player
-                                .entry(player_id.clone())
-                                .or_default();
-                            *player_num_qualifiers += 1;
-                            if *player_num_qualifiers >= max_qualifiers_by_player[player_id] {
-                                *cutoff_reached_by_player.get_mut(player_id).unwrap() = true;
-                            }
+                            *max_qualifiers_by_player.get_mut(player_id).unwrap() -= 1;
                             true
                         }
                     }) {
@@ -211,11 +202,10 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                             .or_default()
                             .entry(track_id.clone())
                             .or_default() += 1;
-                        *num_qualifiers_by_player.get_mut(player_id).unwrap() += 1;
 
-                        *rank = idx;
+                        *rank = idx + 1;
                         *num_qualifiers < challenge_config.max_qualifiers_per_track
-                            && *rank + 1 < bundles_by_track[track_id].len()
+                            && *rank < bundles_by_track[track_id].len()
                     } else {
                         false
                     }
