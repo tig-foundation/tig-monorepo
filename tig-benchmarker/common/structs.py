@@ -196,6 +196,7 @@ class Challenge(FromDict):
 @dataclass
 class OPoWBlockData(FromDict):
     num_qualifiers_by_challenge_by_track: Dict[str, Dict[str, int]]
+    num_potential_qualifiers_by_challenge_by_track: Dict[str, Dict[str, int]]
     cutoff: int
     weighted_delegated_deposit: PreciseNumber
     weighted_self_deposit: PreciseNumber

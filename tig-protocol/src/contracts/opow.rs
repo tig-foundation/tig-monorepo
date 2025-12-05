@@ -151,7 +151,8 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 HashMap::<String, HashMap<String, HashMap<String, u64>>>::new();
             let mut num_qualifiers_by_player_by_track =
                 HashMap::<String, HashMap<String, u64>>::new();
-            let mut num_qualifiers_by_player = HashMap::<String, u64>::new();
+            let mut num_potential_qualifiers_by_player_by_track =
+                HashMap::<String, HashMap<String, u64>>::new();
             let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
 
             let mut track_rank = bundles_by_track
@@ -166,6 +167,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                     if let Some(idx) = (*rank..bundles_by_track[track_id].len()).find(|&idx| {
                         let player_id = &bundles_by_track[track_id][idx].0.player_id;
                         if max_qualifiers_by_player[player_id] == 0 {
+                            *num_potential_qualifiers_by_player_by_track
+                                .entry(player_id.clone())
+                                .or_default()
+                                .entry(track_id.clone())
+                                .or_default() += 1;
                             false
                         } else {
                             *max_qualifiers_by_player.get_mut(player_id).unwrap() -= 1;
@@ -217,6 +223,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 opow_data
                     .num_qualifiers_by_challenge_by_track
                     .insert(challenge_id.clone(), num_qualifiers_by_track);
+            }
+            for (player_id, num_potential_qualifiers_by_track) in
+                num_potential_qualifiers_by_player_by_track
+            {
+                let opow_data = active_opow_block_data.get_mut(&player_id).unwrap();
+                opow_data
+                    .num_potential_qualifiers_by_challenge_by_track
+                    .insert(challenge_id.clone(), num_potential_qualifiers_by_track);
             }
             for (algorithm_id, num_qualifiers_by_track_by_player) in
                 num_qualifiers_by_code_by_track_by_player
