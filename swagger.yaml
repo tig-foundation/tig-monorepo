@@ -621,12 +621,14 @@ components:
     CodeBlockData:
       type: object
       properties:
-        num_qualifiers_by_player:
+        num_qualifiers_by_track_by_player:
           type: object
           additionalProperties:
-            type: integer
-            format: uint64
-          example: {"0x1234...": 5, "0x5678...": 3}
+            type: object
+            additionalProperties:
+              type: integer
+              format: uint64
+          example: {"n=100": {"0x1234...": 3, "0x5678...": 5}, "n=200": {"0x1234...": 3, "0x5678...": 4}}
         adoption:
           $ref: '#/components/schemas/PreciseNumber'
         merge_points:
@@ -1020,10 +1022,12 @@ components:
     ChallengeBlockData:
       type: object
       properties:
-        num_qualifiers:
-          type: integer
-          format: uint64
-        qualifier_qualities:
+        num_qualifiers_by_track:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint64
+        qualifier_qualities_by_track:
           description: "Map<TrackId, int32[]>"
           additionalProperties:
             type: array
@@ -1126,18 +1130,22 @@ components:
     OPoWBlockData:
       type: object
       properties:
-        num_qualifiers_by_challenge:
+        num_qualifiers_by_challenge_by_track:
           type: object
           additionalProperties:
-            type: integer
-            format: uint64
-          example: {"c001": 5, "c002": 3}
-        solution_ratio_by_challenge:
+            type: object
+            additionalProperties:
+              type: integer
+              format: uint64
+          example: {"c001": {"n=100": 5, "n=200": 3}, "c002": {"n=100": 2, "n=200": 4}}
+        num_potential_qualifiers_by_challenge_by_track:
           type: object
           additionalProperties:
-            type: number
-            format: number
-          example: {"c001": 0.001, "c002": 0.5}
+            type: object
+            additionalProperties:
+              type: integer
+              format: uint64
+          example: {"c001": {"n=100": 5, "n=200": 3}, "c002": {"n=100": 2, "n=200": 4}}
         cutoff:
           type: integer
           format: uint64
