@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 impl_kv_string_serde! {
     Track {
-        num_hyperedges: u32,
+        n_h_edges: u32,
     }
 }
 
@@ -59,8 +59,8 @@ impl Challenge {
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
         let mut rng = StdRng::from_seed(seed.clone());
-        let num_hyperedges = track.num_hyperedges;
-        let target_num_nodes = track.num_hyperedges; // actual number may be around 8% less
+        let num_hyperedges = track.n_h_edges;
+        let target_num_nodes = track.n_h_edges; // actual number may be around 8% less
         let depth = 6;
         let num_parts = 1 << depth; // 2^6 = 64 partitions
         let level_weights: Vec<f32> = vec![
@@ -354,7 +354,7 @@ impl Challenge {
 
         Ok(Self {
             seed: *seed,
-            num_hyperedges: track.num_hyperedges,
+            num_hyperedges: track.n_h_edges,
             num_nodes: target_num_nodes - num_prune,
             num_parts,
             max_part_size,

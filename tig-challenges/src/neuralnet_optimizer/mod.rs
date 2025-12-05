@@ -16,7 +16,7 @@ const THREADS_PER_BLOCK: u32 = 1024;
 
 impl_kv_string_serde! {
     Track {
-        num_hidden_layers: usize,
+        n_hidden: usize,
     }
 }
 
@@ -208,7 +208,7 @@ impl Challenge {
 
         Ok(Self {
             seed: *seed,
-            num_hidden_layers: track.num_hidden_layers.clone(),
+            num_hidden_layers: track.n_hidden.clone(),
             hidden_layers_dims: 256,
             batch_size: 128,
             max_epochs: 1000,

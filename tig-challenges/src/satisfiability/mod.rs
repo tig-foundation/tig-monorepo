@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 
 impl_kv_string_serde! {
     Track {
-        num_variables: usize,
-        clauses_to_variables_ratio: u32
+        n_vars: usize,
+        ratio: u32
     }
 }
 
@@ -39,11 +39,9 @@ pub struct Challenge {
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], track: &Track) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).gen());
-        let num_clauses = (track.num_variables as f64 * track.clauses_to_variables_ratio as f64
-            / 1000.0)
-            .floor() as usize;
+        let num_clauses = (track.n_vars as f64 * track.ratio as f64 / 1000.0).floor() as usize;
 
-        let var_distr = Uniform::new(1, track.num_variables as i32 + 1);
+        let var_distr = Uniform::new(1, track.n_vars as i32 + 1);
         // Create a uniform distribution for negations.
         let neg_distr = Uniform::new(0, 2);
 
@@ -70,7 +68,7 @@ impl Challenge {
 
         Ok(Self {
             seed: seed.clone(),
-            num_variables: track.num_variables.clone(),
+            num_variables: track.n_vars.clone(),
             clauses,
         })
     }
