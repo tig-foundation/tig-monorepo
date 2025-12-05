@@ -1,4 +1,4 @@
-use crate::{context::*, contracts::players};
+use crate::context::*;
 use logging_timer::time;
 use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
@@ -154,6 +154,7 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             let mut num_potential_qualifiers_by_player_by_track =
                 HashMap::<String, HashMap<String, u64>>::new();
             let mut max_qualifiers_by_player = max_qualifiers_by_player.clone();
+            let mut qualifier_age_by_track = HashMap::<String, Vec<(u32, String)>>::new();
 
             let mut track_rank = bundles_by_track
                 .keys()
@@ -195,6 +196,14 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                             .num_qualifiers_by_track
                             .get_mut(track_id)
                             .unwrap();
+                        qualifier_age_by_track
+                            .entry(track_id.clone())
+                            .or_default()
+                            .push((
+                                block_details.round
+                                    - active_codes_state[algorithm_id].round_submitted,
+                                player_id.clone(),
+                            ));
                         *num_qualifiers += 1;
                         *num_qualifiers_by_code_by_track_by_player
                             .entry(algorithm_id.clone())
@@ -218,6 +227,39 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 });
             }
 
+            for (track_id, ages_and_players) in qualifier_age_by_track.iter_mut() {
+                if ages_and_players.len() == 1 {
+                    let (_, player_id) = &ages_and_players[0];
+                    let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
+                    opow_data
+                        .legacy_multiplier_by_challenge_by_track
+                        .entry(challenge_id.clone())
+                        .or_default()
+                        .insert(track_id.clone(), 1.0);
+                } else {
+                    ages_and_players.shuffle(&mut rng);
+                    ages_and_players.sort_by_key(|(age, _)| *age);
+                    let step = challenge_config.legacy_multiplier_span
+                        / (ages_and_players.len() as f32 - 1.0);
+                    let start = 1.0 - challenge_config.legacy_multiplier_span / 2.0;
+                    let mut legacy_multiplier_by_player = HashMap::<String, (f32, usize)>::new();
+                    for (i, (_, player_id)) in ages_and_players.iter().enumerate() {
+                        let entry = legacy_multiplier_by_player
+                            .entry(player_id.clone())
+                            .or_default();
+                        entry.0 += start + step * (i as f32);
+                        entry.1 += 1;
+                    }
+                    for (player_id, (sum, count)) in legacy_multiplier_by_player {
+                        let opow_data = active_opow_block_data.get_mut(&player_id).unwrap();
+                        opow_data
+                            .legacy_multiplier_by_challenge_by_track
+                            .entry(challenge_id.clone())
+                            .or_default()
+                            .insert(track_id.clone(), sum / (count as f32));
+                    }
+                }
+            }
             for (player_id, num_qualifiers_by_track) in num_qualifiers_by_player_by_track {
                 let opow_data = active_opow_block_data.get_mut(&player_id).unwrap();
                 opow_data
@@ -323,12 +365,20 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
             factors.push(if total_qualifiers == 0 {
                 zero.clone()
             } else {
-                PreciseNumber::from(
+                PreciseNumber::from_f64(
                     opow_data
                         .num_qualifiers_by_challenge_by_track
                         .get(challenge_id)
-                        .map(|x| x.values().sum::<u64>())
-                        .unwrap_or_default(),
+                        .map(|x| {
+                            x.iter()
+                                .map(|(track_id, num)| {
+                                    *num as f32
+                                        * opow_data.legacy_multiplier_by_challenge_by_track
+                                            [challenge_id][track_id]
+                                })
+                                .sum::<f32>()
+                        })
+                        .unwrap_or_default() as f64,
                 ) / PreciseNumber::from(total_qualifiers)
             });
         }
