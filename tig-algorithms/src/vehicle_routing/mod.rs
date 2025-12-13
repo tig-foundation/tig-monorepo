@@ -1,4 +1,5 @@
-// c002_a001
+pub mod clarke_wright;
+pub use clarke_wright as c002_a001;
 
 // c002_a002
 
@@ -66,9 +67,11 @@
 
 // c002_a034
 
-// c002_a035
+pub mod cw_heuristic;
+pub use cw_heuristic as c002_a035;
 
-// c002_a036
+pub mod clarke_wright_super;
+pub use clarke_wright_super as c002_a036;
 
 // c002_a037
 
@@ -94,7 +97,8 @@
 
 // c002_a048
 
-// c002_a049
+pub mod advanced_routing;
+pub use advanced_routing as c002_a049;
 
 // c002_a050
 
@@ -102,31 +106,40 @@
 
 // c002_a052
 
-// c002_a053
+pub mod enhanced_routing;
+pub use enhanced_routing as c002_a053;
 
-// c002_a054
+pub mod advanced_heuristics;
+pub use advanced_heuristics as c002_a054;
 
 // c002_a055
 
 // c002_a056
 
-// c002_a057
+pub mod enhanced_heuristics;
+pub use enhanced_heuristics as c002_a057;
 
 // c002_a058
 
-// c002_a059
+pub mod advanced_cw_opt;
+pub use advanced_cw_opt as c002_a059;
 
-// c002_a060
+pub mod advanced_cw_adp;
+pub use advanced_cw_adp as c002_a060;
 
-// c002_a061
+pub mod enhanced_cw;
+pub use enhanced_cw as c002_a061;
 
-// c002_a062
+pub mod new_enhanced_cw;
+pub use new_enhanced_cw as c002_a062;
 
 // c002_a063
 
-// c002_a064
+pub mod new_enhanced_cw_opt;
+pub use new_enhanced_cw_opt as c002_a064;
 
-// c002_a065
+pub mod new_enhanced_cw_low;
+pub use new_enhanced_cw_low as c002_a065;
 
 // c002_a066
 
@@ -134,25 +147,31 @@
 
 // c002_a068
 
-// c002_a069
+pub mod enhanced_solomon;
+pub use enhanced_solomon as c002_a069;
 
 // c002_a070
 
 // c002_a071
 
-// c002_a072
+pub mod better_routing;
+pub use better_routing as c002_a072;
 
-// c002_a073
+pub mod routing_redone;
+pub use routing_redone as c002_a073;
 
-// c002_a074
+pub mod sausage;
+pub use sausage as c002_a074;
 
-// c002_a075
+pub mod native_routing;
+pub use native_routing as c002_a075;
 
 // c002_a076
 
 // c002_a077
 
-// c002_a078
+pub mod simple_ls_zero;
+pub use simple_ls_zero as c002_a078;
 
 // c002_a079
 
@@ -168,13 +187,16 @@
 
 // c002_a085
 
-// c002_a086
+pub mod vrptw_ultimate;
+pub use vrptw_ultimate as c002_a086;
 
-// c002_a087
+pub mod vrptw_high;
+pub use vrptw_high as c002_a087;
 
 // c002_a088
 
-// c002_a089
+pub mod hgs_v1;
+pub use hgs_v1 as c002_a089;
 
 // c002_a090
 

@@ -161,6 +161,7 @@ impl BenchmarkSettings {
 serializable_struct_with_getters! {
     BenchmarkDetails {
         stopped: bool,
+        num_active_bundles: u64,
         average_quality_by_bundle: Option<Vec<i32>>,
         merkle_root: Option<MerkleHash>,
         sampled_nonces: Option<HashSet<u64>>,
@@ -350,6 +351,8 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     OPoWBlockData {
         num_qualifiers_by_challenge_by_track: HashMap<String, HashMap<String, u64>>,
+        num_potential_qualifiers_by_challenge_by_track: HashMap<String, HashMap<String, u64>>,
+        legacy_multiplier_by_challenge_by_track: HashMap<String, HashMap<String, f32>>,
         cutoff: u64,
         weighted_self_deposit: PreciseNumber,
         weighted_delegated_deposit: PreciseNumber,

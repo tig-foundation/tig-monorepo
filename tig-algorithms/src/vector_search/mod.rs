@@ -24,7 +24,8 @@
 
 // c004_a013
 
-// c004_a014
+pub mod brute_force_bacalhau;
+pub use brute_force_bacalhau as c004_a014;
 
 // c004_a015
 
@@ -48,7 +49,8 @@
 
 // c004_a025
 
-// c004_a026
+pub mod optimax_gpu;
+pub use optimax_gpu as c004_a026;
 
 // c004_a027
 
@@ -64,7 +66,8 @@
 
 // c004_a033
 
-// c004_a034
+pub mod invector;
+pub use invector as c004_a034;
 
 // c004_a035
 
@@ -80,7 +83,8 @@
 
 // c004_a041
 
-// c004_a042
+pub mod invector_hybrid;
+pub use invector_hybrid as c004_a042;
 
 // c004_a043
 
@@ -88,9 +92,11 @@
 
 // c004_a045
 
-// c004_a046
+pub mod invector_hybrid_adp;
+pub use invector_hybrid_adp as c004_a046;
 
-// c004_a047
+pub mod invector_revisited_s;
+pub use invector_revisited_s as c004_a047;
 
 // c004_a048
 
@@ -102,15 +108,18 @@
 
 // c004_a052
 
-// c004_a053
+pub mod invector_adj;
+pub use invector_adj as c004_a053;
 
 // c004_a054
 
-// c004_a055
+pub mod invector_fast;
+pub use invector_fast as c004_a055;
 
 // c004_a056
 
-// c004_a057
+pub mod better_vector;
+pub use better_vector as c004_a057;
 
 // c004_a058
 
@@ -124,7 +133,8 @@
 
 // c004_a063
 
-// c004_a064
+pub mod improved_search_adp;
+pub use improved_search_adp as c004_a064;
 
 // c004_a065
 
@@ -132,23 +142,28 @@
 
 // c004_a067
 
-// c004_a068
+pub mod is_adp_optimal;
+pub use is_adp_optimal as c004_a068;
 
 // c004_a069
 
-// c004_a070
+pub mod improved_search_new;
+pub use improved_search_new as c004_a070;
 
 // c004_a071
 
 // c004_a072
 
-// c004_a073
+pub mod cluster_improved;
+pub use cluster_improved as c004_a073;
 
 // c004_a074
 
-// c004_a075
+pub mod stat_filter_fixed;
+pub use stat_filter_fixed as c004_a075;
 
-// c004_a076
+pub mod cluster_new;
+pub use cluster_new as c004_a076;
 
 // c004_a077
 

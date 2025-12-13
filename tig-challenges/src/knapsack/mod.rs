@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 impl_kv_string_serde! {
     Track {
-        num_items: usize,
+        n_items: usize,
         density: u32,
     }
 }
@@ -42,12 +42,10 @@ impl Challenge {
         let density = track.density as f64 / 100.0;
 
         // Generate weights w_i in the range [1, 50]
-        let weights: Vec<u32> = (0..track.num_items)
-            .map(|_| rng.gen_range(1..=50))
-            .collect();
+        let weights: Vec<u32> = (0..track.n_items).map(|_| rng.gen_range(1..=50)).collect();
 
         // Generate values v_i in the range [1, 100] with density probability, 0 otherwise
-        let values: Vec<u32> = (0..track.num_items)
+        let values: Vec<u32> = (0..track.n_items)
             .map(|_| {
                 if rng.gen_bool(density) {
                     rng.gen_range(1..=100)
@@ -61,10 +59,10 @@ impl Challenge {
         // - V_ij == V_ji (symmetric matrix)
         // - V_ii == 0 (diagonal is zero)
         // - Values are in range [1, 100] with density probability, 0 otherwise
-        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; track.num_items]; track.num_items];
+        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; track.n_items]; track.n_items];
 
-        for i in 0..track.num_items {
-            for j in (i + 1)..track.num_items {
+        for i in 0..track.n_items {
+            for j in (i + 1)..track.n_items {
                 let value = if rng.gen_bool(density) {
                     rng.gen_range(1..=100)
                 } else {
@@ -81,7 +79,7 @@ impl Challenge {
 
         Ok(Challenge {
             seed: seed.clone(),
-            num_items: track.num_items.clone(),
+            num_items: track.n_items.clone(),
             weights,
             values,
             interaction_values,

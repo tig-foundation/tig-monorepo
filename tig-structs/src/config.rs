@@ -95,6 +95,7 @@ serializable_struct_with_getters! {
         active_tracks: HashMap<String, TrackConfig>,
         runtime_config_limits: RuntimeConfig,
         max_qualifiers_per_track: u64,
+        legacy_multiplier_span: f32,
         min_num_bundles: u64,
     }
 }

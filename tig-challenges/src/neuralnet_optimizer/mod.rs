@@ -16,7 +16,7 @@ const THREADS_PER_BLOCK: u32 = 1024;
 
 impl_kv_string_serde! {
     Track {
-        num_hidden_layers: usize,
+        n_hidden: usize,
     }
 }
 
@@ -208,7 +208,7 @@ impl Challenge {
 
         Ok(Self {
             seed: *seed,
-            num_hidden_layers: track.num_hidden_layers.clone(),
+            num_hidden_layers: track.n_hidden.clone(),
             hidden_layers_dims: 256,
             batch_size: 128,
             max_epochs: 1000,
@@ -381,7 +381,6 @@ pub fn training_loop(
     )?;
 
     let mut lowest_loss = f32::INFINITY;
-    let mut last_save_epoch = None;
     let mut epochs_no_improvement = 0;
     let mut prev_train_loss = None;
     let mut prev_validation_loss = None;
@@ -568,17 +567,10 @@ pub fn training_loop(
         if avg_val_loss < lowest_loss - min_loss_delta {
             lowest_loss = avg_val_loss;
             epochs_no_improvement = 0;
-            if !last_save_epoch
-                .as_ref()
-                .is_some_and(|&x| epoch - x < max_epochs / 20)
-            {
-                last_save_epoch = Some(epoch);
-                save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
-            }
+            save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
         } else {
             epochs_no_improvement += 1;
             if epochs_no_improvement >= patience {
-                save_solution(&to_solution(&model, epoch + 1, stream.clone())?)?;
                 break;
             }
         }

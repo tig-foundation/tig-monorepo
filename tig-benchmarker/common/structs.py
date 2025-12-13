@@ -72,6 +72,7 @@ class Precommit(FromDict):
 @dataclass
 class BenchmarkDetails(FromDict):
     stopped: bool
+    num_active_bundles: int
     merkle_root: Optional[MerkleHash]
     average_quality_by_bundle: Optional[List[int]]
     sampled_nonces: Optional[List[int]]
@@ -195,6 +196,7 @@ class Challenge(FromDict):
 @dataclass
 class OPoWBlockData(FromDict):
     num_qualifiers_by_challenge_by_track: Dict[str, Dict[str, int]]
+    num_potential_qualifiers_by_challenge_by_track: Dict[str, Dict[str, int]]
     cutoff: int
     weighted_delegated_deposit: PreciseNumber
     weighted_self_deposit: PreciseNumber

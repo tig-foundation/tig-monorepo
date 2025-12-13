@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 impl_kv_string_serde! {
     Track {
-        num_nodes: usize,
+        n_nodes: usize,
     }
 }
 
@@ -49,13 +49,13 @@ impl Challenge {
         let max_capacity = 200;
 
         let num_clusters = rng.gen_range(3..=8);
-        let mut node_positions: Vec<(i32, i32)> = Vec::with_capacity(track.num_nodes);
-        let mut node_positions_set: HashSet<(i32, i32)> = HashSet::with_capacity(track.num_nodes);
+        let mut node_positions: Vec<(i32, i32)> = Vec::with_capacity(track.n_nodes);
+        let mut node_positions_set: HashSet<(i32, i32)> = HashSet::with_capacity(track.n_nodes);
         node_positions.push((500, 500)); // Depot is node 0, and in the center
         node_positions_set.insert((500, 500));
 
         let mut cluster_assignments = HashMap::new();
-        while node_positions.len() < track.num_nodes {
+        while node_positions.len() < track.n_nodes {
             let node = node_positions.len();
             if node <= num_clusters || rng.gen::<f64>() < 0.5 {
                 let pos = (rng.gen_range(0..=1000), rng.gen_range(0..=1000));
@@ -93,9 +93,7 @@ impl Challenge {
             }
         }
 
-        let mut demands: Vec<i32> = (0..track.num_nodes)
-            .map(|_| rng.gen_range(1..=35))
-            .collect();
+        let mut demands: Vec<i32> = (0..track.n_nodes).map(|_| rng.gen_range(1..=35)).collect();
         demands[0] = 0;
 
         let distance_matrix: Vec<Vec<i32>> = node_positions
@@ -112,22 +110,22 @@ impl Challenge {
             })
             .collect();
 
-        let average_demand = demands.iter().sum::<i32>() as f64 / track.num_nodes as f64;
+        let average_demand = demands.iter().sum::<i32>() as f64 / track.n_nodes as f64;
         let average_route_size = max_capacity as f64 / average_demand;
         let average_distance = (1000.0 / 4.0) * 0.5214;
-        let furthest_node = (1..track.num_nodes)
+        let furthest_node = (1..track.n_nodes)
             .max_by_key(|&node| distance_matrix[0][node])
             .unwrap();
 
         let service_time = 10;
-        let mut ready_times = vec![0; track.num_nodes];
-        let mut due_times = vec![0; track.num_nodes];
+        let mut ready_times = vec![0; track.n_nodes];
+        let mut due_times = vec![0; track.n_nodes];
 
         // time to return to depot
         due_times[0] = distance_matrix[0][furthest_node]
             + ((average_distance + service_time as f64) * average_route_size).ceil() as i32;
 
-        for node in 1..track.num_nodes {
+        for node in 1..track.n_nodes {
             let min_due_time = distance_matrix[0][node];
             let max_due_time = due_times[0] - distance_matrix[0][node] - service_time;
             due_times[node] = rng.gen_range(min_due_time..=max_due_time);
@@ -145,7 +143,7 @@ impl Challenge {
 
         let mut c = Challenge {
             seed: seed.clone(),
-            num_nodes: track.num_nodes.clone(),
+            num_nodes: track.n_nodes.clone(),
             demands,
             node_positions,
             distance_matrix,

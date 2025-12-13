@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 impl_kv_string_serde! {
     Track {
-        num_queries: u32,
+        n_queries: u32,
     }
 }
 
@@ -48,7 +48,7 @@ impl Challenge {
     ) -> Result<Self> {
         let mut rng = StdRng::from_seed(seed.clone());
         let vector_dims = 250;
-        let database_size = 100 * track.num_queries;
+        let database_size = 100 * track.n_queries;
         let avg_cluster_size: f32 = 700.0;
         let num_clusters: u32 = ((1.0 + rng.gen::<f32>() * 0.05)
             + database_size as f32 / avg_cluster_size)
@@ -105,14 +105,14 @@ impl Challenge {
         let mut d_database_vectors =
             stream.alloc_zeros::<f32>((database_size * vector_dims) as usize)?;
         let mut d_query_vectors =
-            stream.alloc_zeros::<f32>((track.num_queries * vector_dims) as usize)?;
+            stream.alloc_zeros::<f32>((track.n_queries * vector_dims) as usize)?;
 
         unsafe {
             stream
                 .launch_builder(&generate_vectors_kernel)
                 .arg(&d_seed)
                 .arg(&database_size)
-                .arg(&track.num_queries)
+                .arg(&track.n_queries)
                 .arg(&vector_dims)
                 .arg(&num_clusters)
                 .arg(&d_cluster_cum_prob)
@@ -130,7 +130,7 @@ impl Challenge {
 
         return Ok(Self {
             seed: seed.clone(),
-            num_queries: track.num_queries.clone(),
+            num_queries: track.n_queries.clone(),
             vector_dims,
             database_size,
             d_database_vectors,

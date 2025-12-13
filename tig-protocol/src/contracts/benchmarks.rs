@@ -146,6 +146,7 @@ pub async fn submit_benchmark<T: Context>(
             benchmark_id,
             BenchmarkDetails {
                 stopped: true,
+                num_active_bundles: 0,
                 average_quality_by_bundle: None,
                 merkle_root: None,
                 sampled_nonces: None,
@@ -197,32 +198,31 @@ pub async fn submit_benchmark<T: Context>(
             chunk.to_vec()
         })
         .collect::<Vec<_>>();
-    let average_quality_by_bundle = bundles
+    let active_bundles = bundles
         .iter()
         .map(|bundle| {
-            match challenge_config.quality_type {
-                QualityType::Continuous => {
-                    // median
-                    bundle[num_nonces_per_bundle / 2].1
-                }
-                QualityType::Binary => {
-                    // mean
-                    (bundle.iter().map(|&(_, q)| q as i64).sum::<i64>()
-                        / num_nonces_per_bundle as i64) as i32
-                }
-            }
+            (
+                match challenge_config.quality_type {
+                    QualityType::Continuous => {
+                        // median
+                        if num_nonces_per_bundle % 2 == 0 {
+                            (bundle[num_nonces_per_bundle / 2 - 1].1
+                                + bundle[num_nonces_per_bundle / 2].1)
+                                / 2
+                        } else {
+                            bundle[num_nonces_per_bundle / 2].1
+                        }
+                    }
+                    QualityType::Binary => {
+                        // mean
+                        (bundle.iter().map(|&(_, q)| q as i64).sum::<i64>()
+                            / num_nonces_per_bundle as i64) as i32
+                    }
+                },
+                bundle,
+            )
         })
-        .collect::<Vec<i32>>();
-    let active_bundles = average_quality_by_bundle
-        .iter()
-        .zip(bundles)
-        .filter_map(|(&q, bundle)| {
-            if q >= track_config.min_active_quality {
-                Some(bundle)
-            } else {
-                None
-            }
-        })
+        .filter(|(q, _)| *q >= track_config.min_active_quality)
         .collect::<Vec<_>>();
 
     let mut sampled_nonces = HashSet::new();
@@ -232,7 +232,7 @@ pub async fn submit_benchmark<T: Context>(
             if gte_average_samples.len() == challenge_config.num_samples_gte_average {
                 break;
             }
-            let bundle = &active_bundles[rng.gen_range(0..active_bundles.len())];
+            let bundle = active_bundles[rng.gen_range(0..active_bundles.len())].1;
             let start = match challenge_config.quality_type {
                 QualityType::Continuous => num_nonces_per_bundle / 2,
                 QualityType::Binary => {
@@ -253,7 +253,7 @@ pub async fn submit_benchmark<T: Context>(
             if lt_average_samples.len() == challenge_config.num_samples_lt_average {
                 break;
             }
-            let bundle = &active_bundles[rng.gen_range(0..active_bundles.len())];
+            let bundle = active_bundles[rng.gen_range(0..active_bundles.len())].1;
             let end = match challenge_config.quality_type {
                 QualityType::Continuous => num_nonces_per_bundle / 2,
                 QualityType::Binary => {
@@ -277,7 +277,9 @@ pub async fn submit_benchmark<T: Context>(
         benchmark_id,
         BenchmarkDetails {
             stopped: active_bundles.is_empty(),
-            average_quality_by_bundle: Some(average_quality_by_bundle),
+            num_active_bundles: active_bundles.len() as u64,
+            average_quality_by_bundle: (!active_bundles.is_empty())
+                .then_some(active_bundles.iter().map(|(q, _)| *q).collect::<Vec<_>>()),
             merkle_root: Some(merkle_root),
             sampled_nonces: (!active_bundles.is_empty()).then_some(sampled_nonces),
         },
