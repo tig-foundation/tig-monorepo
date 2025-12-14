@@ -2067,6 +2067,7 @@ dependencies = [
  "ndarray",
  "paste",
  "rand",
+ "rand_distr",
  "serde",
  "serde_json",
  "statrs",
