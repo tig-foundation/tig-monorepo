@@ -26,6 +26,7 @@ serde_json = { version = "1.0.113" }
 statrs = { version = "0.18.0" }
 
 [features]
+default = ["c008"]
 hide_verification = []
 c001 = []
 satisfiability = ["c001"]
@@ -39,3 +40,5 @@ c005 = ["cudarc"]
 hypergraph = ["c005"]
 c006 = ["cudarc", "cudarc/cublas", "cudarc/cudnn"]
 neuralnet_optimizer = ["c006"]
+c008 = ["cudarc", "cudarc/cublas", "cudarc/cusolver"]
+cur_decomposition = ["c008"]

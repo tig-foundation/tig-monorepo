@@ -202,3 +202,7 @@ pub use hypergraph as c005;
 pub mod neuralnet_optimizer;
 #[cfg(feature = "c006")]
 pub use neuralnet_optimizer as c006;
+#[cfg(feature = "c008")]
+pub mod cur_decomposition;
+#[cfg(feature = "c008")]
+pub use cur_decomposition as c008;
