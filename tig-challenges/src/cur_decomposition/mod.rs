@@ -330,6 +330,7 @@ fn test_generate_instance() -> Result<()> {
             "m": track.m,
             "k": track.k,
             "target_k": track.target_k,
+            "baseline_fnorm": challenge.baseline_fnorm,
             "scalars": challenge.scalars,
             "u_mat": h_u_mat,
             "v_mat": h_v_mat,
