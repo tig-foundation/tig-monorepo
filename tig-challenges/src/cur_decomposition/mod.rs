@@ -21,18 +21,18 @@ impl_kv_string_serde! {
 
 impl_base64_serde! {
     Solution {
-        row_idxs: Vec<usize>,
-        r_mat: Vec<Vec<f32>>,
-        col_idxs: Vec<usize>,
+        c_idxs: Vec<usize>,
+        u_mat: Vec<Vec<f32>>,
+        r_idxs: Vec<usize>,
     }
 }
 
 impl Solution {
     pub fn new() -> Self {
         Self {
-            row_idxs: Vec::new(),
-            r_mat: Vec::new(),
-            col_idxs: Vec::new(),
+            c_idxs: Vec::new(),
+            u_mat: Vec::new(),
+            r_idxs: Vec::new(),
         }
     }
 }
@@ -44,7 +44,7 @@ pub struct Challenge {
     pub k: i32,
     pub target_k: i32,
     pub scalars: Vec<f32>,
-    pub baseline_error: f32,
+    pub baseline_fnorm: f32,
     pub d_u_mat: CudaSlice<f32>, // remove in actual challenge?
     pub d_v_mat: CudaSlice<f32>, // remove in actual challenge?
     pub d_a_mat: CudaSlice<f32>,
@@ -189,9 +189,9 @@ impl Challenge {
         let mut scalars: Vec<f32> = (0..k)
             .map(|j| (-l5 * ((j + 1) as f32).sqrt() / (k as f32).sqrt()).exp())
             .collect();
-        let baseline_error = scalars[target_k as usize..].iter().sum::<f32>();
+        let baseline_fnorm = scalars[target_k as usize..].iter().sum::<f32>();
         scalars.shuffle(&mut rng);
-        let d_scalars = stream.memcpy_stod(&scalars[..target_k as usize])?;
+        let d_scalars = stream.memcpy_stod(&scalars)?;
 
         unsafe {
             stream
@@ -237,20 +237,49 @@ impl Challenge {
             k,
             target_k,
             scalars,
-            baseline_error,
+            baseline_fnorm,
             d_u_mat,
             d_v_mat,
             d_a_mat,
         });
     }
 
-    pub fn evaluate_frobenius_norm(
+    pub fn evaluate_fnorm(
         &self,
         solution: &Solution,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<f32> {
+        if solution.c_idxs.len() != self.target_k as usize {
+            return Err(anyhow!(
+                "Solution must select exactly {} columns, but got {}",
+                self.target_k,
+                solution.c_idxs.len()
+            ));
+        }
+        if solution.r_idxs.len() != self.target_k as usize {
+            return Err(anyhow!(
+                "Solution must select exactly {} rows, but got {}",
+                self.target_k,
+                solution.r_idxs.len()
+            ));
+        }
+        if solution.u_mat.len() != self.target_k as usize
+            || solution
+                .u_mat
+                .iter()
+                .any(|row| row.len() != self.target_k as usize)
+        {
+            return Err(anyhow!(
+                "Solution U matrix must be size {}x{}",
+                self.target_k,
+                self.target_k
+            ));
+        }
+        // extract C & R
+        // matmul C U R
+        // compute F-norm of A - CUR
         Err(anyhow!("Not implemented"))
     }
 
@@ -267,47 +296,46 @@ impl Challenge {
     );
 }
 
-const KERNEL_SRC: &str = include_str!("kernels.cu");
+const KERNEL_SRC: &str = include_str!("kernels.ptx");
 
 #[test]
 fn test_generate_instance() -> Result<()> {
     use cudarc::driver::CudaContext;
-    use cudarc::nvrtc::compile_ptx;
+    use cudarc::nvrtc::Ptx;
     use cudarc::runtime::result::device::get_device_prop;
     let ctx = CudaContext::new(0)?;
     let stream = ctx.default_stream();
-    let ptx = compile_ptx(KERNEL_SRC)?;
+    let ptx = Ptx::from_src(KERNEL_SRC);
     let module = ctx.load_module(ptx)?;
     let prop = get_device_prop(0)?;
 
     let track = Track {
-        n: 5,
-        m: 5,
-        k: 3,
-        target_k: 2,
+        n: 1000,
+        m: 1000,
+        k: 500,
+        target_k: 250,
     };
     let seed = [0u8; 32];
     let start = std::time::Instant::now();
-    let challenge = Challenge::generate_instance(&seed, &track, module, stream, &prop)?;
+    let challenge = Challenge::generate_instance(&seed, &track, module, stream.clone(), &prop)?;
 
     let h_u_mat = stream.memcpy_dtov(&challenge.d_u_mat)?;
     let h_v_mat = stream.memcpy_dtov(&challenge.d_v_mat)?;
     let h_a_mat = stream.memcpy_dtov(&challenge.d_a_mat)?;
     println!("Instance generated in {:?}", start.elapsed());
-    println!("Track: {:?}", track);
-    println!("Singular values: {:?}", challenge.scalars);
-    println!("U matrix with scaling (col major):");
-    for chunk in h_u_mat.chunks(track.m as usize) {
-        println!("{:?}", chunk);
-    }
-    println!("V matrix (col major):");
-    for chunk in h_v_mat.chunks(track.n as usize) {
-        println!("{:?}", chunk);
-    }
-    println!("A matrix (col major):");
-    for chunk in h_a_mat.chunks(track.m as usize) {
-        println!("{:?}", chunk);
-    }
+    std::fs::write(
+        "dump.json",
+        serde_json::to_string(&serde_json::json!({
+            "n": track.n,
+            "m": track.m,
+            "k": track.k,
+            "target_k": track.target_k,
+            "scalars": challenge.scalars,
+            "u_mat": h_u_mat,
+            "v_mat": h_v_mat,
+            "a_mat": h_a_mat,
+        }))?,
+    )?;
 
     Ok(())
 }
