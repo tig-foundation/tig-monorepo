@@ -189,7 +189,11 @@ impl Challenge {
         let mut scalars: Vec<f32> = (0..k)
             .map(|j| (-l5 * ((j + 1) as f32).sqrt() / (k as f32).sqrt()).exp())
             .collect();
-        let baseline_fnorm = scalars[target_k as usize..].iter().sum::<f32>();
+        let baseline_fnorm = scalars[target_k as usize..]
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         scalars.shuffle(&mut rng);
         let d_scalars = stream.memcpy_stod(&scalars)?;
 
