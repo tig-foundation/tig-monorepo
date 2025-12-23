@@ -35,3 +35,7 @@ pub use hypergraph as c005;
 pub mod neuralnet_optimizer;
 #[cfg(feature = "c006")]
 pub use neuralnet_optimizer as c006;
+#[cfg(feature = "c007")]
+pub mod job_scheduling;
+#[cfg(feature = "c007")]
+pub use job_scheduling as c007;
