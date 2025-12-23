@@ -209,6 +209,12 @@ pub fn verify_solution(
             #[cfg(feature = "c006")]
             dispatch_challenge!(c006, gpu)
         }
+        "c007" => {
+            #[cfg(not(feature = "c007"))]
+            panic!("tig-verifier was not compiled with '--features c007'");
+            #[cfg(feature = "c007")]
+            dispatch_challenge!(c007, cpu)
+        }
         _ => panic!("Unsupported challenge"),
     }
 

@@ -21,6 +21,7 @@ rand = { version = "0.8.5", default-features = false, features = [
     "std_rng",
     "small_rng",
 ] }
+rand_distr = "0.4.3"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }
 statrs = { version = "0.18.0" }
@@ -39,3 +40,5 @@ c005 = ["cudarc"]
 hypergraph = ["c005"]
 c006 = ["cudarc", "cudarc/cublas", "cudarc/cudnn"]
 neuralnet_optimizer = ["c006"]
+c007 = []
+job_scheduling = ["c007"]
