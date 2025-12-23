@@ -96,7 +96,7 @@ impl_kv_string_serde! {
         n: usize,
         m: usize,
         o: usize,
-        r#flow: Flow
+        flow: Flow
     }
 }
 
