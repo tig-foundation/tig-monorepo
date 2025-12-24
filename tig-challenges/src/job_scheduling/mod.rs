@@ -214,7 +214,7 @@ impl Challenge {
         let op_eligible_machines = (0..n_op_types)
             .map(|i| {
                 if avg_op_flexibility as usize >= n_machines {
-                    (0..n_machines).collect::<HashSet<usize>>()
+                    (0..n_machines).collect::<Vec<usize>>()
                 } else {
                     let mut eligible = HashSet::<usize>::from([if i < n_machines {
                         i
@@ -229,6 +229,7 @@ impl Challenge {
                             .difference(&eligible)
                             .cloned()
                             .collect::<Vec<usize>>();
+                        remaining.sort_unstable();
                         let num_to_add = (target_flex - 1).min(remaining.len());
                         for j in 0..num_to_add {
                             let idx = rng.gen_range(j..remaining.len());
@@ -236,6 +237,8 @@ impl Challenge {
                         }
                         eligible.extend(remaining[..num_to_add].iter().cloned());
                     }
+                    let mut eligible = eligible.into_iter().collect::<Vec<usize>>();
+                    eligible.sort_unstable();
                     eligible
                 }
             })
