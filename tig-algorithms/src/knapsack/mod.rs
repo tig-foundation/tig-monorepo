@@ -225,7 +225,8 @@ pub use knapsplat_hyper_s as c003_a102;
 
 // c003_a104
 
-// c003_a105
+pub mod fast_and_furious;
+pub use fast_and_furious as c003_a105;
 
 // c003_a106
 
