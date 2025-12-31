@@ -156,7 +156,8 @@
 
 // c004_a079
 
-// c004_a080
+pub mod stat_filter_sigma;
+pub use stat_filter_sigma as c004_a080;
 
 // c004_a081
 
