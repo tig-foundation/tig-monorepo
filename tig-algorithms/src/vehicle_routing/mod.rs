@@ -184,7 +184,8 @@
 
 // c002_a093
 
-// c002_a094
+pub mod adaptive_tig_adp_v4;
+pub use adaptive_tig_adp_v4 as c002_a094;
 
 // c002_a095
 
