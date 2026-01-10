@@ -186,7 +186,8 @@
 
 // c002_a094
 
-// c002_a095
+pub mod fast_lane_v2;
+pub use fast_lane_v2 as c002_a095;
 
 // c002_a096
 
