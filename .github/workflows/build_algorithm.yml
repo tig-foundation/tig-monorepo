@@ -9,12 +9,14 @@ on:
       - 'vector_search/*'
       - 'hypergraph/*'
       - 'neuralnet_optimizer/*'
+      - 'influence_maximization/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
       - 'test/vector_search/*'
       - 'test/hypergraph/*'
       - 'test/neuralnet_optimizer/*'
+      - 'test/influence_maximization/*'
 
 jobs:
   init:
