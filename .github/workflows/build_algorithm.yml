@@ -10,6 +10,7 @@ on:
       - 'hypergraph/*'
       - 'neuralnet_optimizer/*'
       - 'job_scheduling/*'
+      - 'cur_decomposition/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
@@ -17,6 +18,7 @@ on:
       - 'test/hypergraph/*'
       - 'test/neuralnet_optimizer/*'
       - 'test/job_scheduling/*'
+      - 'test/cur_decomposition/*'
 
 jobs:
   init:

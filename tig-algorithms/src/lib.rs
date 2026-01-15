@@ -39,3 +39,7 @@ pub use neuralnet_optimizer as c006;
 pub mod job_scheduling;
 #[cfg(feature = "c007")]
 pub use job_scheduling as c007;
+#[cfg(feature = "c008")]
+pub mod cur_decomposition;
+#[cfg(feature = "c008")]
+pub use cur_decomposition as c008;
