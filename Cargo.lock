@@ -361,7 +361,7 @@ dependencies = [
 [[package]]
 name = "cudarc"
 version = "0.16.4"
-source = "git+https://github.com/tig-foundation/cudarc.git?branch=runtime-fuel%2Fcudnn-cublas#b3fccf5003c6e356bdd36e6808bf6e66f08f98d2"
+source = "git+https://github.com/tig-foundation/cudarc.git?branch=runtime-fuel%2Fcudnn-cublas#325f9f5928df09f9a383e88c4ed6a24dae47711b"
 dependencies = [
  "libloading",
 ]

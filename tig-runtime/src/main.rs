@@ -335,6 +335,12 @@ pub fn compute_solution(
             #[cfg(feature = "c006")]
             dispatch_challenge!(c006, gpu)
         }
+        "c008" => {
+            #[cfg(not(feature = "c008"))]
+            panic!("tig-runtime was not compiled with '--features c008'");
+            #[cfg(feature = "c008")]
+            dispatch_challenge!(c008, gpu)
+        }
         _ => panic!("Unsupported challenge"),
     }
 }
