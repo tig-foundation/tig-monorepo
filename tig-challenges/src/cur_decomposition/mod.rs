@@ -310,8 +310,7 @@ impl Challenge {
                 })?;
         }
         stream.synchronize()?;
-        let h_c_mat = stream.memcpy_dtov(&d_c_mat)?;
-        println!("C matrix: {:?}", &h_c_mat);
+
         unsafe {
             stream
                 .launch_builder(&extract_rows_kernel)
@@ -332,8 +331,6 @@ impl Challenge {
                 })?;
         }
         stream.synchronize()?;
-        let h_r_mat = stream.memcpy_dtov(&d_r_mat)?;
-        println!("R matrix: {:?}", &h_r_mat);
 
         let gemm_config = GemmConfig {
             transa: cublasOperation_t::CUBLAS_OP_N, // Don't transpose C
@@ -348,14 +345,11 @@ impl Challenge {
             ldc: self.m, // Leading dim of CU
         };
 
-        println!("Computing CU");
         unsafe {
             cublas.gemm(gemm_config, &d_c_mat, &d_u_mat, &mut d_cu_mat)?;
         }
 
         stream.synchronize()?;
-        let h_cu_mat = stream.memcpy_dtov(&d_cu_mat)?;
-        println!("CU matrix: {:?}", &h_cu_mat);
 
         let gemm_config = GemmConfig {
             transa: cublasOperation_t::CUBLAS_OP_N, // Don't transpose
@@ -374,8 +368,6 @@ impl Challenge {
             cublas.gemm(gemm_config, &d_cu_mat, &d_r_mat, &mut d_cur_mat)?;
         }
         stream.synchronize()?;
-        let h_cur_mat = stream.memcpy_dtov(&d_cur_mat)?;
-        println!("CUR matrix: {:?}", &h_cur_mat);
 
         // FIXME: Compute ||A - CUR||_F as kernel
         let cur_mat = stream.memcpy_dtov(&d_cur_mat)?;
