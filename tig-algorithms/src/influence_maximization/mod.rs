@@ -1,4 +1,5 @@
-// c009_a001
+pub mod simple_top;
+pub use simple_top as c009_a001;
 
 // c009_a002
 
