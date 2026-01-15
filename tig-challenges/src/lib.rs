@@ -210,3 +210,7 @@ pub use job_scheduling as c007;
 pub mod cur_decomposition;
 #[cfg(feature = "c008")]
 pub use cur_decomposition as c008;
+#[cfg(feature = "c009")]
+pub mod influence_maximization;
+#[cfg(feature = "c009")]
+pub use influence_maximization as c009;

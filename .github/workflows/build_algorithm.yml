@@ -11,6 +11,7 @@ on:
       - 'neuralnet_optimizer/*'
       - 'job_scheduling/*'
       - 'cur_decomposition/*'
+      - 'influence_maximization/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
@@ -19,6 +20,7 @@ on:
       - 'test/neuralnet_optimizer/*'
       - 'test/job_scheduling/*'
       - 'test/cur_decomposition/*'
+      - 'test/influence_maximization/*'
 
 jobs:
   init:
