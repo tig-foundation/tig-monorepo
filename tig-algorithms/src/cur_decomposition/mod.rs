@@ -1,4 +1,5 @@
-// c008_a001
+pub mod simple_rand;
+pub use simple_rand as c008_a001;
 
 // c008_a002
 
