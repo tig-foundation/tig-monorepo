@@ -202,3 +202,7 @@ pub use hypergraph as c005;
 pub mod neuralnet_optimizer;
 #[cfg(feature = "c006")]
 pub use neuralnet_optimizer as c006;
+#[cfg(feature = "c009")]
+pub mod influence_maximization;
+#[cfg(feature = "c009")]
+pub use influence_maximization as c009;
