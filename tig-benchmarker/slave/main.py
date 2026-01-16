@@ -81,26 +81,17 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
         ]
     logger.debug(f"computing nonce: {' '.join(cmd[:4] + [f"'{cmd[4]}'"] + cmd[5:])}")
     process = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     while True:
-        ret = process.poll()
-        if ret is not None:
-            exit_codes = {
-                0: "success",
-                # 82: "cuda out of memory",
-                # 83: "host out of memory",
-                84: "runtime error",
-                # 85: "no solution",
-                # 86: "invalid solution",
-                87: "out of fuel",
-            }
-
+        try:
+            _, stderr = process.communicate(timeout=0.1)
+            ret = process.returncode
             if not os.path.exists(output_file):
                 if ret == 0:
                     raise Exception(f"no output")
                 else:
-                    raise Exception(f"failed with exit code {ret}: {process.stderr.read().decode()}")
+                    raise Exception(f"failed with exit code {ret}: {stderr}")
                 
             start = now()
             cmd = [
@@ -133,13 +124,11 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path, results_dir):
             with open(output_file, "w") as f:
                 json.dump(d, f)
             break
-
-        elif batch["id"] not in PROCESSING_BATCH_IDS:
-            process.kill()
-            logger.debug(f"batch {batch['id']}, nonce {nonce} stopped")
-            break
-        
-        time.sleep(0.1)
+        except subprocess.TimeoutExpired:
+            if batch["id"] not in PROCESSING_BATCH_IDS:
+                process.kill()
+                logger.debug(f"batch {batch['id']}, nonce {nonce} stopped")
+                break
 
     logger.debug(f"batch {batch['id']}, nonce {nonce} finished, took {now() - start}ms")
 
