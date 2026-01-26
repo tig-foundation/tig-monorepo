@@ -100,6 +100,7 @@ f"""Library not found at {so_path}:
         "vector_search": "c004",
         "hypergraph": "c005",
         "neuralnet_optimizer": "c006",
+        "job_scheduling": "c007",
     }
     challenge_id = challenge_ids[CHALLENGE]
 

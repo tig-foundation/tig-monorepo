@@ -46,8 +46,12 @@ case "$CHALLENGE" in
     build_so $ALGORITHM
     build_ptx $ALGORITHM
     ;;
+  job_scheduling)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'job_scheduling'"
+    build_so $ALGORITHM
+    ;;
   *)
-    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, knapsack, vehicle_routing, vector_search, hypergraph, neuralnet_optimizer"
+    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, knapsack, vehicle_routing, vector_search, hypergraph, neuralnet_optimizer, job_scheduling"
     exit 1
     ;;
 esac
