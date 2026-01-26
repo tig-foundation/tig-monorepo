@@ -326,6 +326,7 @@ pub type OptimizerQueryAtParamsFn = fn(
 /// Function type for optimizer step (computes parameter updates)
 pub type OptimizerStepFn = fn(
     optimizer_state: &mut dyn OptimizerStateTrait,
+    model_params: &[CudaSlice<f32>],
     gradients: &[CudaSlice<f32>], // FIXME pass in model map instead
     epoch: usize,
     train_loss: Option<f32>,
@@ -489,14 +490,19 @@ pub fn training_loop(
             )?;
 
             // Restore original parameters if they were modified
-            if let Some(params_to_restore) = original_params {
-                model.set_parameters(&params_to_restore, stream.clone(), module.clone())?;
+            if let Some(params_to_restore) = &original_params {
+                model.set_parameters(params_to_restore, stream.clone(), module.clone())?;
             }
 
             // Get gradients and apply optimizer step
             let gradients = model.extract_gradients(stream.clone())?;
             let param_updates = optimizer_step(
                 optimizer_state.as_mut(),
+                if let Some(modified_params) = &original_params {
+                    modified_params
+                } else {
+                    &model_params
+                },
                 &gradients,
                 epoch,
                 prev_train_loss,

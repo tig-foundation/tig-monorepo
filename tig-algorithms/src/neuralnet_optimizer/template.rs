@@ -95,6 +95,7 @@ fn optimizer_query_at_params(
 
 fn optimizer_step(
     optimizer_state: &mut dyn OptimizerStateTrait,
+    model_params: &[CudaSlice<f32>],
     gradients: &[CudaSlice<f32>],
     epoch: usize,
     train_loss: Option<f32>,
