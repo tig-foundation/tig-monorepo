@@ -70,7 +70,7 @@ impl MLP {
     ) -> Result<()> {
         let mut rng = StdRng::from_seed(seed);
         for layer in &mut self.lin {
-            layer.init_weights(rng.gen(), stream.clone(), module.clone())?;
+            layer.init_weights(rng.r#gen(), stream.clone(), module.clone())?;
         }
         Ok(())
     }
