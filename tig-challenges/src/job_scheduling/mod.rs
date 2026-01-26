@@ -360,14 +360,20 @@ impl Challenge {
                 *solution.borrow_mut() = s.clone();
                 Ok(())
             };
-            baselines::dispatching_rules::solve_challenge(self, &save_solution_fn, &None)?;
+            baselines::dispatching_rules::solve_challenge_with_effort(self, &save_solution_fn, 0)?;
             Ok(solution.into_inner())
         }
     );
 
     conditional_pub!(
         fn compute_sota_baseline(&self) -> Result<Solution> {
-            Err(anyhow!("Not implemented yet"))
+            let solution = RefCell::new(Solution::new());
+            let save_solution_fn = |s: &Solution| -> Result<()> {
+                *solution.borrow_mut() = s.clone();
+                Ok(())
+            };
+            baselines::dispatching_rules::solve_challenge_with_effort(self, &save_solution_fn, 1)?;
+            Ok(solution.into_inner())
         }
     );
 
@@ -376,8 +382,16 @@ impl Challenge {
             let makespan = self.evaluate_makespan(solution)?;
             let greedy_solution = self.compute_greedy_baseline()?;
             let greedy_makespan = self.evaluate_makespan(&greedy_solution)?;
-            // TODO: implement SOTA baseline
-            let quality = (greedy_makespan as f64 - makespan as f64) / greedy_makespan as f64;
+            if makespan > greedy_makespan {
+                return Err(anyhow!(
+                    "Makespan {} must be better than greedy baseline makespan {}",
+                    makespan,
+                    greedy_makespan
+                ));
+            }
+            let sota_solution = self.compute_sota_baseline()?;
+            let sota_makespan = self.evaluate_makespan(&sota_solution)?;
+            let quality = (sota_makespan as f64 - makespan as f64) / sota_makespan as f64;
             let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
             let quality = quality.round() as i32;
             Ok(quality)
