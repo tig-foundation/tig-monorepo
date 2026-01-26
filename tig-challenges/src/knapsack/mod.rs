@@ -3,13 +3,20 @@ mod baselines;
 use anyhow::{anyhow, Result};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::collections::HashSet;
+use std::{cell::RefCell, collections::HashSet, f64::consts::PI};
+
+/// Generate a sample from lognormal distribution using Box-Muller transform
+fn sample_lognormal(rng: &mut SmallRng, mean: f64, std_dev: f64) -> f64 {
+    let u1: f64 = rng.r#gen();
+    let u2: f64 = rng.r#gen();
+    let z = (-2.0 * u1.ln()).sqrt() * (2.0 * PI * u2).cos();
+    (mean + std_dev * z).exp()
+}
 
 impl_kv_string_serde! {
     Track {
         n_items: usize,
-        density: u32,
+        budget: u32,
     }
 }
 
@@ -38,48 +45,99 @@ pub struct Challenge {
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], track: &Track) -> Result<Self> {
         let mut rng = SmallRng::from_seed(seed.clone());
-        // Set constant density for value generation
-        let density = track.density as f64 / 100.0;
+        let n_participants = track.n_items;
+        let n_projects = 30000;
+        let log_normal_mean = 4.0;
+        let log_normal_std = 1.0;
+        let max_weight_val = 10;
 
-        // Generate weights w_i in the range [1, 50]
-        let weights: Vec<u32> = (0..track.n_items).map(|_| rng.gen_range(1..=50)).collect();
+        // Step 1: Generate subsets of projects using lognormal cardinalities
+        let mut subsets: Vec<Vec<usize>> = Vec::new();
+        let mut counter: usize = 0;
+        while counter < n_projects {
+            let cardinality =
+                1 + sample_lognormal(&mut rng, log_normal_mean, log_normal_std) as usize;
+            let end = (counter + cardinality).min(n_projects);
+            subsets.push((counter..end).collect());
+            counter = end;
+        }
+        let n_subsets = subsets.len();
 
-        // Generate values v_i in the range [1, 100] with density probability, 0 otherwise
-        let values: Vec<u32> = (0..track.n_items)
-            .map(|_| {
-                if rng.gen_bool(density) {
-                    rng.gen_range(1..=100)
-                } else {
-                    0
-                }
-            })
+        // Step 2: Determine number of projects per participant
+        let n_projects_per_participant: Vec<usize> = (0..n_participants)
+            .map(|_| 1 + sample_lognormal(&mut rng, log_normal_mean, log_normal_std) as usize)
             .collect();
 
-        // Generate interaction values V_ij with the following properties:
-        // - V_ij == V_ji (symmetric matrix)
-        // - V_ii == 0 (diagonal is zero)
-        // - Values are in range [1, 100] with density probability, 0 otherwise
-        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; track.n_items]; track.n_items];
+        // Step 3: Assign projects to each participant
+        let mut projects_dict: Vec<HashSet<usize>> = Vec::with_capacity(n_participants);
+        for i in 0..n_participants {
+            let subset_id = rng.gen_range(0..n_subsets);
+            let subset = &subsets[subset_id];
+            let cardinality_of_subset = subset.len();
 
-        for i in 0..track.n_items {
-            for j in (i + 1)..track.n_items {
-                let value = if rng.gen_bool(density) {
-                    rng.gen_range(1..=100)
-                } else {
-                    0
-                };
+            let selected_projects: HashSet<usize> = if n_projects_per_participant[i]
+                < cardinality_of_subset
+            {
+                // Sample without replacement from subset
+                let mut selected: Vec<usize> = subset.clone();
+                for j in 0..n_projects_per_participant[i] {
+                    let idx = rng.gen_range(j..selected.len());
+                    selected.swap(j, idx);
+                }
+                selected
+                    .into_iter()
+                    .take(n_projects_per_participant[i])
+                    .collect()
+            } else {
+                // Take all from subset and sample more from remaining projects
+                let mut selected: HashSet<usize> = subset.iter().cloned().collect();
+                let n_projects_to_choose = n_projects_per_participant[i] - cardinality_of_subset;
 
-                // Set both V_ij and V_ji due to symmetry
-                interaction_values[i][j] = value;
-                interaction_values[j][i] = value;
+                // Sample additional projects not in the subset
+                let mut remaining: Vec<usize> =
+                    (0..n_projects).filter(|p| !selected.contains(p)).collect();
+
+                for j in 0..n_projects_to_choose.min(remaining.len()) {
+                    let idx = rng.gen_range(j..remaining.len());
+                    remaining.swap(j, idx);
+                    selected.insert(remaining[j]);
+                }
+                selected
+            };
+            projects_dict.push(selected_projects);
+        }
+
+        // Step 4: Compute Jaccard similarity for interaction values
+        // Scale by 1000 to convert float to integer
+        let mut interaction_values: Vec<Vec<i32>> = vec![vec![0; n_participants]; n_participants];
+        for i in 0..n_participants {
+            for j in (i + 1)..n_participants {
+                let set_i = &projects_dict[i];
+                let set_j = &projects_dict[j];
+                let intersection_size = set_i.intersection(set_j).count();
+                let union_size = set_i.len() + set_j.len() - intersection_size;
+
+                if union_size > 0 && intersection_size > 0 {
+                    let jaccard = (intersection_size as f64 / union_size as f64 * 1000.0) as i32;
+                    interaction_values[i][j] = jaccard;
+                    interaction_values[j][i] = jaccard;
+                }
             }
         }
 
-        let max_weight: u32 = weights.iter().sum::<u32>() / 2;
+        // Generate weights in [1, 10]
+        let weights: Vec<u32> = (0..n_participants)
+            .map(|_| rng.gen_range(1..=max_weight_val))
+            .collect();
+
+        // No linear values in team-formation
+        let values: Vec<u32> = vec![0; n_participants];
+
+        let max_weight = (track.budget as f64 / 100.0 * weights.iter().sum::<u32>() as f64) as u32;
 
         Ok(Challenge {
             seed: seed.clone(),
-            num_items: track.n_items.clone(),
+            num_items: n_participants,
             weights,
             values,
             interaction_values,
