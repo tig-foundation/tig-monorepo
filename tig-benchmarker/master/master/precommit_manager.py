@@ -47,21 +47,24 @@ class PrecommitManager:
             logger.error(f"Invalid selected challenge_id '{c_id}'. Valid challenge_ids: {sorted(self.challenge_configs)}")
             return
         challenge_config = self.challenge_configs[c_id]
-        selected_track_ids = sorted(set(selection["selected_track_ids"]) & set(challenge_config["active_tracks"]))
-        if len(selected_track_ids) == 0:
-            selected_track_ids = sorted(challenge_config["active_tracks"])
-        selection["selected_track_ids"] = selected_track_ids
+        for t_id in set(selection["track_settings"]) - set(challenge_config["active_tracks"]):
+            selection["track_settings"].pop(t_id)
+        for t_id in set(challenge_config["active_tracks"]) - set(selection["track_settings"]):
+            selection["track_settings"][t_id] = {}
         
-        if selection["num_bundles"] < challenge_config["min_num_bundles"]:
-            selection["num_bundles"] = challenge_config["min_num_bundles"]
-
-        if (
-            len(selection["runtime_config"]) > 1 or
-            selection["runtime_config"].get("max_fuel") is None or 
-            selection["runtime_config"]["max_fuel"] < 0 or
-            selection["runtime_config"]["max_fuel"] > challenge_config["runtime_config_limits"]["max_fuel"]
-        ):
-            selection["runtime_config"] = {"max_fuel": challenge_config["runtime_config_limits"]["max_fuel"]}
+        for t_id in set(challenge_config["active_tracks"]):
+            for k in set(selection["track_settings"][t_id]) - {"num_bundles", "hyperparameters", "fuel_budget"}:
+                selection["track_settings"][t_id].pop(k)
+            if selection["track_settings"][t_id].get("num_bundles", 0) < challenge_config["min_num_bundles"]:
+                selection["track_settings"][t_id]["num_bundles"] = challenge_config["min_num_bundles"]
+            if (
+                selection["track_settings"][t_id].get("fuel_budget") is None or 
+                selection["track_settings"][t_id]["fuel_budget"] < 0 or
+                selection["track_settings"][t_id]["fuel_budget"] > challenge_config["max_fuel_budget"]
+            ):
+                selection["track_settings"][t_id]["fuel_budget"] = challenge_config["max_fuel_budget"]
+            if "hyperparameters" not in selection["track_settings"][t_id]:
+                selection["track_settings"][t_id]["hyperparameters"] = None
 
         self.num_precommits_submitted += 1
         req = SubmitPrecommitRequest(
@@ -70,14 +73,9 @@ class PrecommitManager:
                 algorithm_id=a_id,
                 player_id=CONFIG["player_id"],
                 block_id=self.last_block_id,
-                track_id=random.choice(selection["selected_track_ids"]),
+                track_id="",
             ),
-            num_bundles=selection["num_bundles"],
-            hyperparameters=selection["hyperparameters"],
-            runtime_config={
-                **challenge_config["runtime_config_limits"],
-                **selection["runtime_config"]
-            },
+            track_settings=selection["track_settings"],
         )
         logger.info(f"Created precommit (algorithm_id: {a_id}, track: {req.settings.track_id}, num_bundles: {req.num_bundles}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
         return req

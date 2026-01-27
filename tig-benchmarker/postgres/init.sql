@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS job (
     hyperparameters JSONB,
     num_nonces INTEGER NOT NULL,
     rand_hash TEXT NOT NULL,
-    runtime_config JSONB NOT NULL,
+    fuel_budget BIGINT NOT NULL,
     batch_size INTEGER NOT NULL,
     num_batches INTEGER NOT NULL,
     challenge TEXT NOT NULL,
@@ -115,57 +115,39 @@ SELECT '
   "algo_selection": [
     {
       "algorithm_id": "c001_a001",
-      "num_bundles": 1,
-      "selected_track_ids": [],
+      "track_settings": {},
       "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null,
-      "runtime_config": {}
+      "batch_size": 8
     },
     {
       "algorithm_id": "c002_a001",
-      "num_bundles": 1,
-      "selected_track_ids": [],
+      "track_settings": {},
       "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null,
-      "runtime_config": {}
+      "batch_size": 8
     },
     {
       "algorithm_id": "c003_a001",
-      "num_bundles": 1,
-      "selected_track_ids": [],
+      "track_settings": {},
       "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null,
-      "runtime_config": {}
+      "batch_size": 8
     },
     {
       "algorithm_id": "c004_a001",
-      "num_bundles": 1,
-      "selected_track_ids": [],
+      "track_settings": {},
       "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null,
-      "runtime_config": {}
+      "batch_size": 8
     },
     {
       "algorithm_id": "c005_a001",
-      "num_bundles": 1,
-      "selected_track_ids": [],
+      "track_settings": {},
       "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null,
-      "runtime_config": {}
+      "batch_size": 8
     },
     {
       "algorithm_id": "c006_a001",
-      "num_bundles": 1,
-      "selected_track_ids": [],
+      "track_settings": {},
       "weight": 1,
-      "batch_size": 8,
-      "hyperparameters": null,
-      "runtime_config": {}
+      "batch_size": 8
     }
   ],
   "time_before_batch_retry": 60000,

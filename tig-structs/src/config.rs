@@ -52,12 +52,6 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
-    RuntimeConfig {
-        max_memory: u64,
-        max_fuel: u64,
-    }
-}
-serializable_struct_with_getters! {
     TopUpsConfig {
         topup_address: String,
         min_topup_amount: PreciseNumber,
@@ -93,7 +87,7 @@ serializable_struct_with_getters! {
         per_nonce_fee: PreciseNumber,
         base_fee: PreciseNumber,
         active_tracks: HashMap<String, TrackConfig>,
-        runtime_config_limits: RuntimeConfig,
+        max_fuel_budget: u64,
         max_qualifiers_per_track: u64,
         legacy_multiplier_span: f32,
         min_num_bundles: u64,

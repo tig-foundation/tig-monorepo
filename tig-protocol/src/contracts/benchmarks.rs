@@ -1,19 +1,16 @@
 use crate::context::*;
 use anyhow::{anyhow, Result};
 use logging_timer::time;
-use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
-use serde_json::{Map, Value};
-use std::collections::HashSet;
+use rand::{prelude::IteratorRandom, rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
+use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 
 #[time]
 pub async fn submit_precommit<T: Context>(
     ctx: &T,
     player_id: String,
-    settings: BenchmarkSettings,
-    hyperparameters: Option<Map<String, Value>>,
-    runtime_config: RuntimeConfig,
-    num_bundles: u64,
+    mut settings: BenchmarkSettings,
+    mut track_settings: HashMap<String, TrackSettings>,
     seed: u64,
 ) -> Result<String> {
     if player_id != settings.player_id {
@@ -53,13 +50,32 @@ pub async fn submit_precommit<T: Context>(
 
     // verify size
     let challenge_config = &config.challenges[&settings.challenge_id];
-    if !challenge_config
-        .active_tracks
-        .contains_key(&settings.track_id)
+    if challenge_config.active_tracks.len() != track_settings.len()
+        || !track_settings
+            .keys()
+            .all(|k| challenge_config.active_tracks.contains_key(k))
     {
-        return Err(anyhow!("Invalid track_id '{}'", settings.track_id));
+        return Err(anyhow!(
+            "Must submit settings for all active tracks: {:?}",
+            challenge_config.active_tracks.keys().collect::<Vec<_>>(),
+        ));
     }
+
+    // randomly select a track
+    let mut rng = StdRng::seed_from_u64(seed);
+    settings.track_id = challenge_config
+        .active_tracks
+        .keys()
+        .choose(&mut rng)
+        .unwrap()
+        .clone();
     let track_config = &challenge_config.active_tracks[&settings.track_id];
+
+    let TrackSettings {
+        hyperparameters,
+        fuel_budget,
+        num_bundles,
+    } = track_settings.remove(&settings.track_id).unwrap();
 
     if num_bundles < challenge_config.min_num_bundles {
         return Err(anyhow!(
@@ -69,19 +85,11 @@ pub async fn submit_precommit<T: Context>(
         ));
     }
 
-    if runtime_config.max_memory > challenge_config.runtime_config_limits.max_memory {
+    if fuel_budget > challenge_config.max_fuel_budget {
         return Err(anyhow!(
-            "Invalid runtime_config.max_memory '{}'. Must be <= {}",
-            runtime_config.max_memory,
-            challenge_config.runtime_config_limits.max_memory
-        ));
-    }
-
-    if runtime_config.max_fuel > challenge_config.runtime_config_limits.max_fuel {
-        return Err(anyhow!(
-            "Invalid runtime_config.max_fuel '{}'. Must be <= {}",
-            runtime_config.max_fuel,
-            challenge_config.runtime_config_limits.max_fuel
+            "Invalid fuel_budget '{}'. Must be <= {}",
+            fuel_budget,
+            challenge_config.max_fuel_budget
         ));
     }
 
@@ -103,10 +111,10 @@ pub async fn submit_precommit<T: Context>(
                 block_started: block_details.height,
                 num_nonces: num_bundles * track_config.num_nonces_per_bundle,
                 num_bundles,
-                rand_hash: hex::encode(StdRng::seed_from_u64(seed).gen::<[u8; 16]>()),
+                rand_hash: hex::encode(rng.r#gen::<[u8; 16]>()),
                 fee_paid: submission_fee,
                 hyperparameters,
-                runtime_config,
+                fuel_budget,
             },
         )
         .await?;
