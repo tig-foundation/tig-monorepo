@@ -56,3 +56,8 @@ services:
     <<: [*common, *common-gpu]
     image: ghcr.io/tig-foundation/tig-monorepo/neuralnet_optimizer/runtime:${VERSION}
     container_name: neuralnet_optimizer
+
+  job_scheduling:
+    <<: *common
+    image: ghcr.io/tig-foundation/tig-monorepo/job_scheduling/runtime:${VERSION}
+    container_name: job_scheduling

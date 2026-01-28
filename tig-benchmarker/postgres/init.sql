@@ -148,6 +148,12 @@ SELECT '
       "track_settings": {},
       "weight": 1,
       "batch_size": 8
+    },
+    {
+      "algorithm_id": "c007_a001",
+      "track_settings": {},
+      "weight": 1,
+      "batch_size": 8
     }
   ],
   "time_before_batch_retry": 60000,
