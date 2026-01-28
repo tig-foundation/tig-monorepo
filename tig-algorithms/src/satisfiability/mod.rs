@@ -146,7 +146,8 @@
 
 // c001_a074
 
-// c001_a075
+pub mod sat_excelled_2;
+pub use sat_excelled_2 as c001_a075;
 
 // c001_a076
 
