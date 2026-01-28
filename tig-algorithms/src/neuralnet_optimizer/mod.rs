@@ -1,4 +1,5 @@
-// c006_a001
+pub mod simple_sgd;
+pub use simple_sgd as c006_a001;
 
 // c006_a002
 
