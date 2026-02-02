@@ -212,7 +212,8 @@
 
 // c003_a107
 
-// c003_a108
+pub mod quad_improved_v1;
+pub use quad_improved_v1 as c003_a108;
 
 // c003_a109
 
