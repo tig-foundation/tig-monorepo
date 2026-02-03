@@ -77,5 +77,5 @@ class PrecommitManager:
             ),
             track_settings=selection["track_settings"],
         )
-        logger.info(f"Created precommit (algorithm_id: {a_id}, track: {req.settings.track_id}, num_bundles: {req.num_bundles}, hyperparameters: {req.hyperparameters}, runtime_config: {req.runtime_config})")
+        logger.info(f"Created precommit with algorithm: {a_id}")
         return req
