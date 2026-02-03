@@ -46,16 +46,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     let mut num_bundles_by_player_by_challenge = HashMap::<String, HashMap<String, u64>>::new();
     for (settings, average_quality_by_bundle) in active_benchmarks.iter() {
-        if config.challenges[&settings.challenge_id]
-            .active_tracks
-            .contains_key(&settings.track_id)
-        {
-            *num_bundles_by_player_by_challenge
-                .entry(settings.player_id.clone())
-                .or_default()
-                .entry(settings.challenge_id.clone())
-                .or_default() += average_quality_by_bundle.len() as u64;
-        }
+        *num_bundles_by_player_by_challenge
+            .entry(settings.player_id.clone())
+            .or_default()
+            .entry(settings.challenge_id.clone())
+            .or_default() += average_quality_by_bundle.len() as u64;
     }
     for (player_id, player_bundles_by_challenge) in num_bundles_by_player_by_challenge.iter() {
         let opow_data = active_opow_block_data.get_mut(player_id).unwrap();
