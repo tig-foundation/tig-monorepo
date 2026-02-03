@@ -369,6 +369,9 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     PlayerDetails {
         name: Option<String>,
+        x: Option<String>,
+        telegram: Option<String>,
+        discord: Option<String>,
         is_multisig: bool,
     }
 }

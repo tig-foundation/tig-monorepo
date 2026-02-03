@@ -33,7 +33,7 @@ paths:
         
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
           
-        * `names` is a map of `<player_id>` to ENS name (only if one exists)
+        * `player_details` is a map of `<player_id>` to `PlayerDetails`
       parameters:
         - name: block_id
           in: query
@@ -158,6 +158,8 @@ paths:
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
         
         * All players who have a deposit are included in the response
+
+        * `player_details` is a map of `<player_id>` to `PlayerDetails`
         
       parameters:
         - name: block_id
@@ -236,7 +238,7 @@ paths:
         * Query parameter `<block_id>` must be the latest block. Use `/get-block` endpoint
         * Each opow is for a specific Benchmarker. `opow.block_data.reward` is the reward before any sharing amongst delegators
         
-        * `names` is a map of `<player_id>` to ENS name (only if one exists)
+        * `player_details` is a map of `<player_id>` to `PlayerDetails`
       parameters:
         - name: block_id
           in: query
@@ -303,7 +305,7 @@ paths:
           
         * `players` is a map of `<player_id>` to a dict of reward types (algorithm, benchmark, advance, delegator)
         
-        * `names` is a map of `<player_id>` to ENS name (only if one exists)
+        * `player_details` is a map of `<player_id>` to `PlayerDetails`
 
         * `totals` is a map of emission types to `uint256`
       parameters:
@@ -377,6 +379,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SetCoinbaseResponse'
+  /set-profile:
+    post:
+      tags:
+        - POST
+      summary: Set your profile (display name and social handles)
+      description: |-
+        # Notes
+        * Can only be updated once every 10080 blocks
+        * Header `X-Api-Key` is required. Use `/request-api-key` endpoint.
+          * If `<api_key>` is invalid, a `401` error will be returned
+        * All fields are optional. Omit a field to leave it unchanged.
+        * **name**: max 20 characters; letters, numbers, underscores, dashes only.
+        * **x**: X (Twitter) handle; optional `@` prefix; 1–15 characters; letters, numbers, underscores.
+        * **telegram**: Telegram username; optional `@` prefix; 5–32 characters; letters, numbers, underscores.
+        * **discord**: Discord username; optional `@` prefix; 2–32 characters; letters, numbers, underscores, periods.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetProfileRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetProfileResponse'
   /set-delegatees:
     post:
       tags:
@@ -1251,7 +1286,20 @@ components:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/Address'
+          type: string
+          nullable: true
+        x:
+          type: string
+          nullable: true
+          description: X (Twitter) handle
+        telegram:
+          type: string
+          nullable: true
+          description: Telegram username
+        discord:
+          type: string
+          nullable: true
+          description: Discord username
         is_multisig:
           type: boolean
     PlayerState:
@@ -1398,10 +1446,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Binary'
-        names:
+        player_details:
           type: object
           additionalProperties:
-            type: string
+            $ref: '#/components/schemas/PlayerDetails'
+          description: Map of player_id to PlayerDetails
     GetBenchmarksResponse:
       type: object
       properties:
@@ -1463,6 +1512,11 @@ components:
                   format: double
               reward:
                 $ref: '#/components/schemas/PreciseNumber'
+        player_details:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PlayerDetails'
+          description: Map of player_id to PlayerDetails
     GetTracksDataResponse:
       type: object
       properties:
@@ -1480,10 +1534,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OPoW'
-        names:
+        player_details:
           type: object
           additionalProperties:
-            type: string
+            $ref: '#/components/schemas/PlayerDetails'
+          description: Map of player_id to PlayerDetails
     GetPlayerDataResponse:
       type: object
       properties:
@@ -1534,10 +1589,11 @@ components:
               $ref: '#/components/schemas/PreciseNumber'
              delegator:
               $ref: '#/components/schemas/PreciseNumber'
-       names:
+       player_details:
          type: object
          additionalProperties:
-           type: string
+           $ref: '#/components/schemas/PlayerDetails'
+         description: Map of player_id to PlayerDetails
        totals:
          type: object
          properties:
@@ -1576,6 +1632,34 @@ components:
           type: number
           format: double
     SetCoinbaseResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+    SetProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 20
+          pattern: ^[a-zA-Z0-9_-]+$
+          description: Display name (max 20 characters; letters, numbers, underscores, dashes only)
+        x:
+          type: string
+          maxLength: 16
+          pattern: ^@?[a-zA-Z0-9_]{1,15}$
+          description: X (Twitter) handle; optional @ prefix; 1–15 characters
+        telegram:
+          type: string
+          maxLength: 33
+          pattern: ^@?[a-zA-Z0-9_]{5,32}$
+          description: Telegram username; optional @ prefix; 5–32 characters
+        discord:
+          type: string
+          maxLength: 33
+          pattern: ^@?[a-zA-Z0-9_.]{2,32}$
+          description: Discord username; optional @ prefix; 2–32 characters; letters, numbers, underscores, periods
+    SetProfileResponse:
       type: object
       properties:
         ok:
