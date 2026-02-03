@@ -37,7 +37,7 @@ The data has the following split: Train = 1000, Validation = 200, Test = 250.
 Innovator optimizers integrate into the training loop via three functions:
 - `optimizer_init_state(seed, param_sizes, ...) -> state`. This is a one-time setup function that initialises the optimizer state.
 - `optimizer_query_at_params(state, model_params, epoch, train_loss, val_loss, ...) -> Option<modified_params>`. This is an optional “parameter proposal” function: if you return modified parameters, the forward/backward uses them for that batch; the original parameters are then restored before applying updates. This enables lookahead optimizer schemes.
-- `optimizer_step(state, gradients, epoch, train_loss, val_loss, ...) -> updates`. This is the main function in the submission, it decides how to update the weights given the graidents of the loss. 
+- `optimizer_step(state, model_params, gradients, epoch, train_loss, val_loss, ...) -> updates`. This is the main function in the submission; it receives the current model parameters and gradients and returns per-parameter update tensors. 
 
 You may only change optimizer logic and its internal hyperparameters/state. Model architecture (beyond `num_hidden_layers` from difficulty), data, batch size, and training loop controls are fixed.
 
@@ -46,11 +46,13 @@ Each epoch (iteration of the training loop) consists of:
 * For each mini-batch:
    - Optional parameter proposal: the harness calls optimizer_query_at_params(...). If you return modified parameters, the forward/backward uses them for this batch; the original parameters are restored immediately after.
     - Run a forward pass to compute the batch loss, then a backward pass to compute gradients with respect to the current model parameters.
-    - Update computation: the harness calls optimizer_step(...) with the gradients (and optional loss signals). Your function returns per-parameter update tensors.
+    - Update computation: the harness calls optimizer_step(...) with the current model parameters and gradients (and optional loss signals). Your function returns per-parameter update tensors.
     - Apply the returned updates to the model parameters.
 - After all batches, evaluate on the validation set, track the best validation loss for early stopping, and save the best model so far.
 
 **Scoring and Acceptance**
+Your optimizer integrates into the training loop; the harness evaluates the best model state produced during the run (no separate "returned" solution). The evaluated metric is **quality** (a fixed-point integer with 6 decimal places); see the challenge code for how it is derived from test loss and the acceptance threshold.
+
 After training, we compute the average MSE on the test set (`avg_model_loss_on_test`) and compare it to a target computed from the data’s noise:
 
 - Let `alpha = 4.0 - accuracy_factor / 1000.0`.
