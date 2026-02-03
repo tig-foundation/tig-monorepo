@@ -56,7 +56,9 @@ This assignment corresponds to the variable assignment $X1=False, X2=True, X3=Tr
 When substituted into the Boolean formula, each clause will evaluate to True, thereby this assignment is a solution as it satisfies all clauses.
 
 # Our Challenge
-In TIG, the 3-SAT Challenge is based on the example above with configurable difficulty.  Please see the challenge code for a precise specification. 
+In TIG, the 3-SAT Challenge is based on the example above with configurable difficulty. Please see the challenge code for a precise specification.
+
+Your algorithm does not return a solution; it calls `save_solution` as it runs. The **last** saved solution is evaluated. A valid solution is any assignment of True/False to the variables (one value per variable). The evaluated metric is **quality** (a fixed-point integer with 6 decimal places): quality is **1.0** if the assignment satisfies the formula (makes all clauses true) and **0** otherwise. 
 
 # Applications
 
