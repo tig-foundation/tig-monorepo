@@ -550,11 +550,16 @@ paths:
         - POST
       summary: Submit a precommit
       description: |-
+        Submit benchmark settings and per-track settings for all active tracks of the challenge.
+        The server selects a track at random; the returned precommit will indicate the selected track.
+
         # Notes
-        
+
         * This endpoint can only be invoked once every few seconds
-        
-        * When a precommit is confirmed (`precommit.state != null`), a random string will be set (`precommit.state.rand_hash`). This string must be used when generating seeds
+
+        * `track_settings` must include every active track for the challenge (key = track_id). Each value has `hyperparameters`, `fuel_budget`, and `num_bundles`.
+
+        * When a precommit is confirmed (`precommit.state != null`), a random string will be set (`precommit.state.rand_hash`). This string must be used when generating seeds.
       requestBody:
         content:
           application/json:
@@ -740,6 +745,22 @@ components:
           $ref: '#/components/schemas/AlgorithmId'
         track_id:
           $ref: '#/components/schemas/TrackId'
+    TrackSettings:
+      type: object
+      required:
+        - fuel_budget
+        - num_bundles
+      properties:
+        hyperparameters:
+          type: object
+          nullable: true
+          additionalProperties: true
+        fuel_budget:
+          type: integer
+          format: uint64
+        num_bundles:
+          type: integer
+          format: uint64
     BenchmarkState:
       type: object
       properties:
@@ -1638,31 +1659,31 @@ components:
           type: boolean
     SubmitPrecommitRequest:
       type: object
+      required:
+        - settings
+        - track_settings
       properties:
         settings:
           $ref: '#/components/schemas/BenchmarkSettings'
-        num_nonces:
-          type: integer
-          format: uint32
-        hyperparameters:
+        track_settings:
           type: object
-          nullable: true
-        runtime_config:
-          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/TrackSettings'
+          description: Settings per active track (key = track_id). Must include all active tracks for the challenge.
     SubmitPrecommitResponse:
       type: object
       properties:
         benchmark_id:
           $ref: '#/components/schemas/MD5'
     SubmitProofRequest:
-          type: object
-          properties:
-            benchmark_id:
-              $ref: '#/components/schemas/MD5'
-            merkle_proofs:
-              type: array
-              items:
-                $ref: '#/components/schemas/MerkleProof'
+      type: object
+      properties:
+        benchmark_id:
+          $ref: '#/components/schemas/MD5'
+        merkle_proofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerkleProof'
     SubmitProofResponse:
       type: object
       properties:
