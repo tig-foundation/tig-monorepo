@@ -56,9 +56,11 @@ mean_distance = 0.47 / 3 = 0.16
 In TIG, the vector search challenge features vectors with 250 dimensions, and uses the Euclidean distance. The set we sample from is the hypercube $[-1,1]^{250}$. The number of Database vectors scales with the number of Query vectors, such that the number Database vectors is the Query vectors multiplied by $100$. There are two parameters that can be adjusted in order to vary the difficulty of the challenge instance: 
 
 - Parameter 1: $num\textunderscore{ }queries$ = **The number of queries**.  
-- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline$ = **The mean Euclidean distance of query vectors to selected nearby vectors in the database have to be below `threshold = 11 - better_than_baseline / 1000`**. 
+- Parameter 2: **quality target** – Your mean Euclidean distance is compared to a baseline (see below).
 
-Real-world data is typically clustered, we generate cluster sizes from the log-normal distribution, such that the mean number of points in a cluster is $700$. All vectors in the Query and Database sets are generated in the following way. When a vector is generated it is assigned a cluster center with a probability proportional to that clusters size. Once a vector is assigned a cluster center it is generated from a anisotropic Guassian with mean equal to the cluster center.
+Real-world data is typically clustered; we generate cluster sizes from the log-normal distribution, such that the mean number of points in a cluster is $700$. All vectors in the Query and Database sets are generated in the following way. When a vector is generated it is assigned a cluster center with a probability proportional to that cluster's size. Once a vector is assigned a cluster center it is generated from an anisotropic Gaussian with mean equal to the cluster center.
+
+Your algorithm does not return a solution; it calls `save_solution` as it runs. The **last** saved solution is evaluated. A valid solution must assign each query vector to a valid database index. The evaluated metric is **quality** (a fixed-point integer with 6 decimal places), computed from your mean distance (avg_dist) and a solution’s mean Euclidean distance to a hardcoded baseline distance of **11.0**: `quality = 1.0 − avg_dist / 11.0` (avg_dist is your solution’s mean Euclidean distance). Lower mean distance gives higher quality; the result is encoded in the fixed-point format in the challenge code.)
 
 # Application
 
