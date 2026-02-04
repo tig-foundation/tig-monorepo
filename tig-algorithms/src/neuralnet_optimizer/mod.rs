@@ -18,7 +18,8 @@
 
 // c006_a010
 
-// c006_a011
+pub mod gas_fx;
+pub use gas_fx as c006_a011;
 
 // c006_a012
 
