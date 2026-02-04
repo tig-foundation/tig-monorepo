@@ -188,7 +188,8 @@
 
 // c002_a095
 
-// c002_a096
+pub mod adaptive_v3_opt;
+pub use adaptive_v3_opt as c002_a096;
 
 // c002_a097
 
