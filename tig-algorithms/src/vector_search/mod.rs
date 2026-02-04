@@ -160,7 +160,8 @@
 
 // c004_a081
 
-// c004_a082
+pub mod autovector_native_v8;
+pub use autovector_native_v8 as c004_a082;
 
 // c004_a083
 
