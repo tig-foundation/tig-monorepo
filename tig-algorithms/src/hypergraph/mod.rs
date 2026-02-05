@@ -26,7 +26,8 @@
 
 // c005_a014
 
-// c005_a015
+pub mod freud_opt_v2;
+pub use freud_opt_v2 as c005_a015;
 
 // c005_a016
 
