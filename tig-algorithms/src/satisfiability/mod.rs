@@ -148,7 +148,8 @@
 
 // c001_a075
 
-// c001_a076
+pub mod sat_final;
+pub use sat_final as c001_a076;
 
 // c001_a077
 
