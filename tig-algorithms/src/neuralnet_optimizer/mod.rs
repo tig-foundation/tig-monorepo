@@ -12,7 +12,8 @@
 
 // c006_a007
 
-// c006_a008
+pub mod twenty5;
+pub use twenty5 as c006_a008;
 
 // c006_a009
 
