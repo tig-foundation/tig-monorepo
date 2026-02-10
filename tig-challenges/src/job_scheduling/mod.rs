@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-pub struct FlowConfig {
+pub struct ScenarioConfig {
     pub avg_op_flexibility: f32,
     pub reentrance_level: f32,
     pub flow_structure: f32,
@@ -19,42 +19,42 @@ pub struct FlowConfig {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Flow {
-    STRICT,
-    PARALLEL,
-    RANDOM,
-    COMPLEX,
-    CHAOTIC,
+pub enum Scenario {
+    FLOW_SHOP,
+    HYBRID_FLOW_SHOP,
+    JOB_SHOP,
+    FJSP_MEDIUM,
+    FJSP_HIGH,
 }
 
-impl From<Flow> for FlowConfig {
-    fn from(flow: Flow) -> Self {
-        match flow {
-            Flow::STRICT => FlowConfig {
+impl From<Scenario> for ScenarioConfig {
+    fn from(scenario: Scenario) -> Self {
+        match scenario {
+            Scenario::FLOW_SHOP => ScenarioConfig {
                 avg_op_flexibility: 1.0,
                 reentrance_level: 0.2,
                 flow_structure: 0.0,
                 product_mix_ratio: 0.5,
             },
-            Flow::PARALLEL => FlowConfig {
+            Scenario::HYBRID_FLOW_SHOP => ScenarioConfig {
                 avg_op_flexibility: 3.0,
                 reentrance_level: 0.2,
                 flow_structure: 0.0,
                 product_mix_ratio: 0.5,
             },
-            Flow::RANDOM => FlowConfig {
+            Scenario::JOB_SHOP => ScenarioConfig {
                 avg_op_flexibility: 1.0,
                 reentrance_level: 0.0,
                 flow_structure: 0.4,
                 product_mix_ratio: 1.0,
             },
-            Flow::COMPLEX => FlowConfig {
+            Scenario::FJSP_MEDIUM => ScenarioConfig {
                 avg_op_flexibility: 3.0,
                 reentrance_level: 0.2,
                 flow_structure: 0.4,
                 product_mix_ratio: 1.0,
             },
-            Flow::CHAOTIC => FlowConfig {
+            Scenario::FJSP_HIGH => ScenarioConfig {
                 avg_op_flexibility: 10.0,
                 reentrance_level: 0.0,
                 flow_structure: 1.0,
@@ -64,29 +64,29 @@ impl From<Flow> for FlowConfig {
     }
 }
 
-impl std::fmt::Display for Flow {
+impl std::fmt::Display for Scenario {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Flow::STRICT => write!(f, "strict"),
-            Flow::PARALLEL => write!(f, "parallel"),
-            Flow::RANDOM => write!(f, "random"),
-            Flow::COMPLEX => write!(f, "complex"),
-            Flow::CHAOTIC => write!(f, "chaotic"),
+            Scenario::FLOW_SHOP => write!(f, "flow_shop"),
+            Scenario::HYBRID_FLOW_SHOP => write!(f, "hybrid_flow_shop"),
+            Scenario::JOB_SHOP => write!(f, "job_shop"),
+            Scenario::FJSP_MEDIUM => write!(f, "fjsp_medium"),
+            Scenario::FJSP_HIGH => write!(f, "fjsp_high"),
         }
     }
 }
 
-impl std::str::FromStr for Flow {
+impl std::str::FromStr for Scenario {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "strict" => Ok(Flow::STRICT),
-            "parallel" => Ok(Flow::PARALLEL),
-            "random" => Ok(Flow::RANDOM),
-            "complex" => Ok(Flow::COMPLEX),
-            "chaotic" => Ok(Flow::CHAOTIC),
-            _ => Err(anyhow::anyhow!("Invalid flow type: {}", s)),
+            "flow_shop" => Ok(Scenario::FLOW_SHOP),
+            "hybrid_flow_shop" => Ok(Scenario::HYBRID_FLOW_SHOP),
+            "job_shop" => Ok(Scenario::JOB_SHOP),
+            "fjsp_medium" => Ok(Scenario::FJSP_MEDIUM),
+            "fjsp_high" => Ok(Scenario::FJSP_HIGH),
+            _ => Err(anyhow::anyhow!("Invalid scenario type: {}", s)),
         }
     }
 }
@@ -94,9 +94,7 @@ impl std::str::FromStr for Flow {
 impl_kv_string_serde! {
     Track {
         n: usize,
-        m: usize,
-        o: usize,
-        flow: Flow
+        s: Scenario
     }
 }
 
@@ -128,15 +126,15 @@ pub struct Challenge {
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], track: &Track) -> Result<Self> {
         let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).r#gen());
-        let FlowConfig {
+        let ScenarioConfig {
             avg_op_flexibility,
             reentrance_level,
             flow_structure,
             product_mix_ratio,
-        } = track.flow.clone().into();
-        let n_jobs = track.n;
-        let n_machines = track.m;
-        let n_op_types = track.o;
+        } = track.s.clone().into();
+        let n_jobs = 50;
+        let n_machines = n_jobs / 2 + 5;
+        let n_op_types = n_jobs / 2 + 5;
         let n_products = 1.max((product_mix_ratio * n_jobs as f32) as usize);
         let n_routes = 1.max((flow_structure * n_jobs as f32) as usize);
         let min_eligible_machines = 1;
@@ -187,7 +185,7 @@ impl Challenge {
                         // Job Shop Logic: Random permutation
                         rng.gen_range(0..base_sequence.len())
                     } else {
-                        // Flow Shop Logic: Pick next sequential op
+                        // Scenario Shop Logic: Pick next sequential op
                         0
                     };
 
