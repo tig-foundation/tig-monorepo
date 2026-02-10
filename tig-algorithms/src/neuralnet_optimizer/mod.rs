@@ -1,4 +1,5 @@
-// c006_a001
+pub mod neural_alchemist;
+pub use neural_alchemist as c006_a001;
 
 // c006_a002
 
