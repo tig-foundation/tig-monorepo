@@ -24,7 +24,8 @@
 
 // c006_a013
 
-// c006_a014
+pub mod gas_fx_opt2;
+pub use gas_fx_opt2 as c006_a014;
 
 // c006_a015
 
