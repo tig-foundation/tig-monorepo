@@ -10,7 +10,8 @@
 
 // c006_a006
 
-// c006_a007
+pub mod chungus;
+pub use chungus as c006_a007;
 
 // c006_a008
 
