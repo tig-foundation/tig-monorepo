@@ -8,7 +8,8 @@
 
 // c006_a005
 
-// c006_a006
+pub mod neural_advanced;
+pub use neural_advanced as c006_a006;
 
 // c006_a007
 
