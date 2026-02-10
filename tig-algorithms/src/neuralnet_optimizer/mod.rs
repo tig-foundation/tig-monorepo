@@ -16,7 +16,8 @@
 
 // c006_a009
 
-// c006_a010
+pub mod cag_sgd_1;
+pub use cag_sgd_1 as c006_a010;
 
 // c006_a011
 
