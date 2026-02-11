@@ -214,7 +214,8 @@
 
 // c003_a108
 
-// c003_a109
+pub mod npppy;
+pub use npppy as c003_a109;
 
 // c003_a110
 
