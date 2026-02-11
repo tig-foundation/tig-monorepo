@@ -1,4 +1,5 @@
-// c007_a001
+pub mod adaptive_js;
+pub use adaptive_js as c007_a001;
 
 // c007_a002
 
