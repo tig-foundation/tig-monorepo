@@ -1,6 +1,7 @@
 // c007_a001
 
-// c007_a002
+pub mod combinedjob;
+pub use combinedjob as c007_a002;
 
 // c007_a003
 
