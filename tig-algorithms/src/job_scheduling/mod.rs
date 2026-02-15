@@ -2,7 +2,8 @@
 
 // c007_a002
 
-// c007_a003
+pub mod rigor_v1;
+pub use rigor_v1 as c007_a003;
 
 // c007_a004
 
