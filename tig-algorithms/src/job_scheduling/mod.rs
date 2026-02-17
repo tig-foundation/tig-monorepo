@@ -4,7 +4,8 @@
 
 // c007_a003
 
-// c007_a004
+pub mod job_one;
+pub use job_one as c007_a004;
 
 // c007_a005
 
