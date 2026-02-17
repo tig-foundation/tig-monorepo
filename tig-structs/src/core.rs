@@ -447,13 +447,14 @@ serializable_struct_with_getters! {
         nonce: u64,
         runtime_signature: u64,
         fuel_consumed: u64,
+        snapshots: Vec<(u64, u64)>,
         solution: String,
         cpu_arch: CPUArchitecture,
     }
 }
 impl OutputData {
     pub fn calc_solution_signature(&self) -> u64 {
-        u64s_from_str(&jsonify(&self.solution))[0]
+        u64s_from_str(&jsonify(&self.solution))[0] ^ u64s_from_str(&jsonify(&self.snapshots))[0]
     }
 }
 

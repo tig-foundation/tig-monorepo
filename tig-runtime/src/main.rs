@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{arg, Command};
 use libloading::Library;
 use serde_json::{Map, Value};
-use std::{fs, panic, path::PathBuf};
+use std::{cell::RefCell, fs, panic, path::PathBuf};
 use tig_challenges::*;
 use tig_structs::core::{BenchmarkSettings, CPUArchitecture, OutputData};
 use tig_utils::{dejsonify, jsonify};
@@ -132,12 +132,17 @@ pub fn compute_solution(
 
             let challenge = $c::Challenge::generate_instance(&seed, &track)?;
 
+            let count = RefCell::new(0);
+            let snapshots = RefCell::new(vec![(0, 0)]);
             let save_solution_fn = |solution: &$c::Solution| -> Result<()> {
                 let fuel_consumed = (max_fuel
                     - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? })
                 .min(max_fuel + 1);
                 let runtime_signature =
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+
+                let mut snapshots = snapshots.borrow_mut();
+                *snapshots.last_mut().unwrap() = (fuel_consumed, runtime_signature);
 
                 let solution = serde_json::to_string(&solution)?;
 
@@ -146,12 +151,19 @@ pub fn compute_solution(
                     runtime_signature,
                     fuel_consumed,
                     solution,
+                    snapshots: snapshots.clone(),
                     #[cfg(target_arch = "x86_64")]
                     cpu_arch: CPUArchitecture::AMD64,
                     #[cfg(target_arch = "aarch64")]
                     cpu_arch: CPUArchitecture::ARM64,
                 };
                 fs::write(&output_file, jsonify(&output_data))?;
+
+                let mut count: usize = *count.borrow_mut();
+                count += 1;
+                if count.is_power_of_two() {
+                    snapshots.push((0, 0));
+                }
                 Ok(())
             };
             let result = solve_challenge_fn(&challenge, &save_solution_fn, hyperparameters);
@@ -233,6 +245,8 @@ pub fn compute_solution(
                     .launch(cfg)?;
             }
 
+            let count = RefCell::new(0);
+            let snapshots = RefCell::new(vec![(0, 0)]);
             let save_solution_fn = |solution: &$c::Solution| -> Result<()> {
                 stream.synchronize()?;
                 ctx.synchronize()?;
@@ -268,6 +282,9 @@ pub fn compute_solution(
                     unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
                 let runtime_signature = gpu_runtime_signature ^ cpu_runtime_signature;
 
+                let mut snapshots = snapshots.borrow_mut();
+                *snapshots.last_mut().unwrap() = (fuel_consumed, runtime_signature);
+
                 let solution = serde_json::to_string(&solution)?;
 
                 let output_data = OutputData {
@@ -275,12 +292,19 @@ pub fn compute_solution(
                     runtime_signature,
                     fuel_consumed,
                     solution,
+                    snapshots: snapshots.clone(),
                     #[cfg(target_arch = "x86_64")]
                     cpu_arch: CPUArchitecture::AMD64,
                     #[cfg(target_arch = "aarch64")]
                     cpu_arch: CPUArchitecture::ARM64,
                 };
                 fs::write(&output_file, jsonify(&output_data))?;
+
+                let mut count: usize = *count.borrow_mut();
+                count += 1;
+                if count.is_power_of_two() {
+                    snapshots.push((0, 0));
+                }
                 Ok(())
             };
             let result = solve_challenge_fn(
