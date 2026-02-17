@@ -22,6 +22,17 @@ pub fn help() {
     println!("No help information provided.");
 }
 
+// The solver receives one sub-instance at a time via the Challenge struct.
+// Each Challenge contains:
+//   - seed: [u8; 32]     - deterministic seed for RNG
+//   - n: i32             - number of columns in the matrix
+//   - m: i32             - number of rows in the matrix
+//   - target_k: i32      - number of columns/rows to select for CUR decomposition
+//   - d_a_mat: CudaSlice - the matrix A on GPU (m x n, column-major)
+//
+// Your algorithm is called 13 times per nonce (once per sub-instance).
+// Information cannot be transferred between sub-instance calls.
+// Use save_solution to save intermediate results in case of fuel exhaustion.
 pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
@@ -56,7 +67,9 @@ pub fn solve_challenge(
     //          shared_mem_bytes: 400,
     //      }
 
-    // use save_solution(&Solution) to save your solution. Overwrites any previous solution
+    // use save_solution(&Solution) to save your solution. Overwrites any previous solution.
+    // IMPORTANT: Call save_solution early with a "good enough" answer.
+    // If you run out of fuel, the last saved solution will be used.
 
     // return Err(<msg>) if your algorithm encounters an error
     // return Ok(()) if your algorithm is finished

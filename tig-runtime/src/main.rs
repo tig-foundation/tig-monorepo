@@ -339,7 +339,171 @@ pub fn compute_solution(
             #[cfg(not(feature = "c008"))]
             panic!("tig-runtime was not compiled with '--features c008'");
             #[cfg(feature = "c008")]
-            dispatch_challenge!(c008, gpu)
+            {
+                let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
+                {
+                    settings.track_id.clone()
+                } else {
+                    format!(r#""{}""#, settings.track_id)
+                };
+                let track = serde_json::from_str(&track_id).map_err(|_| {
+                    anyhow::anyhow!(
+                        "Failed to parse track_id '{}' as c008::Track",
+                        settings.track_id,
+                    )
+                })?;
+
+                if ptx_path.is_none() {
+                    panic!("PTX file is required for GPU challenges.");
+                }
+                let ptx_path = ptx_path.unwrap();
+
+                let solve_challenge_fn = unsafe {
+                    library.get::<fn(
+                        &c008::Challenge,
+                        save_solution: &dyn Fn(&c008::Solution) -> anyhow::Result<()>,
+                        Option<String>,
+                        Arc<CudaModule>,
+                        Arc<CudaStream>,
+                        &cudaDeviceProp,
+                    ) -> Result<()>>(b"entry_point")?
+                };
+
+                let gpu_fuel_scale = 20u64;
+                let num_sub = c008::NUM_SUB_INSTANCES as u64;
+                let fuel_per_instance = max_fuel / num_sub;
+                let ptx_content = std::fs::read_to_string(&ptx_path)
+                    .map_err(|e| anyhow!("Failed to read PTX file: {}", e))?;
+                let max_fuel_hex = format!("0x{:016x}", fuel_per_instance * gpu_fuel_scale);
+                let modified_ptx = ptx_content.replace("0xdeadbeefdeadbeef", &max_fuel_hex);
+
+                let num_gpus = CudaContext::device_count()?;
+                if num_gpus == 0 {
+                    panic!("No CUDA devices found");
+                }
+                let gpu_device = gpu_device.unwrap_or((nonce % num_gpus as u64) as usize);
+                let ptx = Ptx::from_src(modified_ptx);
+                let ctx = CudaContext::new(gpu_device)?;
+                ctx.set_blocking_synchronize()?;
+                let module = ctx.load_module(ptx)?;
+                // Use default_stream for generation (no fuel checking)
+                let gen_stream = ctx.default_stream();
+                // Use fuel_check_stream for solver execution
+                let solve_stream = ctx.fuel_check_stream();
+                let prop = get_device_prop(gpu_device as i32)?;
+
+                let multi_challenge = c008::MultiChallenge::generate(
+                    &seed,
+                    &track,
+                    module.clone(),
+                    gen_stream.clone(),
+                    &prop,
+                )?;
+
+                let initialize_kernel = module.load_function("initialize_kernel")?;
+                let init_cfg = LaunchConfig {
+                    grid_dim: (1, 1, 1),
+                    block_dim: (1, 1, 1),
+                    shared_mem_bytes: 0,
+                };
+
+                use std::cell::RefCell;
+                let solutions: RefCell<Vec<Option<c008::Solution>>> =
+                    RefCell::new(vec![None; c008::NUM_SUB_INSTANCES]);
+
+                let mut total_fuel_consumed: u64 = 0;
+                let mut combined_runtime_signature: u64 =
+                    u64::from_be_bytes(seed[0..8].try_into().unwrap());
+
+                for sub_idx in 0..c008::NUM_SUB_INSTANCES {
+                    // Reset GPU fuel counter
+                    let sub_signature = u64::from_be_bytes(seed[8..16].try_into().unwrap())
+                        ^ (sub_idx as u64);
+                    unsafe {
+                        solve_stream
+                            .launch_builder(&initialize_kernel)
+                            .arg(&sub_signature)
+                            .launch(init_cfg)?;
+                    }
+
+                    // Reset CPU fuel and runtime signature for this sub-instance
+                    unsafe { *fuel_remaining_ptr = fuel_per_instance };
+                    unsafe { *runtime_signature_ptr = sub_signature };
+
+                    // Use gen_stream (non-fuel-checking) for matrix copy setup
+                    let challenge_view =
+                        multi_challenge.challenge_view(sub_idx, gen_stream.clone())?;
+
+                    let save_solution_fn = |solution: &c008::Solution| -> Result<()> {
+                        solutions.borrow_mut()[sub_idx] = Some(solution.clone());
+                        Ok(())
+                    };
+
+                    let result = solve_challenge_fn(
+                        &challenge_view,
+                        &save_solution_fn,
+                        hyperparameters.clone(),
+                        module.clone(),
+                        solve_stream.clone(),
+                        &prop,
+                    );
+
+                    // Collect fuel/signature for this sub-instance
+                    solve_stream.synchronize()?;
+                    ctx.synchronize()?;
+
+                    let mut fuel_usage = solve_stream.alloc_zeros::<u64>(1)?;
+                    let mut signature = solve_stream.alloc_zeros::<u64>(1)?;
+                    let mut error_stat = solve_stream.alloc_zeros::<u64>(1)?;
+                    let finalize_kernel = module.load_function("finalize_kernel")?;
+                    unsafe {
+                        solve_stream
+                            .launch_builder(&finalize_kernel)
+                            .arg(&mut fuel_usage)
+                            .arg(&mut signature)
+                            .arg(&mut error_stat)
+                            .launch(init_cfg)?;
+                    }
+                    let gpu_fuel =
+                        solve_stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
+                    let cpu_fuel = fuel_per_instance
+                        - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
+                    total_fuel_consumed += (gpu_fuel + cpu_fuel).min(fuel_per_instance + 1);
+
+                    let gpu_sig = solve_stream.memcpy_dtov(&signature)?[0];
+                    let cpu_sig =
+                        unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                    combined_runtime_signature ^= gpu_sig ^ cpu_sig;
+
+                    // Continue to next sub-instance regardless of result
+                    if let Err(_) = result {
+                        // Solver failed or ran out of fuel — continue
+                    }
+                }
+
+                // Build final output
+                let solutions_vec: Vec<c008::Solution> = solutions
+                    .into_inner()
+                    .into_iter()
+                    .map(|s| s.unwrap_or_else(|| c008::Solution::new()))
+                    .collect();
+
+                let solution_str = serde_json::to_string(&solutions_vec)?;
+                let fuel_consumed = total_fuel_consumed.min(max_fuel + 1);
+
+                let output_data = OutputData {
+                    nonce,
+                    runtime_signature: combined_runtime_signature,
+                    fuel_consumed,
+                    solution: solution_str,
+                    #[cfg(target_arch = "x86_64")]
+                    cpu_arch: CPUArchitecture::AMD64,
+                    #[cfg(target_arch = "aarch64")]
+                    cpu_arch: CPUArchitecture::ARM64,
+                };
+                fs::write(&output_file, jsonify(&output_data))?;
+                Ok(())
+            }
         }
         _ => panic!("Unsupported challenge"),
     }

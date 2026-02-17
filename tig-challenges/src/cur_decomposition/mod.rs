@@ -2,9 +2,14 @@ use crate::QUALITY_PRECISION;
 use anyhow::{anyhow, Result};
 use core::ffi::c_int;
 use cudarc::{
-    cublas::{sys::cublasOperation_t, CudaBlas, Gemm, GemmConfig},
+    cublas::{
+        sys::{self as cublas_sys, cublasOperation_t},
+        CudaBlas, Gemm, GemmConfig,
+    },
     cusolver::{sys, DnHandle},
-    driver::{CudaModule, CudaSlice, CudaStream, DevicePtrMut, LaunchConfig, PushKernelArg},
+    driver::{
+        CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut, LaunchConfig, PushKernelArg,
+    },
     runtime::sys::cudaDeviceProp,
 };
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
@@ -14,8 +19,6 @@ impl_kv_string_serde! {
     Track {
         n: i32,
         m: i32,
-        k: i32,
-        target_k: i32,
     }
 }
 
@@ -37,43 +40,124 @@ impl Solution {
     }
 }
 
+pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
+pub const NUM_MATRICES: usize = 5;
+pub const NUM_SUB_INSTANCES: usize = 13;
+const BASELINE_MULTIPLIER: f64 = 50.0;
+
+// Strides for the 5 dyadic index sets (index 0 = largest rank, index 4 = smallest)
+const STRIDES: [i32; NUM_MATRICES] = [1, 2, 4, 8, 16];
+
+// target_rank_map: for each matrix, which target_rank denominators to use
+// tau / denominator gives the target_rank
+const TARGET_RANK_MAP: [[i32; 3]; NUM_MATRICES] = [
+    [3, 5, 0],   // matrix 0 (rank ~ tau): tau/3, tau/5
+    [3, 5, 9],   // matrix 1 (rank ~ tau/2): tau/3, tau/5, tau/9
+    [5, 9, 20],  // matrix 2 (rank ~ tau/4): tau/5, tau/9, tau/20
+    [9, 17, 20], // matrix 3 (rank ~ tau/8): tau/9, tau/17, tau/20
+    [17, 20, 0], // matrix 4 (rank ~ tau/16): tau/17, tau/20
+];
+
+// Number of target_ranks per matrix
+const TARGET_RANK_COUNTS: [usize; NUM_MATRICES] = [2, 3, 3, 3, 2];
+
+/// What the solver sees — one sub-instance at a time
 pub struct Challenge {
     pub seed: [u8; 32],
     pub n: i32,
     pub m: i32,
-    pub k: i32,
     pub target_k: i32,
-    pub scalars: Vec<f32>,
-    pub optimal_fnorm: f32,
-    pub d_u_mat: CudaSlice<f32>, // remove in actual challenge?
-    pub d_v_mat: CudaSlice<f32>, // remove in actual challenge?
     pub d_a_mat: CudaSlice<f32>,
 }
 
-pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
+pub struct SubInstanceInfo {
+    pub matrix_idx: usize,
+    pub target_k: i32,
+    pub optimal_fnorm: f32,
+}
 
-impl Challenge {
-    pub fn generate_instance(
+/// Container for all 13 sub-instances, used by runtime and verifier
+pub struct MultiChallenge {
+    pub seed: [u8; 32],
+    pub n: i32,
+    pub m: i32,
+    pub matrices: Vec<CudaSlice<f32>>,
+    pub sub_instances: Vec<SubInstanceInfo>,
+}
+
+/// Compute dyadic index set for a given stride: {0, stride, 2*stride, ..., 2^p}
+fn dyadic_indices(max_rank: i32, stride: i32) -> Vec<i32> {
+    (0..max_rank).step_by(stride as usize).collect()
+}
+
+/// Compute the "new" indices at a level: I_curr \ I_prev
+/// Level NUM_MATRICES-1 is the smallest set (base case), level 0 is the largest.
+fn new_indices_at_level(max_rank: i32, level: usize) -> Vec<i32> {
+    let stride = STRIDES[level];
+    if level == NUM_MATRICES - 1 {
+        // Smallest set — all indices at this stride
+        return dyadic_indices(max_rank, stride);
+    }
+    let prev_stride = STRIDES[level + 1];
+    // Indices in current set but not in previous (smaller) set
+    // Current: {0, stride, 2*stride, ...}
+    // Previous: {0, prev_stride, 2*prev_stride, ...} where prev_stride > stride
+    (0..max_rank)
+        .step_by(stride as usize)
+        .filter(|i| i % prev_stride != 0)
+        .collect()
+}
+
+/// Check if max_rank is of the form 2^p + 1
+fn validate_max_rank(max_rank: i32) -> Result<i32> {
+    if max_rank < 2 {
+        return Err(anyhow!("max_rank must be at least 2"));
+    }
+    let val = max_rank - 1;
+    if val & (val - 1) != 0 {
+        return Err(anyhow!(
+            "min(m, n) must be of the form 2^p + 1, got {}",
+            max_rank
+        ));
+    }
+    let p = (val as f64).log2().round() as i32;
+    if p < 5 {
+        return Err(anyhow!("p must be >= 5, got {} (max_rank={})", p, max_rank));
+    }
+    Ok(p)
+}
+
+impl MultiChallenge {
+    pub fn generate(
         seed: &[u8; 32],
         track: &Track,
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
+        let Track { n, m } = *track;
+        let max_rank = m.min(n);
+        let _p = validate_max_rank(max_rank)?;
+
         let l5: f32 = 2.0;
-        let Track { n, m, k, target_k } = *track;
         let cublas = CudaBlas::new(stream.clone())?;
         let cusolver = DnHandle::new(stream.clone())?;
 
         let gaussian_matrix_kernel = module.load_function("gaussian_matrix_kernel")?;
         let scale_columns_kernel = module.load_function("scale_columns_kernel")?;
+        let extract_columns_kernel = module.load_function("extract_columns_kernel")?;
 
-        let mut d_u_mat = stream.alloc_zeros::<f32>((n * k) as usize)?;
-        let mut d_v_mat = stream.alloc_zeros::<f32>((m * k) as usize)?;
-        let mut d_a_mat = stream.alloc_zeros::<f32>((m * n) as usize)?;
+        // Step 1: Generate full orthogonal bases U (m x max_rank) and V (n x max_rank)
+        let mut d_u_mat = stream.alloc_zeros::<f32>((m * max_rank) as usize)?;
+        let mut d_v_mat = stream.alloc_zeros::<f32>((n * max_rank) as usize)?;
 
         let generate_orthogonal_matrix =
-            |d_mat: &mut CudaSlice<f32>, n_rows: i32, n_cols: i32, seed: u64| -> Result<()> {
+            |d_mat: &mut CudaSlice<f32>,
+             n_rows: i32,
+             n_cols: i32,
+             qr_rank: i32,
+             seed: u64|
+             -> Result<()> {
                 unsafe {
                     stream
                         .launch_builder(&gaussian_matrix_kernel)
@@ -93,7 +177,7 @@ impl Challenge {
                             shared_mem_bytes: 0,
                         })?;
                 }
-                // Query workspace size
+
                 let mut lwork: c_int = 0;
                 unsafe {
                     let stat = sys::cusolverDnSgeqrf_bufferSize(
@@ -111,7 +195,6 @@ impl Challenge {
                 let mut d_info = stream.alloc_zeros::<c_int>(1)?;
                 let mut d_tau = stream.alloc_zeros::<f32>(n_rows.min(n_cols) as usize)?;
 
-                // Perform QR factorization
                 unsafe {
                     let stat = sys::cusolverDnSgeqrf(
                         cusolver.cu(),
@@ -129,15 +212,13 @@ impl Challenge {
 
                 stream.synchronize()?;
 
-                // Generate explicit Q matrix using cusolverDnSorgqr
-                // Query workspace size for orgqr
                 let mut lwork_orgqr: c_int = 0;
                 unsafe {
                     let stat = sys::cusolverDnSorgqr_bufferSize(
                         cusolver.cu(),
                         n_rows,
                         n_cols,
-                        k,
+                        qr_rank,
                         d_mat.device_ptr_mut(&stream).0 as *const f32,
                         n_rows,
                         d_tau.device_ptr_mut(&stream).0 as *const f32,
@@ -146,16 +227,14 @@ impl Challenge {
                     assert_eq!(stat, sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS);
                 }
 
-                // Allocate workspace for orgqr
                 let mut d_work_orgqr = stream.alloc_zeros::<f32>(lwork_orgqr as usize)?;
 
-                // Generate Q matrix
                 unsafe {
                     let stat = sys::cusolverDnSorgqr(
                         cusolver.cu(),
                         n_rows,
                         n_cols,
-                        k,
+                        qr_rank,
                         d_mat.device_ptr_mut(&stream).0 as *mut f32,
                         n_rows,
                         d_tau.device_ptr_mut(&stream).0 as *const f32,
@@ -173,40 +252,40 @@ impl Challenge {
         generate_orthogonal_matrix(
             &mut d_u_mat,
             m,
-            k,
+            max_rank,
+            max_rank,
             u64::from_le_bytes(seed[0..8].try_into()?)
                 ^ u64::from_le_bytes(seed[8..16].try_into()?),
         )?;
         generate_orthogonal_matrix(
             &mut d_v_mat,
             n,
-            k,
+            max_rank,
+            max_rank,
             u64::from_le_bytes(seed[16..24].try_into()?)
                 ^ u64::from_le_bytes(seed[24..32].try_into()?),
         )?;
 
-        let mut rng = StdRng::from_seed(seed.clone());
-        let mut scalars: Vec<f32> = (0..k)
-            .map(|j| (-l5 * ((j + 1) as f32).sqrt() / (k as f32).sqrt()).exp())
+        // Step 2: Generate and shuffle singular values
+        let mut rng = StdRng::from_seed(*seed);
+        let mut scalars: Vec<f32> = (0..max_rank)
+            .map(|j| (-l5 * ((j + 1) as f32).sqrt() / (max_rank as f32).sqrt()).exp())
             .collect();
-        let optimal_fnorm = scalars[target_k as usize..]
-            .iter()
-            .map(|x| x * x)
-            .sum::<f32>()
-            .sqrt();
         scalars.shuffle(&mut rng);
-        let d_scalars = stream.memcpy_stod(&scalars)?;
 
+        // Step 3: Scale U columns by singular values (in-place)
+        let d_scalars = stream.memcpy_stod(&scalars)?;
         unsafe {
             stream
                 .launch_builder(&scale_columns_kernel)
                 .arg(&d_u_mat)
                 .arg(&m)
-                .arg(&k)
+                .arg(&max_rank)
                 .arg(&d_scalars)
                 .launch(LaunchConfig {
                     grid_dim: (
-                        ((m * k) as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
+                        ((m * max_rank) as u32 + MAX_THREADS_PER_BLOCK - 1)
+                            / MAX_THREADS_PER_BLOCK,
                         1,
                         1,
                     ),
@@ -216,193 +295,436 @@ impl Challenge {
         }
         stream.synchronize()?;
 
-        let gemm_config = GemmConfig {
-            transa: cublasOperation_t::CUBLAS_OP_N, // Don't transpose U
-            transb: cublasOperation_t::CUBLAS_OP_T, // Transpose V
-            m,                                      // Rows of output
-            n,                                      // Columns of output
-            k,                                      // Inner dimension
-            alpha: 1.0f32,
-            lda: m, // Leading dim of U
-            ldb: n, // Leading dim of V
-            beta: 0.0f32,
-            ldc: m, // Leading dim of A
-        };
+        // Step 4: Build 5 matrices incrementally using dyadic index sets
+        // Construction goes from smallest rank (level 4, stride 16) to largest (level 0, stride 1).
+        // matrices[0] = largest rank, matrices[4] = smallest rank.
+        let mat_size = (m * n) as usize;
+        let mut matrices: Vec<Option<CudaSlice<f32>>> =
+            (0..NUM_MATRICES).map(|_| None).collect();
 
-        unsafe {
-            cublas.gemm(gemm_config, &d_u_mat, &d_v_mat, &mut d_a_mat)?;
+        for level in (0..NUM_MATRICES).rev() {
+            let mut d_a_mat = stream.alloc_zeros::<f32>(mat_size)?;
+
+            // Copy from the next level (smaller subset) if it exists
+            if level < NUM_MATRICES - 1 {
+                let src = matrices[level + 1].as_ref().unwrap();
+                let num_elems = mat_size as c_int;
+                let alpha_copy: f32 = 1.0;
+                let (prev_ptr, _prev_record) = src.device_ptr(&stream);
+                let (curr_ptr, _curr_record) = d_a_mat.device_ptr_mut(&stream);
+                unsafe {
+                    cublas_sys::cublasSaxpy_v2(
+                        *cublas.handle(),
+                        num_elems,
+                        &alpha_copy as *const f32,
+                        prev_ptr as *const f32,
+                        1,
+                        curr_ptr as *mut f32,
+                        1,
+                    )
+                    .result()?;
+                }
+            }
+
+            // Get the new indices for this level (indices not in any previous smaller set)
+            let new_idxs = new_indices_at_level(max_rank, level);
+            let new_count = new_idxs.len() as i32;
+
+            if new_count > 0 {
+                // Extract U columns at new indices
+                let d_new_idxs = stream.memcpy_stod(&new_idxs)?;
+                let u_sub_size = (m * new_count) as usize;
+                let v_sub_size = (n * new_count) as usize;
+                let mut d_u_sub = stream.alloc_zeros::<f32>(u_sub_size)?;
+                let mut d_v_sub = stream.alloc_zeros::<f32>(v_sub_size)?;
+
+                unsafe {
+                    stream
+                        .launch_builder(&extract_columns_kernel)
+                        .arg(&d_u_mat)
+                        .arg(&mut d_u_sub)
+                        .arg(&m)
+                        .arg(&max_rank)
+                        .arg(&new_count)
+                        .arg(&d_new_idxs)
+                        .launch(LaunchConfig {
+                            grid_dim: (
+                                (u_sub_size as u32 + MAX_THREADS_PER_BLOCK - 1)
+                                    / MAX_THREADS_PER_BLOCK,
+                                1,
+                                1,
+                            ),
+                            block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
+                            shared_mem_bytes: 0,
+                        })?;
+                }
+
+                unsafe {
+                    stream
+                        .launch_builder(&extract_columns_kernel)
+                        .arg(&d_v_mat)
+                        .arg(&mut d_v_sub)
+                        .arg(&n)
+                        .arg(&max_rank)
+                        .arg(&new_count)
+                        .arg(&d_new_idxs)
+                        .launch(LaunchConfig {
+                            grid_dim: (
+                                (v_sub_size as u32 + MAX_THREADS_PER_BLOCK - 1)
+                                    / MAX_THREADS_PER_BLOCK,
+                                1,
+                                1,
+                            ),
+                            block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
+                            shared_mem_bytes: 0,
+                        })?;
+                }
+
+                // GEMM: d_a_mat += d_u_sub * d_v_sub^T
+                let beta = if level == NUM_MATRICES - 1 {
+                    0.0f32
+                } else {
+                    1.0f32
+                };
+                let gemm_config = GemmConfig {
+                    transa: cublasOperation_t::CUBLAS_OP_N,
+                    transb: cublasOperation_t::CUBLAS_OP_T,
+                    m,
+                    n,
+                    k: new_count,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: n,
+                    beta,
+                    ldc: m,
+                };
+
+                unsafe {
+                    cublas.gemm(gemm_config, &d_u_sub, &d_v_sub, &mut d_a_mat)?;
+                }
+            }
+
+            stream.synchronize()?;
+            matrices[level] = Some(d_a_mat);
         }
 
-        stream.synchronize()?;
-        return Ok(Self {
-            seed: seed.clone(),
+        let matrices: Vec<CudaSlice<f32>> = matrices.into_iter().map(|m| m.unwrap()).collect();
+
+        // Step 5: Build sub-instance info with target_ranks and optimal_fnorms
+        let tau = max_rank;
+        let mut sub_instances = Vec::with_capacity(NUM_SUB_INSTANCES);
+
+        // matrices[i] has stride STRIDES[i]: matrices[0]=stride 1 (largest), matrices[4]=stride 16 (smallest)
+        for matrix_idx in 0..NUM_MATRICES {
+            // Collect the singular values used for this matrix's index set
+            let stride = STRIDES[matrix_idx];
+            let indices = dyadic_indices(max_rank, stride);
+            let mut matrix_scalars: Vec<f32> =
+                indices.iter().map(|&i| scalars[i as usize]).collect();
+            matrix_scalars.sort_by(|a, b| b.abs().partial_cmp(&a.abs()).unwrap());
+
+            for t in 0..TARGET_RANK_COUNTS[matrix_idx] {
+                let denom = TARGET_RANK_MAP[matrix_idx][t];
+                let target_k = ((tau as f64) / (denom as f64)).round() as i32;
+
+                // optimal_fnorm = sqrt(sum of sigma_i^2 for i >= target_k)
+                let optimal_fnorm = matrix_scalars[target_k as usize..]
+                    .iter()
+                    .map(|x| x * x)
+                    .sum::<f32>()
+                    .sqrt();
+
+                sub_instances.push(SubInstanceInfo {
+                    matrix_idx,
+                    target_k,
+                    optimal_fnorm,
+                });
+            }
+        }
+
+        assert_eq!(sub_instances.len(), NUM_SUB_INSTANCES);
+
+        Ok(Self {
+            seed: *seed,
             n,
             m,
-            k,
-            target_k,
-            scalars,
-            optimal_fnorm,
-            d_u_mat,
-            d_v_mat,
-            d_a_mat,
-        });
+            matrices,
+            sub_instances,
+        })
     }
 
-    pub fn evaluate_fnorm(
+    /// Create a Challenge view for the solver for a specific sub-instance.
+    /// This copies the matrix data on GPU (device-to-device via cuBLAS).
+    pub fn challenge_view(
         &self,
-        solution: &Solution,
-        module: Arc<CudaModule>,
+        idx: usize,
         stream: Arc<CudaStream>,
-        _prop: &cudaDeviceProp,
-    ) -> Result<f32> {
-        if solution.c_idxs.len() != self.target_k as usize {
-            return Err(anyhow!(
-                "Solution must select exactly {} columns, but got {}",
-                self.target_k,
-                solution.c_idxs.len()
-            ));
-        }
-        if solution.r_idxs.len() != self.target_k as usize {
-            return Err(anyhow!(
-                "Solution must select exactly {} rows, but got {}",
-                self.target_k,
-                solution.r_idxs.len()
-            ));
-        }
-        if solution.u_mat.len() != (self.target_k * self.target_k) as usize {
-            return Err(anyhow!(
-                "Solution U matrix must be size {}x{}",
-                self.target_k,
-                self.target_k
-            ));
-        }
+    ) -> Result<Challenge> {
+        let info = &self.sub_instances[idx];
+        let src = &self.matrices[info.matrix_idx];
+        let mat_size = (self.m * self.n) as usize;
 
+        // Device-to-device copy via cublasSaxpy (dst = 0 + 1.0*src)
         let cublas = CudaBlas::new(stream.clone())?;
-        let extract_columns_kernel = module.load_function("extract_columns_kernel")?;
-        let extract_rows_kernel = module.load_function("extract_rows_kernel")?;
-        let c_mat_size = (self.m * self.target_k) as usize;
-        let r_mat_size = (self.target_k * self.n) as usize;
-        let mut d_c_mat = stream.alloc_zeros::<f32>(c_mat_size)?;
-        let d_u_mat = stream.memcpy_stod(&solution.u_mat)?;
-        let mut d_r_mat = stream.alloc_zeros::<f32>(r_mat_size)?;
-        let mut d_cu_mat = stream.alloc_zeros::<f32>((self.m * self.target_k) as usize)?;
-        let mut d_cur_mat = stream.alloc_zeros::<f32>((self.m * self.n) as usize)?;
-        let d_c_idxs = stream.memcpy_stod(&solution.c_idxs)?;
-        let d_r_idxs = stream.memcpy_stod(&solution.r_idxs)?;
-
+        let mut d_a_mat = stream.alloc_zeros::<f32>(mat_size)?;
+        let alpha: f32 = 1.0;
+        let (src_ptr, _src_record) = src.device_ptr(&stream);
+        let (dst_ptr, _dst_record) = d_a_mat.device_ptr_mut(&stream);
         unsafe {
-            stream
-                .launch_builder(&extract_columns_kernel)
-                .arg(&self.d_a_mat)
-                .arg(&mut d_c_mat)
-                .arg(&self.m)
-                .arg(&self.n)
-                .arg(&self.target_k)
-                .arg(&d_c_idxs)
-                .launch(LaunchConfig {
-                    grid_dim: (
-                        (c_mat_size as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
-                        1,
-                        1,
-                    ),
-                    block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
+            cublas_sys::cublasSaxpy_v2(
+                *cublas.handle(),
+                mat_size as c_int,
+                &alpha as *const f32,
+                src_ptr as *const f32,
+                1,
+                dst_ptr as *mut f32,
+                1,
+            )
+            .result()?;
         }
         stream.synchronize()?;
-        let h_c_mat = stream.memcpy_dtov(&d_c_mat)?;
-        println!("C matrix: {:?}", &h_c_mat);
-        unsafe {
-            stream
-                .launch_builder(&extract_rows_kernel)
-                .arg(&self.d_a_mat)
-                .arg(&mut d_r_mat)
-                .arg(&self.m)
-                .arg(&self.n)
-                .arg(&self.target_k)
-                .arg(&d_r_idxs)
-                .launch(LaunchConfig {
-                    grid_dim: (
-                        (r_mat_size as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
-                        1,
-                        1,
-                    ),
-                    block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-        }
-        stream.synchronize()?;
-        let h_r_mat = stream.memcpy_dtov(&d_r_mat)?;
-        println!("R matrix: {:?}", &h_r_mat);
 
-        let gemm_config = GemmConfig {
-            transa: cublasOperation_t::CUBLAS_OP_N, // Don't transpose C
-            transb: cublasOperation_t::CUBLAS_OP_N, // Don't transpose U
-            m: self.m,                              // Rows of output
-            n: self.target_k,                       // Columns of output
-            k: self.target_k,                       // Inner dimension
-            alpha: 1.0f32,
-            lda: self.m,        // Leading dim of C
-            ldb: self.target_k, // Leading dim of U
-            beta: 0.0f32,
-            ldc: self.m, // Leading dim of CU
-        };
+        Ok(Challenge {
+            seed: self.seed,
+            n: self.n,
+            m: self.m,
+            target_k: info.target_k,
+            d_a_mat,
+        })
+    }
 
-        println!("Computing CU");
-        unsafe {
-            cublas.gemm(gemm_config, &d_c_mat, &d_u_mat, &mut d_cu_mat)?;
-        }
-
-        stream.synchronize()?;
-        let h_cu_mat = stream.memcpy_dtov(&d_cu_mat)?;
-        println!("CU matrix: {:?}", &h_cu_mat);
-
-        let gemm_config = GemmConfig {
-            transa: cublasOperation_t::CUBLAS_OP_N, // Don't transpose
-            transb: cublasOperation_t::CUBLAS_OP_N, // Don't transpose R
-            m: self.m,                              // Rows of output
-            n: self.n,                              // Columns of output
-            k: self.target_k,                       // Inner dimension
-            alpha: 1.0f32,
-            lda: self.m,        // Leading dim of CU
-            ldb: self.target_k, // Leading dim of R
-            beta: 0.0f32,
-            ldc: self.m, // Leading dim of CUR
-        };
-
-        unsafe {
-            cublas.gemm(gemm_config, &d_cu_mat, &d_r_mat, &mut d_cur_mat)?;
-        }
-        stream.synchronize()?;
-        let h_cur_mat = stream.memcpy_dtov(&d_cur_mat)?;
-        println!("CUR matrix: {:?}", &h_cur_mat);
-
-        // FIXME: Compute ||A - CUR||_F as kernel
-        let cur_mat = stream.memcpy_dtov(&d_cur_mat)?;
-        let a_mat = stream.memcpy_dtov(&self.d_a_mat)?;
-        let fnorm = cur_mat
-            .iter()
-            .zip(a_mat.iter())
-            .map(|(x, y)| (x - y) * (x - y))
-            .sum::<f32>()
-            .sqrt();
-        Ok(fnorm)
+    /// Number of sub-instances
+    pub fn num_sub_instances(&self) -> usize {
+        self.sub_instances.len()
     }
 
     conditional_pub!(
-        fn evaluate_solution(
+        fn evaluate_solutions(
             &self,
-            solution: &Solution,
+            solutions: &Vec<Solution>,
             module: Arc<CudaModule>,
             stream: Arc<CudaStream>,
             prop: &cudaDeviceProp,
         ) -> Result<i32> {
-            let fnorm = self.evaluate_fnorm(solution, module, stream, prop)?;
-            let quality = (self.optimal_fnorm as f64 * 100.0 - fnorm as f64)
-                / (self.optimal_fnorm as f64 * 99.0);
-            let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
-            let quality = quality.round() as i32;
+            if solutions.len() != NUM_SUB_INSTANCES {
+                return Err(anyhow!(
+                    "Expected {} solutions, got {}",
+                    NUM_SUB_INSTANCES,
+                    solutions.len()
+                ));
+            }
+
+            let mut log_sum: f64 = 0.0;
+
+            for (idx, (info, solution)) in
+                self.sub_instances.iter().zip(solutions.iter()).enumerate()
+            {
+                let d_a_mat = &self.matrices[info.matrix_idx];
+                let fnorm = evaluate_fnorm(
+                    d_a_mat,
+                    self.m,
+                    self.n,
+                    info.target_k,
+                    solution,
+                    module.clone(),
+                    stream.clone(),
+                    prop,
+                )?;
+
+                let optimal = info.optimal_fnorm as f64;
+                let baseline = BASELINE_MULTIPLIER * optimal;
+                let quality = (baseline - fnorm as f64) / (baseline - optimal);
+
+                if quality <= 0.0 {
+                    return Err(anyhow!(
+                        "Sub-instance {} has non-positive quality ({:.6}): solution fnorm ({:.6}) exceeds baseline ({:.6})",
+                        idx,
+                        quality,
+                        fnorm,
+                        baseline,
+                    ));
+                }
+
+                log_sum += quality.ln();
+            }
+
+            let geomean = (log_sum / NUM_SUB_INSTANCES as f64).exp();
+            let quality = (geomean * QUALITY_PRECISION as f64).round() as i32;
             Ok(quality)
         }
     );
+}
+
+/// Evaluate the Frobenius norm of the CUR reconstruction error ||A - C*U*R||_F
+pub fn evaluate_fnorm(
+    d_a_mat: &CudaSlice<f32>,
+    m: i32,
+    n: i32,
+    target_k: i32,
+    solution: &Solution,
+    module: Arc<CudaModule>,
+    stream: Arc<CudaStream>,
+    _prop: &cudaDeviceProp,
+) -> Result<f32> {
+    if solution.c_idxs.len() != target_k as usize {
+        return Err(anyhow!(
+            "Solution must select exactly {} columns, but got {}",
+            target_k,
+            solution.c_idxs.len()
+        ));
+    }
+    if solution.r_idxs.len() != target_k as usize {
+        return Err(anyhow!(
+            "Solution must select exactly {} rows, but got {}",
+            target_k,
+            solution.r_idxs.len()
+        ));
+    }
+    if solution.u_mat.len() != (target_k * target_k) as usize {
+        return Err(anyhow!(
+            "Solution U matrix must be size {}x{}",
+            target_k,
+            target_k
+        ));
+    }
+    for (i, &idx) in solution.c_idxs.iter().enumerate() {
+        if idx < 0 || idx >= n {
+            return Err(anyhow!(
+                "c_idxs[{}] = {} is out of bounds [0, {})",
+                i,
+                idx,
+                n
+            ));
+        }
+    }
+    for (i, &idx) in solution.r_idxs.iter().enumerate() {
+        if idx < 0 || idx >= m {
+            return Err(anyhow!(
+                "r_idxs[{}] = {} is out of bounds [0, {})",
+                i,
+                idx,
+                m
+            ));
+        }
+    }
+
+    let cublas = CudaBlas::new(stream.clone())?;
+    let extract_columns_kernel = module.load_function("extract_columns_kernel")?;
+    let extract_rows_kernel = module.load_function("extract_rows_kernel")?;
+
+    let c_mat_size = (m * target_k) as usize;
+    let r_mat_size = (target_k * n) as usize;
+    let mut d_c_mat = stream.alloc_zeros::<f32>(c_mat_size)?;
+    let d_u_mat = stream.memcpy_stod(&solution.u_mat)?;
+    let mut d_r_mat = stream.alloc_zeros::<f32>(r_mat_size)?;
+    let mut d_cu_mat = stream.alloc_zeros::<f32>((m * target_k) as usize)?;
+    let mut d_cur_mat = stream.alloc_zeros::<f32>((m * n) as usize)?;
+    let d_c_idxs = stream.memcpy_stod(&solution.c_idxs)?;
+    let d_r_idxs = stream.memcpy_stod(&solution.r_idxs)?;
+
+    unsafe {
+        stream
+            .launch_builder(&extract_columns_kernel)
+            .arg(d_a_mat)
+            .arg(&mut d_c_mat)
+            .arg(&m)
+            .arg(&n)
+            .arg(&target_k)
+            .arg(&d_c_idxs)
+            .launch(LaunchConfig {
+                grid_dim: (
+                    (c_mat_size as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
+                    1,
+                    1,
+                ),
+                block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            })?;
+    }
+    unsafe {
+        stream
+            .launch_builder(&extract_rows_kernel)
+            .arg(d_a_mat)
+            .arg(&mut d_r_mat)
+            .arg(&m)
+            .arg(&n)
+            .arg(&target_k)
+            .arg(&d_r_idxs)
+            .launch(LaunchConfig {
+                grid_dim: (
+                    (r_mat_size as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
+                    1,
+                    1,
+                ),
+                block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
+                shared_mem_bytes: 0,
+            })?;
+    }
+
+    // C * U
+    let gemm_config = GemmConfig {
+        transa: cublasOperation_t::CUBLAS_OP_N,
+        transb: cublasOperation_t::CUBLAS_OP_N,
+        m,
+        n: target_k,
+        k: target_k,
+        alpha: 1.0f32,
+        lda: m,
+        ldb: target_k,
+        beta: 0.0f32,
+        ldc: m,
+    };
+    unsafe {
+        cublas.gemm(gemm_config, &d_c_mat, &d_u_mat, &mut d_cu_mat)?;
+    }
+
+    // (C * U) * R
+    let gemm_config = GemmConfig {
+        transa: cublasOperation_t::CUBLAS_OP_N,
+        transb: cublasOperation_t::CUBLAS_OP_N,
+        m,
+        n,
+        k: target_k,
+        alpha: 1.0f32,
+        lda: m,
+        ldb: target_k,
+        beta: 0.0f32,
+        ldc: m,
+    };
+    unsafe {
+        cublas.gemm(gemm_config, &d_cu_mat, &d_r_mat, &mut d_cur_mat)?;
+    }
+
+    // ||A - CUR||_F
+    let num_elems = (m * n) as c_int;
+    let alpha: f32 = -1.0;
+    let (a_ptr, _a_record) = d_a_mat.device_ptr(&stream);
+    let (cur_ptr, _cur_record) = d_cur_mat.device_ptr_mut(&stream);
+
+    unsafe {
+        cublas_sys::cublasSaxpy_v2(
+            *cublas.handle(),
+            num_elems,
+            &alpha as *const f32,
+            a_ptr as *const f32,
+            1,
+            cur_ptr as *mut f32,
+            1,
+        )
+        .result()?;
+    }
+
+    let mut fnorm: f32 = 0.0;
+    unsafe {
+        cublas_sys::cublasSnrm2_v2(
+            *cublas.handle(),
+            num_elems,
+            cur_ptr as *const f32,
+            1,
+            &mut fnorm as *mut f32,
+        )
+        .result()?;
+    }
+    stream.synchronize()?;
+    Ok(fnorm)
 }
