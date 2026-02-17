@@ -216,7 +216,8 @@
 
 // c003_a109
 
-// c003_a110
+pub mod near_knap_improve;
+pub use near_knap_improve as c003_a110;
 
 // c003_a111
 
