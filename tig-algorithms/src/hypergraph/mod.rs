@@ -32,7 +32,8 @@
 
 // c005_a017
 
-// c005_a018
+pub mod hyper_opt;
+pub use hyper_opt as c005_a018;
 
 // c005_a019
 
