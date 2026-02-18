@@ -33,7 +33,6 @@ c008 (CUR decomposition) differs in several ways:
 4. **Two CUDA streams**: Matrix generation runs on the default (non-fuel-checked) stream so it doesn't consume solver fuel. The solver runs on a fuel-checked stream.
 5. **Aggregate quality**: Instead of a single quality score, per-instance qualities are combined via geometric mean. Any sub-instance with negative quality invalidates the entire nonce.
 6. **Multi-solution output**: The serialized solution is a JSON array of 13 `Solution` structs (one per sub-instance), rather than a single solution.
-7. **`MultiChallenge` container**: Generation produces a `MultiChallenge` struct holding 5 GPU matrices and 13 sub-instance descriptors, from which individual `Challenge` views are created on-the-fly for the solver.
 
 ## Multi-Instance Design
 
@@ -49,7 +48,7 @@ Constraint: `min(m, n)` must equal `2^p + 1` for some `p >= 5` (e.g., 33, 65, 12
 
 ### Matrix Generation
 
-1. **QR Factorization** (one-time cost): Generate two random Gaussian matrices and extract orthogonal bases U (m x max_rank) and V (n x max_rank) via QR.
+1. **QR Factorization** (one-time cost): Generate two random Gaussian matrices and extract orthogonal bases U (m x max_rank) and V (n x max_rank) via QR. This is handled by `Challenge::generate_uv()`.
 
 2. **Singular values**: Generate `max_rank` values using `sigma_j = exp(-2.0 * sqrt(j+1) / sqrt(max_rank))`, then shuffle with a seeded RNG. This produces a spectrum of decaying singular values.
 
@@ -60,7 +59,7 @@ Constraint: `min(m, n)` must equal `2^p + 1` for some `p >= 5` (e.g., 33, 65, 12
    | 0      | 1      | {0, 1, 2, 3, ...}             | 2^p + 1       |
    | 1      | 2      | {0, 2, 4, 6, ...}             | 2^(p-1) + 1   |
    | 2      | 4      | {0, 4, 8, 12, ...}            | 2^(p-2) + 1   |
-   | 3      | 8      | {0, 8, 16, 24, ...}           | 2^(p-3) + 1   |
+   | 3      | 8      | {0, 8, 16, 24, ...}            | 2^(p-3) + 1   |
    | 4      | 16     | {0, 16, 32, ...}              | 2^(p-4) + 1   |
 
    These sets are perfectly nested: I_4 ⊂ I_3 ⊂ I_2 ⊂ I_1 ⊂ I_0.
@@ -71,7 +70,9 @@ Constraint: `min(m, n)` must equal `2^p + 1` for some `p >= 5` (e.g., 33, 65, 12
    - A_2 = A_3 + contribution from I_2 \ I_3
    - ... and so on up to A_0 (full rank, stride 1)
 
-   This uses GEMM with `beta=1.0` to accumulate new components onto the previous matrix. Each matrix is stored directly at its final index (`matrices[0]` = largest rank through `matrices[4]` = smallest rank).
+   This uses GEMM with `beta=1.0` to accumulate new components onto the previous matrix.
+
+5. **Challenge instances**: Each of the 5 matrices is paired with 2-3 target_k values, producing 13 `Challenge` instances. Each instance owns a device-to-device copy of its matrix and stores its `optimal_fnorm` directly.
 
 ### Target Rank Mapping
 
@@ -94,11 +95,21 @@ For each sub-instance, the optimal Frobenius norm error is computed analytically
 optimal_fnorm = sqrt(sum of sigma_i^2 for i >= target_k)
 ```
 
-where sigma values are sorted by magnitude descending, restricted to the index set of that matrix.
+where sigma values are sorted by magnitude descending, restricted to the index set of that matrix. This value is stored as a private field on each `Challenge` instance and is only accessible to verification code — the solver cannot read it.
 
-## What the Solver Sees
+## Challenge API
 
-The solver function is called **13 times per nonce**, once per sub-instance. Each call receives:
+### Generation
+
+```rust
+let challenges: Vec<Challenge> = Challenge::generate_multiple_instances(
+    &seed, &track, module, stream, &prop
+)?;
+```
+
+Performs a single QR factorization, builds all 5 matrices, and returns 13 ready-to-solve `Challenge` instances. Internally calls `Challenge::generate_uv()` to produce the orthogonal bases.
+
+### Challenge struct
 
 ```rust
 pub struct Challenge {
@@ -106,11 +117,26 @@ pub struct Challenge {
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
-    pub d_a_mat: CudaSlice<f32>,  // the matrix A on GPU (m x n, column-major)
+    pub d_a_mat: CudaSlice<f32>, // the matrix A on GPU (m x n, column-major)
+    // optimal_fnorm is private — used only for verification, not visible to the solver
 }
 ```
 
-The solver has no knowledge of multi-instance structure. It simply receives a matrix and a target rank, and must produce:
+### Evaluation
+
+```rust
+// Frobenius norm of reconstruction error (always public)
+let fnorm: f32 = challenge.evaluate_fnorm(&solution, module, stream, &prop)?;
+
+// Per-instance quality in [0, 1] (conditional_pub behind hide_verification)
+let quality: f64 = challenge.evaluate_solution(&solution, module, stream, &prop)?;
+```
+
+`evaluate_solution` returns the raw per-instance quality as `f64`. The caller (verifier) aggregates across all 13 instances via geometric mean and scales to an integer.
+
+## What the Solver Sees
+
+The solver function is called **13 times per nonce**, once per sub-instance. Each call receives a single `Challenge` and must produce:
 
 ```rust
 pub struct Solution {
@@ -158,32 +184,31 @@ The final quality is the **geometric mean** across all 13 sub-instances:
 quality = exp(mean(ln(quality_i)))
 ```
 
-This is then scaled to an integer: `round(quality * QUALITY_PRECISION)` where `QUALITY_PRECISION = 1_000_000`.
+This is then scaled to an integer: `round(quality * QUALITY_PRECISION)` where `QUALITY_PRECISION = 1_000_000`. The geometric mean is computed in the verifier after calling `evaluate_solution` on each instance.
 
 ## Runtime Flow (tig-runtime)
 
 1. Parse track, set up CUDA context
 2. Load PTX with fuel limit = `fuel_per_instance * gpu_fuel_scale` (replacing `0xdeadbeefdeadbeef` placeholder)
-3. Generate `MultiChallenge` on the non-fuel-checked stream
-4. For each of 13 sub-instances:
+3. Call `Challenge::generate_multiple_instances()` on the non-fuel-checked stream → `Vec<Challenge>` (13 instances)
+4. For each challenge in the vec:
    a. Launch `initialize_kernel` to reset GPU fuel counter and signature
    b. Reset CPU fuel counter
-   c. Create `Challenge` view (device-to-device matrix copy on non-fuel-checked stream)
-   d. Call solver's `entry_point` on fuel-checked stream
-   e. Launch `finalize_kernel` to read GPU fuel/signature
-   f. Accumulate fuel consumed and runtime signature
-   g. Store solution (or empty solution if solver failed/didn't save)
+   c. Call solver's `entry_point` on fuel-checked stream with the challenge
+   d. Launch `finalize_kernel` to read GPU fuel/signature
+   e. Accumulate fuel consumed and runtime signature
+   f. Store solution (or empty solution if solver failed/didn't save)
 5. Serialize all 13 solutions as JSON array into OutputData
 
 ## Verification Flow (tig-verifier)
 
 1. Parse track, set up CUDA context
-2. Generate `MultiChallenge` (same deterministic generation as runtime)
+2. Call `Challenge::generate_multiple_instances()` (same deterministic generation as runtime)
 3. Deserialize solution as `Vec<Solution>` (13 entries)
-4. Call `evaluate_solutions()`:
-   - For each sub-instance: compute `||A - CUR||_F`
-   - Compute per-instance quality, check for negatives
-   - Return geometric mean quality
+4. For each `(challenge, solution)` pair:
+   - Call `challenge.evaluate_solution()` → per-instance quality `f64`
+   - Any non-positive quality → invalid submission
+5. Compute geometric mean of all 13 qualities and scale to `i32`
 
 ## Key Files
 
@@ -199,6 +224,6 @@ This is then scaled to an integer: `round(quality * QUALITY_PRECISION)` where `Q
 
 1. **`finalize_kernel` on fuel-checked stream after fuel exhaustion**: `finalize_kernel` is launched on `solve_stream` (fuel-checked). If the solver exhausted fuel via `asm("trap")`, the stream may be in a bad state and `finalize_kernel` could fail to run. Need to verify that trap doesn't poison the stream for subsequent kernel launches. See `tig-runtime/src/main.rs` c008 dispatch block and `tig-binary/src/framework.cu`.
 
-2. **GPU memory lifecycle of `challenge_view` allocations**: Each iteration of the runtime loop creates a `challenge_view` with an m x n `CudaSlice`. If cudarc's `Drop` for `CudaSlice` is deferred or pooled rather than immediate, GPU memory could accumulate across the 13 iterations. Worth testing with large matrices.
+2. **GPU memory lifecycle of Challenge allocations**: Each `Challenge` returned by `generate_multiple_instances` holds an m x n `CudaSlice`. If cudarc's `Drop` for `CudaSlice` is deferred or pooled rather than immediate, GPU memory for all 13 instances could accumulate. Worth testing with large matrices.
 
 3. **`Vec<Solution>` serde round-trip**: The runtime serializes `Vec<c008::Solution>` via `serde_json::to_string`. Each `Solution` uses `impl_base64_serde!` for custom serde (bincode -> gzip -> base64). The verifier deserializes with `serde_json::from_str::<Vec<c008::Solution>>`. Need to verify this round-trips correctly — that the macro's custom `Serialize`/`Deserialize` impls work as expected when nested inside a `Vec` serialized by serde_json.

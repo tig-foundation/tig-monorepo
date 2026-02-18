@@ -392,7 +392,7 @@ pub fn compute_solution(
                 let solve_stream = ctx.fuel_check_stream();
                 let prop = get_device_prop(gpu_device as i32)?;
 
-                let multi_challenge = c008::MultiChallenge::generate(
+                let challenges = c008::Challenge::generate_multiple_instances(
                     &seed,
                     &track,
                     module.clone(),
@@ -409,13 +409,13 @@ pub fn compute_solution(
 
                 use std::cell::RefCell;
                 let solutions: RefCell<Vec<Option<c008::Solution>>> =
-                    RefCell::new(vec![None; c008::NUM_SUB_INSTANCES]);
+                    RefCell::new(vec![None; challenges.len()]);
 
                 let mut total_fuel_consumed: u64 = 0;
                 let mut combined_runtime_signature: u64 =
                     u64::from_be_bytes(seed[0..8].try_into().unwrap());
 
-                for sub_idx in 0..c008::NUM_SUB_INSTANCES {
+                for (sub_idx, challenge) in challenges.iter().enumerate() {
                     // Reset GPU fuel counter
                     let sub_signature = u64::from_be_bytes(seed[8..16].try_into().unwrap())
                         ^ (sub_idx as u64);
@@ -430,17 +430,13 @@ pub fn compute_solution(
                     unsafe { *fuel_remaining_ptr = fuel_per_instance };
                     unsafe { *runtime_signature_ptr = sub_signature };
 
-                    // Use gen_stream (non-fuel-checking) for matrix copy setup
-                    let challenge_view =
-                        multi_challenge.challenge_view(sub_idx, gen_stream.clone())?;
-
                     let save_solution_fn = |solution: &c008::Solution| -> Result<()> {
                         solutions.borrow_mut()[sub_idx] = Some(solution.clone());
                         Ok(())
                     };
 
                     let result = solve_challenge_fn(
-                        &challenge_view,
+                        challenge,
                         &save_solution_fn,
                         hyperparameters.clone(),
                         module.clone(),

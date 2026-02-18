@@ -1,6 +1,6 @@
 pub const BUILD_TIME_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
-const QUALITY_PRECISION: i32 = 1_000_000;
+pub const QUALITY_PRECISION: i32 = 1_000_000;
 
 macro_rules! conditional_pub {
     (fn $name:ident $($rest:tt)*) => {

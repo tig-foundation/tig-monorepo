@@ -243,7 +243,7 @@ pub fn verify_solution(
                 let stream = ctx.default_stream();
                 let prop = get_device_prop(gpu_device as i32)?;
 
-                let multi_challenge = c008::MultiChallenge::generate(
+                let challenges = c008::Challenge::generate_multiple_instances(
                     &seed,
                     &track,
                     module.clone(),
@@ -254,18 +254,39 @@ pub fn verify_solution(
                 let solution = load_solution(&solution_path);
                 match serde_json::from_str::<Vec<c008::Solution>>(&solution) {
                     Ok(solutions) => {
-                        match multi_challenge.evaluate_solutions(
-                            &solutions,
-                            module.clone(),
-                            stream.clone(),
-                            &prop,
-                        ) {
-                            Ok(quality) => {
-                                stream.synchronize()?;
-                                ctx.synchronize()?;
-                                println!("quality: {}", quality);
+                        if solutions.len() != challenges.len() {
+                            err_msg = Some(format!(
+                                "Expected {} solutions, got {}",
+                                challenges.len(),
+                                solutions.len()
+                            ));
+                        } else {
+                            let mut quality_result: Result<i32> = Ok(0);
+                            let mut log_sum: f64 = 0.0;
+                            'eval: for (challenge, sol) in challenges.iter().zip(solutions.iter()) {
+                                match challenge.evaluate_solution(
+                                    sol,
+                                    module.clone(),
+                                    stream.clone(),
+                                    &prop,
+                                ) {
+                                    Ok(q) => log_sum += q.ln(),
+                                    Err(e) => {
+                                        quality_result = Err(e);
+                                        break 'eval;
+                                    }
+                                }
                             }
-                            Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
+                            match quality_result {
+                                Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
+                                Ok(_) => {
+                                    stream.synchronize()?;
+                                    ctx.synchronize()?;
+                                    let geomean = (log_sum / challenges.len() as f64).exp();
+                                    let quality = (geomean * QUALITY_PRECISION as f64).round() as i32;
+                                    println!("quality: {}", quality);
+                                }
+                            }
                         }
                     }
                     Err(_) => {
