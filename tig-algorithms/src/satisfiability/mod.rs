@@ -150,7 +150,8 @@
 
 // c001_a076
 
-// c001_a077
+pub mod sat_turbo;
+pub use sat_turbo as c001_a077;
 
 // c001_a078
 
