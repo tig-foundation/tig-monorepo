@@ -1,4 +1,5 @@
-// c003_a001
+pub mod dynamic;
+pub use dynamic as c003_a001;
 
 // c003_a002
 
@@ -10,7 +11,8 @@
 
 // c003_a006
 
-// c003_a007
+pub mod knapmaxxing;
+pub use knapmaxxing as c003_a007;
 
 // c003_a008
 
@@ -34,7 +36,8 @@
 
 // c003_a018
 
-// c003_a019
+pub mod knapheudp;
+pub use knapheudp as c003_a019;
 
 // c003_a020
 
@@ -98,13 +101,15 @@
 
 // c003_a050
 
-// c003_a051
+pub mod classic_quadkp;
+pub use classic_quadkp as c003_a051;
 
 // c003_a052
 
 // c003_a053
 
-// c003_a054
+pub mod quadkp_improved;
+pub use quadkp_improved as c003_a054;
 
 // c003_a055
 
@@ -116,7 +121,8 @@
 
 // c003_a059
 
-// c003_a060
+pub mod knap_one;
+pub use knap_one as c003_a060;
 
 // c003_a061
 
@@ -124,9 +130,11 @@
 
 // c003_a063
 
-// c003_a064
+pub mod quadkp_maximize;
+pub use quadkp_maximize as c003_a064;
 
-// c003_a065
+pub mod relative_quad_fast;
+pub use relative_quad_fast as c003_a065;
 
 // c003_a066
 
@@ -134,7 +142,8 @@
 
 // c003_a068
 
-// c003_a069
+pub mod new_relative_ultra;
+pub use new_relative_ultra as c003_a069;
 
 // c003_a070
 
@@ -146,13 +155,16 @@
 
 // c003_a074
 
-// c003_a075
+pub mod relative_opt_fast;
+pub use relative_opt_fast as c003_a075;
 
-// c003_a076
+pub mod relative_opt_mid;
+pub use relative_opt_mid as c003_a076;
 
 // c003_a077
 
-// c003_a078
+pub mod relative_opt_optima;
+pub use relative_opt_optima as c003_a078;
 
 // c003_a079
 
@@ -174,7 +186,8 @@
 
 // c003_a088
 
-// c003_a089
+pub mod relative_raw_ultra;
+pub use relative_raw_ultra as c003_a089;
 
 // c003_a090
 
@@ -182,35 +195,43 @@
 
 // c003_a092
 
-// c003_a093
+pub mod knapsack_redone;
+pub use knapsack_redone as c003_a093;
 
-// c003_a094
+pub mod native_knapsack;
+pub use native_knapsack as c003_a094;
 
 // c003_a095
 
 // c003_a096
 
-// c003_a097
+pub mod fast_and_fun;
+pub use fast_and_fun as c003_a097;
 
-// c003_a098
+pub mod knapsplatt;
+pub use knapsplatt as c003_a098;
 
 // c003_a099
 
-// c003_a100
+pub mod knap_supreme;
+pub use knap_supreme as c003_a100;
 
 // c003_a101
 
-// c003_a102
+pub mod knapsplat_hyper_s;
+pub use knapsplat_hyper_s as c003_a102;
 
 // c003_a103
 
 // c003_a104
 
-// c003_a105
+pub mod fast_and_furious;
+pub use fast_and_furious as c003_a105;
 
 // c003_a106
 
-// c003_a107
+pub mod near_knap;
+pub use near_knap as c003_a107;
 
 // c003_a108
 

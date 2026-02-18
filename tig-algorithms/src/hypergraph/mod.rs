@@ -1,8 +1,10 @@
-// c005_a001
+pub mod hyper_cluster;
+pub use hyper_cluster as c005_a001;
 
 // c005_a002
 
-// c005_a003
+pub mod hyper_improved;
+pub use hyper_improved as c005_a003;
 
 // c005_a004
 
@@ -14,9 +16,11 @@
 
 // c005_a008
 
-// c005_a009
+pub mod hyper_advanced_v2;
+pub use hyper_advanced_v2 as c005_a009;
 
-// c005_a010
+pub mod sigma_freud;
+pub use sigma_freud as c005_a010;
 
 // c005_a011
 
