@@ -26,6 +26,10 @@ tig-challenges = { path = "../tig-challenges", features = [
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[example]]
+name = "test_leverage"
+required-features = ["cur_decomposition"]
+
 [features]
 c001 = ["tig-challenges/c001"]
 satisfiability = ["c001"]

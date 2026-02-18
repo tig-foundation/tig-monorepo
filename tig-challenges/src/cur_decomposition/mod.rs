@@ -532,19 +532,21 @@ impl Challenge {
                 let src = &matrices[matrix_idx];
                 let mut d_a_mat = stream.alloc_zeros::<f32>(mat_size)?;
                 let alpha: f32 = 1.0;
-                let (src_ptr, _src_record) = src.device_ptr(&stream);
-                let (dst_ptr, _dst_record) = d_a_mat.device_ptr_mut(&stream);
-                unsafe {
-                    cublas_sys::cublasSaxpy_v2(
-                        *cublas.handle(),
-                        mat_size as c_int,
-                        &alpha as *const f32,
-                        src_ptr as *const f32,
-                        1,
-                        dst_ptr as *mut f32,
-                        1,
-                    )
-                    .result()?;
+                {
+                    let (src_ptr, _src_record) = src.device_ptr(&stream);
+                    let (dst_ptr, _dst_record) = d_a_mat.device_ptr_mut(&stream);
+                    unsafe {
+                        cublas_sys::cublasSaxpy_v2(
+                            *cublas.handle(),
+                            mat_size as c_int,
+                            &alpha as *const f32,
+                            src_ptr as *const f32,
+                            1,
+                            dst_ptr as *mut f32,
+                            1,
+                        )
+                        .result()?;
+                    }
                 }
                 stream.synchronize()?;
 
