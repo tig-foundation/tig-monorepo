@@ -194,7 +194,8 @@
 
 // c002_a098
 
-// c002_a099
+pub mod dprx_sub4;
+pub use dprx_sub4 as c002_a099;
 
 // c002_a100
 
