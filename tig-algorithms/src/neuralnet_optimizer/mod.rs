@@ -26,7 +26,8 @@
 
 // c006_a014
 
-// c006_a015
+pub mod adammw;
+pub use adammw as c006_a015;
 
 // c006_a016
 
