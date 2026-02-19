@@ -1,0 +1,12 @@
+CUR Decomposition Benchmark Results
+Matrix : 1025×1025  max_rank=1025
+Seeds  : 20 (+ 1 warmup per algorithm, warmup excluded)
+PTX    : tig-algorithms/lib/cur_decomposition/ptx/leverage.ptx
+Score  : fnorm / optimal  (1.0 = perfect, lower is better)
+
+algorithm                  solve_ms  gen+verify_ms mean_score    var_score  min_score  max_score
+────────────────────────────────────────────────────────────────────────────────────────────────
+leverage (1t)                 258.6           68.4     1.7715     0.075298     1.3816     2.3557
+leverage (1t+cheap)           120.6           65.8    74.8123 24176.365322     6.0573  1786.1780
+leverage (12t)               3863.0           67.5     1.7537     0.067860     1.3734     2.2625
+fastest_algo                    0.4           66.3     4.9291     7.231688     1.5437    10.5995

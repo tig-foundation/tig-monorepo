@@ -30,6 +30,10 @@ crate-type = ["cdylib", "rlib"]
 name = "test_leverage"
 required-features = ["cur_decomposition"]
 
+[[example]]
+name = "test_multi_instance"
+required-features = ["cur_decomposition"]
+
 [features]
 c001 = ["tig-challenges/c001"]
 satisfiability = ["c001"]

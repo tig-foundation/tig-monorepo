@@ -565,6 +565,11 @@ impl Challenge {
         Ok(challenges)
     }
 
+    /// Returns the optimal (lower-bound) Frobenius norm for this sub-instance.
+    pub fn optimal_fnorm(&self) -> f32 {
+        self.optimal_fnorm
+    }
+
     /// Evaluate the Frobenius norm of the CUR reconstruction error ||A - C*U*R||_F
     pub fn evaluate_fnorm(
         &self,

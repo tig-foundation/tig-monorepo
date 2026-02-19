@@ -10,6 +10,9 @@ use tig_challenges::cur_decomposition::*;
 #[path = "../src/cur_decomposition/leverage/mod.rs"]
 mod leverage;
 
+#[path = "../src/cur_decomposition/simple_rand/mod.rs"]
+mod simple_rand;
+
 // ─── Stats helper ────────────────────────────────────────────────────────────
 
 struct Stats {
@@ -73,6 +76,7 @@ fn run_config(
     true_rank: i32,
     target_rank: i32,
     num_seeds: usize,
+    algo_name: &str,
     hyperparameters: &Option<serde_json::Map<String, serde_json::Value>>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
@@ -80,20 +84,17 @@ fn run_config(
 ) -> Result<()> {
     println!("\n╔══ M={} N={} T={} K={} ══", m, n, true_rank, target_rank);
     println!(
-        "║ {:>5}  {:>10}  {:>10}  {:>9}  {:>9}",
-        "seed", "gen_ms", "algo_ms", "quality", "fnorm/opt"
+        "║ {:>5}  {:>10}  {:>12}  {:>9}",
+        "seed", "solve_ms", "gen+vrfy_ms", "score"
     );
-    println!("╟{}", "─".repeat(52));
+    println!("╟{}", "─".repeat(44));
 
     let track = Track { m, n };
     let optimal = compute_optimal_fnorm(true_rank, target_rank);
-    let baseline = 50.0 * optimal;
 
-    let mut gen_ms = Stats::new();
-    let mut algo_ms = Stats::new();
-    let mut quality_stats = Stats::new();
-    let mut ratio_stats = Stats::new();
-    let mut passes = 0usize;
+    let mut solve_ms = Stats::new();
+    let mut gv_ms = Stats::new();
+    let mut score_stats = Stats::new();
     let mut attempted = 0usize;
 
     for s in 0..num_seeds {
@@ -116,8 +117,7 @@ fn run_config(
                 continue;
             }
         };
-        let g_ms = t0.elapsed().as_secs_f64() * 1000.0;
-        gen_ms.push(g_ms);
+        let gen_elapsed = t0.elapsed().as_secs_f64() * 1000.0;
 
         // ── Algorithm ──────────────────────────────────────────────────────
         let best: RefCell<Option<Solution>> = RefCell::new(None);
@@ -127,23 +127,33 @@ fn run_config(
                 *best.borrow_mut() = Some(sol.clone());
                 Ok(())
             };
-            leverage::solve_challenge(
-                &challenge,
-                &save_fn,
-                hyperparameters,
-                module.clone(),
-                stream.clone(),
-                prop,
-            )
+            match algo_name {
+                "simple_rand" => simple_rand::solve_challenge(
+                    &challenge,
+                    &save_fn,
+                    hyperparameters,
+                    module.clone(),
+                    stream.clone(),
+                    prop,
+                ),
+                _ => leverage::solve_challenge(
+                    &challenge,
+                    &save_fn,
+                    hyperparameters,
+                    module.clone(),
+                    stream.clone(),
+                    prop,
+                ),
+            }
         };
-        let a_ms = t1.elapsed().as_secs_f64() * 1000.0;
-        algo_ms.push(a_ms);
+        let s_ms = t1.elapsed().as_secs_f64() * 1000.0;
+        solve_ms.push(s_ms);
         attempted += 1;
 
         let solution = match result {
             Ok(sol) => sol.or_else(|| best.into_inner()),
             Err(e) => {
-                println!("║ {:>5}  {:>10.1}  algo error: {}", s, g_ms, e);
+                println!("║ {:>5}  {:>10.1}  algo error: {}", s, s_ms, e);
                 continue;
             }
         };
@@ -151,72 +161,58 @@ fn run_config(
         match solution {
             None => {
                 println!(
-                    "║ {:>5}  {:>10.1}  {:>10.1}  no solution",
-                    s, g_ms, a_ms
+                    "║ {:>5}  {:>10.1}  {:>12}  no solution",
+                    s, s_ms, "-"
                 );
             }
             Some(sol) => {
+                let t2 = Instant::now();
                 let fnorm =
                     challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)?;
-                let q = (baseline - fnorm) / (baseline - optimal);
-                let ratio = fnorm / optimal;
+                let vrfy_elapsed = t2.elapsed().as_secs_f64() * 1000.0;
+                let total_gv = gen_elapsed + vrfy_elapsed;
+                gv_ms.push(total_gv);
 
-                quality_stats.push(q as f64);
-                ratio_stats.push(ratio as f64);
-                if q > 0.0 {
-                    passes += 1;
-                }
+                let score = fnorm / optimal;
+                score_stats.push(score as f64);
 
                 println!(
-                    "║ {:>5}  {:>10.1}  {:>10.1}  {:>9.4}  {:>9.4}{}",
-                    s,
-                    g_ms,
-                    a_ms,
-                    q,
-                    ratio,
-                    if q <= 0.0 { "  ← FAIL" } else { "" }
+                    "║ {:>5}  {:>10.1}  {:>12.1}  {:>9.4}",
+                    s, s_ms, total_gv, score
                 );
             }
         }
     }
 
-    println!("╟{}", "─".repeat(52));
+    println!("╟{}", "─".repeat(44));
 
-    if !gen_ms.is_empty() {
+    if !solve_ms.is_empty() {
         println!(
-            "║ gen_ms   avg={:8.1}  min={:8.1}  max={:8.1}",
-            gen_ms.mean(),
-            gen_ms.min(),
-            gen_ms.max()
+            "║ solve_ms    avg={:8.1}  min={:8.1}  max={:8.1}",
+            solve_ms.mean(),
+            solve_ms.min(),
+            solve_ms.max()
         );
     }
-    if !algo_ms.is_empty() {
+    if !gv_ms.is_empty() {
         println!(
-            "║ algo_ms  avg={:8.1}  min={:8.1}  max={:8.1}",
-            algo_ms.mean(),
-            algo_ms.min(),
-            algo_ms.max()
+            "║ gen+vrfy_ms avg={:8.1}  min={:8.1}  max={:8.1}",
+            gv_ms.mean(),
+            gv_ms.min(),
+            gv_ms.max()
         );
     }
-    if !quality_stats.is_empty() {
+    if !score_stats.is_empty() {
         println!(
-            "║ quality  avg={:8.4}  min={:8.4}  max={:8.4}  std={:.4}  pass={}/{}",
-            quality_stats.mean(),
-            quality_stats.min(),
-            quality_stats.max(),
-            quality_stats.std(),
-            passes,
+            "║ score       avg={:8.4}  min={:8.4}  max={:8.4}  std={:.4}  n={}",
+            score_stats.mean(),
+            score_stats.min(),
+            score_stats.max(),
+            score_stats.std(),
             attempted
         );
-        println!(
-            "║ f/opt    avg={:8.4}  min={:8.4}  max={:8.4}  std={:.4}",
-            ratio_stats.mean(),
-            ratio_stats.min(),
-            ratio_stats.max(),
-            ratio_stats.std()
-        );
     }
-    println!("╚{}", "═".repeat(52));
+    println!("╚{}", "═".repeat(44));
 
     Ok(())
 }
@@ -229,16 +225,18 @@ fn print_usage(prog: &str) {
         prog
     );
     eprintln!();
-    eprintln!("  PTX_PATH       Path to compiled leverage.ptx");
+    eprintln!("  PTX_PATH       Path to compiled .ptx file");
     eprintln!("                 Build with:");
-    eprintln!("                   CHALLENGE=cur_decomposition python3 tig-binary/scripts/build_ptx leverage");
+    eprintln!("                   CHALLENGE=cur_decomposition python3 tig-binary/scripts/build_ptx <algo>");
     eprintln!();
     eprintln!("  M N T K        Matrix dimensions and ranks. Multiple groups run sequentially.");
     eprintln!("                   M = rows, N = cols, T = true rank, K = target rank (K <= T)");
     eprintln!();
     eprintln!("Options:");
-    eprintln!("  --seeds  N     Number of seeds to test per config  (default: 5)");
-    eprintln!("  --trials N     Leverage score trials per solve      (default: algorithm default)");
+    eprintln!("  --algo   NAME  Algorithm: leverage or simple_rand   (default: leverage)");
+    eprintln!("  --seeds  N     Number of seeds to test per config   (default: 5)");
+    eprintln!("  --trials N     Trials per solve                     (default: algorithm default)");
+    eprintln!("  --cheap-u      Use cheap U computation (leverage only, default: false)");
     eprintln!("  --gpu    N     GPU device index                     (default: 0)");
 }
 
@@ -254,13 +252,25 @@ fn main() -> Result<()> {
 
     // Parse positional M N T K groups and named options
     let mut configs: Vec<(i32, i32, i32, i32)> = Vec::new();
+    let mut algo_name = "leverage".to_string();
     let mut num_seeds: usize = 5;
     let mut num_trials: Option<usize> = None;
+    let mut cheap_u: bool = false;
     let mut gpu_device: usize = 0;
 
     let mut i = 2;
     while i < args.len() {
         match args[i].as_str() {
+            "--algo" => {
+                i += 1;
+                algo_name = args
+                    .get(i)
+                    .ok_or_else(|| anyhow!("--algo requires a value"))?
+                    .to_string();
+                if algo_name != "leverage" && algo_name != "simple_rand" {
+                    return Err(anyhow!("--algo must be 'leverage' or 'simple_rand'"));
+                }
+            }
             "--seeds" => {
                 i += 1;
                 num_seeds = args
@@ -277,6 +287,9 @@ fn main() -> Result<()> {
                         .parse()
                         .map_err(|_| anyhow!("--trials must be a positive integer"))?,
                 );
+            }
+            "--cheap-u" => {
+                cheap_u = true;
             }
             "--gpu" => {
                 i += 1;
@@ -317,11 +330,18 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    let hyperparameters = num_trials.map(|t| {
+    let hyperparameters = if num_trials.is_some() || cheap_u {
         let mut map = serde_json::Map::new();
-        map.insert("num_trials".to_string(), serde_json::json!(t));
-        map
-    });
+        if let Some(t) = num_trials {
+            map.insert("num_trials".to_string(), serde_json::json!(t));
+        }
+        if cheap_u {
+            map.insert("cheap_u".to_string(), serde_json::json!(true));
+        }
+        Some(map)
+    } else {
+        None
+    };
 
     // ── CUDA setup (shared across all configs) ────────────────────────────
     let ptx_src = std::fs::read_to_string(ptx_path)
@@ -335,12 +355,15 @@ fn main() -> Result<()> {
         return Err(anyhow!("No CUDA devices found"));
     }
 
-    println!("=== CUR Decomposition Benchmark (leverage) ===");
+    println!("=== CUR Decomposition Benchmark ({}) ===", algo_name);
     println!("PTX    : {}", ptx_path);
     println!("GPU    : device {} of {}", gpu_device, num_gpus);
     println!("Seeds  : {}", num_seeds);
     if let Some(t) = num_trials {
         println!("Trials : {}", t);
+    }
+    if cheap_u {
+        println!("CheapU : true");
     }
     println!("Configs: {}", configs.len());
 
@@ -358,6 +381,7 @@ fn main() -> Result<()> {
             *true_rank,
             *target_rank,
             num_seeds,
+            &algo_name,
             &hyperparameters,
             module.clone(),
             stream.clone(),

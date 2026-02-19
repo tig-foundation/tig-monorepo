@@ -21,6 +21,10 @@ const MAX_THREADS: u32 = 1024;
 #[derive(Serialize, Deserialize)]
 pub struct Hyperparameters {
     pub num_trials: usize,
+    /// Use intersection inverse W⁻¹ instead of full least-squares U.
+    /// Avoids all O(mnk) GEMMs; only reads k² elements from A.
+    #[serde(default)]
+    pub cheap_u: bool,
 }
 
 pub fn help() {
@@ -31,21 +35,35 @@ pub fn help() {
 
 // ─── CPU helpers (only for small k×k operations) ─────────────────────────────
 
-/// Gauss-Jordan inversion of an n×n column-major matrix. Returns None if singular.
+/// Gauss-Jordan inversion of an n×n column-major matrix.
+/// Works in f64 internally to avoid f32 precision loss on ill-conditioned matrices.
+/// Uses a relative pivot threshold scaled to the input magnitude so that
+/// nearly-singular matrices (not just exactly-singular ones) are rejected.
+/// Returns None if the matrix is (near-)singular or if the result contains
+/// non-finite values (overflow from extreme ill-conditioning).
 fn invert(a: &[f32], n: usize) -> Option<Vec<f32>> {
-    let mut aug = vec![0.0f32; n * 2 * n];
+    // Promote to f64 for the entire computation.
+    let mut aug = vec![0.0f64; n * 2 * n];
     for i in 0..n {
         for j in 0..n {
-            aug[i * 2 * n + j] = a[i + j * n];
+            aug[i * 2 * n + j] = a[i + j * n] as f64;
         }
-        aug[i * 2 * n + n + i] = 1.0;
+        aug[i * 2 * n + n + i] = 1.0f64;
     }
+
+    // Relative threshold: a pivot is considered zero if it is smaller than
+    // eps * ||A||_max.  Using 1e-10 as eps gives us ~6 orders of headroom
+    // before f64's machine epsilon (~2e-16), so condition numbers up to ~10^6
+    // are handled accurately; anything worse is rejected as singular.
+    let max_entry = a.iter().map(|x| x.abs() as f64).fold(0.0f64, f64::max);
+    let threshold = 1e-10f64 * max_entry.max(f64::EPSILON);
+
     for col in 0..n {
         let (max_row, max_val) = (col..n)
             .map(|r| (r, aug[r * 2 * n + col].abs()))
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .unwrap();
-        if max_val < 1e-10 {
+        if max_val < threshold {
             return None;
         }
         if max_row != col {
@@ -68,10 +86,17 @@ fn invert(a: &[f32], n: usize) -> Option<Vec<f32>> {
             }
         }
     }
+
     let mut inv = vec![0.0f32; n * n];
     for i in 0..n {
         for j in 0..n {
-            inv[i + j * n] = aug[i * 2 * n + n + j];
+            let v = aug[i * 2 * n + n + j];
+            // If any element is non-finite the matrix was too ill-conditioned
+            // even for f64; reject rather than propagate garbage into the solver.
+            if !v.is_finite() {
+                return None;
+            }
+            inv[i + j * n] = v as f32;
         }
     }
     Some(inv)
@@ -243,14 +268,14 @@ pub fn solve_challenge(
     hyperparameters: &Option<Map<String, Value>>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
-    _prop: &cudaDeviceProp,
+    prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let hp = match hyperparameters {
         Some(hp) => {
             serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
                 .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?
         }
-        None => Hyperparameters { num_trials: 3 },
+        None => Hyperparameters { num_trials: 4, cheap_u: false },
     };
 
     let m = challenge.m;
@@ -285,14 +310,74 @@ pub fn solve_challenge(
     let mut best_fnorm = f32::INFINITY;
     let mut best_solution: Option<Solution> = None;
 
-    // ── Helper: extract C/R, solve for U, evaluate fnorm, optionally save ────
-    // Returns (fnorm) or None if the system is singular.
+    let only_one_trial = num_trials == 1;
+
+    // ── Helper: extract C/R, solve for U, optionally evaluate fnorm ──────────
+    // When compute_fnorm=false the expensive CUR reconstruction is skipped and
+    // fnorm is returned as 0.0 (caller must not use it for comparison).
+    let cheap_u = hp.cheap_u;
+
     let mut run_trial = |c_idxs_i32: Vec<i32>,
                           r_idxs_i32: Vec<i32>,
-                          rng_inner: &mut SmallRng|
+                          rng_inner: &mut SmallRng,
+                          compute_fnorm: bool|
      -> Result<Option<(Vec<i32>, Vec<f32>, Vec<i32>, f32)>> {
         let d_c_idxs = stream.memcpy_stod(&c_idxs_i32)?;
         let d_r_idxs = stream.memcpy_stod(&r_idxs_i32)?;
+
+        // ── cheap_u: intersection inverse W⁻¹ — skips all O(mnk) GEMMs ────
+        if cheap_u {
+            let r_size = k_sz * n_sz;
+            let mut d_r = stream.alloc_zeros::<f32>(r_size)?;
+            unsafe {
+                stream
+                    .launch_builder(&extract_rows_kernel)
+                    .arg(&challenge.d_a_mat)
+                    .arg(&mut d_r)
+                    .arg(&m)
+                    .arg(&n)
+                    .arg(&k)
+                    .arg(&d_r_idxs)
+                    .launch(LaunchConfig {
+                        grid_dim: ((r_size as u32 + MAX_THREADS - 1) / MAX_THREADS, 1, 1),
+                        block_dim: (MAX_THREADS, 1, 1),
+                        shared_mem_bytes: 0,
+                    })?;
+            }
+            let w_size = k_sz * k_sz;
+            let mut d_w = stream.alloc_zeros::<f32>(w_size)?;
+            unsafe {
+                stream
+                    .launch_builder(&extract_cols_kernel)
+                    .arg(&d_r)
+                    .arg(&mut d_w)
+                    .arg(&k)
+                    .arg(&n)
+                    .arg(&k)
+                    .arg(&d_c_idxs)
+                    .launch(LaunchConfig {
+                        grid_dim: ((w_size as u32 + MAX_THREADS - 1) / MAX_THREADS, 1, 1),
+                        block_dim: (MAX_THREADS, 1, 1),
+                        shared_mem_bytes: 0,
+                    })?;
+            }
+            stream.synchronize()?;
+            let w_cpu = stream.memcpy_dtov(&d_w)?;
+            let u_mat = match invert(&w_cpu, k_sz) {
+                Some(u) => u,
+                None => return Ok(None),
+            };
+            if !compute_fnorm {
+                return Ok(Some((c_idxs_i32, u_mat, r_idxs_i32, 0.0f32)));
+            }
+            let sol = Solution {
+                c_idxs: c_idxs_i32.clone(),
+                u_mat: u_mat.clone(),
+                r_idxs: r_idxs_i32.clone(),
+            };
+            let fnorm = challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)?;
+            return Ok(Some((c_idxs_i32, u_mat, r_idxs_i32, fnorm)));
+        }
 
         let c_size = m_sz * k_sz;
         let r_size = k_sz * n_sz;
@@ -412,6 +497,11 @@ pub fn solve_challenge(
         let tmp = matmul(&ctc_inv, k_sz, k_sz, &m_mat, k_sz);
         let u_mat = matmul(&tmp, k_sz, k_sz, &rrt_inv, k_sz);
 
+        // Skip reconstruction if fnorm is not needed (single-trial case).
+        if !compute_fnorm {
+            return Ok(Some((c_idxs_i32, u_mat, r_idxs_i32, 0.0f32)));
+        }
+
         // Upload U and compute  CUR = C U R  on GPU.
         let d_u = stream.memcpy_stod(&u_mat)?;
 
@@ -492,16 +582,22 @@ pub fn solve_challenge(
         let c_i32: Vec<i32> = c_idxs.iter().map(|&i| i as i32).collect();
         let r_i32: Vec<i32> = r_idxs.iter().map(|&i| i as i32).collect();
 
-        if let Ok(Some((ci, u, ri, fnorm))) = run_trial(c_i32, r_i32, &mut rng) {
+        if let Ok(Some((ci, u, ri, fnorm))) = run_trial(c_i32, r_i32, &mut rng, !only_one_trial) {
             let sol = Solution { c_idxs: ci, u_mat: u, r_idxs: ri };
             save_solution(&sol)?;
+            if only_one_trial {
+                return Ok(Some(sol));
+            }
             best_fnorm = fnorm;
             best_solution = Some(sol);
+        }
+        if only_one_trial {
+            return Ok(best_solution);
         }
     }
 
     // ── Leverage score trials ─────────────────────────────────────────────────
-    for trial in 0..num_trials {
+    for trial in 0..(num_trials - 1) {
         let col_seed = seed0 ^ (trial as u64).wrapping_mul(0xA1B2_C3D4_E5F6_0718);
         let row_seed = seed1 ^ (trial as u64).wrapping_mul(0x1827_3645_5463_7281);
         let scale = 1.0f32 / (s as f32).sqrt();
@@ -637,7 +733,7 @@ pub fn solve_challenge(
         let r_i32: Vec<i32> = r_idxs.iter().map(|&i| i as i32).collect();
 
         // ── Compute U, evaluate fnorm, save if improved ─────────────────────
-        if let Ok(Some((ci, u, ri, fnorm))) = run_trial(c_i32, r_i32, &mut rng) {
+        if let Ok(Some((ci, u, ri, fnorm))) = run_trial(c_i32, r_i32, &mut rng, true) {
             if fnorm < best_fnorm {
                 best_fnorm = fnorm;
                 let sol = Solution { c_idxs: ci, u_mat: u, r_idxs: ri };
