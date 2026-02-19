@@ -24,7 +24,8 @@ pub use sigma_freud as c005_a010;
 
 // c005_a011
 
-// c005_a012
+pub mod freud_opt;
+pub use freud_opt as c005_a012;
 
 // c005_a013
 
