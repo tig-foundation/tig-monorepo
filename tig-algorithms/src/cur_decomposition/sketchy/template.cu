@@ -1,4 +1,4 @@
-// IMPORTANT NOTES:
+p// IMPORTANT NOTES:
 // 1. You can import any libraries available in nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
 //    Example:
 //    #include <curand_kernel.h>

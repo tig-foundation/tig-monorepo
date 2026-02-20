@@ -1,14 +1,20 @@
-// Benchmark for CUR decomposition: generate_multiple_instances + solve + verify.
+// Large benchmark for CUR decomposition.
 //
-// Runs a fixed set of algorithm configurations over N seeds (plus 1 warmup seed
-// whose results are discarded). Writes a summary table to stdout and to
-// examples/benchmark_results.txt.
+// Algorithms : fastest_algo | leverage (1t+cheap) | leverage (15t) | sketchy
+// Sizes      : 6 rectangular configs (m always 2^p+1, n > m)
+// Seeds      : 25 real + 1 warmup per (algo, size) pair
 //
-// Score = fnorm / optimal  (1.0 = perfect, lower is better)
+// Score      : fnorm / optimal  (1.0 = perfect, lower is better)
+// Per seed   : avg_score = mean(score) over sub-instances of that seed
+// Reported   : avg/min/max of per-seed avg_scores over the 25 seeds
+//
+// Outputs:
+//   examples/large_benchmark_summary.txt  — summary table
+//   examples/large_benchmark_scores.csv   — every (algo,m,n,seed,sub,k,score)
 //
 // Usage:
 //   cargo run --release --example test_multi_instance --features cur_decomposition \
-//       -- <PTX_PATH> [--m N] [--n N] [--seeds N] [--gpu N]
+//       -- <PTX_PATH> [--seeds N] [--gpu N]
 
 use anyhow::{anyhow, Result};
 use cudarc::{
@@ -25,7 +31,10 @@ mod leverage;
 #[path = "../src/cur_decomposition/fastest_algo/mod.rs"]
 mod fastest_algo;
 
-// ─── Stats ───────────────────────────────────────────────────────────────────
+#[path = "../src/cur_decomposition/sketchy/mod.rs"]
+mod sketchy;
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
 
 struct Stats {
     values: Vec<f64>,
@@ -36,33 +45,45 @@ impl Stats {
     fn push(&mut self, v: f64) { self.values.push(v); }
     fn is_empty(&self) -> bool { self.values.is_empty() }
     fn mean(&self) -> f64 { self.values.iter().sum::<f64>() / self.values.len() as f64 }
-    fn variance(&self) -> f64 {
-        let m = self.mean();
-        self.values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / self.values.len() as f64
-    }
     fn min(&self) -> f64 { self.values.iter().cloned().fold(f64::INFINITY, f64::min) }
     fn max(&self) -> f64 { self.values.iter().cloned().fold(f64::NEG_INFINITY, f64::max) }
 }
 
 // ─── Config & result types ────────────────────────────────────────────────────
 
-struct RunConfig {
+struct AlgoConfig {
     label: &'static str,
     algo: &'static str,
     hyperparameters: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
-struct BenchmarkResult {
-    label: String,
-    avg_solve_ms: f64,
-    avg_gen_verify_ms: f64,
-    mean_score: f64,
-    var_score: f64,
-    min_score: f64,
-    max_score: f64,
+struct SizeConfig {
+    m: i32,
+    n: i32,
 }
 
-// ─── Seed helper ─────────────────────────────────────────────────────────────
+struct RunResult {
+    algo: String,
+    m: i32,
+    n: i32,
+    avg_solve_ms: f64,
+    avg_gen_verify_ms: f64,
+    avg_score: f64,       // mean of per-seed avg_scores
+    min_seed_score: f64,  // min of per-seed avg_scores
+    max_seed_score: f64,  // max of per-seed avg_scores
+}
+
+struct ScoreRecord {
+    algo: String,
+    m: i32,
+    n: i32,
+    seed: usize,
+    sub_idx: usize,
+    target_k: i32,
+    score: f64,
+}
+
+// ─── Seed helper ──────────────────────────────────────────────────────────────
 
 fn make_seed(index: u64) -> [u8; 32] {
     let mut seed = [0u8; 32];
@@ -83,27 +104,30 @@ fn solve(
 ) -> Result<Option<Solution>> {
     match algo {
         "fastest_algo" => fastest_algo::solve_challenge(challenge, save_fn, hp, module, stream, prop),
+        "sketchy"      => sketchy::solve_challenge(challenge, save_fn, hp, module, stream, prop),
         _              => leverage::solve_challenge(challenge, save_fn, hp, module, stream, prop),
     }
 }
 
-// ─── Per-algorithm benchmark ──────────────────────────────────────────────────
+// ─── Per (algo, size) benchmark ───────────────────────────────────────────────
 
 fn run_algo(
-    cfg: &RunConfig,
-    m: i32,
-    n: i32,
+    cfg: &AlgoConfig,
+    size: &SizeConfig,
     num_seeds: usize,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
     prop: &cudaDeviceProp,
-) -> Result<BenchmarkResult> {
+) -> Result<(RunResult, Vec<ScoreRecord>)> {
+    let m = size.m;
+    let n = size.n;
     let track = Track { m, n };
 
-    let mut all_solve_ms  = Stats::new();
     let mut all_gen_ms    = Stats::new();
+    let mut all_solve_ms  = Stats::new();
     let mut all_verify_ms = Stats::new();
-    let mut all_scores    = Stats::new(); // fnorm/optimal across ALL instances × seeds
+    let mut seed_avgs     = Stats::new(); // one entry per real seed
+    let mut records: Vec<ScoreRecord> = Vec::new();
 
     println!(
         "\n╔══ {} │ M={} N={} │ {} seeds + 1 warmup ══",
@@ -111,41 +135,40 @@ fn run_algo(
     );
     println!(
         "║ {:>5}  {:>9}  {:>9}  {:>9}  {:>10}  {:>8}  {:>8}",
-        "seed", "gen_ms", "solve_ms", "vrfy_ms", "mean_score", "min", "max"
+        "seed", "gen_ms", "solve_ms", "vrfy_ms", "avg_score", "min", "max"
     );
     println!("╟{}", "─".repeat(74));
 
-    // seed_idx == 0  →  warmup (results discarded)
+    // seed_idx == 0  →  warmup (distinct seed, results discarded)
     // seed_idx  > 0  →  real seeds 0 .. num_seeds-1
     for seed_idx in 0..=(num_seeds) {
         let is_warmup = seed_idx == 0;
-        // warmup uses a distinct seed (num_seeds itself) to avoid influencing real seeds
         let si = if is_warmup { num_seeds } else { seed_idx - 1 };
         let seed = make_seed(si as u64);
 
-        // ── Generate 13 sub-instances ────────────────────────────────────────
+        // ── Generate sub-instances ────────────────────────────────────────────
         let t_gen = Instant::now();
         let challenges = match Challenge::generate_multiple_instances(
             &seed, &track, module.clone(), stream.clone(), prop,
         ) {
             Ok(cs) => cs,
             Err(e) => {
-                let label = if is_warmup { "warm".to_string() } else { si.to_string() };
-                println!("║ {:>5}  generate error: {}", label, e);
+                let lbl = if is_warmup { "warm".to_string() } else { si.to_string() };
+                println!("║ {:>5}  generate error: {}", lbl, e);
                 continue;
             }
         };
         let gen_ms = t_gen.elapsed().as_secs_f64() * 1000.0;
 
-        // ── Solve + verify each sub-instance ────────────────────────────────
-        let mut seed_solve_ms  = 0.0f64;
-        let mut seed_verify_ms = 0.0f64;
-        let mut seed_scores: Vec<f64> = Vec::new();
+        // ── Solve + verify each sub-instance ──────────────────────────────────
+        let mut total_solve_ms  = 0.0f64;
+        let mut total_verify_ms = 0.0f64;
+        let mut sub_scores: Vec<f64> = Vec::new();
 
-        for challenge in &challenges {
+        for (sub_idx, challenge) in challenges.iter().enumerate() {
             let optimal = challenge.optimal_fnorm() as f64;
-
             let best: RefCell<Option<Solution>> = RefCell::new(None);
+
             let t_solve = Instant::now();
             let result = {
                 let save_fn = |sol: &Solution| -> Result<()> {
@@ -155,98 +178,102 @@ fn run_algo(
                 solve(cfg.algo, challenge, &save_fn, &cfg.hyperparameters,
                       module.clone(), stream.clone(), prop)
             };
-            seed_solve_ms += t_solve.elapsed().as_secs_f64() * 1000.0;
+            total_solve_ms += t_solve.elapsed().as_secs_f64() * 1000.0;
 
             let solution = match result {
                 Ok(sol) => sol.or_else(|| best.into_inner()),
-                Err(e) => { eprintln!("  solve error (k={}): {}", challenge.target_k, e); continue; }
+                Err(e) => {
+                    eprintln!("  solve error (k={}): {}", challenge.target_k, e);
+                    None
+                }
             };
 
             if let Some(sol) = solution {
                 let t_verify = Instant::now();
-                let fnorm = match challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop) {
-                    Ok(f) => f,
-                    Err(e) => { eprintln!("  verify error (k={}): {}", challenge.target_k, e); continue; }
-                };
-                seed_verify_ms += t_verify.elapsed().as_secs_f64() * 1000.0;
-
-                seed_scores.push(fnorm as f64 / optimal);
+                match challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop) {
+                    Ok(fnorm) => {
+                        total_verify_ms += t_verify.elapsed().as_secs_f64() * 1000.0;
+                        let score = fnorm as f64 / optimal;
+                        sub_scores.push(score);
+                        if !is_warmup {
+                            records.push(ScoreRecord {
+                                algo: cfg.label.to_string(),
+                                m, n,
+                                seed: si,
+                                sub_idx,
+                                target_k: challenge.target_k,
+                                score,
+                            });
+                        }
+                    }
+                    Err(e) => eprintln!("  verify error (k={}): {}", challenge.target_k, e),
+                }
             }
         }
 
-        let (seed_mean, seed_min, seed_max) = if seed_scores.is_empty() {
+        let (seed_avg, seed_min, seed_max) = if sub_scores.is_empty() {
             (f64::NAN, f64::NAN, f64::NAN)
         } else {
-            let mean = seed_scores.iter().sum::<f64>() / seed_scores.len() as f64;
-            let min  = seed_scores.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max  = seed_scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let mean = sub_scores.iter().sum::<f64>() / sub_scores.len() as f64;
+            let min  = sub_scores.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max  = sub_scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             (mean, min, max)
         };
 
-        let label = if is_warmup { "warm".to_string() } else { si.to_string() };
+        let lbl = if is_warmup { "warm".to_string() } else { si.to_string() };
         println!(
             "║ {:>5}  {:>9.1}  {:>9.1}  {:>9.1}  {:>10.4}  {:>8.4}  {:>8.4}{}",
-            label, gen_ms, seed_solve_ms, seed_verify_ms,
-            seed_mean, seed_min, seed_max,
+            lbl, gen_ms, total_solve_ms, total_verify_ms,
+            seed_avg, seed_min, seed_max,
             if is_warmup { "  (warmup)" } else { "" }
         );
 
         if is_warmup { continue; }
 
         all_gen_ms.push(gen_ms);
-        all_solve_ms.push(seed_solve_ms);
-        all_verify_ms.push(seed_verify_ms);
-        for &score in &seed_scores {
-            all_scores.push(score);
-        }
+        all_solve_ms.push(total_solve_ms);
+        all_verify_ms.push(total_verify_ms);
+        if seed_avg.is_finite() { seed_avgs.push(seed_avg); }
     }
 
     println!("╟{}", "─".repeat(74));
+    let avg_solve      = if all_solve_ms.is_empty() { f64::NAN } else { all_solve_ms.mean() };
     let avg_gen_verify = if all_gen_ms.is_empty() { f64::NAN }
                          else { all_gen_ms.mean() + all_verify_ms.mean() };
-    let avg_solve = if all_solve_ms.is_empty() { f64::NAN } else { all_solve_ms.mean() };
-    let (mean_score, var_score, min_score, max_score) = if all_scores.is_empty() {
-        (f64::NAN, f64::NAN, f64::NAN, f64::NAN)
+    let (avg_score, min_seed_score, max_seed_score) = if seed_avgs.is_empty() {
+        (f64::NAN, f64::NAN, f64::NAN)
     } else {
-        (all_scores.mean(), all_scores.variance(), all_scores.min(), all_scores.max())
+        (seed_avgs.mean(), seed_avgs.min(), seed_avgs.max())
     };
-
-    println!("║ avg    {:>9.1}  {:>9.1}  {:>9.1}  {:>10.4}  {:>8.4}  {:>8.4}  var={:.6}",
+    println!(
+        "║ avg    {:>9.1}  {:>9.1}  {:>9.1}  {:>10.4}  {:>8.4}  {:>8.4}",
         all_gen_ms.mean(), avg_solve, all_verify_ms.mean(),
-        mean_score, min_score, max_score, var_score);
+        avg_score, min_seed_score, max_seed_score
+    );
     println!("╚{}", "═".repeat(74));
 
-    Ok(BenchmarkResult {
-        label: cfg.label.to_string(),
-        avg_solve_ms: avg_solve,
-        avg_gen_verify_ms: avg_gen_verify,
-        mean_score,
-        var_score,
-        min_score,
-        max_score,
-    })
+    Ok((RunResult { algo: cfg.label.to_string(), m, n,
+                    avg_solve_ms: avg_solve, avg_gen_verify_ms: avg_gen_verify,
+                    avg_score, min_seed_score, max_seed_score },
+        records))
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <PTX_PATH> [--m N] [--n N] [--seeds N] [--gpu N]", args[0]);
+        eprintln!("Usage: {} <PTX_PATH> [--seeds N] [--gpu N]", args[0]);
         std::process::exit(1);
     }
 
     let ptx_path    = &args[1];
-    let mut m: i32        = 1025;
-    let mut n: i32        = 1025;
-    let mut num_seeds     = 20usize;
-    let mut gpu_device    = 0usize;
+    let mut num_seeds  = 25usize;
+    let mut gpu_device = 0usize;
 
     let mut i = 2;
     while i < args.len() {
         match args[i].as_str() {
-            "--m"     => { i += 1; m          = args[i].parse()?; }
-            "--n"     => { i += 1; n          = args[i].parse()?; }
             "--seeds" => { i += 1; num_seeds  = args[i].parse()?; }
             "--gpu"   => { i += 1; gpu_device = args[i].parse()?; }
             other => { eprintln!("Unknown arg: {}", other); std::process::exit(1); }
@@ -254,7 +281,7 @@ fn main() -> Result<()> {
         i += 1;
     }
 
-    // ── CUDA setup ────────────────────────────────────────────────────────
+    // ── CUDA setup ─────────────────────────────────────────────────────────────
     let ptx_src = std::fs::read_to_string(ptx_path)
         .map_err(|e| anyhow!("Failed to read PTX '{}': {}", ptx_path, e))?;
     let ptx_src = ptx_src.replace("0xdeadbeefdeadbeef", "0xffffffffffffffff");
@@ -269,73 +296,106 @@ fn main() -> Result<()> {
     let stream = ctx.default_stream();
     let prop   = get_device_prop(gpu_device as i32)?;
 
-    // ── Algorithm configurations ──────────────────────────────────────────
-    let hp_1t = {
-        let mut m = serde_json::Map::new();
-        m.insert("num_trials".into(), serde_json::json!(1));
-        m
-    };
+    // ── Algorithm configs ──────────────────────────────────────────────────────
     let hp_1t_cheap = {
         let mut m = serde_json::Map::new();
         m.insert("num_trials".into(), serde_json::json!(1));
-        m.insert("cheap_u".into(), serde_json::json!(true));
+        m.insert("cheap_u".into(),    serde_json::json!(true));
         m
     };
-    let hp_12t = {
+    let hp_15t = {
         let mut m = serde_json::Map::new();
-        m.insert("num_trials".into(), serde_json::json!(12));
+        m.insert("num_trials".into(), serde_json::json!(15));
         m
     };
 
-    let configs: Vec<RunConfig> = vec![
-        RunConfig { label: "leverage (1t)",       algo: "leverage",      hyperparameters: Some(hp_1t) },
-        RunConfig { label: "leverage (1t+cheap)", algo: "leverage",      hyperparameters: Some(hp_1t_cheap) },
-        RunConfig { label: "leverage (12t)",      algo: "leverage",      hyperparameters: Some(hp_12t) },
-        RunConfig { label: "fastest_algo",        algo: "fastest_algo",  hyperparameters: None },
+    let algos: Vec<AlgoConfig> = vec![
+        AlgoConfig { label: "fastest_algo",       algo: "fastest_algo", hyperparameters: None },
+        AlgoConfig { label: "leverage (1t+cheap)", algo: "leverage",     hyperparameters: Some(hp_1t_cheap) },
+        AlgoConfig { label: "leverage (15t)",      algo: "leverage",     hyperparameters: Some(hp_15t) },
+        AlgoConfig { label: "sketchy",             algo: "sketchy",      hyperparameters: None },
     ];
 
-    println!("=== CUR Decomposition Multi-Instance Benchmark ===");
+    // ── Size configs ───────────────────────────────────────────────────────────
+    let sizes: Vec<SizeConfig> = vec![
+        SizeConfig { m: 1025, n: 1500 },
+        SizeConfig { m: 1025, n: 2000 },
+        SizeConfig { m: 2049, n: 2150 },
+        SizeConfig { m: 2049, n: 3000 },
+        SizeConfig { m: 4097, n: 4150 },
+        SizeConfig { m: 4097, n: 5000 },
+    ];
+
+    println!("=== CUR Decomposition Large Benchmark ===");
     println!("PTX    : {}", ptx_path);
     println!("GPU    : device {} of {}", gpu_device, num_gpus);
-    println!("Matrix : {}×{}  (max_rank={})", m, n, m.min(n));
-    println!("Seeds  : {} real + 1 warmup per algorithm", num_seeds);
+    println!("Seeds  : {} real + 1 warmup per (algo, size)", num_seeds);
     println!("Score  : fnorm / optimal  (1.0 = perfect, lower is better)");
-    println!("Configs: {}", configs.len());
+    println!("Algos  : {}", algos.len());
+    println!("Sizes  : {}", sizes.len());
 
-    // ── Run all configs ───────────────────────────────────────────────────
-    let mut results: Vec<BenchmarkResult> = Vec::new();
-    for cfg in &configs {
-        let r = run_algo(cfg, m, n, num_seeds, module.clone(), stream.clone(), &prop)?;
-        results.push(r);
+    // ── Run all (algo, size) combos ────────────────────────────────────────────
+    let mut all_results: Vec<RunResult> = Vec::new();
+    let mut all_records: Vec<ScoreRecord> = Vec::new();
+
+    for algo in &algos {
+        for size in &sizes {
+            let (result, records) =
+                run_algo(algo, size, num_seeds, module.clone(), stream.clone(), &prop)?;
+            all_results.push(result);
+            all_records.extend(records);
+        }
     }
 
-    // ── Summary table ─────────────────────────────────────────────────────
-    let mut out = String::new();
-    writeln!(out, "CUR Decomposition Benchmark Results").unwrap();
-    writeln!(out, "Matrix : {}×{}  max_rank={}", m, n, m.min(n)).unwrap();
-    writeln!(out, "Seeds  : {} (+ 1 warmup per algorithm, warmup excluded)", num_seeds).unwrap();
-    writeln!(out, "PTX    : {}", ptx_path).unwrap();
-    writeln!(out, "Score  : fnorm / optimal  (1.0 = perfect, lower is better)").unwrap();
-    writeln!(out).unwrap();
-    writeln!(out,
-        "{:<24} {:>10} {:>14} {:>10} {:>12} {:>10} {:>10}",
-        "algorithm", "solve_ms", "gen+verify_ms", "mean_score", "var_score", "min_score", "max_score"
+    // ── Summary table ──────────────────────────────────────────────────────────
+    let mut summary = String::new();
+    writeln!(summary, "CUR Decomposition Large Benchmark Results").unwrap();
+    writeln!(summary, "PTX   : {}", ptx_path).unwrap();
+    writeln!(summary, "Seeds : {} real + 1 warmup per (algo, size)", num_seeds).unwrap();
+    writeln!(summary, "Score : fnorm / optimal  (1.0 = perfect, lower is better)").unwrap();
+    writeln!(summary).unwrap();
+    writeln!(summary,
+        "{:<24} {:>6} {:>6} {:>10} {:>14} {:>10} {:>12} {:>12}",
+        "algorithm", "m", "n", "solve_ms", "gen+verify_ms",
+        "avg_score", "min_seed_sc", "max_seed_sc"
     ).unwrap();
-    writeln!(out, "{}", "─".repeat(96)).unwrap();
-    for r in &results {
-        writeln!(out,
-            "{:<24} {:>10.1} {:>14.1} {:>10.4} {:>12.6} {:>10.4} {:>10.4}",
-            r.label, r.avg_solve_ms, r.avg_gen_verify_ms,
-            r.mean_score, r.var_score, r.min_score, r.max_score
+    writeln!(summary, "{}", "─".repeat(100)).unwrap();
+
+    let mut prev_algo = String::new();
+    for r in &all_results {
+        if r.algo != prev_algo && !prev_algo.is_empty() {
+            writeln!(summary).unwrap();
+        }
+        writeln!(summary,
+            "{:<24} {:>6} {:>6} {:>10.1} {:>14.1} {:>10.4} {:>12.4} {:>12.4}",
+            r.algo, r.m, r.n,
+            r.avg_solve_ms, r.avg_gen_verify_ms,
+            r.avg_score, r.min_seed_score, r.max_seed_score
+        ).unwrap();
+        prev_algo = r.algo.clone();
+    }
+
+    println!("\n{}", summary);
+
+    let manifest = env!("CARGO_MANIFEST_DIR");
+    let summary_path = format!("{}/examples/large_benchmark_summary.txt", manifest);
+    fs::write(&summary_path, &summary)
+        .map_err(|e| anyhow!("Failed to write summary: {}", e))?;
+    println!("Summary saved to {}", summary_path);
+
+    // ── Detailed scores CSV ────────────────────────────────────────────────────
+    let mut csv = String::new();
+    writeln!(csv, "algo,m,n,seed,sub_idx,target_k,score").unwrap();
+    for rec in &all_records {
+        writeln!(csv, "{},{},{},{},{},{},{:.6}",
+            rec.algo, rec.m, rec.n, rec.seed, rec.sub_idx, rec.target_k, rec.score
         ).unwrap();
     }
 
-    println!("\n{}", out);
-
-    let out_path = format!("{}/examples/benchmark_results.txt", env!("CARGO_MANIFEST_DIR"));
-    fs::write(&out_path, &out)
-        .map_err(|e| anyhow!("Failed to write results to '{}': {}", out_path, e))?;
-    println!("Results saved to {}", out_path);
+    let scores_path = format!("{}/examples/large_benchmark_scores.csv", manifest);
+    fs::write(&scores_path, &csv)
+        .map_err(|e| anyhow!("Failed to write scores CSV: {}", e))?;
+    println!("Detailed scores saved to {}", scores_path);
 
     Ok(())
 }

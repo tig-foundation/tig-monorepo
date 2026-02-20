@@ -98,49 +98,20 @@ fn gpu_qr(
     Ok(())
 }
 
-/// Column-pivoted QR of d_mat (m×n). Returns 0-based pivot indices (length n).
-/// d_mat is overwritten with the QR factorisation.
-fn gpu_cpqr(
-    cusolver: &DnHandle,
-    stream: &Arc<CudaStream>,
-    d_mat: &mut CudaSlice<f32>,
-    m: c_int,
-    n: c_int,
-) -> Result<Vec<i32>> {
-    let min_mn = m.min(n) as usize;
-    // jpvt must be zeroed so cuSOLVER picks freely
-    let mut d_jpvt = stream.alloc_zeros::<i32>(n as usize)?;
-    let mut d_tau = stream.alloc_zeros::<f32>(min_mn)?;
-    let mut lwork = 0i32;
-    unsafe {
-        if cusolver_sys::cusolverDnSgeqp3_bufferSize(
-            cusolver.cu(), m, n,
-            d_mat.device_ptr_mut(stream).0 as *mut f32, m,
-            d_jpvt.device_ptr_mut(stream).0 as *mut i32,
-            d_tau.device_ptr_mut(stream).0 as *mut f32,
-            &mut lwork,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
-            return Err(anyhow!("cusolverDnSgeqp3_bufferSize failed"));
-        }
-    }
-    let mut d_work = stream.alloc_zeros::<f32>((lwork as usize).max(1))?;
-    let mut d_info = stream.alloc_zeros::<i32>(1)?;
-    unsafe {
-        if cusolver_sys::cusolverDnSgeqp3(
-            cusolver.cu(), m, n,
-            d_mat.device_ptr_mut(stream).0 as *mut f32, m,
-            d_jpvt.device_ptr_mut(stream).0 as *mut i32,
-            d_tau.device_ptr_mut(stream).0 as *mut f32,
-            d_work.device_ptr_mut(stream).0 as *mut f32, lwork,
-            d_info.device_ptr_mut(stream).0 as *mut i32,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
-            return Err(anyhow!("cusolverDnSgeqp3 failed"));
-        }
-    }
-    stream.synchronize()?;
-    let jpvt = stream.memcpy_dtov(&d_jpvt)?;
-    // cuSOLVER returns 1-based indices; convert to 0-based
-    Ok(jpvt.into_iter().map(|x| x - 1).collect())
+/// Select k column indices from a column-major (m×n) matrix by descending column L2 norm.
+/// cusolverDnSgeqp3 (column-pivoted QR) was removed in CUDA 12; this CPU fallback is
+/// equivalent for column selection when the sketch dimension s is small.
+fn cpu_select_cols_by_norm(mat_cpu: &[f32], m: usize, n: usize, k: usize) -> Vec<i32> {
+    let mut norms: Vec<(f64, usize)> = (0..n)
+        .map(|j| {
+            let norm_sq = (0..m)
+                .map(|i| (mat_cpu[i + j * m] as f64).powi(2))
+                .sum::<f64>();
+            (norm_sq, j)
+        })
+        .collect();
+    norms.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    norms[..k.min(n)].iter().map(|&(_, j)| j as i32).collect()
 }
 
 /// Thin SVD of d_mat (m×n). Returns (d_u, s_cpu, d_vt).
@@ -301,10 +272,11 @@ pub fn solve_challenge(
         }
         drop(d_q_c);
 
-        // CPQR(Z_c) → first k column pivot indices
-        let col_pivots = gpu_cpqr(&cusolver, &stream, &mut d_z_c, s, n)?;
+        // Select top-k columns of Z_c by norm → column indices for C
+        stream.synchronize()?;
+        let z_c_cpu = stream.memcpy_dtov(&d_z_c)?;
         drop(d_z_c);
-        let c_i32: Vec<i32> = col_pivots[..k_sz].iter().map(|&x| x as i32).collect();
+        let c_i32: Vec<i32> = cpu_select_cols_by_norm(&z_c_cpu, s_sz, n_sz, k_sz);
 
         // ── Row selection: Y_r = A^T·T, QR(Y_r)=Q_r, Z_r = Q_r^T·A^T, CPQR(Z_r) ──
 
@@ -365,10 +337,11 @@ pub fn solve_challenge(
         }
         drop(d_q_r);
 
-        // CPQR(Z_r) → first k column pivot indices of Z_r = first k row indices of A
-        let row_pivots = gpu_cpqr(&cusolver, &stream, &mut d_z_r, s, m)?;
+        // Select top-k columns of Z_r by norm → row indices for R
+        stream.synchronize()?;
+        let z_r_cpu = stream.memcpy_dtov(&d_z_r)?;
         drop(d_z_r);
-        let r_i32: Vec<i32> = row_pivots[..k_sz].iter().map(|&x| x as i32).collect();
+        let r_i32: Vec<i32> = cpu_select_cols_by_norm(&z_r_cpu, s_sz, m_sz, k_sz);
 
         // ── Extract C (m×k) and R (k×n) ──────────────────────────────────────
         let d_c_idxs = stream.memcpy_stod(&c_i32)?;
