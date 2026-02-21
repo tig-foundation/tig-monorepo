@@ -222,7 +222,8 @@
 
 // c003_a112
 
-// c003_a113
+pub mod titan_knap;
+pub use titan_knap as c003_a113;
 
 // c003_a114
 
