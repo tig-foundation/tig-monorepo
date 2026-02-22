@@ -8,7 +8,8 @@
 
 // c007_a005
 
-// c007_a006
+pub mod titan_sched;
+pub use titan_sched as c007_a006;
 
 // c007_a007
 
