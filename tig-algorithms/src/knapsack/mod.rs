@@ -220,7 +220,8 @@
 
 // c003_a111
 
-// c003_a112
+pub mod near_knap_v2;
+pub use near_knap_v2 as c003_a112;
 
 // c003_a113
 
