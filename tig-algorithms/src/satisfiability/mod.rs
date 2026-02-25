@@ -152,7 +152,8 @@
 
 // c001_a077
 
-// c001_a078
+pub mod sat_turbo_fix;
+pub use sat_turbo_fix as c001_a078;
 
 // c001_a079
 
