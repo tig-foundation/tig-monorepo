@@ -32,7 +32,8 @@
 
 // c006_a017
 
-// c006_a018
+pub mod neural_sam;
+pub use neural_sam as c006_a018;
 
 // c006_a019
 
