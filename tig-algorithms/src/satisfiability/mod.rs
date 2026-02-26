@@ -154,7 +154,8 @@
 
 // c001_a078
 
-// c001_a079
+pub mod sat_compressed;
+pub use sat_compressed as c001_a079;
 
 // c001_a080
 
