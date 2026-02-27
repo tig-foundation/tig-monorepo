@@ -61,3 +61,8 @@ services:
     <<: *common
     image: ghcr.io/tig-foundation/tig-monorepo/job_scheduling/runtime:${VERSION}
     container_name: job_scheduling
+
+  energy_arbitrage:
+    <<: *common
+    image: ghcr.io/tig-foundation/tig-monorepo/energy_arbitrage/runtime:${VERSION}
+    container_name: energy_arbitrage
