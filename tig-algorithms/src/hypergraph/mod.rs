@@ -34,7 +34,8 @@
 
 // c005_a018
 
-// c005_a019
+pub mod sigma_freud_v6;
+pub use sigma_freud_v6 as c005_a019;
 
 // c005_a020
 
