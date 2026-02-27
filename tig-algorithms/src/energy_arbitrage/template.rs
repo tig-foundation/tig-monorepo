@@ -28,7 +28,8 @@ pub fn solve_challenge(
 }
 
 pub fn policy(challenge: &Challenge, state: &State) -> Result<Vec<f64>> {
-    Ok(vec![0.0; challenge.batteries.len()])
+    // TODO: implement your policy here
+    Err(anyhow!("Not implemented"))
 }
 
 // Important! Do not include any tests in this file, it will result in your submission being rejected
