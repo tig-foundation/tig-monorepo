@@ -417,4 +417,15 @@ mod tests {
             assert!(result.is_err());
         }
     }
+
+    #[test]
+    fn test_greedy_baseline() {
+        for challenge in challenge_iter() {
+            let result = challenge.compute_greedy_baseline();
+            assert!(result.is_ok());
+            let solution = result.unwrap();
+            let total_profit = challenge.evaluate_total_profit(&solution).unwrap();
+            assert!(total_profit > 0.0);
+        }
+    }
 }
