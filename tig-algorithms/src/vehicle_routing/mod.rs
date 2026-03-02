@@ -196,7 +196,8 @@
 
 // c002_a099
 
-// c002_a100
+pub mod v2_fast;
+pub use v2_fast as c002_a100;
 
 // c002_a101
 
