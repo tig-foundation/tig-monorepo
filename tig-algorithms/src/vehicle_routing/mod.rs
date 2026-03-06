@@ -200,7 +200,8 @@
 
 // c002_a101
 
-// c002_a102
+pub mod new_adaptive;
+pub use new_adaptive as c002_a102;
 
 // c002_a103
 
