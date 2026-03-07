@@ -158,7 +158,8 @@
 
 // c001_a080
 
-// c001_a081
+pub mod turbo_sat_lite;
+pub use turbo_sat_lite as c001_a081;
 
 // c001_a082
 
