@@ -232,7 +232,8 @@
 
 // c003_a117
 
-// c003_a118
+pub mod swift_knap_sparse;
+pub use swift_knap_sparse as c003_a118;
 
 // c003_a119
 
