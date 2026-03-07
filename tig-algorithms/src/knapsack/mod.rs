@@ -230,7 +230,8 @@
 
 // c003_a116
 
-// c003_a117
+pub mod swift_knap_dense;
+pub use swift_knap_dense as c003_a117;
 
 // c003_a118
 
