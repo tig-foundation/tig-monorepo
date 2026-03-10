@@ -44,7 +44,7 @@ pub const RHO_SPATIAL: f64 = 0.70;
 pub const GAMMA_PRICE: f64 = 20.0;
 
 /// Congestion proximity threshold
-pub const TAU_CONG: f64 = 0.97;
+pub const TAU_CONG: f64 = 0.90;
 
 /// Jump probability
 pub const RHO_JUMP: f64 = 0.02;
@@ -74,7 +74,7 @@ pub const NOMINAL_CAPACITY: f64 = 100.0;
 pub const NOMINAL_POWER: f64 = 25.0;
 
 /// Nominal line flow limit (MW)
-pub const NOMINAL_FLOW_LIMIT: f64 = 100.0;
+pub const NOMINAL_FLOW_LIMIT: f64 = 50.0;
 
 /// Base susceptance for network generation
 pub const BASE_SUSCEPTANCE: f64 = 10.0;

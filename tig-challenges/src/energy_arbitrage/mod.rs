@@ -1,10 +1,14 @@
 mod baselines;
-pub mod battery;
+mod battery;
+pub use battery::*;
 pub mod constants;
-pub mod market;
-pub mod network;
-pub mod scenarios;
-pub mod utils;
+mod market;
+pub use market::*;
+mod network;
+pub use network::*;
+mod scenarios;
+pub use scenarios::*;
+mod utils;
 
 use crate::QUALITY_PRECISION;
 use anyhow::{anyhow, Result};
@@ -173,6 +177,9 @@ impl Challenge {
         let mut total_profit = 0.0;
 
         for (battery, &u) in self.batteries.iter().zip(action.iter()) {
+            if u == 0.0 {
+                continue;
+            }
             let price = state.rt_prices[battery.node];
 
             // Revenue: u * λ * Δt
@@ -351,8 +358,8 @@ impl Challenge {
             // }
             // let sota_solution = self.compute_sota_baseline()?;
             // let sota_total_value = self.evaluate_total_value(&sota_solution)?;
-            let quality =
-                (total_profit as f64 - sota_total_profit as f64) / sota_total_profit as f64;
+            let quality = (total_profit as f64 - sota_total_profit as f64)
+                / (sota_total_profit as f64 + 1e-6);
             let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
             let quality = quality.round() as i32;
             Ok(quality)

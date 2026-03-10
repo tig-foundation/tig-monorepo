@@ -223,9 +223,9 @@ impl Network {
             .collect();
 
         // Combine with noise
-        let base_load = 50.0; // MW
-        let pattern_scale = 20.0;
-        let noise_scale = 2.0;
+        let base_load = 200.0; // MW
+        let pattern_scale = 60.0;
+        let noise_scale = 5.0;
 
         let normal = Normal::new(0.0, 1.0).unwrap();
         for i in 0..self.num_nodes {
@@ -251,29 +251,26 @@ impl Network {
             injections[t][self.slack_bus] = -sum;
         }
 
-        // Verify flows are within EFFECTIVE limits (after gamma_cong scaling)
-        // Use a margin to leave room for battery actions
-        let flow_margin = 0.7; // Use only 70% of limit for exogenous flows
-        let mut scale: f64 = 1.0;
+        // Per-timestep rescaling: ensure exogenous flows stay within
+        // flow_margin * effective_limit for each timestep independently.
+        // This avoids the "one-bad-timestep-kills-all" problem of global scaling.
+        let flow_margin = 0.85;
         for t in 0..num_steps {
             let flows = self.compute_flows(&injections[t]);
+            let mut scale_t: f64 = 1.0;
             for (l, &flow) in flows.iter().enumerate() {
-                // Use effective flow_limits, not nominal, and leave margin
                 let limit = self.flow_limits[l] * flow_margin;
                 if flow.abs() > limit {
-                    scale = scale.min(limit / flow.abs() * 0.95);
+                    scale_t = scale_t.min(limit / flow.abs());
                 }
             }
-        }
-
-        if scale < 1.0 {
-            for i in 0..self.num_nodes {
-                for t in 0..num_steps {
-                    injections[t][i] *= scale;
+            if scale_t < 1.0 {
+                for i in 0..self.num_nodes {
+                    if i != self.slack_bus {
+                        injections[t][i] *= scale_t;
+                    }
                 }
-            }
-            // Re-balance at slack
-            for t in 0..num_steps {
+                // Re-balance at slack for this timestep
                 let mut sum = 0.0;
                 for i in 0..self.num_nodes {
                     if i != self.slack_bus {
@@ -283,7 +280,6 @@ impl Network {
                 injections[t][self.slack_bus] = -sum;
             }
         }
-
         injections
     }
 
