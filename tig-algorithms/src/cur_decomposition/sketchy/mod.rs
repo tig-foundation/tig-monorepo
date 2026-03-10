@@ -117,6 +117,8 @@ fn cpu_select_cols_by_norm(mat_cpu: &[f32], m: usize, n: usize, k: usize) -> Vec
 /// Thin SVD of d_mat (m×n). Returns (d_u, s_cpu, d_vt).
 /// d_u: m×p (GPU), s_cpu: Vec<f32> of p (CPU), d_vt: p×n (GPU), where p = min(m,n).
 /// d_mat is destroyed by this call.
+/// cusolverDnSgesvd requires m >= n; when m < n we transpose, compute SVD of the
+/// tall matrix, then recover U and Vt for the original via U_orig = Vt_T^T, Vt_orig = U_T^T.
 fn gpu_svd_thin(
     cusolver: &DnHandle,
     stream: &Arc<CudaStream>,
@@ -124,6 +126,52 @@ fn gpu_svd_thin(
     m: c_int,
     n: c_int,
 ) -> Result<(CudaSlice<f32>, Vec<f32>, CudaSlice<f32>)> {
+    if m < n {
+        // cusolverDnSgesvd requires m >= n.  Transpose A (m×n) → A^T (n×m) on CPU,
+        // compute SVD of A^T, then: U_A = Vt_T^T  and  Vt_A = U_T^T.
+        let m_sz = m as usize;
+        let n_sz = n as usize;
+        // Download A (m×n col-major) and build A^T (n×m col-major).
+        let a_cpu = stream.memcpy_dtov(d_mat)?;
+        let mut at_cpu = vec![0f32; n_sz * m_sz];
+        for col in 0..n_sz {
+            for row in 0..m_sz {
+                // A[row,col] = a_cpu[row + col*m_sz]
+                // A^T[col,row] stored at at_cpu[col + row*n_sz]
+                at_cpu[col + row * n_sz] = a_cpu[row + col * m_sz];
+            }
+        }
+        let mut d_at = stream.memcpy_stod(&at_cpu)?;
+        drop(at_cpu);
+
+        // SVD of A^T (n×m, n >= m): returns (U_T: n×m, s: m, Vt_T: m×m).
+        let (d_u_t, s, d_vt_t) = gpu_svd_thin(cusolver, stream, &mut d_at, n, m)?;
+        drop(d_at);
+
+        // p = min(m,n) = m.
+        // U_A = (Vt_T)^T (m×m):  u_a[row + col*m] = vt_t[col + row*m]
+        let vt_t_cpu = stream.memcpy_dtov(&d_vt_t)?;
+        let mut u_a_cpu = vec![0f32; m_sz * m_sz];
+        for col in 0..m_sz {
+            for row in 0..m_sz {
+                u_a_cpu[row + col * m_sz] = vt_t_cpu[col + row * m_sz];
+            }
+        }
+        let d_u_a = stream.memcpy_stod(&u_a_cpu)?;
+
+        // Vt_A = (U_T)^T (m×n):  vt_a[row + col*m] = u_t[col + row*n_sz]
+        let u_t_cpu = stream.memcpy_dtov(&d_u_t)?;
+        let mut vt_a_cpu = vec![0f32; m_sz * n_sz];
+        for col in 0..n_sz {
+            for row in 0..m_sz {
+                vt_a_cpu[row + col * m_sz] = u_t_cpu[col + row * n_sz];
+            }
+        }
+        let d_vt_a = stream.memcpy_stod(&vt_a_cpu)?;
+
+        return Ok((d_u_a, s, d_vt_a));
+    }
+
     let p = m.min(n);
     let p_sz = p as usize;
     let mut d_u = stream.alloc_zeros::<f32>(m as usize * p_sz)?;
@@ -159,6 +207,11 @@ fn gpu_svd_thin(
         }
     }
     stream.synchronize()?;
+    // Check d_info: >0 means SVD didn't converge; U/Vt may contain NaN.
+    let info_vec = stream.memcpy_dtov(&d_info)?;
+    if info_vec[0] != 0 {
+        return Err(anyhow!("cusolverDnSgesvd did not converge (info={})", info_vec[0]));
+    }
     let s_cpu = stream.memcpy_dtov(&d_s)?;
     Ok((d_u, s_cpu, d_vt))
 }
@@ -399,20 +452,29 @@ pub fn solve_challenge(
 
         // ── Thin SVD of C (m×k) and R (k×n) ─────────────────────────────────
         // C = Uc(m×k) · diag(σc) · Vc^T(k×k)
-        let (d_uc, sigma_c, d_vct) = gpu_svd_thin(&cusolver, &stream, &mut d_c_svd, m, k)?;
-        // R = Ur(k×k) · diag(σr) · Vr^T(k×n)
-        let (d_ur, sigma_r, d_vrt) = gpu_svd_thin(&cusolver, &stream, &mut d_r_svd, k, n)?;
+        // Skip trial if SVD fails to converge (try next random sketch instead).
+        let svd_c = gpu_svd_thin(&cusolver, &stream, &mut d_c_svd, m, k);
         drop(d_c_svd);
+        let (d_uc, sigma_c, d_vct) = match svd_c {
+            Ok(x) => x,
+            Err(_) => continue,
+        };
+        // R = Ur(k×k) · diag(σr) · Vr^T(k×n)
+        let svd_r = gpu_svd_thin(&cusolver, &stream, &mut d_r_svd, k, n);
         drop(d_r_svd);
+        let (d_ur, sigma_r, d_vrt) = match svd_r {
+            Ok(x) => x,
+            Err(_) => continue,
+        };
 
         // Compute truncated inverse singular values
         let sc_max = sigma_c[0].max(1e-30f32);
         let inv_sc: Vec<f32> = sigma_c.iter()
-            .map(|&v| if v >= sv_thresh * sc_max { 1.0 / v } else { 0.0 })
+            .map(|&v| if v.is_finite() && v >= sv_thresh * sc_max { 1.0 / v } else { 0.0 })
             .collect();
         let sr_max = sigma_r[0].max(1e-30f32);
         let inv_sr: Vec<f32> = sigma_r.iter()
-            .map(|&v| if v >= sv_thresh * sr_max { 1.0 / v } else { 0.0 })
+            .map(|&v| if v.is_finite() && v >= sv_thresh * sr_max { 1.0 / v } else { 0.0 })
             .collect();
 
         let d_inv_sc = stream.memcpy_stod(&inv_sc)?;

@@ -11,13 +11,13 @@ use cudarc::{
     },
     runtime::sys::cudaDeviceProp,
 };
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;
 
 impl_kv_string_serde! {
     Track {
         n: i32,
         m: i32,
+        poly: bool,
     }
 }
 
@@ -36,6 +36,44 @@ impl Solution {
             u_mat: Vec::new(),
             r_idxs: Vec::new(),
         }
+    }
+}
+
+pub const TRACKS: [Track; 10] = [
+    Track { m: 1025, n: 1500, poly: false },
+    Track { m: 1025, n: 2000, poly: false },
+    Track { m: 2049, n: 2150, poly: false },
+    Track { m: 2049, n: 3000, poly: false },
+    Track { m: 4097, n: 4150, poly: false },
+    Track { m: 1025, n: 1500, poly: true },
+    Track { m: 1025, n: 2000, poly: true },
+    Track { m: 2049, n: 2150, poly: true },
+    Track { m: 2049, n: 3000, poly: true },
+    Track { m: 4097, n: 4150, poly: true },
+];
+
+pub const L: f32 = 13.0; // exponent scale: σ_j = exp(-L * sqrt(j+1) / sqrt(rank)), σ_min = exp(-L)
+
+/// Generate singular values for a matrix of the given rank.
+///
+/// Exponential (poly=false): σ_j = exp(-L * sqrt(j+1) / sqrt(rank))
+/// Polynomial  (poly=true):  σ_j = c / ((j+1)/rank)^2 + c)
+///   where c = -exp(-L) / (exp(-L) - 1) = exp(-L) / (1 - exp(-L))
+///   (chosen so that σ_rank = exp(-L), matching the exponential boundary)
+fn generate_scalars(rank: i32, poly: bool) -> Vec<f32> {
+    let t = rank as f32;
+    if poly {
+        let c = (-L).exp() / (1.0 - (-L).exp());
+        (0..rank)
+            .map(|j| {
+                let i = (j + 1) as f32;
+                c / ((i / t).powi(2) + c)
+            })
+            .collect()
+    } else {
+        (0..rank)
+            .map(|j| (-L * ((j + 1) as f32).sqrt() / t.sqrt()).exp())
+            .collect()
     }
 }
 
@@ -68,6 +106,7 @@ pub struct Challenge {
     pub m: i32,
     pub target_k: i32,
     optimal_fnorm: f32,
+    full_fnorm: f32,
     pub d_a_mat: CudaSlice<f32>,
 }
 
@@ -257,7 +296,7 @@ impl Challenge {
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
-        let Track { n, m } = *track;
+        let Track { n, m, poly } = *track;
 
         if true_rank < 1 || true_rank > m.min(n) {
             return Err(anyhow!(
@@ -272,19 +311,14 @@ impl Challenge {
             ));
         }
 
-        let l5: f32 = 2.0;
         let cublas = CudaBlas::new(stream.clone())?;
         let scale_columns_kernel = module.load_function("scale_columns_kernel")?;
 
         let (mut d_u_mat, d_v_mat) =
             Self::generate_uv(&module, &stream, m, n, true_rank, seed)?;
 
-        // Generate and shuffle singular values
-        let mut rng = StdRng::from_seed(*seed);
-        let mut scalars: Vec<f32> = (0..true_rank)
-            .map(|j| (-l5 * ((j + 1) as f32).sqrt() / (true_rank as f32).sqrt()).exp())
-            .collect();
-        scalars.shuffle(&mut rng);
+        // Generate singular values (descending order, no shuffle)
+        let scalars = generate_scalars(true_rank, poly);
 
         // Scale U columns by singular values (in-place)
         let d_scalars = stream.memcpy_stod(&scalars)?;
@@ -335,6 +369,7 @@ impl Challenge {
             .map(|x| x * x)
             .sum::<f32>()
             .sqrt();
+        let full_fnorm = sorted_scalars.iter().map(|x| x * x).sum::<f32>().sqrt();
 
         Ok(Challenge {
             seed: *seed,
@@ -342,6 +377,7 @@ impl Challenge {
             m,
             target_k: target_rank,
             optimal_fnorm,
+            full_fnorm,
             d_a_mat,
         })
     }
@@ -355,22 +391,17 @@ impl Challenge {
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Vec<Self>> {
-        let Track { n, m } = *track;
+        let Track { n, m, poly } = *track;
         let max_rank = m.min(n);
         let _p = validate_max_rank(max_rank)?;
 
-        let l5: f32 = 2.0;
         let cublas = CudaBlas::new(stream.clone())?;
 
         let (mut d_u_mat, d_v_mat) =
             Self::generate_uv(&module, &stream, m, n, max_rank, seed)?;
 
-        // Generate and shuffle singular values
-        let mut rng = StdRng::from_seed(*seed);
-        let mut scalars: Vec<f32> = (0..max_rank)
-            .map(|j| (-l5 * ((j + 1) as f32).sqrt() / (max_rank as f32).sqrt()).exp())
-            .collect();
-        scalars.shuffle(&mut rng);
+        // Generate singular values (descending order, no shuffle)
+        let scalars = generate_scalars(max_rank, poly);
 
         // Scale U columns by singular values (in-place)
         let scale_columns_kernel = module.load_function("scale_columns_kernel")?;
@@ -527,6 +558,7 @@ impl Challenge {
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
+                let full_fnorm = matrix_scalars.iter().map(|x| x * x).sum::<f32>().sqrt();
 
                 // Device-to-device copy of the matrix for this sub-instance
                 let src = &matrices[matrix_idx];
@@ -556,6 +588,7 @@ impl Challenge {
                     m,
                     target_k,
                     optimal_fnorm,
+                    full_fnorm,
                     d_a_mat,
                 });
             }
@@ -568,6 +601,11 @@ impl Challenge {
     /// Returns the optimal (lower-bound) Frobenius norm for this sub-instance.
     pub fn optimal_fnorm(&self) -> f32 {
         self.optimal_fnorm
+    }
+
+    /// Returns ||A||_F — the zero-effort (CUR=0) error for this sub-instance.
+    pub fn full_fnorm(&self) -> f32 {
+        self.full_fnorm
     }
 
     /// Evaluate the Frobenius norm of the CUR reconstruction error ||A - C*U*R||_F
