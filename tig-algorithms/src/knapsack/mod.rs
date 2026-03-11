@@ -234,7 +234,8 @@
 
 // c003_a118
 
-// c003_a119
+pub mod knap_quality_opt_v2;
+pub use knap_quality_opt_v2 as c003_a119;
 
 // c003_a120
 
