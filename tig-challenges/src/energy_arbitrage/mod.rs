@@ -21,6 +21,12 @@ use rand::{
 };
 use scenarios::*;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+#[cfg(not(feature = "hide_verification"))]
+pub static CALLED_GRID_OPTIMIZE: AtomicBool = AtomicBool::new(false);
+#[cfg(feature = "hide_verification")]
+static CALLED_GRID_OPTIMIZE: AtomicBool = AtomicBool::new(true);
 
 impl_kv_string_serde! {
     Track {
@@ -109,7 +115,7 @@ impl Challenge {
             num_steps,
         );
         Ok(Self {
-            seed: seed.clone(),
+            seed: rng.r#gen(),
             hidden_seed: rng.r#gen(),
             num_steps,
             num_batteries,
@@ -120,16 +126,12 @@ impl Challenge {
         })
     }
 
-    fn initial_state(&self) -> State {
-        let congestion: Vec<bool> = std::iter::repeat(false)
-            .take(self.network.num_nodes)
-            .collect();
+    fn initial_state(&self, rng: &mut impl Rng) -> State {
+        let congestion: Vec<bool> = vec![false; self.network.num_nodes];
         State {
             time_step: 0,
             socs: self.batteries.iter().map(|b| b.soc_initial_mwh).collect(),
-            rt_prices: self
-                .market
-                .generate_rt_prices(self.hidden_seed.clone(), 0, &congestion),
+            rt_prices: self.market.generate_rt_prices(rng, 0, &congestion),
             exogenous_injections: self.exogenous_injections[0].clone(),
             action_bounds: self
                 .batteries
@@ -233,7 +235,6 @@ impl Challenge {
         let injections = self.compute_total_injections(state, &action);
         let flows = self.network.compute_flows(&injections);
         self.network.verify_flows(&flows)?;
-        let congestion = self.network.compute_congestion_indicators(&flows);
         let next_time_step = state.time_step + 1;
         let next_total_profit = state.total_profit + self.compute_profit(state, action);
         Ok(if next_time_step < self.num_steps {
@@ -249,8 +250,12 @@ impl Challenge {
                     prices
                 }
                 NextRTPrices::Generate(seed) => {
+                    let mut rng = SmallRng::from_seed(seed);
+                    let congestion = self
+                        .network
+                        .generate_congestion_indicators(&mut rng, &state.exogenous_injections);
                     self.market
-                        .generate_rt_prices(seed, next_time_step, &congestion)
+                        .generate_rt_prices(&mut rng, next_time_step, &congestion)
                 }
             };
             let next_exogenous_injections = self.exogenous_injections[next_time_step].clone();
@@ -285,17 +290,6 @@ impl Challenge {
         })
     }
 
-    /// Compute seed commitment update
-    /// s_{t+1} = H(s_t || state_t || action_t)
-    fn commit_step(&self, seed: [u8; 32], state: &State, action: &[f64]) -> [u8; 32] {
-        let data = seed
-            .into_iter()
-            .chain(bincode::serialize(state).unwrap())
-            .chain(action.iter().flat_map(|&a| a.to_le_bytes().to_vec()))
-            .collect::<Vec<u8>>();
-        blake3::hash(&data).into()
-    }
-
     /// Run the full rollout loop with commitment chain.
     ///
     /// Calls `policy` at each step to produce actions. If any action violates
@@ -306,14 +300,13 @@ impl Challenge {
         &self,
         policy: &dyn Fn(&Challenge, &State) -> Result<Vec<f64>>,
     ) -> Result<(Vec<Vec<f64>>, State)> {
-        let mut state = self.initial_state();
-        let mut seed = self.hidden_seed.clone();
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(self.hidden_seed.clone()).r#gen());
+        let mut state = self.initial_state(&mut rng);
         let mut schedule = Vec::with_capacity(self.num_steps);
 
         for _ in 0..self.num_steps {
             let action = policy(self, &state)?;
-            seed = self.commit_step(seed, &state, &action);
-            state = self.take_step(&state, &action, NextRTPrices::Generate(seed))?;
+            state = self.take_step(&state, &action, NextRTPrices::Generate(rng.r#gen()))?;
             schedule.push(action);
         }
 
@@ -325,41 +318,37 @@ impl Challenge {
         &self,
         policy: &dyn Fn(&Challenge, &State) -> Result<Vec<f64>>,
     ) -> Result<Solution> {
+        // Attempt to flip it from false to true
+        let already_set = CALLED_GRID_OPTIMIZE.swap(true, Ordering::SeqCst);
+        if already_set {
+            return Err(anyhow::anyhow!("Can only call grid_optimize once"));
+        }
+
         let (schedule, _) = self.simulate(policy)?;
         Ok(Solution { schedule })
     }
 
-    /// Evaluate the total profit of a given solution.
-    pub fn evaluate_total_profit(&self, solution: &Solution) -> Result<f64> {
-        let (_, state) =
-            self.simulate(&|_, state: &State| Ok(solution.schedule[state.time_step].clone()))?;
-        Ok(state.total_profit)
-    }
+    conditional_pub!(
+        fn evaluate_total_profit(&self, solution: &Solution) -> Result<f64> {
+            let (_, state) =
+                self.simulate(&|_, state: &State| Ok(solution.schedule[state.time_step].clone()))?;
+            Ok(state.total_profit)
+        }
+    );
 
     conditional_pub!(
-        fn compute_greedy_baseline(&self) -> Result<Solution> {
-            self.grid_optimize(&baselines::greedy::policy)
+        fn compute_greedy_baseline(&self) -> Result<(Solution, f64)> {
+            let (schedule, state) = self.simulate(&baselines::greedy::policy)?;
+            Ok((Solution { schedule }, state.total_profit))
         }
     );
 
     conditional_pub!(
         fn evaluate_solution(&self, solution: &Solution) -> Result<i32> {
             let total_profit = self.evaluate_total_profit(solution)?;
-            let greedy_solution = self.compute_greedy_baseline()?;
-            let greedy_total_profit = self.evaluate_total_profit(&greedy_solution)?;
-            // TODO: implement SOTA baseline
-            let sota_total_profit = greedy_total_profit;
-            // if total_value < greedy_total_value {
-            //     return Err(anyhow!(
-            //         "Total value {} is less than greedy baseline value {}",
-            //         total_value,
-            //         greedy_total_value
-            //     ));
-            // }
-            // let sota_solution = self.compute_sota_baseline()?;
-            // let sota_total_value = self.evaluate_total_value(&sota_solution)?;
-            let quality = (total_profit as f64 - sota_total_profit as f64)
-                / (sota_total_profit as f64 + 1e-6);
+            let (_, greedy_total_profit) = self.compute_greedy_baseline()?;
+            let quality = (total_profit as f64 - greedy_total_profit as f64)
+                / (greedy_total_profit as f64 + 1e-6);
             let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
             let quality = quality.round() as i32;
             Ok(quality)
@@ -420,6 +409,7 @@ mod tests {
             Err(anyhow!("Faulty policy"))
         }
         for challenge in challenge_iter() {
+            CALLED_GRID_OPTIMIZE.store(false, Ordering::SeqCst);
             let result = challenge.grid_optimize(&policy);
             assert!(result.is_err());
         }
@@ -430,8 +420,7 @@ mod tests {
         for challenge in challenge_iter() {
             let result = challenge.compute_greedy_baseline();
             assert!(result.is_ok());
-            let solution = result.unwrap();
-            let total_profit = challenge.evaluate_total_profit(&solution).unwrap();
+            let (_, total_profit) = result.unwrap();
             assert!(total_profit > 0.0);
         }
     }

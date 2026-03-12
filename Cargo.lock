@@ -2048,6 +2048,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "anyhow",
+ "blake3",
  "cudarc",
  "ndarray",
  "rand",
@@ -2074,7 +2075,6 @@ dependencies = [
  "anyhow",
  "base64 0.21.7",
  "bincode",
- "blake3",
  "cudarc",
  "flate2",
  "nalgebra",

@@ -310,11 +310,17 @@ impl Network {
         Ok(())
     }
 
-    /// Compute congestion indicators given nodal injections (including slack balancing)
-    pub fn compute_congestion_indicators(&self, flows: &[f64]) -> Vec<bool> {
+    /// Generate congestion indicators given nodal injections (including slack balancing)
+    pub fn generate_congestion_indicators(
+        &self,
+        rng: &mut impl Rng,
+        exogenous_injections: &[f64],
+    ) -> Vec<bool> {
         let mut indicators = vec![false; self.num_nodes];
+        let flows = self.compute_flows(&exogenous_injections);
         for (l, &flow) in flows.iter().enumerate() {
-            if flow.abs() >= self.congestion_threshold * self.flow_limits[l] {
+            let p = (flow.abs() / (self.congestion_threshold * self.flow_limits[l])).powf(10.0);
+            if p > rng.r#gen::<f64>() {
                 let (from, to) = self.lines[l];
                 indicators[from] = true;
                 indicators[to] = true;

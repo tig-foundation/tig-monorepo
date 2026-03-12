@@ -84,27 +84,26 @@ impl Market {
     /// Generate real-time prices for a given time step
     pub fn generate_rt_prices(
         &self,
-        seed: [u8; 32],
+        rng: &mut impl Rng,
         time_step: usize,
         congestion_indicators: &[bool],
     ) -> Vec<f64> {
-        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed).r#gen());
         let normal = Normal::new(0.0, 1.0).unwrap();
 
         let num_nodes = self.day_ahead_prices[0].len();
         let mut prices = Vec::with_capacity(num_nodes);
 
         // Draw common factor z_t
-        let z_common: f64 = normal.sample(&mut rng);
+        let z_common: f64 = normal.sample(rng);
         // Draw z'_t for congestion premium
-        let z_prime = normal.sample(&mut rng);
+        let z_prime = normal.sample(rng);
         let zeta = z_prime.max(0.0);
 
         for i in 0..num_nodes {
             let da_price = self.day_ahead_prices[time_step][i];
 
             // Draw idiosyncratic shock ε_i,t
-            let eps_i = normal.sample(&mut rng);
+            let eps_i = normal.sample(rng);
 
             // Spatially correlated shock
             let rho = constants::RHO_SPATIAL; // Spatial correlation (ρ_sp)
