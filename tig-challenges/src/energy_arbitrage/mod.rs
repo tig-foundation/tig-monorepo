@@ -337,18 +337,39 @@ impl Challenge {
     );
 
     conditional_pub!(
-        fn compute_greedy_baseline(&self) -> Result<(Solution, f64)> {
-            let (schedule, state) = self.simulate(&baselines::greedy::policy)?;
-            Ok((Solution { schedule }, state.total_profit))
+        fn compute_baseline(&self) -> Result<(Solution, f64)> {
+            let (greedy_schedule, state) = self.simulate(&baselines::greedy::policy)?;
+            let greedy_total_profit = state.total_profit;
+            let (conservative_schedule, state) = self.simulate(&baselines::conservative::policy)?;
+            let conservative_total_profit = state.total_profit;
+            println!(
+                "Greedy total profit: {}, Conservative total profit: {}",
+                greedy_total_profit, conservative_total_profit
+            );
+            if greedy_total_profit > conservative_total_profit {
+                Ok((
+                    Solution {
+                        schedule: greedy_schedule,
+                    },
+                    greedy_total_profit,
+                ))
+            } else {
+                Ok((
+                    Solution {
+                        schedule: conservative_schedule,
+                    },
+                    conservative_total_profit,
+                ))
+            }
         }
     );
 
     conditional_pub!(
         fn evaluate_solution(&self, solution: &Solution) -> Result<i32> {
             let total_profit = self.evaluate_total_profit(solution)?;
-            let (_, greedy_total_profit) = self.compute_greedy_baseline()?;
-            let quality = (total_profit as f64 - greedy_total_profit as f64)
-                / (greedy_total_profit as f64 + 1e-6);
+            let (_, baseline_total_profit) = self.compute_baseline()?;
+            let quality = (total_profit as f64 - baseline_total_profit as f64)
+                / (baseline_total_profit as f64 + 1e-6);
             let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
             let quality = quality.round() as i32;
             Ok(quality)
@@ -418,7 +439,7 @@ mod tests {
     #[test]
     fn test_greedy_baseline() {
         for challenge in challenge_iter() {
-            let result = challenge.compute_greedy_baseline();
+            let result = challenge.compute_baseline();
             assert!(result.is_ok());
             let (_, total_profit) = result.unwrap();
             assert!(total_profit > 0.0);

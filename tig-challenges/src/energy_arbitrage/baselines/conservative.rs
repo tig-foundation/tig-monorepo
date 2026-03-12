@@ -1,6 +1,8 @@
 use crate::energy_arbitrage::{constants, Challenge, State};
 use anyhow::{anyhow, Result};
 
+const CHARGE_THRESHOLD: f64 = 0.95;
+const DISCHARGE_THRESHOLD: f64 = 1.05;
 const MAX_FLOW_ADJUST_ITERS: usize = 64;
 const GLOBAL_SCALE_BSEARCH_ITERS: usize = 32;
 const EPS: f64 = 1e-12;
@@ -84,6 +86,22 @@ fn soften_most_violated_line(
     true
 }
 
+/// Scale actions to maintain non-negative total profit
+fn enforce_profit_floor(challenge: &Challenge, state: &State, mut action: Vec<f64>) -> Vec<f64> {
+    let mut profit = challenge.compute_profit(state, &action);
+    if state.total_profit + profit >= 0.0 {
+        return action;
+    }
+    while state.total_profit + profit < 0.0 {
+        action = action
+            .into_iter()
+            .map(|u| if u.abs() < EPS { 0.0 } else { u * 0.95 })
+            .collect();
+        profit = challenge.compute_profit(state, &action);
+    }
+    action
+}
+
 fn enforce_flow_feasibility(
     challenge: &Challenge,
     state: &State,
@@ -125,61 +143,42 @@ fn enforce_flow_feasibility(
     Ok(base.into_iter().map(|u| low * u).collect())
 }
 
-// --- End Feasibility Helpers ---
-
 pub fn policy(challenge: &Challenge, state: &State) -> Result<Vec<f64>> {
-    let time_step = state.time_step;
-    let horizon = 12; // Look ahead 3 hours
-
-    let mut best_action = vec![0.0; challenge.num_batteries];
-
-    let da_prices = &challenge.market.day_ahead_prices;
-    let current_da = da_prices[time_step][0]; // Approximate with node 0
-
-    // Calculate average future DA price
-    let end_step = (time_step + horizon).min(challenge.num_steps);
-    let mut future_sum = 0.0;
-    let mut future_count = 0.0;
-    for t in time_step + 1..end_step {
-        future_sum += da_prices[t][0];
-        future_count += 1.0;
+    if state.time_step >= challenge.market.day_ahead_prices.len() {
+        return Err(anyhow!(
+            "Missing day-ahead prices for time_step {}",
+            state.time_step
+        ));
     }
-    let future_avg = if future_count > 0.0 {
-        future_sum / future_count
-    } else {
-        current_da
-    };
-
-    // Check future congestion
-    // We can calculate "Net Load" for the whole grid in future steps
-    // High Net Load -> Likely Congestion -> Higher Prices
-    let mut future_congestion_risk = 0.0;
-    for t in time_step + 1..end_step {
-        let net_load: f64 = challenge.exogenous_injections[t].iter().sum();
-        if net_load > 100.0 {
-            // Arbitrary threshold
-            future_congestion_risk += 1.0;
-        }
+    let da_prices = &challenge.market.day_ahead_prices[state.time_step];
+    if da_prices.len() != challenge.network.num_nodes {
+        return Err(anyhow!(
+            "Day-ahead prices length ({}) does not match network nodes ({})",
+            da_prices.len(),
+            challenge.network.num_nodes
+        ));
     }
 
-    for i in 0..challenge.num_batteries {
+    let avg_da = da_prices.iter().sum::<f64>() / da_prices.len() as f64;
+    let mut action = vec![0.0; challenge.num_batteries];
+
+    for (i, battery) in challenge.batteries.iter().enumerate() {
+        let node_price = da_prices[battery.node];
         let (min_bound, max_bound) = state.action_bounds[i];
+        let can_full_charge = min_bound <= -battery.power_charge_mw + constants::EPS_SOC;
+        let can_full_discharge = max_bound >= battery.power_discharge_mw - constants::EPS_SOC;
 
-        // If current price is lower than future average, charge
-        // But if future has high congestion risk, price will be even higher, so charge more aggressively
-        let threshold_adjust = future_congestion_risk * 2.0;
-
-        if current_da < future_avg - 5.0 - threshold_adjust {
-            // Charge
-            best_action[i] = min_bound;
-        } else if current_da > future_avg + 5.0 + threshold_adjust {
-            // Discharge
-            best_action[i] = max_bound;
+        action[i] = if node_price < CHARGE_THRESHOLD * avg_da && can_full_charge {
+            -battery.power_charge_mw
+        } else if node_price > DISCHARGE_THRESHOLD * avg_da && can_full_discharge {
+            battery.power_discharge_mw
         } else {
-            best_action[i] = 0.0;
-        }
+            0.0
+        };
+
+        action[i] = action[i].clamp(min_bound, max_bound);
     }
 
-    // Enforce feasibility
-    enforce_flow_feasibility(challenge, state, best_action)
+    let action = enforce_flow_feasibility(challenge, state, action)?;
+    Ok(enforce_profit_floor(challenge, state, action))
 }
