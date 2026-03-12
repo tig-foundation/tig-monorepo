@@ -36,7 +36,8 @@
 
 // c006_a019
 
-// c006_a020
+pub mod nova_prime_opt;
+pub use nova_prime_opt as c006_a020;
 
 // c006_a021
 
