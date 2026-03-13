@@ -445,4 +445,37 @@ mod tests {
             assert!(total_profit > 0.0);
         }
     }
+
+    #[test]
+    fn test_policy_independent_rt_prices() {
+        for challenge in challenge_iter() {
+            let mut rng =
+                SmallRng::from_seed(StdRng::from_seed(challenge.hidden_seed.clone()).r#gen());
+            let seeds = (0..challenge.num_steps)
+                .map(|_| rng.r#gen())
+                .collect::<Vec<[u8; 32]>>();
+            let initial_state = challenge.initial_state(&mut rng);
+
+            let mut rt_prices1 = Vec::with_capacity(challenge.num_steps);
+            let mut state = initial_state.clone();
+            for s in seeds.iter() {
+                let action = baselines::greedy::policy(&challenge, &state).unwrap();
+                state = challenge
+                    .take_step(&state, &action, NextRTPrices::Generate(s.clone()))
+                    .unwrap();
+                rt_prices1.push(state.rt_prices.clone());
+            }
+
+            let mut rt_prices2 = Vec::with_capacity(challenge.num_steps);
+            let mut state = initial_state.clone();
+            for s in seeds.iter() {
+                let action = baselines::conservative::policy(&challenge, &state).unwrap();
+                state = challenge
+                    .take_step(&state, &action, NextRTPrices::Generate(s.clone()))
+                    .unwrap();
+                rt_prices2.push(state.rt_prices.clone());
+            }
+            assert_eq!(rt_prices1, rt_prices2);
+        }
+    }
 }
