@@ -36,7 +36,8 @@
 
 // c005_a019
 
-// c005_a020
+pub mod hyper_opt_extrem_v1;
+pub use hyper_opt_extrem_v1 as c005_a020;
 
 // c005_a021
 
