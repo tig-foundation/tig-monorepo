@@ -26,7 +26,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(not(feature = "hide_verification"))]
 pub static CALLED_GRID_OPTIMIZE: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "hide_verification")]
-static CALLED_GRID_OPTIMIZE: AtomicBool = AtomicBool::new(true);
+static CALLED_GRID_OPTIMIZE: AtomicBool = AtomicBool::new(false);
 
 impl_kv_string_serde! {
     Track {
@@ -330,6 +330,13 @@ impl Challenge {
 
     conditional_pub!(
         fn evaluate_total_profit(&self, solution: &Solution) -> Result<f64> {
+            if solution.schedule.len() != self.num_steps {
+                return Err(anyhow!(
+                    "Schedule length ({}) does not match number of steps ({})",
+                    solution.schedule.len(),
+                    self.num_steps
+                ));
+            }
             let (_, state) =
                 self.simulate(&|_, state: &State| Ok(solution.schedule[state.time_step].clone()))?;
             Ok(state.total_profit)
