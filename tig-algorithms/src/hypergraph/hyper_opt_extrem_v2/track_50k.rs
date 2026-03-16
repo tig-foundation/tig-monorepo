@@ -1,0 +1,33 @@
+use super::TrackConfig;
+pub fn config() -> TrackConfig {
+    TrackConfig {
+        refinement: 5000,
+        ils: 50,
+        ils_refine: 80,
+        polish: 300,
+        post_balance: 120,
+        move_limit: 200_000,
+        extra_window: 16_384,
+        tabu_tenure: 8,
+        use_gpu_swaps: false,
+        num_init_restarts: 5,
+        scout_rounds: 0,
+        vcycle_depth: 0,
+        vcycle_ils_freq: 0,
+        vcycle_post_refine: 0,
+        neg_gain_thresh: 5,
+        swap_scan_limit: 64,
+        cycle_scan_limit: 20,
+        cpu_fm_rounds: 4,
+        cpu_fm_max_degree: 256,
+        ils_cpu_fm: 0,
+        final_swap_rounds: 12,
+        final_cycle_limit: 16,
+        max_coarsen_levels: 5,
+        min_coarse_nodes: 800,
+        perturb_strong: 2,
+        perturb_stagnant_thresh: 5,
+        perturb_stagnant_strength: 1,
+        balance_weight: 4,
+    }
+}
