@@ -342,10 +342,6 @@ impl Challenge {
             let greedy_total_profit = state.total_profit;
             let (conservative_schedule, state) = self.simulate(&baselines::conservative::policy)?;
             let conservative_total_profit = state.total_profit;
-            println!(
-                "Greedy total profit: {}, Conservative total profit: {}",
-                greedy_total_profit, conservative_total_profit
-            );
             if greedy_total_profit > conservative_total_profit {
                 Ok((
                     Solution {
