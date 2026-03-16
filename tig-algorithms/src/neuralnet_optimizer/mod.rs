@@ -42,7 +42,8 @@
 
 // c006_a022
 
-// c006_a023
+pub mod neural_extrem;
+pub use neural_extrem as c006_a023;
 
 // c006_a024
 
