@@ -204,7 +204,8 @@
 
 // c002_a103
 
-// c002_a104
+pub mod v3_fast;
+pub use v3_fast as c002_a104;
 
 // c002_a105
 
