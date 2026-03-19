@@ -182,7 +182,8 @@ pub use nearly_there as c004_a079;
 
 // c004_a083
 
-// c004_a084
+pub mod autovector_v9;
+pub use autovector_v9 as c004_a084;
 
 // c004_a085
 

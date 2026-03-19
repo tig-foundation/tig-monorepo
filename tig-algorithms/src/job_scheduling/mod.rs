@@ -7,7 +7,8 @@ pub use adaptive_js as c007_a001;
 
 // c007_a004
 
-// c007_a005
+pub mod adaptive_js_v2;
+pub use adaptive_js_v2 as c007_a005;
 
 // c007_a006
 
