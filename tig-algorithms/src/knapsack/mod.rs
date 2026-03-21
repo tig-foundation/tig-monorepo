@@ -242,7 +242,8 @@
 
 // c003_a122
 
-// c003_a123
+pub mod near_knap_v5;
+pub use near_knap_v5 as c003_a123;
 
 // c003_a124
 
