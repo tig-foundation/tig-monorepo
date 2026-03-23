@@ -206,7 +206,8 @@
 
 // c002_a104
 
-// c002_a105
+pub mod new_adaptive_das;
+pub use new_adaptive_das as c002_a105;
 
 // c002_a106
 
