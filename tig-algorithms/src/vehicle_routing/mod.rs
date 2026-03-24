@@ -208,7 +208,8 @@
 
 // c002_a105
 
-// c002_a106
+pub mod v4_fast;
+pub use v4_fast as c002_a106;
 
 // c002_a107
 
