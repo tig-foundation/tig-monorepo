@@ -20,7 +20,8 @@
 
 // c007_a011
 
-// c007_a012
+pub mod job_five;
+pub use job_five as c007_a012;
 
 // c007_a013
 
