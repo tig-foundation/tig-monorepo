@@ -248,7 +248,8 @@ pub use near_knap_improve_v1 as c003_a111;
 
 // c003_a114
 
-// c003_a115
+pub mod knap_quality_opt;
+pub use knap_quality_opt as c003_a115;
 
 // c003_a116
 

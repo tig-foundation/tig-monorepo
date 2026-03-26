@@ -38,7 +38,8 @@ pub use neural_advanced as c006_a006;
 
 // c006_a018
 
-// c006_a019
+pub mod neural_advanced_v3;
+pub use neural_advanced_v3 as c006_a019;
 
 // c006_a020
 
