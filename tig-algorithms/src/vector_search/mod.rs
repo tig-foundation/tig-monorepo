@@ -174,7 +174,8 @@
 
 // c004_a088
 
-// c004_a089
+pub mod autovector_v13;
+pub use autovector_v13 as c004_a089;
 
 // c004_a090
 
