@@ -46,7 +46,8 @@
 
 // c006_a024
 
-// c006_a025
+pub mod nova_prime_fgd;
+pub use nova_prime_fgd as c006_a025;
 
 // c006_a026
 
