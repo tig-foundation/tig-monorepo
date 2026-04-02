@@ -14,7 +14,8 @@ pub use adaptive_js_v2 as c007_a005;
 
 // c007_a007
 
-// c007_a008
+pub mod adaptive_js_v3;
+pub use adaptive_js_v3 as c007_a008;
 
 // c007_a009
 
