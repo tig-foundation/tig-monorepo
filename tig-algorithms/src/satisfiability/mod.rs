@@ -170,7 +170,8 @@
 
 // c001_a086
 
-// c001_a087
+pub mod cypher_sat;
+pub use cypher_sat as c001_a087;
 
 // c001_a088
 
