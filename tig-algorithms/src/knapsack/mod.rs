@@ -260,7 +260,8 @@ pub use knap_quality_opt as c003_a115;
 
 // c003_a119
 
-// c003_a120
+pub mod near_knap_v4;
+pub use near_knap_v4 as c003_a120;
 
 // c003_a121
 
