@@ -184,7 +184,8 @@
 
 // c004_a093
 
-// c004_a094
+pub mod autovector_final2;
+pub use autovector_final2 as c004_a094;
 
 // c004_a095
 
