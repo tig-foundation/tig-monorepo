@@ -52,7 +52,8 @@
 
 // c006_a027
 
-// c006_a028
+pub mod neural_advanced_v5;
+pub use neural_advanced_v5 as c006_a028;
 
 // c006_a029
 
