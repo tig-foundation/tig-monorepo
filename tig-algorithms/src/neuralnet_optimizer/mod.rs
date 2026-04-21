@@ -50,7 +50,8 @@
 
 // c006_a026
 
-// c006_a027
+pub mod neural_extrem_v4_f;
+pub use neural_extrem_v4_f as c006_a027;
 
 // c006_a028
 
