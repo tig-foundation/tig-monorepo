@@ -262,7 +262,7 @@ pub fn verify_solution(
                             ));
                         } else {
                             let mut quality_result: Result<i32> = Ok(0);
-                            let mut log_sum: f64 = 0.0;
+                            let mut sum: f64 = 0.0;
                             'eval: for (challenge, sol) in challenges.iter().zip(solutions.iter()) {
                                 match challenge.evaluate_solution(
                                     sol,
@@ -270,7 +270,7 @@ pub fn verify_solution(
                                     stream.clone(),
                                     &prop,
                                 ) {
-                                    Ok(q) => log_sum += q.ln(),
+                                    Ok(q) => sum += q,
                                     Err(e) => {
                                         quality_result = Err(e);
                                         break 'eval;
@@ -282,8 +282,8 @@ pub fn verify_solution(
                                 Ok(_) => {
                                     stream.synchronize()?;
                                     ctx.synchronize()?;
-                                    let geomean = (log_sum / challenges.len() as f64).exp();
-                                    let quality = (geomean * QUALITY_PRECISION as f64).round() as i32;
+                                    let mean = sum / challenges.len() as f64;
+                                    let quality = (mean * QUALITY_PRECISION as f64).round() as i32;
                                     println!("quality: {}", quality);
                                 }
                             }

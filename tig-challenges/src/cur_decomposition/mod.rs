@@ -52,61 +52,76 @@ pub const TRACKS: [Track; 10] = [
     Track { m: 4097, n: 4150, poly: true },
 ];
 
-pub const L: f32 = 13.0; // exponent scale: σ_j = exp(-L * sqrt(j+1) / sqrt(rank)), σ_min = exp(-L)
+pub const L: f32 = 13.0; // exponent scale: σ_j = exp(-L * sqrt(j+1) / sqrt(τ+1)), σ_min ≈ exp(-L)
 
-/// Generate singular values for a matrix of the given rank.
+/// Generate singular values for the full spectrum of length τ.
 ///
-/// Exponential (poly=false): σ_j = exp(-L * sqrt(j+1) / sqrt(rank))
-/// Polynomial  (poly=true):  σ_j = c / ((j+1)/rank)^2 + c)
-///   where c = -exp(-L) / (exp(-L) - 1) = exp(-L) / (1 - exp(-L))
-///   (chosen so that σ_rank = exp(-L), matching the exponential boundary)
-fn generate_scalars(rank: i32, poly: bool) -> Vec<f32> {
-    let t = rank as f32;
+/// Exponential (poly=false): σ_j = exp(-L * sqrt(j+1) / sqrt(τ+1))
+/// Polynomial  (poly=true):  σ_j = c / ((j/τ)^2 + c)
+///   where c = exp(-L) / (1 - exp(-L))
+///   (so σ_0 = 1 and σ_{τ-1} ≈ exp(-L), matching the exponential endpoint)
+fn generate_scalars(tau: i32, poly: bool) -> Vec<f32> {
+    let t = tau as f32;
     if poly {
         let c = (-L).exp() / (1.0 - (-L).exp());
-        (0..rank)
+        (0..tau)
             .map(|j| {
-                let i = (j + 1) as f32;
-                c / ((i / t).powi(2) + c)
+                let x = j as f32 / t;
+                c / (x * x + c)
             })
             .collect()
     } else {
-        (0..rank)
-            .map(|j| (-L * ((j + 1) as f32).sqrt() / t.sqrt()).exp())
+        let denom = ((tau + 1) as f32).sqrt();
+        (0..tau)
+            .map(|j| (-L * ((j + 1) as f32).sqrt() / denom).exp())
             .collect()
     }
 }
 
 pub const MAX_THREADS_PER_BLOCK: u32 = 1024;
 pub const NUM_MATRICES: usize = 5;
-pub const NUM_SUB_INSTANCES: usize = 13;
-const BASELINE_MULTIPLIER: f64 = 50.0;
+pub const NUM_SUB_INSTANCES: usize = 18;
 
-// Strides for the 5 dyadic index sets (index 0 = largest rank, index 4 = smallest)
+// Strides for the 5 dyadic index sets (repo index 0 = largest rank, stride 1 = finest).
+// Paper convention: paper A_i ↔ repo matrix (NUM_MATRICES - 1 - i), i.e. A_4 = repo 0.
 const STRIDES: [i32; NUM_MATRICES] = [1, 2, 4, 8, 16];
 
-// target_rank_map: for each matrix, which target_rank denominators to use
-// tau / denominator gives the target_rank
-const TARGET_RANK_MAP: [[i32; 3]; NUM_MATRICES] = [
-    [3, 5, 0],   // matrix 0 (rank ~ tau): tau/3, tau/5
-    [3, 5, 9],   // matrix 1 (rank ~ tau/2): tau/3, tau/5, tau/9
-    [5, 9, 20],  // matrix 2 (rank ~ tau/4): tau/5, tau/9, tau/20
-    [9, 17, 20], // matrix 3 (rank ~ tau/8): tau/9, tau/17, tau/20
-    [17, 20, 0], // matrix 4 (rank ~ tau/16): tau/17, tau/20
-];
+// Number of target_ranks per repo matrix.
+// Repo matrix i (= paper A_{4-i}) is paired with C_{2}, C_1∪C_2, C_0∪C_1∪C_2, C_0∪C_1, C_0
+// for i = 0, 1, 2, 3, 4 respectively. Each |C_k| = 2, so counts are [2, 4, 6, 4, 2] summing to 18.
+const TARGET_RANK_COUNTS: [usize; NUM_MATRICES] = [2, 4, 6, 4, 2];
 
-// Number of target_ranks per matrix
-const TARGET_RANK_COUNTS: [usize; NUM_MATRICES] = [2, 3, 3, 3, 2];
+/// C_k = { ⌊2^(p-4+k) / 3⌋, ⌊2^(p-4+k) / 5⌋ }, used to build the target-rank sets.
+/// k ∈ {0, 1, 2}; the pyramidal mapping below shares each C_k across 3 matrices.
+fn c_set(p: i32, k: i32) -> [i32; 2] {
+    let base = 1i32 << (p - 4 + k);
+    [base / 3, base / 5]
+}
+
+/// Target ranks for a given repo matrix index (0 = largest, 4 = smallest).
+/// Returns 2, 4, 6, 4, 2 values for indices 0..4.
+fn targets_for_repo_matrix(p: i32, repo_idx: usize) -> Vec<i32> {
+    let c0 = c_set(p, 0);
+    let c1 = c_set(p, 1);
+    let c2 = c_set(p, 2);
+    match repo_idx {
+        0 => c2.to_vec(),
+        1 => [c1.as_slice(), c2.as_slice()].concat(),
+        2 => [c0.as_slice(), c1.as_slice(), c2.as_slice()].concat(),
+        3 => [c0.as_slice(), c1.as_slice()].concat(),
+        4 => c0.to_vec(),
+        _ => unreachable!("repo matrix index out of range"),
+    }
+}
 
 /// One sub-instance of the CUR decomposition challenge.
-/// Each nonce produces 13 of these via `Challenge::generate_multiple_instances`.
+/// Each nonce produces `NUM_SUB_INSTANCES` of these via `Challenge::generate_multiple_instances`.
 pub struct Challenge {
     pub seed: [u8; 32],
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
     optimal_fnorm: f32,
-    full_fnorm: f32,
     pub d_a_mat: CudaSlice<f32>,
 }
 
@@ -369,7 +384,6 @@ impl Challenge {
             .map(|x| x * x)
             .sum::<f32>()
             .sqrt();
-        let full_fnorm = sorted_scalars.iter().map(|x| x * x).sum::<f32>().sqrt();
 
         Ok(Challenge {
             seed: *seed,
@@ -377,12 +391,11 @@ impl Challenge {
             m,
             target_k: target_rank,
             optimal_fnorm,
-            full_fnorm,
             d_a_mat,
         })
     }
 
-    /// Generate all 13 sub-instances from a single QR factorization.
+    /// Generate all 18 sub-instances from a single QR factorization.
     /// The solver is called once per returned `Challenge`.
     pub fn generate_multiple_instances(
         seed: &[u8; 32],
@@ -393,7 +406,7 @@ impl Challenge {
     ) -> Result<Vec<Self>> {
         let Track { n, m, poly } = *track;
         let max_rank = m.min(n);
-        let _p = validate_max_rank(max_rank)?;
+        let p = validate_max_rank(max_rank)?;
 
         let cublas = CudaBlas::new(stream.clone())?;
 
@@ -538,8 +551,7 @@ impl Challenge {
 
         let matrices: Vec<CudaSlice<f32>> = matrices.into_iter().map(|m| m.unwrap()).collect();
 
-        // Build all 13 Challenge instances with their target_ranks and optimal_fnorms.
-        let tau = max_rank;
+        // Build all 18 Challenge instances with their target_ranks and optimal_fnorms.
         let mut challenges = Vec::with_capacity(NUM_SUB_INSTANCES);
 
         for matrix_idx in 0..NUM_MATRICES {
@@ -549,16 +561,23 @@ impl Challenge {
                 indices.iter().map(|&i| scalars[i as usize]).collect();
             matrix_scalars.sort_by(|a, b| b.abs().partial_cmp(&a.abs()).unwrap());
 
-            for t in 0..TARGET_RANK_COUNTS[matrix_idx] {
-                let denom = TARGET_RANK_MAP[matrix_idx][t];
-                let target_k = ((tau as f64) / (denom as f64)).round() as i32;
+            let targets = targets_for_repo_matrix(p, matrix_idx);
+            assert_eq!(targets.len(), TARGET_RANK_COUNTS[matrix_idx]);
+
+            for &target_k in &targets {
+                assert!(target_k >= 1, "target_k must be >= 1, got {}", target_k);
+                assert!(
+                    (target_k as usize) < matrix_scalars.len(),
+                    "target_k {} must be < matrix rank {}",
+                    target_k,
+                    matrix_scalars.len(),
+                );
 
                 let optimal_fnorm = matrix_scalars[target_k as usize..]
                     .iter()
                     .map(|x| x * x)
                     .sum::<f32>()
                     .sqrt();
-                let full_fnorm = matrix_scalars.iter().map(|x| x * x).sum::<f32>().sqrt();
 
                 // Device-to-device copy of the matrix for this sub-instance
                 let src = &matrices[matrix_idx];
@@ -588,7 +607,6 @@ impl Challenge {
                     m,
                     target_k,
                     optimal_fnorm,
-                    full_fnorm,
                     d_a_mat,
                 });
             }
@@ -601,11 +619,6 @@ impl Challenge {
     /// Returns the optimal (lower-bound) Frobenius norm for this sub-instance.
     pub fn optimal_fnorm(&self) -> f32 {
         self.optimal_fnorm
-    }
-
-    /// Returns ||A||_F — the zero-effort (CUR=0) error for this sub-instance.
-    pub fn full_fnorm(&self) -> f32 {
-        self.full_fnorm
     }
 
     /// Evaluate the Frobenius norm of the CUR reconstruction error ||A - C*U*R||_F
@@ -784,6 +797,12 @@ impl Challenge {
     }
 
     conditional_pub!(
+        /// Per-sub-instance score in (0, 1].
+        ///
+        /// Let r = ||A - CUR||_F / optimal_fnorm. Since CUR cannot beat the best
+        /// rank-target_k approximation, r >= 1 always. Let T = target_k + 1:
+        ///   sub_score = 1              if r <  T
+        ///   sub_score = T / r          if r >= T
         fn evaluate_solution(
             &self,
             solution: &Solution,
@@ -791,19 +810,12 @@ impl Challenge {
             stream: Arc<CudaStream>,
             prop: &cudaDeviceProp,
         ) -> Result<f64> {
-            let fnorm = self.evaluate_fnorm(solution, module, stream, prop)?;
+            let fnorm = self.evaluate_fnorm(solution, module, stream, prop)? as f64;
             let optimal = self.optimal_fnorm as f64;
-            let baseline = BASELINE_MULTIPLIER * optimal;
-            let quality = (baseline - fnorm as f64) / (baseline - optimal);
-            if quality <= 0.0 {
-                return Err(anyhow!(
-                    "Non-positive quality ({:.6}): solution fnorm ({:.6}) exceeds baseline ({:.6})",
-                    quality,
-                    fnorm,
-                    baseline,
-                ));
-            }
-            Ok(quality)
+            let r = fnorm / optimal;
+            let threshold = (self.target_k as f64) + 1.0;
+            let sub_score = if r < threshold { 1.0 } else { threshold / r };
+            Ok(sub_score)
         }
     );
 }

@@ -14,88 +14,122 @@ where:
 - **R** = selected rows of A (k x n)
 - **k** = `target_k`, the number of columns/rows to select
 
-The solver must choose which columns (`c_idxs`) and rows (`r_idxs`) to select, and compute the linking matrix (`u_mat`). Quality is measured by how small the reconstruction error `||A - CUR||_F` (Frobenius norm) is relative to the theoretical optimum.
+The solver must choose which columns (`c_idxs`) and rows (`r_idxs`) to select, and compute the linking matrix (`u_mat`). Quality is measured by how close the reconstruction error `||A - CUR||_F` is to the theoretical rank-k optimum.
 
 ## Differences from Standard TIG Challenges
 
 Standard TIG challenges (c001-c006) follow a common pattern:
 
 1. **One instance per nonce**: Each nonce generates a single challenge instance. The solver produces one solution, which is evaluated for a single quality score.
-2. **Generic dispatch**: The runtime and verifier use a shared `dispatch_challenge!` macro that handles instance generation, solver invocation, and evaluation uniformly.
+2. **Generic dispatch**: The runtime and verifier use a shared `dispatch_challenge!` macro.
 3. **Single fuel budget**: The solver gets the full fuel budget for its one instance.
-4. **Direct solution serialization**: The solution is a single struct, serialized directly into OutputData.
+4. **Direct solution serialization**: The solution is a single struct.
 
-c008 (CUR decomposition) differs in several ways:
+c008 (CUR decomposition) differs:
 
-1. **13 sub-instances per nonce**: Each nonce generates 5 matrices (from a single QR factorization), mapped to 13 (matrix, target_k) pairs. The solver is called 13 separate times, once per sub-instance, with no information transfer between calls.
-2. **Custom dispatch blocks**: Both `tig-runtime` and `tig-verifier` have hand-written c008 match arms instead of using the generic `dispatch_challenge!` macro. This is needed to handle the sub-instance loop, per-instance fuel reset, and multi-solution aggregation.
-3. **Split fuel budget**: The total fuel is divided evenly (`max_fuel / 13`), and each sub-instance gets its own independent budget. GPU fuel counters and CPU fuel counters are reset between sub-instances.
-4. **Two CUDA streams**: Matrix generation runs on the default (non-fuel-checked) stream so it doesn't consume solver fuel. The solver runs on a fuel-checked stream.
-5. **Aggregate quality**: Instead of a single quality score, per-instance qualities are combined via geometric mean. Any sub-instance with negative quality invalidates the entire nonce.
-6. **Multi-solution output**: The serialized solution is a JSON array of 13 `Solution` structs (one per sub-instance), rather than a single solution.
+1. **18 sub-instances per nonce**: Each nonce generates 5 matrices (from a single QR factorization), mapped to 18 (matrix, target_k) pairs. The solver is called 18 times per nonce, once per sub-instance, with no information transfer between calls.
+2. **Custom dispatch blocks**: Both `tig-runtime` and `tig-verifier` have hand-written c008 match arms instead of the generic `dispatch_challenge!` macro — needed for the sub-instance loop, per-instance fuel reset, and multi-solution aggregation.
+3. **Split fuel budget**: Total fuel divided as `max_fuel / 18`. GPU and CPU fuel counters reset between sub-instances.
+4. **Two CUDA streams**: Matrix generation runs on the default (non-fuel-checked) stream; the solver runs on a fuel-checked stream.
+5. **Aggregate quality**: Per-sub-instance scores are combined via **arithmetic mean**. A bad sub-instance only tanks its own slot; it does not invalidate the nonce.
+6. **Multi-solution output**: The serialized solution is a JSON array of 18 `Solution` structs.
 
 ## Multi-Instance Design
 
-Each nonce produces **13 sub-instances** from **5 matrices**, all generated from a single expensive QR factorization. This amortizes the QR cost across many problems.
+Each nonce produces **18 sub-instances** from **5 matrices**, all from a single expensive QR factorization.
 
 ### Track Parameters
 
 ```rust
-Track { n: i32, m: i32 }
+Track { n: i32, m: i32, poly: bool }
 ```
 
-Constraint: `min(m, n)` must equal `2^p + 1` for some `p >= 5` (e.g., 33, 65, 129, 257, ...).
+Constraint: `τ = min(m, n) = 2^p + 1` for some `p ≥ 5` (e.g., 33, 65, 129, 257, 513, ...).
+
+`poly` selects the singular-value decay profile (exponential vs polynomial).
 
 ### Matrix Generation
 
-1. **QR Factorization** (one-time cost): Generate two random Gaussian matrices and extract orthogonal bases U (m x max_rank) and V (n x max_rank) via QR. This is handled by `Challenge::generate_uv()`.
+Constants:
+- `τ = min(m, n) = 2^p + 1`
+- coherence `Δ = 10000.0` (passed as `max_d` to `gaussian_matrix_kernel`)
+- exponential scale `L = 13.0` (in code; called `a` in the paper)
 
-2. **Singular values**: Generate `max_rank` values using `sigma_j = exp(-2.0 * sqrt(j+1) / sqrt(max_rank))`, then shuffle with a seeded RNG. This produces a spectrum of decaying singular values.
+1. **Gaussian + coherence scaling**. Sample `G_U ∈ R^{m×τ}`, `G_V ∈ R^{n×τ}` with iid N(0,1), and column-scale by a linear interpolation `d_j` from `d_0 = Δ` down to `d_{τ-1} = 1`. This is baked into `gaussian_matrix_kernel`.
 
-3. **Dyadic index sets**: Build 5 nested subsets of `{0, 1, ..., 2^p}` using strides:
+2. **QR factorization**. `U, _ = qr(G_U · D)`, `V, _ = qr(G_V · D)` via cuSolver (`Sgeqrf` + `Sorgqr`).
 
-   | Matrix | Stride | Index set                     | Rank          |
-   |--------|--------|-------------------------------|---------------|
-   | 0      | 1      | {0, 1, 2, 3, ...}             | 2^p + 1       |
-   | 1      | 2      | {0, 2, 4, 6, ...}             | 2^(p-1) + 1   |
-   | 2      | 4      | {0, 4, 8, 12, ...}            | 2^(p-2) + 1   |
-   | 3      | 8      | {0, 8, 16, 24, ...}            | 2^(p-3) + 1   |
-   | 4      | 16     | {0, 16, 32, ...}              | 2^(p-4) + 1   |
+3. **Singular values** (length τ, descending, no shuffle).
 
-   These sets are perfectly nested: I_4 ⊂ I_3 ⊂ I_2 ⊂ I_1 ⊂ I_0.
+   Exponential (`poly = false`):
+   ```
+   σ_j = exp( -L · sqrt(j+1) / sqrt(τ+1) )
+   ```
 
-4. **Incremental matrix construction**: Each matrix A_i = U_i * diag(sigma) * V_i^T, where U_i and V_i are the columns of U and V at the corresponding index set. Built incrementally starting from the smallest:
-   - A_4 (smallest rank, stride 16) computed from scratch
-   - A_3 = A_4 + contribution from new indices in I_3 \ I_4
-   - A_2 = A_3 + contribution from I_2 \ I_3
-   - ... and so on up to A_0 (full rank, stride 1)
+   Polynomial (`poly = true`):
+   ```
+   σ_j = c / ( (j/τ)^2 + c ),   c = exp(-L) / (1 - exp(-L))
+   ```
+   giving σ_0 = 1 and σ_{τ-1} ≈ exp(-L).
 
-   This uses GEMM with `beta=1.0` to accumulate new components onto the previous matrix.
+4. **Dyadic nested index sets**. The paper defines levels `i ∈ {0..4}` with strides `2^(4-i)`:
+   ```
+   paper I_i = { 0, 2^(4-i), 2·2^(4-i), …, τ-1 },   |I_i| = 2^(p-4+i) + 1
+   ```
+   so paper `I_0` is coarsest (stride 16) and paper `I_4` is finest (stride 1).
 
-5. **Challenge instances**: Each of the 5 matrices is paired with 2-3 target_k values, producing 13 `Challenge` instances. Each instance owns a device-to-device copy of its matrix and stores its `optimal_fnorm` directly.
+   **Repo convention.** The code indexes the other way: `STRIDES = [1, 2, 4, 8, 16]` with repo matrix 0 being the largest. The mapping is:
+   ```
+   paper A_i           ↔  repo matrix index (4 - i)
+   paper I_i stride 2^(4-i)  ↔  repo STRIDES[4 - i]
+   ```
 
-### Target Rank Mapping
+5. **Incremental construction** (building from smallest paper-rank to largest, i.e. repo index 4 down to 0):
+   ```
+   A_0 (paper) = Σ_{j ∈ I_0} σ_j · u_j v_j^T
+   A_i (paper) = A_{i-1} + Σ_{j ∈ I_i \ I_{i-1}} σ_j · u_j v_j^T     for i = 1..4
+   ```
+   GEMM with `beta = 1.0` on the running accumulator. In the repo this is the `for level in (0..NUM_MATRICES).rev()` loop in `generate_multiple_instances`.
 
-Each matrix is paired with 2-3 target_k values (tau = min(m, n)):
+### Sub-Instance Mapping (18 sub-instances)
 
-| Matrix | Stride | Approx rank | target_k values              | Count |
-|--------|--------|-------------|------------------------------|-------|
-| 0      | 1      | tau         | tau/3, tau/5                 | 2     |
-| 1      | 2      | tau/2       | tau/3, tau/5, tau/9          | 3     |
-| 2      | 4      | tau/4       | tau/5, tau/9, tau/20         | 3     |
-| 3      | 8      | tau/8       | tau/9, tau/17, tau/20        | 3     |
-| 4      | 16     | tau/16      | tau/17, tau/20               | 2     |
-| **Total** |     |             |                              | **13** |
+Define three disjoint 2-element target-rank sets for `k ∈ {0, 1, 2}`:
+```
+C_k = { ⌊2^(p-4+k) / 3⌋, ⌊2^(p-4+k) / 5⌋ }
+```
+
+Paper indexing:
+
+| paper matrix | rank ≈ | targets       | count |
+|--------------|--------|---------------|-------|
+| A_0          | 2^(p-4)+1 | C_0         | 2     |
+| A_1          | 2^(p-3)+1 | C_0 ∪ C_1   | 4     |
+| A_2          | 2^(p-2)+1 | C_0 ∪ C_1 ∪ C_2 | 6 |
+| A_3          | 2^(p-1)+1 | C_1 ∪ C_2   | 4     |
+| A_4          | 2^p+1     | C_2         | 2     |
+| **Total**    |        |               | **18** |
+
+Each element of `C_k` is shared across exactly 3 matrices, so every target rank appears 3 times paired with different true ranks.
+
+Translated to the repo (matrix 0 = largest = paper A_4), `TARGET_RANK_COUNTS = [2, 4, 6, 4, 2]`:
+
+| repo matrix | stride | ≈ paper | targets                 | count |
+|-------------|--------|---------|-------------------------|-------|
+| 0           | 1      | A_4     | C_2                     | 2     |
+| 1           | 2      | A_3     | C_1 ∪ C_2               | 4     |
+| 2           | 4      | A_2     | C_0 ∪ C_1 ∪ C_2         | 6     |
+| 3           | 8      | A_1     | C_0 ∪ C_1               | 4     |
+| 4           | 16     | A_0     | C_0                     | 2     |
+
+Since `⌊2^(p-4)/k⌋ < ⌊2^(p-3)/k⌋ < ⌊2^(p-2)/k⌋` for `p ≥ 5`, all six values across `C_0, C_1, C_2` are distinct, so no deduplication is needed.
 
 ### Optimal Error
 
-For each sub-instance, the optimal Frobenius norm error is computed analytically:
-
+For each sub-instance `(matrix, target_k)`, the optimal rank-`target_k` Frobenius error is closed-form:
 ```
-optimal_fnorm = sqrt(sum of sigma_i^2 for i >= target_k)
+optimal_fnorm = sqrt( Σ_{j ∈ I_i, rank(σ_j) ≥ target_k+1} σ_j^2 )
 ```
-
-where sigma values are sorted by magnitude descending, restricted to the index set of that matrix. This value is stored as a private field on each `Challenge` instance and is only accessible to verification code — the solver cannot read it.
+i.e. restrict σ to the indices of matrix `i`, sort descending, drop the top `target_k`, and take the Frobenius norm of the tail. Stored privately on each `Challenge` and used only at evaluation time.
 
 ## Challenge API
 
@@ -104,10 +138,10 @@ where sigma values are sorted by magnitude descending, restricted to the index s
 ```rust
 let challenges: Vec<Challenge> = Challenge::generate_multiple_instances(
     &seed, &track, module, stream, &prop
-)?;
+)?;  // length = 18
 ```
 
-Performs a single QR factorization, builds all 5 matrices, and returns 13 ready-to-solve `Challenge` instances. Internally calls `Challenge::generate_uv()` to produce the orthogonal bases.
+One QR factorization, 5 matrices, 18 `Challenge` instances.
 
 ### Challenge struct
 
@@ -117,113 +151,101 @@ pub struct Challenge {
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
-    pub d_a_mat: CudaSlice<f32>, // the matrix A on GPU (m x n, column-major)
-    // optimal_fnorm is private — used only for verification, not visible to the solver
+    pub d_a_mat: CudaSlice<f32>, // m x n, column-major
+    // optimal_fnorm is private — used only for verification
 }
 ```
 
 ### Evaluation
 
 ```rust
-// Frobenius norm of reconstruction error (always public)
 let fnorm: f32 = challenge.evaluate_fnorm(&solution, module, stream, &prop)?;
-
-// Per-instance quality in [0, 1] (conditional_pub behind hide_verification)
-let quality: f64 = challenge.evaluate_solution(&solution, module, stream, &prop)?;
+let sub_score: f64 = challenge.evaluate_solution(&solution, module, stream, &prop)?;
 ```
 
-`evaluate_solution` returns the raw per-instance quality as `f64`. The caller (verifier) aggregates across all 13 instances via geometric mean and scales to an integer.
+`evaluate_solution` returns the per-sub-instance score in `(0, 1]`. The verifier averages across 18 calls.
 
 ## What the Solver Sees
 
-The solver function is called **13 times per nonce**, once per sub-instance. Each call receives a single `Challenge` and must produce:
+Called **18 times per nonce**. Each call gets one `Challenge` and must return:
 
 ```rust
 pub struct Solution {
-    pub c_idxs: Vec<i32>,   // which columns to select (length target_k)
-    pub u_mat: Vec<f32>,    // linking matrix (target_k x target_k, column-major)
-    pub r_idxs: Vec<i32>,   // which rows to select (length target_k)
+    pub c_idxs: Vec<i32>,   // which columns to select, length target_k
+    pub u_mat:  Vec<f32>,   // linking matrix, target_k x target_k (column-major)
+    pub r_idxs: Vec<i32>,   // which rows to select, length target_k
 }
 ```
 
-**No information can be transferred between sub-instance calls.**
+No information transfers between sub-instance calls.
 
 ## Fuel Budget
 
-The total fuel budget is split evenly across all 13 sub-instances:
-
 ```
-fuel_per_instance = max_fuel / 13
+fuel_per_instance = max_fuel / 18
 ```
 
-- Matrix generation uses a non-fuel-checked stream (generation doesn't count toward fuel).
-- Each sub-instance's solver runs on a fuel-checked stream with its own budget.
+- Matrix generation uses a non-fuel-checked stream (doesn't consume solver fuel).
+- Each sub-instance solver runs on a fuel-checked stream with its own budget.
 - If a sub-instance exhausts its fuel, execution moves to the next one.
 - The solver should call `save_solution()` early with a "good enough" answer in case fuel runs out.
 
 ## Quality Scoring
 
-### Per-instance quality
+### Per-sub-instance score
 
 ```
-quality_i = (baseline - fnorm) / (baseline - optimal_fnorm)
+r = ||A - CUR||_F / optimal_fnorm          // always >= 1
+T = target_k + 1
+sub_score =
+    1              if r <  T
+    T / r          if r >= T
 ```
 
-where:
-- `fnorm` = `||A - C*U*R||_F` (the solver's reconstruction error)
-- `optimal_fnorm` = theoretical minimum error for that matrix and target_k
-- `baseline = 50 * optimal_fnorm`
+`sub_score` is always in `(0, 1]`. A solver that beats the threshold `T` for a given target rank gets a perfect `1.0` on that sub-instance; otherwise it is graded down proportionally.
 
-If `fnorm` exceeds the baseline for **any** sub-instance, that sub-instance's quality is negative and the **entire nonce submission is invalid**.
-
-### Aggregate quality
-
-The final quality is the **geometric mean** across all 13 sub-instances:
+### Aggregate score
 
 ```
-quality = exp(mean(ln(quality_i)))
+score = (1 / 18) · Σ sub_score_i
 ```
 
-This is then scaled to an integer: `round(quality * QUALITY_PRECISION)` where `QUALITY_PRECISION = 1_000_000`. The geometric mean is computed in the verifier after calling `evaluate_solution` on each instance.
+arithmetic mean of the 18 sub-scores; bounded in `(0, 1]`.
+
+Scaled to an integer: `round(score * QUALITY_PRECISION)` with `QUALITY_PRECISION = 1_000_000`.
+
+**There is no "any negative quality invalidates the nonce" rule.** A poor sub-instance simply contributes a low score to the average; it does not poison the others. Validation errors from a malformed `Solution` (wrong lengths, out-of-bounds indices) still invalidate the nonce.
 
 ## Runtime Flow (tig-runtime)
 
-1. Parse track, set up CUDA context
-2. Load PTX with fuel limit = `fuel_per_instance * gpu_fuel_scale` (replacing `0xdeadbeefdeadbeef` placeholder)
-3. Call `Challenge::generate_multiple_instances()` on the non-fuel-checked stream → `Vec<Challenge>` (13 instances)
-4. For each challenge in the vec:
-   a. Launch `initialize_kernel` to reset GPU fuel counter and signature
-   b. Reset CPU fuel counter
-   c. Call solver's `entry_point` on fuel-checked stream with the challenge
-   d. Launch `finalize_kernel` to read GPU fuel/signature
-   e. Accumulate fuel consumed and runtime signature
-   f. Store solution (or empty solution if solver failed/didn't save)
-5. Serialize all 13 solutions as JSON array into OutputData
+1. Parse track, set up CUDA context.
+2. Load PTX with fuel limit = `fuel_per_instance * gpu_fuel_scale` (replacing `0xdeadbeefdeadbeef`).
+3. Call `Challenge::generate_multiple_instances()` on the non-fuel-checked stream → `Vec<Challenge>` (18 entries).
+4. For each challenge:
+   a. `initialize_kernel` to reset GPU fuel counter and signature.
+   b. Reset CPU fuel counter.
+   c. Call the solver's `entry_point` on the fuel-checked stream.
+   d. `finalize_kernel` to read GPU fuel/signature.
+   e. Accumulate fuel consumed and combine runtime signature.
+   f. Store the solution (or an empty one if the solver failed/didn't save).
+5. Serialize all 18 solutions as a JSON array into `OutputData`.
 
 ## Verification Flow (tig-verifier)
 
-1. Parse track, set up CUDA context
-2. Call `Challenge::generate_multiple_instances()` (same deterministic generation as runtime)
-3. Deserialize solution as `Vec<Solution>` (13 entries)
+1. Parse track, set up CUDA context.
+2. Call `Challenge::generate_multiple_instances()` (deterministic given seed/track).
+3. Deserialize solution as `Vec<Solution>` (must be length 18).
 4. For each `(challenge, solution)` pair:
-   - Call `challenge.evaluate_solution()` → per-instance quality `f64`
-   - Any non-positive quality → invalid submission
-5. Compute geometric mean of all 13 qualities and scale to `i32`
+   - Call `challenge.evaluate_solution()` → sub_score `f64`.
+   - Any validation error → invalid submission.
+5. Compute **arithmetic mean** of the 18 sub-scores and scale to `i32` via `QUALITY_PRECISION`.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `tig-challenges/src/cur_decomposition/mod.rs` | Challenge generation, evaluation, structs |
-| `tig-challenges/src/cur_decomposition/kernels.cu` | CUDA kernels (matrix generation, column/row extraction) |
+| `tig-challenges/src/cur_decomposition/kernels.cu` | CUDA kernels (coherent Gaussian, column/row extraction) |
 | `tig-algorithms/src/cur_decomposition/template.rs` | Solver template |
 | `tig-runtime/src/main.rs` | Runtime execution (c008 dispatch block) |
 | `tig-verifier/src/main.rs` | Solution verification (c008 dispatch block) |
-
-## Open Review Items
-
-1. **`finalize_kernel` on fuel-checked stream after fuel exhaustion**: `finalize_kernel` is launched on `solve_stream` (fuel-checked). If the solver exhausted fuel via `asm("trap")`, the stream may be in a bad state and `finalize_kernel` could fail to run. Need to verify that trap doesn't poison the stream for subsequent kernel launches. See `tig-runtime/src/main.rs` c008 dispatch block and `tig-binary/src/framework.cu`.
-
-2. **GPU memory lifecycle of Challenge allocations**: Each `Challenge` returned by `generate_multiple_instances` holds an m x n `CudaSlice`. If cudarc's `Drop` for `CudaSlice` is deferred or pooled rather than immediate, GPU memory for all 13 instances could accumulate. Worth testing with large matrices.
-
-3. **`Vec<Solution>` serde round-trip**: The runtime serializes `Vec<c008::Solution>` via `serde_json::to_string`. Each `Solution` uses `impl_base64_serde!` for custom serde (bincode -> gzip -> base64). The verifier deserializes with `serde_json::from_str::<Vec<c008::Solution>>`. Need to verify this round-trips correctly — that the macro's custom `Serialize`/`Deserialize` impls work as expected when nested inside a `Vec` serialized by serde_json.
