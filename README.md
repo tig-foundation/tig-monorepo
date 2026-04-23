@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://tig.foundation/"><img src="docs/images/logo_black.png" width="140" alt="TIG logo" /></a><br>
+  <a href="https://tig.foundation/"><img src="docs/images/logo_black.png" width="75" alt="TIG logo" /></a><br>
   <b>The Innovation Game</b><br>
   <sub>The Network for Algorithmic Breakthroughs </sub>
 </h1>
