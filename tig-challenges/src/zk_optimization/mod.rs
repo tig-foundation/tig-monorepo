@@ -203,8 +203,8 @@ impl Challenge {
         fn evaluate_solution(&self, solution: &Solution) -> Result<i32> {
             let num_constraints = self.evaluate_num_constraints(solution)?;
             let baseline_num_constraints = self.compute_baseline()?;
-            let quality = (num_constraints as f64 - baseline_num_constraints as f64)
-                / (baseline_num_constraints as f64 + 1e-6);
+            let quality = (baseline_num_constraints as f64 - num_constraints as f64)
+                / (baseline_num_constraints as f64);
             let quality = quality.clamp(-10.0, 10.0) * QUALITY_PRECISION as f64;
             let quality = quality.round() as i32;
             Ok(quality)
