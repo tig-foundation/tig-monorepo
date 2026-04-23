@@ -210,3 +210,7 @@ pub use job_scheduling as c007;
 pub mod energy_arbitrage;
 #[cfg(feature = "c008")]
 pub use energy_arbitrage as c008;
+#[cfg(feature = "c009")]
+pub mod zk_optimization;
+#[cfg(feature = "c009")]
+pub use zk_optimization as c009;
