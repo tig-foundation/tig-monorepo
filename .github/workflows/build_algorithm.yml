@@ -11,6 +11,7 @@ on:
       - 'neuralnet_optimizer/*'
       - 'job_scheduling/*'
       - 'energy_arbitrage/*'
+      - 'zk_optimization/*'
       - 'test/satisfiability/*'
       - 'test/vehicle_routing/*'
       - 'test/knapsack/*'
@@ -19,6 +20,7 @@ on:
       - 'test/neuralnet_optimizer/*'
       - 'test/job_scheduling/*'
       - 'test/energy_arbitrage/*'
+      - 'test/zk_optimization/*'
 
 jobs:
   init:

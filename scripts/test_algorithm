@@ -102,6 +102,7 @@ f"""Library not found at {so_path}:
         "neuralnet_optimizer": "c006",
         "job_scheduling": "c007",
         "energy_arbitrage": "c008",
+        "zk_optimization": "c009",
     }
     challenge_id = challenge_ids[CHALLENGE]
 

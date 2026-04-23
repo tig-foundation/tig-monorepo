@@ -156,7 +156,7 @@ pub fn compute_solution(
             };
             let result = solve_challenge_fn(&challenge, &save_solution_fn, hyperparameters);
             if !output_file.exists() {
-                save_solution_fn(&$c::Solution::new())?;
+                // save_solution_fn(&$c::Solution::new())?; // FIXME: uncomment this
             }
             result
         }};
@@ -346,6 +346,12 @@ pub fn compute_solution(
             panic!("tig-runtime was not compiled with '--features c008'");
             #[cfg(feature = "c008")]
             dispatch_challenge!(c008, cpu)
+        }
+        "c009" => {
+            #[cfg(not(feature = "c009"))]
+            panic!("tig-runtime was not compiled with '--features c009'");
+            #[cfg(feature = "c009")]
+            dispatch_challenge!(c009, cpu)
         }
         _ => panic!("Unsupported challenge"),
     }

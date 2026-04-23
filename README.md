@@ -35,6 +35,7 @@ TIG currently has 8 active computational challenges:
 | c006 | [neuralnet_optimizer](tig-challenges/src/neuralnet_optimizer/README.md) | Neural Network Optimizer | GPU |
 | c007 | [job_scheduling](tig-challenges/src/job_scheduling/README.md) | Flexible Job Shop Scheduling | CPU |
 | c008 | [energy_arbitrage](tig-challenges/src/energy_arbitrage/README.md) | Energy Market Arbitrage | CPU |
+| c009 | [zk_optimization](tig-challenges/src/zk_optimization/README.md) | ZK Circuit Optimization | CPU |
 
 ## Glossary
 

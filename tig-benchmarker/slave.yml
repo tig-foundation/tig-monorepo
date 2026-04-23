@@ -66,3 +66,8 @@ services:
     <<: *common
     image: ghcr.io/tig-foundation/tig-monorepo/energy_arbitrage/runtime:${VERSION}
     container_name: energy_arbitrage
+
+  zk_optimization:
+    <<: *common
+    image: ghcr.io/tig-foundation/tig-monorepo/zk_optimization/runtime:${VERSION}
+    container_name: zk_optimization
