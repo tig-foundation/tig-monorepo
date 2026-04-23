@@ -89,12 +89,17 @@ macro_rules! impl_kv_string_serde {
 macro_rules! impl_base64_serde {
     ($name:ident { $( $field:ident : $ty:ty ),* $(,)? }) => {
         paste::paste! {
-            #[derive(Debug, Clone)]
+            #[derive(Debug)]
             pub struct $name {
                 $( pub $field : $ty ),*
             }
 
-            #[derive(serde::Serialize, serde::Deserialize)]
+            #[derive(serde::Serialize)]
+            struct [<$name DataRef>]<'a> {
+                $( $field : &'a $ty ),*
+            }
+
+            #[derive(serde::Deserialize)]
             struct [<$name Data>] {
                 $( $field : $ty ),*
             }
@@ -109,8 +114,8 @@ macro_rules! impl_base64_serde {
                     use base64::Engine;
                     use std::io::Write;
 
-                    let helper = [<$name Data>] {
-                        $( $field: self.$field.clone() ),*
+                    let helper = [<$name DataRef>] {
+                        $( $field: &self.$field ),*
                     };
 
                     let bincode_data = bincode::serialize(&helper)

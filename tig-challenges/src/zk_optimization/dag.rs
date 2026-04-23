@@ -43,10 +43,7 @@ impl Node {
     pub fn constraint_count(&self) -> usize {
         match self.op {
             OpType::Pow5(_) => 3,
-            OpType::Add(_, _)
-            | OpType::Mul(_, _)
-            | OpType::Alias(_)
-            | OpType::Scale(_, _) => 1,
+            OpType::Add(_, _) | OpType::Mul(_, _) | OpType::Alias(_) | OpType::Scale(_, _) => 1,
             OpType::Undefined | OpType::Input | OpType::Output => 0,
         }
     }
@@ -81,9 +78,9 @@ pub struct CircuitConfig {
 
 impl CircuitConfig {
     /// Creates a configuration for `delta`: `num_constraints = delta * 1000`.
-    pub fn from_difficulty(delta: u32) -> Self {
+    pub fn from_delta(delta: usize) -> Self {
         Self {
-            num_constraints: (delta as usize) * 1000,
+            num_constraints: delta * 1000,
             redundancy_ratio: 0.25,
             power_map_ratio: 0.15,
             alias_ratio: 0.15,
@@ -202,7 +199,11 @@ pub fn generate_dag(seed: &str, config: &CircuitConfig) -> DAG {
 
     let num_inputs = nodes.iter().filter(|n| n.is_input()).count();
 
-    DAG { nodes, num_inputs, num_outputs }
+    DAG {
+        nodes,
+        num_inputs,
+        num_outputs,
+    }
 }
 
 fn pick_operand(
