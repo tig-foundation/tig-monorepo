@@ -30,7 +30,8 @@
 
 // c007_a016
 
-// c007_a017
+pub mod adaptive_js_v6;
+pub use adaptive_js_v6 as c007_a017;
 
 // c007_a018
 
