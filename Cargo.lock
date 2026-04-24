@@ -2256,7 +2256,6 @@ dependencies = [
  "anyhow",
  "base64 0.21.7",
  "bincode",
- "blake3",
  "cudarc",
  "curve25519-dalek",
  "flate2",

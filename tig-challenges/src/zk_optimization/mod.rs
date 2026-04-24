@@ -11,7 +11,7 @@ pub use r1cs::{R1CSMatrix, SpartanInstance, WitnessError};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use curve25519_dalek::scalar::Scalar;
+pub use curve25519_dalek::scalar::Scalar;
 use libspartan::{InputsAssignment, Instance, SNARKGens, VarsAssignment, SNARK};
 use merlin::Transcript;
 
