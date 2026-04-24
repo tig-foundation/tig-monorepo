@@ -22,13 +22,14 @@ pub fn solve_challenge(
     save_solution: &dyn Fn(&Solution) -> Result<()>,
     hyperparameters: &Option<Map<String, Value>>,
 ) -> Result<()> {
-    let solution = challenge.grid_optimize(&policy)?;
+    let circuit_star = optimizer(&challenge)?;
+    let solution = challenge.build_solution(&circuit_star)?;
     save_solution(&solution)?;
     Ok(())
 }
 
-pub fn policy(challenge: &Challenge, state: &State) -> Result<Vec<f64>> {
-    // TODO: implement your policy here
+pub fn optimizer(challenge: &Challenge) -> Result<SpartanInstance> {
+    // TODO: implement your circuit optimizer here
     Err(anyhow!("Not implemented"))
 }
 

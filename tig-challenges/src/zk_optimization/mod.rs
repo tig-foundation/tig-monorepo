@@ -111,6 +111,96 @@ impl Challenge {
         })
     }
 
+    /// Produces a Solution for the challenge using the participant's optimizer.
+    ///
+    /// 1. Derives `x_eval = H(H(C⁰) || H(C*))` (anti-grinding)
+    /// 2. Computes C⁰ witness via DAG (`compute_witness`)
+    /// 3. Computes C* witness via single forward pass (`solve_witness_forward`)
+    /// 4. Generates Spartan proofs π⁰ and π*
+    pub fn build_solution(&self, circuit_star: &SpartanInstance) -> Result<Solution> {
+        // 1. Derive x_eval
+        let h0 = CryptoHash::from_serializable(&self.circuit_c0)?;
+        let h_star = CryptoHash::from_serializable(circuit_star)?;
+        let x_eval = h0.combine(&h_star).to_scalars(self.num_circuit_inputs);
+
+        // 2. C⁰ witness (regenerate DAG)
+        let seed_hex = seed_to_hex(&self.seed);
+        let config = CircuitConfig::from_delta(self.delta);
+        let dag = generate_dag(&seed_hex, &config);
+        let (vars0, public_io0) = compute_witness(&dag, &x_eval);
+
+        // 3. C* witness (single forward pass — rows must be in topological order)
+        let (vars_star, public_io_star) =
+            solve_witness_forward(circuit_star, self.num_circuit_outputs, &x_eval)
+                .map_err(|e| anyhow!("C* witness solver failed: {:?}", e))?;
+
+        // 4a. Prove π⁰
+        let c0 = &self.circuit_c0;
+        let inst0 = Instance::new(c0.num_cons, c0.num_vars, c0.num_inputs, &c0.A, &c0.B, &c0.C)
+            .map_err(|e| anyhow!("Spartan instance for C⁰: {:?}", e))?;
+        let gens0 = SNARKGens::new(c0.num_cons, c0.num_vars, c0.num_inputs, num_non_zero(c0));
+        let (comm0, decomm0) = SNARK::encode(&inst0, &gens0);
+
+        let av0 = VarsAssignment::new(&scalars_to_bytes(&vars0))
+            .map_err(|e| anyhow!("VarsAssignment for C⁰: {:?}", e))?;
+        let ai0 = InputsAssignment::new(&scalars_to_bytes(&public_io0))
+            .map_err(|e| anyhow!("InputsAssignment for C⁰: {:?}", e))?;
+
+        let proof0 = SNARK::prove(
+            &inst0,
+            &comm0,
+            &decomm0,
+            av0,
+            &ai0,
+            &gens0,
+            &mut Transcript::new(b"ZKChallenge_C0"),
+        );
+
+        // 4b. Prove π*
+        let inst_star = Instance::new(
+            circuit_star.num_cons,
+            circuit_star.num_vars,
+            circuit_star.num_inputs,
+            &circuit_star.A,
+            &circuit_star.B,
+            &circuit_star.C,
+        )
+        .map_err(|e| anyhow!("Spartan instance for C*: {:?}", e))?;
+        let gens_star = SNARKGens::new(
+            circuit_star.num_cons,
+            circuit_star.num_vars,
+            circuit_star.num_inputs,
+            num_non_zero(&circuit_star),
+        );
+        let (comm_star, decomm_star) = SNARK::encode(&inst_star, &gens_star);
+
+        let av_star = VarsAssignment::new(&scalars_to_bytes(&vars_star))
+            .map_err(|e| anyhow!("VarsAssignment for C*: {:?}", e))?;
+        let ai_star = InputsAssignment::new(&scalars_to_bytes(&public_io_star))
+            .map_err(|e| anyhow!("InputsAssignment for C*: {:?}", e))?;
+
+        let proof_star = SNARK::prove(
+            &inst_star,
+            &comm_star,
+            &decomm_star,
+            av_star,
+            &ai_star,
+            &gens_star,
+            &mut Transcript::new(b"ZKChallenge_Cstar"),
+        );
+
+        let y0_pub = public_io0[..self.num_circuit_outputs].to_vec();
+        let y_star_pub = public_io_star[..self.num_circuit_outputs].to_vec();
+
+        Ok(Solution {
+            circuit_star: circuit_star.clone(),
+            y0_pub,
+            y_star_pub,
+            proof0,
+            proof_star,
+        })
+    }
+
     /// Verifies a solution against this challenge.
     ///
     /// 1. Recomputes `x_eval = H(H(C⁰) || H(C*))`
@@ -210,104 +300,6 @@ impl Challenge {
             Ok(quality)
         }
     );
-}
-
-// =============================================================================
-// Solver
-// =============================================================================
-
-/// Produces a Solution for the challenge using the participant's optimizer.
-///
-/// 1. Calls `optimize(C⁰)` → C*
-/// 2. Derives `x_eval = H(H(C⁰) || H(C*))` (anti-grinding)
-/// 3. Computes C⁰ witness via DAG (`compute_witness`)
-/// 4. Computes C* witness via single forward pass (`solve_witness_forward`)
-/// 5. Generates Spartan proofs π⁰ and π*
-pub fn solve_challenge(challenge: &Challenge, optimize: OptimizeCircuitFn) -> Result<Solution> {
-    // 1. Optimize
-    let circuit_star = optimize(&challenge.circuit_c0);
-
-    // 2. Derive x_eval
-    let h0 = CryptoHash::from_serializable(&challenge.circuit_c0)?;
-    let h_star = CryptoHash::from_serializable(&circuit_star)?;
-    let x_eval = h0.combine(&h_star).to_scalars(challenge.num_circuit_inputs);
-
-    // 3. C⁰ witness (regenerate DAG)
-    let seed_hex = seed_to_hex(&challenge.seed);
-    let config = CircuitConfig::from_delta(challenge.delta);
-    let dag = generate_dag(&seed_hex, &config);
-    let (vars0, public_io0) = compute_witness(&dag, &x_eval);
-
-    // 4. C* witness (single forward pass — rows must be in topological order)
-    let (vars_star, public_io_star) =
-        solve_witness_forward(&circuit_star, challenge.num_circuit_outputs, &x_eval)
-            .map_err(|e| anyhow!("C* witness solver failed: {:?}", e))?;
-
-    // 5a. Prove π⁰
-    let c0 = &challenge.circuit_c0;
-    let inst0 = Instance::new(c0.num_cons, c0.num_vars, c0.num_inputs, &c0.A, &c0.B, &c0.C)
-        .map_err(|e| anyhow!("Spartan instance for C⁰: {:?}", e))?;
-    let gens0 = SNARKGens::new(c0.num_cons, c0.num_vars, c0.num_inputs, num_non_zero(c0));
-    let (comm0, decomm0) = SNARK::encode(&inst0, &gens0);
-
-    let av0 = VarsAssignment::new(&scalars_to_bytes(&vars0))
-        .map_err(|e| anyhow!("VarsAssignment for C⁰: {:?}", e))?;
-    let ai0 = InputsAssignment::new(&scalars_to_bytes(&public_io0))
-        .map_err(|e| anyhow!("InputsAssignment for C⁰: {:?}", e))?;
-
-    let proof0 = SNARK::prove(
-        &inst0,
-        &comm0,
-        &decomm0,
-        av0,
-        &ai0,
-        &gens0,
-        &mut Transcript::new(b"ZKChallenge_C0"),
-    );
-
-    // 5b. Prove π*
-    let inst_star = Instance::new(
-        circuit_star.num_cons,
-        circuit_star.num_vars,
-        circuit_star.num_inputs,
-        &circuit_star.A,
-        &circuit_star.B,
-        &circuit_star.C,
-    )
-    .map_err(|e| anyhow!("Spartan instance for C*: {:?}", e))?;
-    let gens_star = SNARKGens::new(
-        circuit_star.num_cons,
-        circuit_star.num_vars,
-        circuit_star.num_inputs,
-        num_non_zero(&circuit_star),
-    );
-    let (comm_star, decomm_star) = SNARK::encode(&inst_star, &gens_star);
-
-    let av_star = VarsAssignment::new(&scalars_to_bytes(&vars_star))
-        .map_err(|e| anyhow!("VarsAssignment for C*: {:?}", e))?;
-    let ai_star = InputsAssignment::new(&scalars_to_bytes(&public_io_star))
-        .map_err(|e| anyhow!("InputsAssignment for C*: {:?}", e))?;
-
-    let proof_star = SNARK::prove(
-        &inst_star,
-        &comm_star,
-        &decomm_star,
-        av_star,
-        &ai_star,
-        &gens_star,
-        &mut Transcript::new(b"ZKChallenge_Cstar"),
-    );
-
-    let y0_pub = public_io0[..challenge.num_circuit_outputs].to_vec();
-    let y_star_pub = public_io_star[..challenge.num_circuit_outputs].to_vec();
-
-    Ok(Solution {
-        circuit_star,
-        y0_pub,
-        y_star_pub,
-        proof0,
-        proof_star,
-    })
 }
 
 fn scalars_to_bytes(scalars: &[Scalar]) -> Vec<[u8; 32]> {
@@ -490,7 +482,10 @@ mod tests {
         }
 
         let t0 = Instant::now();
-        let solution = solve_challenge(&ch, alias_optimizer).expect("solve_challenge must succeed");
+        let circuit_star = alias_optimizer(&ch.circuit_c0);
+        let solution = ch
+            .build_solution(&circuit_star)
+            .expect("build_solution must succeed");
         eprintln!(
             "[2] solve: {} -> {} constraints in {:.2?}",
             ch.circuit_c0.num_cons,

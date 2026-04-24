@@ -54,8 +54,12 @@ case "$CHALLENGE" in
     echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'energy_arbitrage'"
     build_so $ALGORITHM
     ;;
+  zk_optimization)
+    echo "Building ALGORITHM '$ALGORITHM' for CHALLENGE 'zk_optimization'"
+    build_so $ALGORITHM
+    ;;
   *)
-    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, vehicle_routing, knapsack, vector_search, hypergraph, neuralnet_optimizer, job_scheduling, energy_arbitrage"
+    echo "Error: Invalid CHALLENGE value. Must be one of: satisfiability, vehicle_routing, knapsack, vector_search, hypergraph, neuralnet_optimizer, job_scheduling, energy_arbitrage, zk_optimization"
     exit 1
     ;;
 esac
