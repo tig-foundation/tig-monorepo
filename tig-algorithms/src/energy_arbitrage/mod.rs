@@ -1,6 +1,7 @@
 // c008_a001
 
-// c008_a002
+pub mod energy_v1;
+pub use energy_v1 as c008_a002;
 
 // c008_a003
 
