@@ -1,7 +1,7 @@
-mod baselines;
-mod crypto;
-mod dag;
-mod r1cs;
+pub mod baselines;
+pub(crate) mod crypto;
+pub(crate) mod dag;
+pub(crate) mod r1cs;
 
 use crate::QUALITY_PRECISION;
 pub use crypto::CryptoHash;
@@ -285,7 +285,7 @@ impl Challenge {
 
     conditional_pub!(
         fn compute_baseline(&self) -> Result<usize> {
-            Ok(baselines::remove_aliases::run(&self.circuit_c0).num_cons)
+            Ok(baselines::remove_aliases(&self.circuit_c0).num_cons)
         }
     );
 
@@ -478,7 +478,7 @@ mod tests {
         eprintln!("[1] baseline: {} constraints", ch.circuit_c0.num_cons);
 
         fn alias_optimizer(c0: &SpartanInstance) -> SpartanInstance {
-            baselines::remove_aliases::run(c0)
+            baselines::remove_aliases(c0)
         }
 
         let t0 = Instant::now();
@@ -521,6 +521,7 @@ mod tests {
             num_cons: c0.num_cons,
             num_vars: c0.num_vars,
             num_inputs: c0.num_inputs,
+            num_outputs: c0.num_outputs,
             A: flip(&c0.A),
             B: flip(&c0.B),
             C: flip(&c0.C),

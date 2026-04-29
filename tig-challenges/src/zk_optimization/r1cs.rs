@@ -1,4 +1,4 @@
-use super::dag::{DAG, OpType};
+use super::dag::{OpType, DAG};
 use curve25519_dalek::scalar::Scalar;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -37,6 +37,7 @@ pub struct SpartanInstance {
     pub num_cons: usize,
     pub num_vars: usize,
     pub num_inputs: usize,
+    pub num_outputs: usize,
     pub A: R1CSMatrix,
     pub B: R1CSMatrix,
     pub C: R1CSMatrix,
@@ -222,6 +223,7 @@ pub fn dag_to_spartan(dag: &DAG) -> SpartanInstance {
         num_cons: row,
         num_vars: cols.num_private_vars,
         num_inputs: cols.num_public_inputs,
+        num_outputs: cols.output_node_order.len(),
         A: a_mat,
         B: b_mat,
         C: c_mat,
@@ -320,7 +322,10 @@ pub fn solve_witness_forward(
 ) -> Result<(Vec<Scalar>, Vec<Scalar>), WitnessError> {
     let expected = instance.num_inputs - num_outputs;
     if circuit_inputs.len() != expected {
-        return Err(WitnessError::InvalidInputs { expected, got: circuit_inputs.len() });
+        return Err(WitnessError::InvalidInputs {
+            expected,
+            got: circuit_inputs.len(),
+        });
     }
 
     let (a_rows, b_rows, c_rows) = build_row_views(instance);
@@ -397,7 +402,10 @@ pub fn solve_witness_from_r1cs(
 ) -> Result<(Vec<Scalar>, Vec<Scalar>), WitnessError> {
     let expected = instance.num_inputs - num_outputs;
     if circuit_inputs.len() != expected {
-        return Err(WitnessError::InvalidInputs { expected, got: circuit_inputs.len() });
+        return Err(WitnessError::InvalidInputs {
+            expected,
+            got: circuit_inputs.len(),
+        });
     }
 
     let (a_rows, b_rows, c_rows) = build_row_views(instance);
@@ -526,7 +534,10 @@ fn check_convergence(
         }
     }
     if count < total {
-        Err(WitnessError::SolverStuck { solved: count, total })
+        Err(WitnessError::SolverStuck {
+            solved: count,
+            total,
+        })
     } else {
         Ok(())
     }
@@ -534,7 +545,6 @@ fn check_convergence(
 
 fn extract_result(z: &[Scalar], instance: &SpartanInstance) -> (Vec<Scalar>, Vec<Scalar>) {
     let vars = z[..instance.num_vars].to_vec();
-    let public_io =
-        z[instance.num_vars + 1..instance.num_vars + 1 + instance.num_inputs].to_vec();
+    let public_io = z[instance.num_vars + 1..instance.num_vars + 1 + instance.num_inputs].to_vec();
     (vars, public_io)
 }
