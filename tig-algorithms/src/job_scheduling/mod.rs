@@ -32,7 +32,8 @@
 
 // c007_a017
 
-// c007_a018
+pub mod job_nine;
+pub use job_nine as c007_a018;
 
 // c007_a019
 
