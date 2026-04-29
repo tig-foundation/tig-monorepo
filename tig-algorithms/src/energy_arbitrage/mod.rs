@@ -2,7 +2,8 @@
 
 // c008_a002
 
-// c008_a003
+pub mod mpc_v5;
+pub use mpc_v5 as c008_a003;
 
 // c008_a004
 
