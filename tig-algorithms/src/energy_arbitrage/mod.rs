@@ -4,7 +4,8 @@
 
 // c008_a003
 
-// c008_a004
+pub mod nodal_pair_arb;
+pub use nodal_pair_arb as c008_a004;
 
 // c008_a005
 
