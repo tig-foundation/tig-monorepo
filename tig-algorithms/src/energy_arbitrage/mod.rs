@@ -6,7 +6,8 @@
 
 // c008_a004
 
-// c008_a005
+pub mod closed_form_arb;
+pub use closed_form_arb as c008_a005;
 
 // c008_a006
 
