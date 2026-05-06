@@ -8,7 +8,8 @@
 
 // c008_a005
 
-// c008_a006
+pub mod energy_v2;
+pub use energy_v2 as c008_a006;
 
 // c008_a007
 
