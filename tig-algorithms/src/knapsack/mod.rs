@@ -254,7 +254,8 @@
 
 // c003_a128
 
-// c003_a129
+pub mod knap_quality_opt_v9;
+pub use knap_quality_opt_v9 as c003_a129;
 
 // c003_a130
 
