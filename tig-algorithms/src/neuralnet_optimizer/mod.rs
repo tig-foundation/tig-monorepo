@@ -54,7 +54,8 @@
 
 // c006_a028
 
-// c006_a029
+pub mod neural_sophia_h_v1;
+pub use neural_sophia_h_v1 as c006_a029;
 
 // c006_a030
 
