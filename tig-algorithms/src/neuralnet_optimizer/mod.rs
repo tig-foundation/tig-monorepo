@@ -60,7 +60,8 @@
 
 // c006_a031
 
-// c006_a032
+pub mod neural_sam_lion_v1;
+pub use neural_sam_lion_v1 as c006_a032;
 
 // c006_a033
 
