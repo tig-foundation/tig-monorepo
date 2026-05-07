@@ -64,7 +64,8 @@
 
 // c006_a033
 
-// c006_a034
+pub mod lion_per_track_v1;
+pub use lion_per_track_v1 as c006_a034;
 
 // c006_a035
 
