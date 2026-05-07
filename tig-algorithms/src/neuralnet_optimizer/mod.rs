@@ -62,7 +62,8 @@
 
 // c006_a032
 
-// c006_a033
+pub mod lion_baseline_v1;
+pub use lion_baseline_v1 as c006_a033;
 
 // c006_a034
 
