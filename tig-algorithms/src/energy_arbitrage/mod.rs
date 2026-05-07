@@ -10,7 +10,8 @@
 
 // c008_a006
 
-// c008_a007
+pub mod iycbtjt;
+pub use iycbtjt as c008_a007;
 
 // c008_a008
 
