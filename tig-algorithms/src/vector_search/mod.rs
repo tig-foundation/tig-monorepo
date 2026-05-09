@@ -188,7 +188,8 @@
 
 // c004_a095
 
-// c004_a096
+pub mod there_v7;
+pub use there_v7 as c004_a096;
 
 // c004_a097
 
