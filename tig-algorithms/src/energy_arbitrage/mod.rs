@@ -14,7 +14,8 @@
 
 // c008_a008
 
-// c008_a009
+pub mod mpc_v7;
+pub use mpc_v7 as c008_a009;
 
 // c008_a010
 
