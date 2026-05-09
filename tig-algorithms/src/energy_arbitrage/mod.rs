@@ -12,7 +12,8 @@
 
 // c008_a007
 
-// c008_a008
+pub mod aiioagayp;
+pub use aiioagayp as c008_a008;
 
 // c008_a009
 
