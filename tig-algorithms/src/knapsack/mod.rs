@@ -256,7 +256,8 @@
 
 // c003_a129
 
-// c003_a130
+pub mod near_knap_zenith;
+pub use near_knap_zenith as c003_a130;
 
 // c003_a131
 
