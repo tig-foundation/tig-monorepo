@@ -180,7 +180,8 @@
 
 // c001_a091
 
-// c001_a092
+pub mod tempre_sat_fast;
+pub use tempre_sat_fast as c001_a092;
 
 // c001_a093
 
