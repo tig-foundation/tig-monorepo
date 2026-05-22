@@ -26,7 +26,8 @@
 
 // c008_a014
 
-// c008_a015
+pub mod test_alg;
+pub use test_alg as c008_a015;
 
 // c008_a016
 
