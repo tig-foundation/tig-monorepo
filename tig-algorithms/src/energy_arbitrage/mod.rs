@@ -28,7 +28,8 @@
 
 // c008_a015
 
-// c008_a016
+pub mod prom_codex_grasp;
+pub use prom_codex_grasp as c008_a016;
 
 // c008_a017
 
