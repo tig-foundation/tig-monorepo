@@ -30,7 +30,8 @@
 
 // c008_a016
 
-// c008_a017
+pub mod prom_raven_thorn;
+pub use prom_raven_thorn as c008_a017;
 
 // c008_a018
 
