@@ -36,7 +36,8 @@
 
 // c008_a019
 
-// c008_a020
+pub mod codex_ea_hybrid;
+pub use codex_ea_hybrid as c008_a020;
 
 // c008_a021
 
