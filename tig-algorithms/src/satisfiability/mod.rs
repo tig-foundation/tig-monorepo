@@ -190,7 +190,8 @@
 
 // c001_a096
 
-// c001_a097
+pub mod sat_tailwalk_v2;
+pub use sat_tailwalk_v2 as c001_a097;
 
 // c001_a098
 
