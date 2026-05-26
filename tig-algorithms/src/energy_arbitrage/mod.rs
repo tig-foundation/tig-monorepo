@@ -34,7 +34,8 @@
 
 // c008_a018
 
-// c008_a019
+pub mod aiwfcihq;
+pub use aiwfcihq as c008_a019;
 
 // c008_a020
 
