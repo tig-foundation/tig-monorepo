@@ -40,7 +40,8 @@
 
 // c008_a021
 
-// c008_a022
+pub mod delta_machine_ea_v2;
+pub use delta_machine_ea_v2 as c008_a022;
 
 // c008_a023
 
