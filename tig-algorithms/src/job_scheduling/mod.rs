@@ -36,7 +36,8 @@
 
 // c007_a019
 
-// c007_a020
+pub mod delta_machine_jss_v1;
+pub use delta_machine_jss_v1 as c007_a020;
 
 // c007_a021
 
