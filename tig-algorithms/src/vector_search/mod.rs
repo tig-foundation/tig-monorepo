@@ -198,7 +198,8 @@
 
 // c004_a100
 
-// c004_a101
+pub mod autovector_f;
+pub use autovector_f as c004_a101;
 
 // c004_a102
 
