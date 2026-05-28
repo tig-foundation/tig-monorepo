@@ -46,7 +46,8 @@
 
 // c008_a024
 
-// c008_a025
+pub mod mpc_router_v3;
+pub use mpc_router_v3 as c008_a025;
 
 // c008_a026
 
