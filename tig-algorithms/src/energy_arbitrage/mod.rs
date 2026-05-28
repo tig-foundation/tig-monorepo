@@ -44,7 +44,8 @@
 
 // c008_a023
 
-// c008_a024
+pub mod prometheus_eb1;
+pub use prometheus_eb1 as c008_a024;
 
 // c008_a025
 
