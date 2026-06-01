@@ -1,0 +1,3019 @@
+use anyhow::{anyhow, Result};
+use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
+use std::collections::HashMap;
+use tig_challenges::job_scheduling::*;
+use super::types::*;
+use super::infra_shared::*;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Rule {
+    Adaptive, BnHeavy, EndTight, CriticalPath, MostWork, LeastFlex, Regret, ShortestProc, FlexBalance,
+}
+
+#[inline]
+fn slack_urgency_fm(pre: &Pre, target_mk: Option<u32>, time: u32, product: usize, op_idx: usize) -> f64 {
+    let Some(tgt) = target_mk else { return 0.0 };
+    let lb = (time as u64).saturating_add(pre.product_suf_min[product][op_idx] as u64);
+    let slack = (tgt as i64) - (lb as i64);
+    let scale = (0.70 * pre.avg_op_min).max(1.0);
+    let pos = (slack.max(0) as f64) / scale; let neg = ((-slack).max(0) as f64) / scale;
+    (1.0 / (1.0 + pos)).clamp(0.0, 1.0) + (0.35 * neg).min(3.0)
+}
+
+#[inline]
+fn route_pref_bonus_fm(rp: Option<&RoutePrefLite>, product: usize, op_idx: usize, machine: usize) -> f64 {
+    let Some(rp) = rp else { return 0.0 };
+    if product >= rp.len() || op_idx >= rp[product].len() { return 0.0; }
+    let r = rp[product][op_idx]; let mu = machine.min(255) as u8;
+    if mu == r.best_m { (r.best_w as f64) / 255.0 } else if mu == r.second_m { (r.second_w as f64) / 255.0 } else { 0.0 }
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline]
+fn score_candidate(
+    pre: &Pre, rule: Rule, job: usize, product: usize, op_idx: usize,
+    ops_rem: usize, op: &OpInfo, machine: usize, pt: u32, time: u32,
+    target_mk: Option<u32>, best_end: u32, second_end: u32, best_cnt_total: usize,
+    progress: f64, job_bias: f64, machine_penalty: f64, dynamic_load: f64,
+    route_pref: Option<&RoutePrefLite>, route_w: f64, jitter: f64,
+) -> f64 {
+    let rem_min = pre.product_suf_min[product][op_idx] as f64;
+    let rem_avg = pre.product_suf_avg[product][op_idx]; let rem_bn = pre.product_suf_bn[product][op_idx];
+    let flex_f = (op.flex as f64).max(1.0); let flex_inv = 1.0/flex_f;
+    let rem_min_n = rem_min/pre.horizon.max(1.0); let rem_avg_n = rem_avg/pre.max_job_avg_work.max(1e-9);
+    let bn_n = rem_bn/pre.max_job_bn.max(1e-9); let ops_n = (ops_rem as f64)/(pre.max_ops as f64).max(1.0);
+    let load_n = dynamic_load/pre.avg_machine_load.max(1e-9); let scar_n = pre.machine_scarcity[machine]/pre.avg_machine_scarcity.max(1e-9);
+    let end_n = (best_end as f64)/pre.time_scale.max(1.0); let proc_n = (pt as f64)/pre.avg_op_min.max(1.0);
+    let regret = if second_end >= INF { pre.avg_op_min*2.6 } else { (second_end-best_end) as f64 };
+    let reg_n = (regret/pre.avg_op_min.max(1.0)).clamp(0.0,6.0);
+    let scarcity_urg = 1.0/(best_cnt_total as f64).max(1.0);
+    let density_n = ((rem_min/(ops_rem as f64).max(1.0))/pre.avg_op_min.max(1.0)).clamp(0.0,4.0);
+    let next_min = pre.product_next_min[product][op_idx] as f64; let next_min_n = next_min/pre.horizon.max(1.0);
+    let next_flex_inv = pre.product_next_flex_inv[product][op_idx];
+    let p2 = progress*progress; let next_w_base = 0.12+p2*0.28;
+    let next_term_raw = (0.55*next_min_n+0.45*next_flex_inv)*(1.0+0.30*density_n*pre.high_flex);
+    let js = pre.jobshopness; let fl = 1.0-js;
+    let avg_flex_inv = 1.0/pre.flex_avg.max(1.0); let scarce_match = scar_n*(flex_inv-avg_flex_inv);
+    let mpen = machine_penalty.clamp(0.0,1.0); let mpen_gain = 1.0+0.85*pre.high_flex;
+    let flow_term = pre.flow_w*pre.job_flow_pref[job]*(0.65+0.70*(1.0-progress));
+    let slack_u = slack_urgency_fm(pre, target_mk, time, product, op_idx);
+    let slack_w = pre.slack_base*(0.25+0.75*progress); let slack_reg_boost = 1.0+0.40*reg_n*progress;
+    let pop_pen = if pre.chaotic_like && op.flex >= 2 { let pop=pre.machine_best_pop[machine]; (0.07+0.15*(1.0-progress)).clamp(0.05,0.24)*pop*pre.flex_factor } else { 0.0 };
+    let route_gain = (0.70+0.80*(1.0-progress)).clamp(0.70,1.40);
+    let route_term = if route_w>0.0 && op.flex>=2 { route_w*route_gain*route_pref_bonus_fm(route_pref,product,op_idx,machine) } else { 0.0 };
+    match rule {
+        Rule::CriticalPath => {
+            let next_term = next_w_base * 0.30 * next_term_raw;
+            let slack_term = slack_w * slack_u * slack_reg_boost;
+            let base_score = (1.03 * rem_min_n) + (0.10 * ops_n) + (0.24 * scarcity_urg) + (0.20 * pre.flex_factor) * flex_inv + next_term + 0.10 * slack_term - (0.70 * end_n) - pop_pen + flow_term + route_term + jitter;
+            let bias_factor = 0.45 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::MostWork => {
+            let next_term = next_w_base * 0.25 * next_term_raw;
+            let base_score = (1.00 * rem_avg_n) + (0.12 * ops_n) + (0.18 * scarcity_urg) + (0.15 * pre.flex_factor) * flex_inv + next_term - (0.62 * end_n) - pop_pen + flow_term + route_term + jitter;
+            let bias_factor = 0.45 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::LeastFlex => {
+            let next_term = next_w_base * 0.20 * next_term_raw;
+            let base_score = (1.00 * flex_inv) + (0.28 * rem_min_n) + (0.22 * scarcity_urg) + next_term - (0.55 * end_n) - pop_pen + flow_term + route_term + jitter;
+            let bias_factor = 0.35 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::ShortestProc => {
+            let next_term = next_w_base * 0.20 * next_term_raw;
+            let base_score = (-1.00 * proc_n) + (0.25 * rem_min_n) + (0.12 * scarcity_urg) + next_term - (0.20 * end_n) - pop_pen + flow_term + route_term + jitter;
+            let bias_factor = 0.25 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::Regret => {
+            let reg_scale = (1.0 + 0.35 * pre.bn_focus) * (1.0 + 0.25 * pre.load_cv);
+            let next_term = next_w_base * 0.25 * next_term_raw;
+            let scarce_w = 0.18 + 0.15 * pre.load_cv;
+            let base_score = (reg_scale * 1.10 * reg_n) + (0.60 * rem_min_n) + (0.25 * scarcity_urg) + (scarce_w * pre.flex_factor) * flex_inv + next_term - (0.65 * end_n) - pop_pen + flow_term + route_term + jitter;
+            let bias_factor = 0.38 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::EndTight => {
+            let end_w = 1.10 + 1.00 * progress + 0.35 * pre.high_flex;
+            let cp_w = 1.15 + 0.30 * js;
+            let reg_w = (0.55 + 0.20 * (1.0 - progress)) * (0.85 + 0.60 * js);
+            let mpen_w = (0.10 + 0.45 * pre.high_flex) * pre.flex_factor;
+            let next_term = next_w_base * (0.45 + 0.55 * js) * next_term_raw;
+            let slack_term = slack_w * (0.70 + 0.40 * js) * slack_u * slack_reg_boost;
+            let base_score = (cp_w * rem_min_n) + 0.12 * rem_avg_n + 0.08 * ops_n + 0.18 * scarcity_urg + (0.30 * pre.flex_factor) * flex_inv + (0.20 * pre.flex_factor) * scarce_match + (reg_w * pre.flex_factor) * reg_n + next_term + slack_term - end_w * end_n - 0.22 * proc_n - pop_pen - (mpen_gain * mpen_w) * mpen + flow_term + route_term + jitter;
+            let bias_factor = 0.55 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::BnHeavy => {
+            let bn_w = (0.90 + 0.55 * js) * pre.bn_focus;
+            let end_w = 0.65 + 0.70 * progress;
+            let reg_w = (0.60 + 0.25 * (1.0 - progress)) * (0.85 + 0.35 * js);
+            let load_w = if pre.hi_flex { -0.35 } else { 0.55 + 0.25 * js };
+            let mpen_w = (0.12 + 0.30 * js) * pre.flex_factor * (0.95 + 0.65 * pre.high_flex);
+            let next_term = next_w_base * (0.55 + 0.75 * js) * next_term_raw;
+            let slack_term = slack_w * (0.45 + 0.55 * js) * slack_u * slack_reg_boost;
+            let base_score = (0.95 * rem_min_n) + (0.30 * rem_avg_n) + (bn_w * bn_n) + (0.22 * density_n) + (0.10 * ops_n) + (0.65 * pre.flex_factor) * flex_inv + (0.35 * pre.flex_factor) * scarce_match + load_w * pre.flex_factor * load_n + (reg_w * pre.flex_factor) * reg_n + 0.18 * scarcity_urg + next_term + slack_term - end_w * end_n - 0.18 * proc_n - pop_pen - (mpen_gain * mpen_w) * mpen + flow_term + route_term + jitter;
+            let bias_factor = 0.60 * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::Adaptive => {
+            let end_w = (0.90 * fl + 0.72 * js) + (0.62 + 0.12 * fl) * progress + 0.18 * pre.high_flex;
+            let reg_scale = (1.0 + 0.40 * pre.bn_focus * (1.0 / pre.flex_avg.max(1.0)) * 2.5) * (1.0 + 0.30 * pre.load_cv);
+            let reg_w = ((0.50 * fl + 0.78 * js) + 0.18 * (1.0 - progress)) * reg_scale;
+            let bn_w = ((0.45 + 0.40 * js) + 0.25 * (1.0 - progress)) * pre.bn_focus;
+            let load_sign = if pre.hi_flex { -1.0 } else { 1.0 };
+            let load_w = load_sign * (0.45 * fl + 0.75 * js) * pre.flex_factor;
+            let density_w = 0.08 * fl + 0.20 * js;
+            let next_term = next_w_base * (0.50 * fl + 1.50 * js) * next_term_raw;
+            let mpen_w = (0.08 * fl + 0.28 * js) * pre.flex_factor * (1.0 + 0.85 * pre.high_flex);
+            let slack_term = slack_w * (0.55 * fl + 0.85 * js) * slack_u * slack_reg_boost;
+            let route_scale = 1.0 + 0.45 * (1.0 / pre.flex_avg.max(1.0)) * 3.0 * (1.0 - 0.5 * pre.high_flex);
+            let route_term_a = route_term * route_scale;
+            let scarce_w = (0.55 + 0.25 * pre.load_cv) * pre.flex_factor;
+            let base_score = (1.05 * rem_min_n) + (0.48 * rem_avg_n) + (bn_w * bn_n) + density_w * density_n + (0.08 * ops_n) + (0.62 * pre.flex_factor) * flex_inv + scarce_w * scarce_match + load_w * load_n + (reg_w * pre.flex_factor) * reg_n + 0.20 * pre.flex_factor * scarcity_urg + next_term + slack_term - end_w * end_n - (0.18 * fl + 0.12 * js) * proc_n - pop_pen - (mpen_gain * mpen_w) * mpen + flow_term + route_term_a + jitter;
+            let bias_factor = (0.62 + 0.06 * js) * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+        Rule::FlexBalance => {
+            let end_w = (0.85 + 0.70 * progress + 0.15 * js).clamp(0.85, 1.75);
+            let cp_w = (1.00 + 0.30 * js + 0.15 * (1.0 - progress)).clamp(0.95, 1.45);
+            let load_w = (0.55 + 0.35 * pre.high_flex).clamp(0.55, 0.95) * pre.flex_factor;
+            let mpen_w = (0.55 + 0.65 * pre.high_flex).clamp(0.55, 1.15);
+            let reg_w = (0.35 + 0.25 * (1.0 - progress)).clamp(0.35, 0.70);
+            let next_term = next_w_base * 0.40 * next_term_raw;
+            let base_score = (cp_w * rem_min_n) + 0.55 * rem_avg_n + 0.08 * ops_n + 0.06 * density_n + 0.08 * scarcity_urg + next_term + (0.70 * slack_w) * slack_u - end_w * end_n - 0.16 * proc_n - pop_pen - load_w * load_n - (mpen_w * (1.0 + 0.85 * pre.high_flex)) * mpen + (reg_w * pre.flex_factor) * reg_n + flow_term + route_term + jitter;
+            let bias_factor = (0.58 + 0.10 * pre.high_flex) * job_bias;
+            base_score + bias_factor * base_score.abs()
+        }
+    }
+}
+
+#[inline]
+fn rule_idx(r: Rule) -> usize {
+    match r { Rule::Adaptive=>0, Rule::BnHeavy=>1, Rule::EndTight=>2, Rule::CriticalPath=>3, Rule::MostWork=>4, Rule::LeastFlex=>5, Rule::Regret=>6, Rule::ShortestProc=>7, Rule::FlexBalance=>8 }
+}
+
+fn choose_rule_bandit(rng: &mut SmallRng, rules: &[Rule], rule_best: &[u32], rule_tries: &[u32], global_best: u32, margin: u32, stuck: usize, chaos_like: bool, late_phase: bool) -> Rule {
+    if rules.is_empty() { return Rule::Adaptive; }
+    let mut best_seen = global_best; for &mk in rule_best { if mk < best_seen { best_seen = mk; } }
+    let scale = (margin as f64).max(1.0); let s = ((stuck as f64)/140.0).clamp(0.0,1.0); let explore_mix = (0.10+0.55*s).clamp(0.10,0.65);
+    let mut sum=0.0;
+    for &r in rules.iter() {
+        let mk=rule_best[rule_idx(r)]; let t=rule_tries[rule_idx(r)].max(1) as f64;
+        let delta=mk.saturating_sub(best_seen) as f64; let exploit=(-delta/scale).exp(); let explore=(1.0/t).sqrt();
+        let mut ww=(1.0-explore_mix)*exploit+explore_mix*explore; ww=ww.max(1e-6);
+        if chaos_like{ww=ww.powf(0.70);}else if late_phase{ww=ww.powf(1.18);}
+        sum+=ww.max(0.0);
+    }
+    if !(sum>0.0) { return rules[rng.gen_range(0..rules.len())]; }
+    let mut r=rng.gen::<f64>()*sum;
+    for &rule in rules.iter() {
+        let mk=rule_best[rule_idx(rule)]; let t=rule_tries[rule_idx(rule)].max(1) as f64;
+        let delta=mk.saturating_sub(best_seen) as f64; let exploit=(-delta/scale).exp(); let explore=(1.0/t).sqrt();
+        let mut ww=(1.0-explore_mix)*exploit+explore_mix*explore; ww=ww.max(1e-6);
+        if chaos_like{ww=ww.powf(0.70);}else if late_phase{ww=ww.powf(1.18);}
+        r-=ww.max(0.0);
+        if r<=0.0 { return rule; }
+    }
+    rules[rules.len()-1]
+}
+
+fn construct_solution_conflict(
+    challenge: &Challenge, pre: &Pre, rule: Rule, k: usize, target_mk: Option<u32>,
+    rng: &mut SmallRng, job_bias: Option<&[f64]>, machine_penalty: Option<&[f64]>,
+    route_pref: Option<&RoutePrefLite>, route_w: f64,
+) -> Result<(Solution, u32)> {
+    if k == 0 {
+        construct_solution_conflict_det(
+            challenge,
+            pre,
+            rule,
+            target_mk,
+            job_bias,
+            machine_penalty,
+            route_pref,
+            route_w,
+        )
+    } else {
+        construct_solution_conflict_topk(
+            challenge,
+            pre,
+            rule,
+            k,
+            target_mk,
+            rng,
+            job_bias,
+            machine_penalty,
+            route_pref,
+            route_w,
+        )
+    }
+}
+
+fn construct_solution_conflict_det(
+    challenge: &Challenge, pre: &Pre, rule: Rule, target_mk: Option<u32>,
+    job_bias: Option<&[f64]>, machine_penalty: Option<&[f64]>,
+    route_pref: Option<&RoutePrefLite>, route_w: f64,
+) -> Result<(Solution, u32)> {
+    let num_jobs = challenge.num_jobs;
+    let num_machines = challenge.num_machines;
+
+    let mut job_next_op = vec![0usize; num_jobs];
+    let mut job_ready_time = vec![0u32; num_jobs];
+    let mut machine_avail = vec![0u32; num_machines];
+    let mut machine_load = pre.machine_load0.clone();
+
+    let mut job_schedule: Vec<Vec<(usize, u32)>> = pre
+        .job_ops_len
+        .iter()
+        .map(|&len| Vec::with_capacity(len))
+        .collect();
+
+    let mut remaining_ops = pre.total_ops;
+    let mut time = 0u32;
+    let mut idle_count = num_machines;
+
+    let chaotic_like = pre.chaotic_like;
+    let mut machine_work: Vec<u64> = if chaotic_like { vec![0u64; num_machines] } else { vec![] };
+    let mut sum_work: u64 = 0;
+
+    let mut ready_jobs: Vec<usize> = Vec::with_capacity(num_jobs);
+    for job in 0..num_jobs {
+        if pre.job_ops_len[job] > 0 {
+            ready_jobs.push(job);
+        }
+    }
+    let mut delayed_jobs: Vec<(u32, usize)> = Vec::with_capacity(num_jobs);
+    let mut delayed_head = 0usize;
+
+    while remaining_ops > 0 {
+        loop {
+            if idle_count == 0 || ready_jobs.is_empty() {
+                break;
+            }
+
+            let progress = 1.0 - (remaining_ops as f64) / (pre.total_ops as f64).max(1.0);
+            let (bal_w, avg_work) = if chaotic_like {
+                (
+                    (0.030 + 0.070 * (1.0 - progress)).clamp(0.025, 0.11),
+                    (sum_work as f64) / (num_machines as f64).max(1.0),
+                )
+            } else {
+                (0.0, 0.0)
+            };
+
+            let mut best: Option<Cand> = None;
+
+            for &job in &ready_jobs {
+                let op_idx = job_next_op[job];
+                if op_idx >= pre.job_ops_len[job] {
+                    continue;
+                }
+                let product = pre.job_products[job];
+                let op = &pre.product_ops[product][op_idx];
+                if op.flex == 0 || op.machines.is_empty() || op.min_pt >= INF {
+                    continue;
+                }
+
+                let (best_end, second_end, best_cnt_total, best_cnt_idle) =
+                    best_second_and_counts(time, &machine_avail, op);
+                if best_end >= INF || best_cnt_idle == 0 {
+                    continue;
+                }
+
+                let ops_rem = pre.job_ops_len[job] - op_idx;
+                let jb = job_bias.map(|v| v[job]).unwrap_or(0.0);
+
+                for &(m, pt) in &op.machines {
+                    if machine_avail[m] > time {
+                        continue;
+                    }
+                    let end = time.saturating_add(pt);
+                    if end != best_end {
+                        continue;
+                    }
+
+                    let mp = machine_penalty.map(|v| v[m]).unwrap_or(0.0);
+
+                    let base = score_candidate(
+                        pre,
+                        rule,
+                        job,
+                        product,
+                        op_idx,
+                        ops_rem,
+                        op,
+                        m,
+                        pt,
+                        time,
+                        target_mk,
+                        best_end,
+                        second_end,
+                        best_cnt_total,
+                        progress,
+                        jb,
+                        mp,
+                        machine_load[m],
+                        route_pref,
+                        route_w,
+                        0.0,
+                    );
+
+                    let bal_pen = if chaotic_like && bal_w > 0.0 {
+                        let denomw = (avg_work + (pre.avg_op_min * 3.0).max(1.0)).max(1.0);
+                        let r = (machine_work[m] as f64) / denomw;
+                        let done_n = (r / (r + 1.0)).clamp(0.0, 1.0);
+                        -bal_w * done_n
+                    } else {
+                        0.0
+                    };
+
+                    let c = Cand { job, machine: m, pt, score: base + bal_pen };
+                    if best.map_or(true, |bb| c.score > bb.score) {
+                        best = Some(c);
+                    }
+                }
+            }
+
+            let chosen = match best {
+                Some(c) => c,
+                None => break,
+            };
+
+            let job = chosen.job;
+            let machine = chosen.machine;
+            let pt = chosen.pt;
+
+            let product = pre.job_products[job];
+            let op_idx = job_next_op[job];
+            let op = &pre.product_ops[product][op_idx];
+
+            let (best_end_now, _, _, _) = best_second_and_counts(time, &machine_avail, op);
+            let end_check = time.max(machine_avail[machine]).saturating_add(pt);
+            if machine_avail[machine] > time || end_check != best_end_now {
+                break;
+            }
+
+            if let Ok(pos) = ready_jobs.binary_search(&job) {
+                ready_jobs.remove(pos);
+            }
+
+            let end_time = time.saturating_add(pt);
+            job_schedule[job].push((machine, time));
+            job_next_op[job] += 1;
+            job_ready_time[job] = end_time;
+            machine_avail[machine] = end_time;
+            if end_time > time {
+                idle_count = idle_count.saturating_sub(1);
+            }
+            remaining_ops -= 1;
+
+            if chaotic_like {
+                machine_work[machine] = machine_work[machine].saturating_add(pt as u64);
+                sum_work = sum_work.saturating_add(pt as u64);
+            }
+
+            if op.min_pt < INF && op.flex > 0 && !op.machines.is_empty() {
+                let delta = (op.min_pt as f64) / (op.flex as f64).max(1.0);
+                if delta > 0.0 {
+                    for &(mm, _) in &op.machines {
+                        let v = machine_load[mm] - delta;
+                        machine_load[mm] = if v > 0.0 { v } else { 0.0 };
+                    }
+                }
+            }
+
+            if job_next_op[job] < pre.job_ops_len[job] {
+                if job_ready_time[job] <= time {
+                    let pos = ready_jobs.binary_search(&job).unwrap_or_else(|p| p);
+                    ready_jobs.insert(pos, job);
+                } else {
+                    let item = (job_ready_time[job], job);
+                    let rel = delayed_jobs[delayed_head..]
+                        .binary_search_by(|&(t, j)| {
+                            if t < item.0 {
+                                std::cmp::Ordering::Less
+                            } else if t > item.0 {
+                                std::cmp::Ordering::Greater
+                            } else {
+                                j.cmp(&item.1)
+                            }
+                        })
+                        .unwrap_or_else(|p| p);
+                    delayed_jobs.insert(delayed_head + rel, item);
+                }
+            }
+
+            if remaining_ops == 0 {
+                break;
+            }
+        }
+
+        if remaining_ops == 0 {
+            break;
+        }
+
+        let mut next_time: Option<u32> = None;
+        for &t in &machine_avail {
+            if t > time {
+                next_time = Some(next_time.map_or(t, |b| b.min(t)));
+            }
+        }
+        if delayed_head < delayed_jobs.len() {
+            let t = delayed_jobs[delayed_head].0;
+            if t > time {
+                next_time = Some(next_time.map_or(t, |b| b.min(t)));
+            }
+        }
+        time = next_time.ok_or_else(|| anyhow!("Stalled"))?;
+        idle_count = machine_avail.iter().filter(|&&t| t <= time).count();
+
+        while delayed_head < delayed_jobs.len() && delayed_jobs[delayed_head].0 <= time {
+            let job = delayed_jobs[delayed_head].1;
+            if job_next_op[job] < pre.job_ops_len[job] && job_ready_time[job] <= time {
+                let pos = ready_jobs.binary_search(&job).unwrap_or_else(|p| p);
+                ready_jobs.insert(pos, job);
+            }
+            delayed_head += 1;
+        }
+        if delayed_head > 64 && delayed_head * 2 >= delayed_jobs.len() {
+            delayed_jobs.drain(0..delayed_head);
+            delayed_head = 0;
+        }
+    }
+
+    let mk = machine_avail.into_iter().max().unwrap_or(0);
+    Ok((Solution { job_schedule }, mk))
+}
+
+fn construct_solution_conflict_topk(
+    challenge: &Challenge, pre: &Pre, rule: Rule, k: usize, target_mk: Option<u32>,
+    rng: &mut SmallRng, job_bias: Option<&[f64]>, machine_penalty: Option<&[f64]>,
+    route_pref: Option<&RoutePrefLite>, route_w: f64,
+) -> Result<(Solution, u32)> {
+    let num_jobs = challenge.num_jobs;
+    let num_machines = challenge.num_machines;
+
+    let mut job_next_op = vec![0usize; num_jobs];
+    let mut job_ready_time = vec![0u32; num_jobs];
+    let mut machine_avail = vec![0u32; num_machines];
+    let mut machine_load = pre.machine_load0.clone();
+
+    let mut job_schedule: Vec<Vec<(usize, u32)>> = pre
+        .job_ops_len
+        .iter()
+        .map(|&len| Vec::with_capacity(len))
+        .collect();
+
+    let mut remaining_ops = pre.total_ops;
+    let mut time = 0u32;
+    let mut idle_count = num_machines;
+
+    let chaotic_like = pre.chaotic_like;
+    let mut machine_work: Vec<u64> = if chaotic_like { vec![0u64; num_machines] } else { vec![] };
+    let mut sum_work: u64 = 0;
+
+    let mut ready_jobs: Vec<usize> = Vec::with_capacity(num_jobs);
+    for job in 0..num_jobs {
+        if pre.job_ops_len[job] > 0 {
+            ready_jobs.push(job);
+        }
+    }
+    let mut delayed_jobs: Vec<(u32, usize)> = Vec::with_capacity(num_jobs);
+    let mut delayed_head = 0usize;
+
+    while remaining_ops > 0 {
+        loop {
+            if idle_count == 0 || ready_jobs.is_empty() {
+                break;
+            }
+
+            let progress = 1.0 - (remaining_ops as f64) / (pre.total_ops as f64).max(1.0);
+            let (bal_w, avg_work) = if chaotic_like {
+                (
+                    (0.030 + 0.070 * (1.0 - progress)).clamp(0.025, 0.11),
+                    (sum_work as f64) / (num_machines as f64).max(1.0),
+                )
+            } else {
+                (0.0, 0.0)
+            };
+
+            let mut top: Vec<Cand> = Vec::with_capacity(k);
+
+            for &job in &ready_jobs {
+                let op_idx = job_next_op[job];
+                if op_idx >= pre.job_ops_len[job] {
+                    continue;
+                }
+                let product = pre.job_products[job];
+                let op = &pre.product_ops[product][op_idx];
+                if op.flex == 0 || op.machines.is_empty() || op.min_pt >= INF {
+                    continue;
+                }
+
+                let (best_end, second_end, best_cnt_total, best_cnt_idle) =
+                    best_second_and_counts(time, &machine_avail, op);
+                if best_end >= INF || best_cnt_idle == 0 {
+                    continue;
+                }
+
+                let ops_rem = pre.job_ops_len[job] - op_idx;
+                let jb = job_bias.map(|v| v[job]).unwrap_or(0.0);
+
+                for &(m, pt) in &op.machines {
+                    if machine_avail[m] > time {
+                        continue;
+                    }
+                    let end = time.saturating_add(pt);
+                    if end != best_end {
+                        continue;
+                    }
+
+                    let mp = machine_penalty.map(|v| v[m]).unwrap_or(0.0);
+                    let jitter = rng.gen::<f64>() * 1e-9;
+
+                    let base = score_candidate(
+                        pre,
+                        rule,
+                        job,
+                        product,
+                        op_idx,
+                        ops_rem,
+                        op,
+                        m,
+                        pt,
+                        time,
+                        target_mk,
+                        best_end,
+                        second_end,
+                        best_cnt_total,
+                        progress,
+                        jb,
+                        mp,
+                        machine_load[m],
+                        route_pref,
+                        route_w,
+                        jitter,
+                    );
+
+                    let bal_pen = if chaotic_like && bal_w > 0.0 {
+                        let denomw = (avg_work + (pre.avg_op_min * 3.0).max(1.0)).max(1.0);
+                        let r = (machine_work[m] as f64) / denomw;
+                        let done_n = (r / (r + 1.0)).clamp(0.0, 1.0);
+                        -bal_w * done_n
+                    } else {
+                        0.0
+                    };
+
+                    let c = Cand { job, machine: m, pt, score: base + bal_pen };
+                    push_top_k(&mut top, c, k);
+                }
+            }
+
+            if top.is_empty() {
+                break;
+            }
+            let chosen = choose_from_top_weighted(rng, &top);
+
+            let job = chosen.job;
+            let machine = chosen.machine;
+            let pt = chosen.pt;
+
+            let product = pre.job_products[job];
+            let op_idx = job_next_op[job];
+            let op = &pre.product_ops[product][op_idx];
+
+            let (best_end_now, _, _, _) = best_second_and_counts(time, &machine_avail, op);
+            let end_check = time.max(machine_avail[machine]).saturating_add(pt);
+            if machine_avail[machine] > time || end_check != best_end_now {
+                break;
+            }
+
+            if let Ok(pos) = ready_jobs.binary_search(&job) {
+                ready_jobs.remove(pos);
+            }
+
+            let end_time = time.saturating_add(pt);
+            job_schedule[job].push((machine, time));
+            job_next_op[job] += 1;
+            job_ready_time[job] = end_time;
+            machine_avail[machine] = end_time;
+            if end_time > time {
+                idle_count = idle_count.saturating_sub(1);
+            }
+            remaining_ops -= 1;
+
+            if chaotic_like {
+                machine_work[machine] = machine_work[machine].saturating_add(pt as u64);
+                sum_work = sum_work.saturating_add(pt as u64);
+            }
+
+            if op.min_pt < INF && op.flex > 0 && !op.machines.is_empty() {
+                let delta = (op.min_pt as f64) / (op.flex as f64).max(1.0);
+                if delta > 0.0 {
+                    for &(mm, _) in &op.machines {
+                        let v = machine_load[mm] - delta;
+                        machine_load[mm] = if v > 0.0 { v } else { 0.0 };
+                    }
+                }
+            }
+
+            if job_next_op[job] < pre.job_ops_len[job] {
+                if job_ready_time[job] <= time {
+                    let pos = ready_jobs.binary_search(&job).unwrap_or_else(|p| p);
+                    ready_jobs.insert(pos, job);
+                } else {
+                    let item = (job_ready_time[job], job);
+                    let rel = delayed_jobs[delayed_head..]
+                        .binary_search_by(|&(t, j)| {
+                            if t < item.0 {
+                                std::cmp::Ordering::Less
+                            } else if t > item.0 {
+                                std::cmp::Ordering::Greater
+                            } else {
+                                j.cmp(&item.1)
+                            }
+                        })
+                        .unwrap_or_else(|p| p);
+                    delayed_jobs.insert(delayed_head + rel, item);
+                }
+            }
+
+            if remaining_ops == 0 {
+                break;
+            }
+        }
+
+        if remaining_ops == 0 {
+            break;
+        }
+
+        let mut next_time: Option<u32> = None;
+        for &t in &machine_avail {
+            if t > time {
+                next_time = Some(next_time.map_or(t, |b| b.min(t)));
+            }
+        }
+        if delayed_head < delayed_jobs.len() {
+            let t = delayed_jobs[delayed_head].0;
+            if t > time {
+                next_time = Some(next_time.map_or(t, |b| b.min(t)));
+            }
+        }
+        time = next_time.ok_or_else(|| anyhow!("Stalled"))?;
+        idle_count = machine_avail.iter().filter(|&&t| t <= time).count();
+
+        while delayed_head < delayed_jobs.len() && delayed_jobs[delayed_head].0 <= time {
+            let job = delayed_jobs[delayed_head].1;
+            if job_next_op[job] < pre.job_ops_len[job] && job_ready_time[job] <= time {
+                let pos = ready_jobs.binary_search(&job).unwrap_or_else(|p| p);
+                ready_jobs.insert(pos, job);
+            }
+            delayed_head += 1;
+        }
+        if delayed_head > 64 && delayed_head * 2 >= delayed_jobs.len() {
+            delayed_jobs.drain(0..delayed_head);
+            delayed_head = 0;
+        }
+    }
+
+    let mk = machine_avail.into_iter().max().unwrap_or(0);
+    Ok((Solution { job_schedule }, mk))
+}
+
+fn construct_solution_job_centric(
+    challenge: &Challenge,
+    pre: &Pre,
+) -> Result<(Solution, u32)> {
+    let num_jobs = challenge.num_jobs;
+    let num_machines = challenge.num_machines;
+
+    let mut job_priorities: Vec<(usize, u32)> = (0..num_jobs)
+        .map(|j| {
+            let product = pre.job_products[j];
+            let total_min_pt: u32 = (0..pre.job_ops_len[j])
+                .map(|op_idx| pre.product_ops[product][op_idx].min_pt)
+                .sum();
+            (j, total_min_pt)
+        })
+        .collect();
+    
+    job_priorities.sort_by_key(|&(_, work)| std::cmp::Reverse(work));
+    let sorted_jobs: Vec<usize> = job_priorities.into_iter().map(|(j, _)| j).collect();
+
+    let mut machine_avail = vec![0u32; num_machines];
+    let mut job_schedule: Vec<Vec<(usize, u32)>> = (0..num_jobs)
+        .map(|j| Vec::with_capacity(pre.job_ops_len[j]))
+        .collect();
+
+    for &job in &sorted_jobs {
+        let product = pre.job_products[job];
+        let num_ops = pre.job_ops_len[job];
+        let mut last_op_completion_time = 0u32;
+
+        for op_idx in 0..num_ops {
+            let op_info = &pre.product_ops[product][op_idx];
+            if op_info.machines.is_empty() {
+                continue;
+            }
+
+            let mut best_finish_time = u32::MAX;
+            let mut best_machine = op_info.machines[0].0;
+            let mut best_start_time = 0u32;
+
+            for &(machine, pt) in &op_info.machines {
+                let start_time = last_op_completion_time.max(machine_avail[machine]);
+                let finish_time = start_time.saturating_add(pt);
+
+                if finish_time < best_finish_time {
+                    best_finish_time = finish_time;
+                    best_machine = machine;
+                    best_start_time = start_time;
+                } else if finish_time == best_finish_time {
+                    if machine_avail[machine] < machine_avail[best_machine] {
+                         best_machine = machine;
+                         best_start_time = start_time;
+                    }
+                }
+            }
+            
+            job_schedule[job].push((best_machine, best_start_time));
+            machine_avail[best_machine] = best_finish_time;
+            last_op_completion_time = best_finish_time;
+        }
+    }
+
+    let mk = machine_avail.into_iter().max().unwrap_or(0);
+    Ok((Solution { job_schedule }, mk))
+}
+
+
+fn exhaustive_critical_reroute_pass(pre: &Pre, challenge: &Challenge, base_sol: &Solution) -> Result<Option<(Solution, u32)>> {
+    let mut ds = build_disj_from_solution(pre, challenge, base_sol)?;
+    let mut buf = EvalBuf::new(ds.n);
+    let Some((mut current_mk, mk_node0)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+    let initial_mk = current_mk;
+    let mut improved = true;
+    let mut passes = 0;
+    let max_passes = 5;
+    let mut buf_matches_current = true;
+    let mut current_mk_node = mk_node0;
+    let mut pos_of_node = vec![0usize; ds.n];
+
+    for seq in &ds.machine_seq {
+        for (pos, &nd) in seq.iter().enumerate() {
+            pos_of_node[nd] = pos;
+        }
+    }
+
+    while improved && passes < max_passes {
+        improved = false;
+        passes += 1;
+        if !buf_matches_current {
+            let Some((mk, mk_node)) = eval_disj(&ds, &mut buf) else { break };
+            current_mk = mk;
+            current_mk_node = mk_node;
+            buf_matches_current = true;
+        }
+        let mut crit_nodes: Vec<usize> = Vec::with_capacity(128);
+        let mut u = current_mk_node;
+        while u != NONE_USIZE { crit_nodes.push(u); u = buf.best_pred[u]; }
+        'node_loop: for &node in crit_nodes.iter().take(5) {
+            let job = ds.node_job[node]; let op_idx = ds.node_op[node]; let product = pre.job_products[job];
+            let op_info = &pre.product_ops[product][op_idx];
+            if op_info.machines.len() <= 1 { continue; }
+            let cur_machine = ds.node_machine[node]; let cur_pt = ds.node_pt[node];
+            let old_pos0 = pos_of_node[node];
+            if old_pos0 >= ds.machine_seq[cur_machine].len() || ds.machine_seq[cur_machine][old_pos0] != node { continue; }
+            let mut best_mk = current_mk; let mut best_m = cur_machine; let mut best_pt = cur_pt; let mut best_pos = 0usize;
+            for &(new_m, new_pt) in &op_info.machines {
+                if new_m == cur_machine { continue; }
+                let old_pos = pos_of_node[node];
+                if old_pos >= ds.machine_seq[cur_machine].len() || ds.machine_seq[cur_machine][old_pos] != node { continue; }
+                ds.machine_seq[cur_machine].remove(old_pos);
+                for idx in old_pos..ds.machine_seq[cur_machine].len() {
+                    let nd = ds.machine_seq[cur_machine][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = new_m; ds.node_pt[node] = new_pt;
+                let target_len = ds.machine_seq[new_m].len();
+                for pos in 0..=target_len {
+                    ds.machine_seq[new_m].insert(pos, node);
+                    for idx in pos..ds.machine_seq[new_m].len() {
+                        let nd = ds.machine_seq[new_m][idx];
+                        pos_of_node[nd] = idx;
+                    }
+                    if let Some((test_mk, _)) = eval_disj(&ds, &mut buf) {
+                        if test_mk < best_mk { best_mk = test_mk; best_m = new_m; best_pt = new_pt; best_pos = pos; }
+                    }
+                    ds.machine_seq[new_m].remove(pos);
+                    for idx in pos..ds.machine_seq[new_m].len() {
+                        let nd = ds.machine_seq[new_m][idx];
+                        pos_of_node[nd] = idx;
+                    }
+                    buf_matches_current = false;
+                }
+                ds.machine_seq[cur_machine].insert(old_pos, node);
+                for idx in old_pos..ds.machine_seq[cur_machine].len() {
+                    let nd = ds.machine_seq[cur_machine][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = cur_machine; ds.node_pt[node] = cur_pt;
+            }
+            if best_m != cur_machine {
+                let old_pos = pos_of_node[node];
+                if old_pos >= ds.machine_seq[cur_machine].len() || ds.machine_seq[cur_machine][old_pos] != node { continue; }
+                ds.machine_seq[cur_machine].remove(old_pos);
+                for idx in old_pos..ds.machine_seq[cur_machine].len() {
+                    let nd = ds.machine_seq[cur_machine][idx];
+                    pos_of_node[nd] = idx;
+                }
+                let ins = best_pos.min(ds.machine_seq[best_m].len());
+                ds.machine_seq[best_m].insert(ins, node);
+                for idx in ins..ds.machine_seq[best_m].len() {
+                    let nd = ds.machine_seq[best_m][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = best_m; ds.node_pt[node] = best_pt;
+                current_mk = best_mk;
+                improved = true;
+                buf_matches_current = false;
+                continue 'node_loop;
+            }
+        }
+    }
+    if current_mk >= initial_mk { return Ok(None); }
+    if !buf_matches_current {
+        let Some((mk, _)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+        current_mk = mk;
+    }
+    let sol = disj_to_solution(pre, &ds, &buf.start)?;
+    Ok(Some((sol, current_mk)))
+}
+
+fn unified_reassign_pass(pre: &Pre, challenge: &Challenge, base_sol: &Solution) -> Result<Option<(Solution, u32)>> {
+    let mut ds = build_disj_from_solution(pre, challenge, base_sol)?;
+    let mut buf = EvalBuf::new(ds.n);
+    let Some((current_mk, mk_node)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+    let current_start = buf.start.clone();
+    let n = ds.n;
+    let num_machines = challenge.num_machines;
+    if num_machines <= 1 {
+        return Ok(None);
+    }
+
+    let mut machine_loads = vec![0u64; num_machines];
+    for nd in 0..n {
+        let m = ds.node_machine[nd];
+        machine_loads[m] = machine_loads[m].saturating_add(ds.node_pt[nd] as u64);
+    }
+    let total_load: u64 = machine_loads.iter().copied().sum();
+
+    let mut crit = vec![false; n];
+    let mut crit_rank = vec![usize::MAX; n];
+    let mut crit_nodes: Vec<usize> = Vec::with_capacity(128);
+    let mut u = mk_node;
+    let mut rank = 0usize;
+    while u != NONE_USIZE {
+        crit[u] = true;
+        crit_rank[u] = rank;
+        crit_nodes.push(u);
+        u = buf.best_pred[u];
+        rank += 1;
+    }
+
+    let mut crit_count_by_machine = vec![0usize; num_machines];
+    let mut crit_pt_by_machine = vec![0u64; num_machines];
+    for &nd in &crit_nodes {
+        let m = ds.node_machine[nd];
+        crit_count_by_machine[m] += 1;
+        crit_pt_by_machine[m] = crit_pt_by_machine[m].saturating_add(ds.node_pt[nd] as u64);
+    }
+
+    let mut pos_of_node = vec![0usize; n];
+    for seq in &ds.machine_seq {
+        for (pos, &nd) in seq.iter().enumerate() {
+            pos_of_node[nd] = pos;
+        }
+    }
+
+    let source_limit = if num_machines <= 4 {
+        num_machines
+    } else if pre.high_flex > 0.55 || pre.jobshopness > 0.45 {
+        5usize.min(num_machines)
+    } else {
+        4usize.min(num_machines)
+    };
+    let target_limit = if num_machines <= 5 {
+        num_machines - 1
+    } else if pre.high_flex > 0.55 || pre.jobshopness > 0.45 {
+        5usize.min(num_machines - 1)
+    } else {
+        4usize.min(num_machines - 1)
+    };
+    let per_source_node_cap = if pre.high_flex > 0.60 || pre.jobshopness > 0.50 { 7usize } else { 5usize };
+    let per_pair_node_cap = if pre.high_flex > 0.60 || pre.jobshopness > 0.50 { 4usize } else { 3usize };
+
+    let mut source_order: Vec<usize> = (0..num_machines)
+        .filter(|&m| {
+            !ds.machine_seq[m].is_empty()
+                && (crit_count_by_machine[m] > 0
+                    || machine_loads[m].saturating_mul(num_machines as u64) >= total_load)
+        })
+        .collect();
+    if source_order.is_empty() {
+        return Ok(None);
+    }
+    source_order.sort_unstable_by(|&a, &b| {
+        let score_a = crit_pt_by_machine[a].saturating_mul(3).saturating_add(machine_loads[a]);
+        let score_b = crit_pt_by_machine[b].saturating_mul(3).saturating_add(machine_loads[b]);
+        score_b
+            .cmp(&score_a)
+            .then_with(|| crit_count_by_machine[b].cmp(&crit_count_by_machine[a]))
+            .then_with(|| machine_loads[b].cmp(&machine_loads[a]))
+            .then_with(|| a.cmp(&b))
+    });
+
+    let mut best_global_move: Option<(usize, usize, u32, usize, usize)> = None;
+    let mut best_global_mk = current_mk;
+
+    for &source_m in source_order.iter().take(source_limit) {
+        let source_seq = ds.machine_seq[source_m].clone();
+        if source_seq.is_empty() {
+            continue;
+        }
+
+        let mut source_nodes: Vec<usize> = Vec::with_capacity(per_source_node_cap * 2);
+        for &node in &source_seq {
+            let job = ds.node_job[node];
+            let op_idx = ds.node_op[node];
+            let product = pre.job_products[job];
+            if pre.product_ops[product][op_idx].machines.len() <= 1 {
+                continue;
+            }
+            if crit[node] && !source_nodes.contains(&node) {
+                source_nodes.push(node);
+            }
+        }
+        let tail_start = source_seq.len().saturating_sub(per_source_node_cap);
+        for &node in &source_seq[tail_start..] {
+            let job = ds.node_job[node];
+            let op_idx = ds.node_op[node];
+            let product = pre.job_products[job];
+            if pre.product_ops[product][op_idx].machines.len() <= 1 {
+                continue;
+            }
+            if !source_nodes.contains(&node) {
+                source_nodes.push(node);
+            }
+        }
+        if source_nodes.is_empty() {
+            continue;
+        }
+
+        source_nodes.sort_unstable_by(|&a, &b| {
+            crit[b]
+                .cmp(&crit[a])
+                .then_with(|| crit_rank[a].cmp(&crit_rank[b]))
+                .then_with(|| ds.node_pt[b].cmp(&ds.node_pt[a]))
+                .then_with(|| pos_of_node[b].cmp(&pos_of_node[a]))
+                .then_with(|| a.cmp(&b))
+        });
+        if source_nodes.len() > per_source_node_cap {
+            source_nodes.truncate(per_source_node_cap);
+        }
+
+        let mut target_buckets: Vec<Vec<(usize, u32)>> = vec![Vec::new(); num_machines];
+        for &node in &source_nodes {
+            let job = ds.node_job[node];
+            let op_idx = ds.node_op[node];
+            let product = pre.job_products[job];
+            let op_info = &pre.product_ops[product][op_idx];
+            for &(new_m, new_pt) in &op_info.machines {
+                if new_m != source_m {
+                    target_buckets[new_m].push((node, new_pt));
+                }
+            }
+        }
+
+        let mut target_order: Vec<usize> = (0..num_machines)
+            .filter(|&m| m != source_m && !target_buckets[m].is_empty())
+            .collect();
+        if target_order.is_empty() {
+            continue;
+        }
+        target_order.sort_unstable_by(|&a, &b| {
+            machine_loads[a]
+                .cmp(&machine_loads[b])
+                .then_with(|| crit_pt_by_machine[a].cmp(&crit_pt_by_machine[b]))
+                .then_with(|| target_buckets[b].len().cmp(&target_buckets[a].len()))
+                .then_with(|| a.cmp(&b))
+        });
+
+        for &target_m in target_order.iter().take(target_limit) {
+            let bucket = &mut target_buckets[target_m];
+            bucket.sort_unstable_by(|&(node_a, pt_a), &(node_b, pt_b)| {
+                crit[node_b]
+                    .cmp(&crit[node_a])
+                    .then_with(|| crit_rank[node_a].cmp(&crit_rank[node_b]))
+                    .then_with(|| ds.node_pt[node_b].cmp(&ds.node_pt[node_a]))
+                    .then_with(|| pt_a.cmp(&pt_b))
+                    .then_with(|| node_a.cmp(&node_b))
+            });
+
+            for &(node, new_pt) in bucket.iter().take(per_pair_node_cap) {
+                let old_pos = pos_of_node[node];
+                if old_pos >= ds.machine_seq[source_m].len() || ds.machine_seq[source_m][old_pos] != node {
+                    continue;
+                }
+
+                let cur_pt = ds.node_pt[node];
+                let job = ds.node_job[node];
+                let jp = if node > ds.job_offsets[job] { node - 1 } else { NONE_USIZE };
+                let jp_end = if jp != NONE_USIZE {
+                    current_start[jp].saturating_add(ds.node_pt[jp])
+                } else {
+                    0u32
+                };
+
+                let base_ins = {
+                    let seq = &ds.machine_seq[target_m];
+                    match seq.binary_search_by(|&nd| current_start[nd].cmp(&jp_end)) {
+                        Ok(pos) | Err(pos) => pos,
+                    }
+                    .min(seq.len())
+                };
+                let target_len = ds.machine_seq[target_m].len();
+                let pos_candidates = [
+                    base_ins,
+                    base_ins.saturating_sub(1),
+                    base_ins.saturating_add(1).min(target_len),
+                    target_len,
+                ];
+
+                ds.machine_seq[source_m].remove(old_pos);
+                for idx in old_pos..ds.machine_seq[source_m].len() {
+                    let nd = ds.machine_seq[source_m][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = target_m;
+                ds.node_pt[node] = new_pt;
+
+                let mut tested_positions = [usize::MAX; 4];
+                let mut tested_len = 0usize;
+                for &cand_ins in &pos_candidates {
+                    let ins = cand_ins.min(ds.machine_seq[target_m].len());
+                    if tested_positions[..tested_len].contains(&ins) {
+                        continue;
+                    }
+                    tested_positions[tested_len] = ins;
+                    tested_len += 1;
+
+                    ds.machine_seq[target_m].insert(ins, node);
+                    for idx in ins..ds.machine_seq[target_m].len() {
+                        let nd = ds.machine_seq[target_m][idx];
+                        pos_of_node[nd] = idx;
+                    }
+
+                    if let Some((test_mk, _)) = eval_disj(&ds, &mut buf) {
+                        if test_mk < best_global_mk {
+                            best_global_mk = test_mk;
+                            best_global_move = Some((node, target_m, new_pt, source_m, ins));
+                        }
+                    }
+
+                    ds.machine_seq[target_m].remove(ins);
+                    for idx in ins..ds.machine_seq[target_m].len() {
+                        let nd = ds.machine_seq[target_m][idx];
+                        pos_of_node[nd] = idx;
+                    }
+                }
+
+                ds.machine_seq[source_m].insert(old_pos, node);
+                for idx in old_pos..ds.machine_seq[source_m].len() {
+                    let nd = ds.machine_seq[source_m][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = source_m;
+                ds.node_pt[node] = cur_pt;
+            }
+        }
+    }
+
+    if let Some((node, new_m, new_pt, cur_m, ins)) = best_global_move {
+        let old_pos = pos_of_node[node];
+        if old_pos >= ds.machine_seq[cur_m].len() || ds.machine_seq[cur_m][old_pos] != node {
+            return Ok(None);
+        }
+        ds.machine_seq[cur_m].remove(old_pos);
+        for idx in old_pos..ds.machine_seq[cur_m].len() {
+            let nd = ds.machine_seq[cur_m][idx];
+            pos_of_node[nd] = idx;
+        }
+        let ins = ins.min(ds.machine_seq[new_m].len());
+        ds.machine_seq[new_m].insert(ins, node);
+        for idx in ins..ds.machine_seq[new_m].len() {
+            let nd = ds.machine_seq[new_m][idx];
+            pos_of_node[nd] = idx;
+        }
+        ds.node_machine[node] = new_m;
+        ds.node_pt[node] = new_pt;
+
+        let Some((final_mk, _)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+        if final_mk < current_mk {
+            let sol = disj_to_solution(pre, &ds, &buf.start)?;
+            Ok(Some((sol, final_mk)))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+fn greedy_reassign_pass(pre: &Pre, challenge: &Challenge, base_sol: &Solution) -> Result<Option<(Solution, u32)>> {
+    let mut ds = build_disj_from_solution(pre, challenge, base_sol)?;
+    let mut buf = EvalBuf::new(ds.n);
+    let Some((mut current_mk, _)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+    let initial_mk = current_mk;
+    let n = ds.n;
+    let num_machines = challenge.num_machines;
+    let max_passes = 3;
+    let mut improved = true;
+    let mut passes = 0;
+
+    let mut pos_of_node = vec![0usize; n];
+    for seq in &ds.machine_seq {
+        for (pos, &nd) in seq.iter().enumerate() {
+            pos_of_node[nd] = pos;
+        }
+    }
+
+    while improved && passes < max_passes {
+        improved = false;
+        passes += 1;
+
+        let Some((mk, mk_node)) = eval_disj(&ds, &mut buf) else { break };
+        current_mk = mk;
+
+        let mut machine_loads = vec![0u64; num_machines];
+        for nd in 0..n {
+            let m = ds.node_machine[nd];
+            machine_loads[m] = machine_loads[m].saturating_add(ds.node_pt[nd] as u64);
+        }
+
+        let mut machine_order: Vec<usize> = (0..num_machines).collect();
+        machine_order.sort_unstable_by(|&a, &b| machine_loads[b].cmp(&machine_loads[a]));
+
+        let top_machine_limit = if num_machines <= 4 {
+            num_machines
+        } else if pre.high_flex > 0.55 || pre.jobshopness > 0.45 {
+            4usize.min(num_machines)
+        } else {
+            3usize.min(num_machines)
+        };
+        let critical_cap = if pre.high_flex > 0.65 || pre.jobshopness > 0.55 { 16usize } else { 10usize };
+        let per_machine_cap = if pre.high_flex > 0.55 { 6usize } else { 4usize };
+
+        let mut top_machine = vec![false; num_machines];
+        for &m in machine_order.iter().take(top_machine_limit) {
+            top_machine[m] = true;
+        }
+
+        let mut crit = vec![false; n];
+        let mut crit_nodes: Vec<usize> = Vec::with_capacity(128);
+        let mut crit_rank = vec![usize::MAX; n];
+        let mut u = mk_node;
+        while u != NONE_USIZE {
+            crit[u] = true;
+            crit_nodes.push(u);
+            u = buf.best_pred[u];
+        }
+        if crit_nodes.len() > critical_cap {
+            crit_nodes.truncate(critical_cap);
+        }
+        for (rank, &node) in crit_nodes.iter().enumerate() {
+            crit_rank[node] = rank;
+        }
+
+        let mut candidate_nodes: Vec<usize> = Vec::with_capacity(critical_cap + top_machine_limit * per_machine_cap);
+        let mut seen = vec![false; n];
+        for &node in &crit_nodes {
+            if !seen[node] {
+                seen[node] = true;
+                candidate_nodes.push(node);
+            }
+        }
+        for &m in machine_order.iter().take(top_machine_limit) {
+            let seq = &ds.machine_seq[m];
+            if seq.is_empty() { continue; }
+            let start = seq.len().saturating_sub(per_machine_cap);
+            for &node in &seq[start..] {
+                if !seen[node] {
+                    seen[node] = true;
+                    candidate_nodes.push(node);
+                }
+            }
+        }
+
+        candidate_nodes.sort_unstable_by(|&a, &b| {
+            let ma = ds.node_machine[a];
+            let mb = ds.node_machine[b];
+            let job_a = ds.node_job[a];
+            let job_b = ds.node_job[b];
+            let op_idx_a = ds.node_op[a];
+            let op_idx_b = ds.node_op[b];
+            let product_a = pre.job_products[job_a];
+            let product_b = pre.job_products[job_b];
+            let flex_a = pre.product_ops[product_a][op_idx_a].machines.len();
+            let flex_b = pre.product_ops[product_b][op_idx_b].machines.len();
+
+            crit[b]
+                .cmp(&crit[a])
+                .then_with(|| crit_rank[a].cmp(&crit_rank[b]))
+                .then_with(|| machine_loads[mb].cmp(&machine_loads[ma]))
+                .then_with(|| flex_b.cmp(&flex_a))
+                .then_with(|| ds.node_pt[b].cmp(&ds.node_pt[a]))
+                .then_with(|| a.cmp(&b))
+        });
+
+        'search_move: for &node in &candidate_nodes {
+            let job = ds.node_job[node];
+            let op_idx = ds.node_op[node];
+            let product = pre.job_products[job];
+            let op_info = &pre.product_ops[product][op_idx];
+            if op_info.machines.len() <= 1 { continue; }
+
+            let cur_machine = ds.node_machine[node];
+            if !crit[node] && !top_machine[cur_machine] { continue; }
+            let cur_pt = ds.node_pt[node];
+            let old_pos = pos_of_node[node];
+            if old_pos >= ds.machine_seq[cur_machine].len() || ds.machine_seq[cur_machine][old_pos] != node { continue; }
+
+            let jp = if node > ds.job_offsets[job] { node - 1 } else { NONE_USIZE };
+            let jp_end = if jp != NONE_USIZE { buf.start[jp].saturating_add(ds.node_pt[jp]) } else { 0u32 };
+
+            let mut alt_machines: Vec<(u64, usize, u32)> = op_info.machines.iter()
+                .filter(|&&(am, _)| am != cur_machine)
+                .map(|&(am, apt)| (machine_loads[am].saturating_add(apt as u64), am, apt))
+                .collect();
+            if alt_machines.is_empty() { continue; }
+            alt_machines.sort_unstable_by(|a, b| a.0.cmp(&b.0).then_with(|| a.2.cmp(&b.2)));
+
+            for &(_, new_m, new_pt) in alt_machines.iter().take(3) {
+                let base_ins = {
+                    let seq = &ds.machine_seq[new_m];
+                    match seq.binary_search_by(|&nd| buf.start[nd].cmp(&jp_end)) {
+                        Ok(pos) | Err(pos) => pos,
+                    }.min(seq.len())
+                };
+                let seq_len = ds.machine_seq[new_m].len();
+                let pos_candidates = [
+                    base_ins,
+                    base_ins.saturating_sub(1),
+                    base_ins.saturating_add(1).min(seq_len),
+                    seq_len,
+                ];
+
+                ds.machine_seq[cur_machine].remove(old_pos);
+                for idx in old_pos..ds.machine_seq[cur_machine].len() {
+                    let nd = ds.machine_seq[cur_machine][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = new_m;
+                ds.node_pt[node] = new_pt;
+
+                let mut tested_positions = [usize::MAX; 4];
+                let mut tested_len = 0usize;
+                for &cand_ins in &pos_candidates {
+                    let ins = cand_ins.min(ds.machine_seq[new_m].len());
+                    if tested_positions[..tested_len].contains(&ins) { continue; }
+                    tested_positions[tested_len] = ins;
+                    tested_len += 1;
+
+                    ds.machine_seq[new_m].insert(ins, node);
+                    for idx in ins..ds.machine_seq[new_m].len() {
+                        let nd = ds.machine_seq[new_m][idx];
+                        pos_of_node[nd] = idx;
+                    }
+
+                    if let Some((test_mk, _)) = eval_disj(&ds, &mut buf) {
+                        if test_mk < current_mk {
+                            current_mk = test_mk;
+                            improved = true;
+                            break 'search_move;
+                        }
+                    }
+
+                    ds.machine_seq[new_m].remove(ins);
+                    for idx in ins..ds.machine_seq[new_m].len() {
+                        let nd = ds.machine_seq[new_m][idx];
+                        pos_of_node[nd] = idx;
+                    }
+                }
+
+                ds.machine_seq[cur_machine].insert(old_pos, node);
+                for idx in old_pos..ds.machine_seq[cur_machine].len() {
+                    let nd = ds.machine_seq[cur_machine][idx];
+                    pos_of_node[nd] = idx;
+                }
+                ds.node_machine[node] = cur_machine;
+                ds.node_pt[node] = cur_pt;
+            }
+        }
+    }
+
+    if current_mk < initial_mk {
+        let Some((mk, _)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+        let sol = disj_to_solution(pre, &ds, &buf.start)?;
+        Ok(Some((sol, mk)))
+    } else {
+        Ok(None)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum MoveType { Swap{machine:usize,pos:usize}, Reassign{node:usize,new_machine:usize,new_pt:u32,insert_pos:usize} }
+
+fn tabu_search_hybrid(pre: &Pre, challenge: &Challenge, base_sol: &Solution, max_iterations: usize, tenure_base: usize) -> Result<Option<(Solution, u32)>> {
+    let mut ds=build_disj_from_solution(pre,challenge,base_sol)?; let mut buf=EvalBuf::new(ds.n); let n=ds.n;
+    let Some(init_eval)=eval_disj(&ds,&mut buf) else{return Ok(None)};
+    let initial_mk=init_eval.0; let mut best_global_mk=initial_mk; let mut best_global_ds=ds.clone();
+    let effective_iterations=max_iterations.saturating_sub(max_iterations/10).max(1);
+    let tenure=tenure_base.max(5); let tenure_delta=(tenure/3).max(2); let max_no_improve=(effective_iterations/2).max(60);
+    let mut tabu_swap: HashMap<(usize,usize),usize>=HashMap::with_capacity(tenure*8);
+    let mut tabu_reassign: HashMap<(usize,usize),usize>=HashMap::with_capacity(tenure*4);
+    let mut crit=vec![false;n]; let mut no_improve=0usize;
+    let mut pseed: u64=(challenge.seed[0] as u64).wrapping_mul(0x9E3779B97F4A7C15)^(initial_mk as u64).wrapping_shl(16)^(n as u64).wrapping_mul(0x517CC1B727220A95);
+    let mut tail=vec![0u32;n]; let mut back_deg=vec![0u16;n]; let mut back_stack: Vec<usize>=Vec::with_capacity(n);
+    let mut machine_pred_node=vec![NONE_USIZE;n]; let mut job_pred_node=vec![NONE_USIZE;n]; let mut pos_of_node=vec![0usize;n];
+    for j in 0..ds.num_jobs{let base=ds.job_offsets[j];let end=ds.job_offsets[j+1];for k in (base+1)..end{job_pred_node[k]=k-1;}}
+    let kick_threshold=(max_no_improve*2/3).max(50); let mut kicks_left=3usize;
+    let beam_adm_cap=if pre.high_flex>0.58||pre.jobshopness>0.48{3usize}else{2usize};
+    let beam_fallback_cap=1usize;
+    let reassign_pos_cap=if pre.high_flex>0.60||pre.jobshopness>0.50{4usize}else{3usize};
+    for iter in 0..effective_iterations {
+        let no_impr_dyn=((max_no_improve as f64)*(1.0-0.4*(iter as f64/effective_iterations as f64).clamp(0.0,1.0))).max(10.0) as usize;
+        if no_improve>=no_impr_dyn{if kicks_left==0{break;}ds=best_global_ds.clone();no_improve=0;kicks_left-=1;tabu_swap.clear();tabu_reassign.clear();continue;}
+        if no_improve>0&&no_improve%kick_threshold==0&&kicks_left>0 {
+            let Some((_,kick_mk_node))=eval_disj(&ds,&mut buf) else{break};
+            crit.fill(false); let mut u=kick_mk_node; while u!=NONE_USIZE{crit[u]=true;u=buf.best_pred[u];}
+            let mut kick_swaps: Vec<(usize,usize)>=Vec::new();
+            for m in 0..ds.num_machines{if ds.machine_seq[m].len()<=1{continue;}for i in 0..(ds.machine_seq[m].len()-1){if crit[ds.machine_seq[m][i]]&&crit[ds.machine_seq[m][i+1]]{kick_swaps.push((m,i));}}}
+            if !kick_swaps.is_empty(){for _ in 0..2{pseed^=pseed.wrapping_shl(13);pseed^=pseed.wrapping_shr(7);pseed^=pseed.wrapping_shl(17);let idx=(pseed as usize)%kick_swaps.len();let (m,pos)=kick_swaps[idx];if pos+1<ds.machine_seq[m].len(){ds.machine_seq[m].swap(pos,pos+1);}}}
+            kicks_left-=1; continue;
+        }
+        let Some((cur_mk,mk_node))=eval_disj(&ds,&mut buf) else{break};
+        if iter>0{if cur_mk<best_global_mk{best_global_mk=cur_mk;best_global_ds=ds.clone();no_improve=0;}else{no_improve+=1;}}
+        machine_pred_node.fill(NONE_USIZE);
+        for seq in &ds.machine_seq{for (i,&nd) in seq.iter().enumerate(){pos_of_node[nd]=i;if i>0{machine_pred_node[nd]=seq[i-1];}}}
+        tail.fill(0); back_deg.fill(0);
+        for i in 0..n{if ds.job_succ[i]!=NONE_USIZE{back_deg[i]+=1;}if buf.machine_succ[i]!=NONE_USIZE{back_deg[i]+=1;}}
+        back_stack.clear(); for i in 0..n{if back_deg[i]==0{back_stack.push(i);}}
+        while let Some(nd)=back_stack.pop(){let contrib=ds.node_pt[nd].saturating_add(tail[nd]);let jp=job_pred_node[nd];if jp!=NONE_USIZE{if contrib>tail[jp]{tail[jp]=contrib;}back_deg[jp]=back_deg[jp].saturating_sub(1);if back_deg[jp]==0{back_stack.push(jp);}}let mp=machine_pred_node[nd];if mp!=NONE_USIZE{if contrib>tail[mp]{tail[mp]=contrib;}back_deg[mp]=back_deg[mp].saturating_sub(1);if back_deg[mp]==0{back_stack.push(mp);}}}
+        crit.fill(false); let mut u=mk_node; while u!=NONE_USIZE{crit[u]=true;u=buf.best_pred[u];}
+        let reassign_freq=if no_improve>(max_no_improve/3).max(15)||pre.high_flex>0.62||pre.jobshopness>0.52{3usize}else{4usize};
+        let use_exact_validation=pre.high_flex>0.55||pre.jobshopness>0.48||no_improve>(max_no_improve/4).max(12)||iter%reassign_freq==0;
+        let mut admissible_beam: Vec<(u32,MoveType)>=Vec::with_capacity(beam_adm_cap);
+        let mut fallback_beam: Vec<(u32,MoveType)>=Vec::with_capacity(beam_fallback_cap);
+        let push_beam=|beam: &mut Vec<(u32,MoveType)>, cap: usize, est: u32, mv: MoveType| {
+            let pos=beam.iter().position(|&(b,_)| est<b).unwrap_or(beam.len());
+            if pos<cap{beam.insert(pos,(est,mv));if beam.len()>cap{beam.pop();}}
+            else if beam.len()<cap{beam.push((est,mv));}
+        };
+        for m in 0..ds.num_machines {
+            if ds.machine_seq[m].len()<=1{continue;}
+            let mut blocks: Vec<(usize,usize)>=Vec::new(); let mut i=0;
+            while i<ds.machine_seq[m].len(){if !crit[ds.machine_seq[m][i]]{i+=1;continue;}let bstart=i;let mut bend=i;while bend+1<ds.machine_seq[m].len(){let x=ds.machine_seq[m][bend];let y=ds.machine_seq[m][bend+1];if !crit[y]{break;}let end_x=buf.start[x].saturating_add(ds.node_pt[x]);if buf.start[y]!=end_x{break;}bend+=1;}if bend>bstart{blocks.push((bstart,bend));}i=bend+1;}
+            for &(bstart,bend) in &blocks {
+                let block_len=bend-bstart+1; let mut swap_positions=[bstart,NONE_USIZE]; let num_swaps=if block_len>=3{swap_positions[1]=bend-1;2}else{1};
+                for si in 0..num_swaps {
+                    let pos=swap_positions[si]; if pos+1>=ds.machine_seq[m].len(){continue;}
+                    let node_u=ds.machine_seq[m][pos]; let node_v=ds.machine_seq[m][pos+1];
+                    let est_mk=estimate_swap_mk_fm(node_u,node_v,&buf.start,&tail,&ds.node_pt,&job_pred_node,&ds.job_succ,&machine_pred_node,&buf.machine_succ);
+                    let mv=MoveType::Swap{machine:m,pos};
+                    let key=(node_u.min(node_v),node_u.max(node_v)); let is_tabu=tabu_swap.get(&key).map_or(false,|&exp|iter<exp); let aspiration=est_mk<best_global_mk;
+                    if !is_tabu||aspiration{push_beam(&mut admissible_beam,beam_adm_cap,est_mk,mv);}else{push_beam(&mut fallback_beam,beam_fallback_cap,est_mk,mv);}
+                }
+            }
+        }
+        if iter%reassign_freq==0 {
+            for node in 0..n {
+                if !crit[node]{continue;}
+                let job=ds.node_job[node]; let op_idx=ds.node_op[node]; let product=pre.job_products[job];
+                let op_info=&pre.product_ops[product][op_idx]; if op_info.machines.len()<=1{continue;}
+                let cur_machine=ds.node_machine[node];
+                for &(new_m,new_pt) in &op_info.machines {
+                    if new_m==cur_machine{continue;}
+                    let key=(node,new_m); let is_tabu=tabu_reassign.get(&key).map_or(false,|&exp|iter<exp);
+                    let positions=find_candidate_insert_positions_fm(&ds,&buf.start,node,new_m,new_pt,&job_pred_node);
+                    for insert_pos in positions.into_iter().take(reassign_pos_cap) {
+                        let est_mk=estimate_reassign_mk_fm(&ds,&buf.start,&tail,node,new_m,new_pt,insert_pos,&job_pred_node,&machine_pred_node,&buf.machine_succ);
+                        let mv=MoveType::Reassign{node,new_machine:new_m,new_pt,insert_pos};
+                        let aspiration=est_mk<best_global_mk;
+                        if !is_tabu||aspiration{push_beam(&mut admissible_beam,beam_adm_cap,est_mk,mv);}else{push_beam(&mut fallback_beam,beam_fallback_cap,est_mk,mv);}
+                    }
+                }
+            }
+        }
+        let chosen=if use_exact_validation{
+            let mut best_choice: Option<MoveType>=None; let mut best_choice_mk=u32::MAX;
+            {
+                let mut eval_candidate=|mv: MoveType| -> Option<u32> {
+                    match mv {
+                        MoveType::Swap{machine:m,pos} => {
+                            if pos+1>=ds.machine_seq[m].len(){return None;}
+                            ds.machine_seq[m].swap(pos,pos+1);
+                            let out=eval_disj(&ds,&mut buf).map(|(mk,_)| mk);
+                            ds.machine_seq[m].swap(pos,pos+1);
+                            out
+                        }
+                        MoveType::Reassign{node,new_machine,new_pt,insert_pos} => {
+                            let old_machine=ds.node_machine[node]; let old_pt=ds.node_pt[node]; let old_pos=pos_of_node[node];
+                            if old_pos>=ds.machine_seq[old_machine].len()||ds.machine_seq[old_machine][old_pos]!=node{return None;}
+                            ds.machine_seq[old_machine].remove(old_pos);
+                            let ins=insert_pos.min(ds.machine_seq[new_machine].len());
+                            ds.machine_seq[new_machine].insert(ins,node); ds.node_machine[node]=new_machine; ds.node_pt[node]=new_pt;
+                            let out=eval_disj(&ds,&mut buf).map(|(mk,_)| mk);
+                            ds.machine_seq[new_machine].remove(ins);
+                            ds.machine_seq[old_machine].insert(old_pos,node); ds.node_machine[node]=old_machine; ds.node_pt[node]=old_pt;
+                            out
+                        }
+                    }
+                };
+                for &(_,mv) in &admissible_beam { if let Some(exact_mk)=eval_candidate(mv){ if exact_mk<best_choice_mk{best_choice_mk=exact_mk;best_choice=Some(mv);} } }
+                if best_choice.is_none() {
+                    for &(_,mv) in &fallback_beam { if let Some(exact_mk)=eval_candidate(mv){ if exact_mk<best_choice_mk{best_choice_mk=exact_mk;best_choice=Some(mv);} } }
+                }
+            }
+            best_choice.map(|mv|(mv,best_choice_mk))
+        }else{
+            admissible_beam.first().copied().or_else(||fallback_beam.first().copied()).map(|(mk,mv)|(mv,mk))
+        };
+        match chosen {
+            Some((MoveType::Swap{machine:m,pos},_)) => {
+                let node_a=ds.machine_seq[m][pos]; let node_b=ds.machine_seq[m][pos+1]; ds.machine_seq[m].swap(pos,pos+1);
+                pseed^=pseed.wrapping_shl(13);pseed^=pseed.wrapping_shr(7);pseed^=pseed.wrapping_shl(17);
+                let offset=(pseed%((2*tenure_delta+1) as u64)) as usize; let progress=(iter as f64)/(effective_iterations as f64); let late_bonus=if progress>0.6{((progress-0.6)*10.0) as usize}else{0};
+                let this_tenure=(tenure+offset+late_bonus).saturating_sub(tenure_delta);
+                tabu_swap.insert((node_a.min(node_b),node_a.max(node_b)),iter+this_tenure);
+            }
+            Some((MoveType::Reassign{node,new_machine,new_pt,insert_pos},_)) => {
+                let old_machine=ds.node_machine[node];
+                let mut old_pos=pos_of_node[node];
+                if old_pos>=ds.machine_seq[old_machine].len()||ds.machine_seq[old_machine][old_pos]!=node{
+                    let Some(p)=ds.machine_seq[old_machine].iter().position(|&x|x==node) else{break};
+                    old_pos=p;
+                }
+                ds.machine_seq[old_machine].remove(old_pos);
+                let ins=insert_pos.min(ds.machine_seq[new_machine].len());
+                ds.machine_seq[new_machine].insert(ins,node); ds.node_machine[node]=new_machine; ds.node_pt[node]=new_pt;
+                pseed^=pseed.wrapping_shl(13);pseed^=pseed.wrapping_shr(7);pseed^=pseed.wrapping_shl(17);
+                let offset=(pseed%((2*tenure_delta+1) as u64)) as usize; let this_tenure=(tenure+offset).saturating_sub(tenure_delta/2);
+                tabu_reassign.insert((node,old_machine),iter+this_tenure);
+            }
+            None => break,
+        }
+    }
+    let Some((final_mk,_))=eval_disj(&ds,&mut buf) else{return Ok(None)};
+    if final_mk<best_global_mk{best_global_mk=final_mk;best_global_ds=ds.clone();}
+    if best_global_mk>=initial_mk{return Ok(None);}
+    ds=best_global_ds; let Some((_,_))=eval_disj(&ds,&mut buf) else{return Ok(None)};
+    let sol=disj_to_solution(pre,&ds,&buf.start)?; Ok(Some((sol,best_global_mk)))
+}
+
+fn compute_tails_pulsar(ds: &DisjSchedule, buf: &EvalBuf) -> Vec<u32> {
+    let n = ds.n;
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_unstable_by(|&a, &b| buf.start[b].cmp(&buf.start[a]));
+    let mut tails = vec![0u32; n];
+    for &nd in &order {
+        let mut max_after = 0u32;
+        let js = ds.job_succ[nd];
+        if js != NONE_USIZE {
+            max_after = max_after.max(ds.node_pt[js].saturating_add(tails[js]));
+        }
+        let ms = buf.machine_succ[nd];
+        if ms != NONE_USIZE {
+            max_after = max_after.max(ds.node_pt[ms].saturating_add(tails[ms]));
+        }
+        tails[nd] = max_after;
+    }
+    tails
+}
+
+fn targeted_cp_kick(
+    pre: &Pre,
+    challenge: &Challenge,
+    base_sol: &Solution,
+    d_reassign: usize,
+    d_swap: usize,
+    rng: &mut SmallRng,
+) -> Result<Solution> {
+    let ds = build_disj_from_solution(pre, challenge, base_sol)?;
+    let mut buf = EvalBuf::new(ds.n);
+    let (mk, _mk_node) = match eval_disj(&ds, &mut buf) {
+        Some(v) => v,
+        None => return Ok(base_sol.clone()),
+    };
+    let tails = compute_tails_pulsar(&ds, &buf);
+
+    let mut m_assign: Vec<Vec<usize>> = vec![Vec::new(); challenge.num_jobs];
+    let mut ops_by_start: Vec<(u32, usize, usize)> = Vec::with_capacity(ds.n);
+    for j in 0..challenge.num_jobs {
+        for (k, &(m, _)) in base_sol.job_schedule[j].iter().enumerate() {
+            m_assign[j].push(m);
+            let node = ds.job_offsets[j] + k;
+            ops_by_start.push((buf.start[node], j, k));
+        }
+    }
+    ops_by_start.sort_unstable_by_key(|x| x.0);
+    let mut seq: Vec<usize> = ops_by_start.iter().map(|x| x.1).collect();
+
+    let mut flex_cp: Vec<(usize, usize)> = Vec::new();
+    let mut cp_indices: Vec<usize> = Vec::new();
+    for (idx, &(st, j, k)) in ops_by_start.iter().enumerate() {
+        let node = ds.job_offsets[j] + k;
+        let pt = ds.node_pt[node];
+        let tail = tails[node];
+        if st + pt + tail == mk {
+            cp_indices.push(idx);
+            let prod = pre.job_products[j];
+            if pre.product_ops[prod][k].machines.len() > 1 {
+                flex_cp.push((j, k));
+            }
+        }
+    }
+
+    flex_cp.shuffle(rng);
+    let num_reassign = d_reassign.min(flex_cp.len());
+    for &(j, k) in flex_cp.iter().take(num_reassign) {
+        let prod = pre.job_products[j];
+        let cur_m = m_assign[j][k];
+        let alts: Vec<(usize, u32)> = pre.product_ops[prod][k]
+            .machines
+            .iter()
+            .filter(|&&(m, _)| m != cur_m)
+            .copied()
+            .collect();
+        if let Some(&(new_m, _)) = alts.choose(rng) {
+            m_assign[j][k] = new_m;
+        }
+    }
+
+    cp_indices.shuffle(rng);
+    let mut swaps_done = 0usize;
+    for &idx in &cp_indices {
+        if swaps_done >= d_swap {
+            break;
+        }
+        if idx + 1 < seq.len() && seq[idx] != seq[idx + 1] {
+            seq.swap(idx, idx + 1);
+            swaps_done += 1;
+        }
+    }
+
+    let mut next_op = vec![0usize; challenge.num_jobs];
+    let mut mready = vec![0u32; challenge.num_machines];
+    let mut jready = vec![0u32; challenge.num_jobs];
+    let mut new_job_schedule: Vec<Vec<(usize, u32)>> = vec![Vec::new(); challenge.num_jobs];
+
+    for &j in &seq {
+        let k = next_op[j];
+        if k >= pre.job_ops_len[j] {
+            continue;
+        }
+        next_op[j] += 1;
+        let m = m_assign[j][k];
+        let prod = pre.job_products[j];
+        let pt = pt_from_op(&pre.product_ops[prod][k], m).unwrap_or(1);
+        let st = jready[j].max(mready[m]);
+        new_job_schedule[j].push((m, st));
+        let end = st + pt;
+        jready[j] = end;
+        mready[m] = end;
+    }
+
+    Ok(Solution {
+        job_schedule: new_job_schedule,
+    })
+}
+
+fn release_dates_excl_machine(ds: &DisjSchedule, excl_m: usize) -> Vec<u32> {
+    let n = ds.n;
+    let mut indeg = ds.indeg_job.clone();
+    let mut msucc = vec![NONE_USIZE; n];
+    for m in 0..ds.num_machines {
+        if m == excl_m {
+            continue;
+        }
+        let seq = &ds.machine_seq[m];
+        for i in 0..seq.len().saturating_sub(1) {
+            let u = seq[i];
+            let v = seq[i + 1];
+            msucc[u] = v;
+            indeg[v] = indeg[v].saturating_add(1);
+        }
+    }
+    let mut start = vec![0u32; n];
+    let mut stack: Vec<usize> = (0..n).filter(|&i| indeg[i] == 0).collect();
+    while let Some(u) = stack.pop() {
+        let eu = start[u].saturating_add(ds.node_pt[u]);
+        let js = ds.job_succ[u];
+        if js != NONE_USIZE {
+            if start[js] < eu {
+                start[js] = eu;
+            }
+            indeg[js] = indeg[js].saturating_sub(1);
+            if indeg[js] == 0 {
+                stack.push(js);
+            }
+        }
+        let ms = msucc[u];
+        if ms != NONE_USIZE {
+            if start[ms] < eu {
+                start[ms] = eu;
+            }
+            indeg[ms] = indeg[ms].saturating_sub(1);
+            if indeg[ms] == 0 {
+                stack.push(ms);
+            }
+        }
+    }
+    start
+}
+
+fn schrage_seq_pulsar(nodes: &[usize], r: &[u32], p: &[u32], q: &[u32]) -> Vec<usize> {
+    let m = nodes.len();
+    if m <= 1 {
+        return nodes.to_vec();
+    }
+    let mut by_r: Vec<usize> = nodes.to_vec();
+    by_r.sort_unstable_by_key(|&nd| r[nd]);
+    let mut result = Vec::with_capacity(m);
+    let mut t = r[by_r[0]];
+    let mut i = 0usize;
+    let mut avail: Vec<usize> = Vec::with_capacity(m);
+    while result.len() < m {
+        while i < by_r.len() && r[by_r[i]] <= t {
+            avail.push(by_r[i]);
+            i += 1;
+        }
+        if avail.is_empty() {
+            if i < by_r.len() {
+                t = r[by_r[i]];
+                continue;
+            }
+            break;
+        }
+        let bp = avail
+            .iter()
+            .enumerate()
+            .max_by_key(|&(_, &nd)| q[nd])
+            .map(|(p2, _)| p2)
+            .unwrap_or(0);
+        let chosen = avail.swap_remove(bp);
+        result.push(chosen);
+        t = t.saturating_add(p[chosen]);
+    }
+    result
+}
+
+fn schrage_pass(
+    pre: &Pre,
+    challenge: &Challenge,
+    base_sol: &Solution,
+    max_iters: usize,
+) -> Result<Option<(Solution, u32)>> {
+    #[derive(Clone, Copy)]
+    struct MachineWindow {
+        m: usize,
+        ws: usize,
+        we: usize,
+        run_len: usize,
+        crit_cnt: usize,
+    }
+
+    let mut ds = build_disj_from_solution(pre, challenge, base_sol)?;
+    let mut buf = EvalBuf::new(ds.n);
+    let Some((mut cur_mk, _)) = eval_disj(&ds, &mut buf) else {
+        return Ok(None);
+    };
+    let init_mk = cur_mk;
+    const HALO: usize = 1;
+    const MAX_WINDOWS_PER_ITER: usize = 4;
+
+    for _ in 0..max_iters {
+        let Some((mk_now, mk_node)) = eval_disj(&ds, &mut buf) else {
+            break;
+        };
+        cur_mk = mk_now;
+        let tails = compute_tails_pulsar(&ds, &buf);
+
+        let mut crit = vec![false; ds.n];
+        let mut u = mk_node;
+        while u != NONE_USIZE {
+            crit[u] = true;
+            u = buf.best_pred[u];
+        }
+
+        let mut candidates: Vec<MachineWindow> = Vec::new();
+        for m in 0..ds.num_machines {
+            let seq = &ds.machine_seq[m];
+            if seq.len() < 3 {
+                continue;
+            }
+
+            let mut best_local: Option<MachineWindow> = None;
+            let mut i = 0usize;
+            while i < seq.len() {
+                if !crit[seq[i]] {
+                    i += 1;
+                    continue;
+                }
+                let start = i;
+                while i + 1 < seq.len() && crit[seq[i + 1]] {
+                    i += 1;
+                }
+                let end = i;
+                let run_len = end - start + 1;
+                if run_len >= 2 {
+                    let ws = start.saturating_sub(HALO);
+                    let we = (end + HALO).min(seq.len() - 1);
+                    let mut crit_cnt = 0usize;
+                    for &nd in &seq[ws..=we] {
+                        if crit[nd] {
+                            crit_cnt += 1;
+                        }
+                    }
+                    let cand = MachineWindow { m, ws, we, run_len, crit_cnt };
+                    let replace = match best_local {
+                        None => true,
+                        Some(best) => {
+                            cand.run_len > best.run_len
+                                || (cand.run_len == best.run_len
+                                    && (cand.crit_cnt > best.crit_cnt
+                                        || (cand.crit_cnt == best.crit_cnt
+                                            && (cand.we - cand.ws) < (best.we - best.ws))))
+                        }
+                    };
+                    if replace {
+                        best_local = Some(cand);
+                    }
+                }
+                i += 1;
+            }
+
+            if let Some(cand) = best_local {
+                candidates.push(cand);
+            }
+        }
+
+        if candidates.is_empty() {
+            break;
+        }
+
+        candidates.sort_unstable_by(|a, b| {
+            b.run_len
+                .cmp(&a.run_len)
+                .then_with(|| b.crit_cnt.cmp(&a.crit_cnt))
+                .then_with(|| (a.we - a.ws).cmp(&(b.we - b.ws)))
+                .then_with(|| a.m.cmp(&b.m))
+        });
+
+        let mut improved = false;
+        for cand in candidates.into_iter().take(MAX_WINDOWS_PER_ITER) {
+            let m = cand.m;
+            let old_seq = ds.machine_seq[m].clone();
+            let window_nodes = old_seq[cand.ws..=cand.we].to_vec();
+            if window_nodes.len() <= 2 {
+                continue;
+            }
+
+            let r_excl = release_dates_excl_machine(&ds, m);
+            let new_window = schrage_seq_pulsar(&window_nodes, &r_excl, &ds.node_pt, &tails);
+            if new_window == window_nodes {
+                continue;
+            }
+
+            let mut new_seq = old_seq.clone();
+            for (off, &nd) in new_window.iter().enumerate() {
+                new_seq[cand.ws + off] = nd;
+            }
+            ds.machine_seq[m] = new_seq;
+
+            if let Some((new_mk, _)) = eval_disj(&ds, &mut buf) {
+                if new_mk < cur_mk {
+                    cur_mk = new_mk;
+                    improved = true;
+                    break;
+                }
+            }
+
+            ds.machine_seq[m] = old_seq;
+            let _ = eval_disj(&ds, &mut buf);
+        }
+
+        if !improved {
+            break;
+        }
+    }
+    if cur_mk < init_mk {
+        Ok(Some((disj_to_solution(pre, &ds, &buf.start)?, cur_mk)))
+    } else {
+        Ok(None)
+    }
+}
+
+fn find_candidate_insert_positions_fm(
+    ds: &DisjSchedule,
+    starts: &[u32],
+    node: usize,
+    new_machine: usize,
+    _new_pt: u32,
+    job_pred: &[usize],
+) -> Vec<usize> {
+    let seq = &ds.machine_seq[new_machine];
+    let len = seq.len();
+    if len == 0 {
+        return vec![0];
+    }
+
+    let jp = job_pred[node];
+    let job_pred_end = if jp != NONE_USIZE {
+        starts[jp].saturating_add(ds.node_pt[jp])
+    } else {
+        0
+    };
+
+    #[inline]
+    fn lower_bound_start_gt(seq: &[usize], starts: &[u32], value: u32) -> usize {
+        let mut lo = 0usize;
+        let mut hi = seq.len();
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            if starts[seq[mid]] <= value {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    #[inline]
+    fn lower_bound_start_ge(seq: &[usize], starts: &[u32], value: u32) -> usize {
+        let mut lo = 0usize;
+        let mut hi = seq.len();
+        while lo < hi {
+            let mid = (lo + hi) >> 1;
+            if starts[seq[mid]] < value {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    let pos_after_jp = lower_bound_start_gt(seq, starts, job_pred_end).min(len);
+    let cur_start = starts[node];
+    let pos_by_cur = lower_bound_start_ge(seq, starts, cur_start).min(len);
+
+    let mut out: Vec<usize> = Vec::with_capacity(5);
+    #[inline]
+    fn push_uniq(v: &mut Vec<usize>, p: usize, len: usize) {
+        if p <= len && !v.contains(&p) {
+            v.push(p);
+        }
+    }
+
+    push_uniq(&mut out, pos_after_jp, len);
+    push_uniq(&mut out, pos_after_jp.saturating_sub(1), len);
+
+    push_uniq(&mut out, pos_by_cur, len);
+    push_uniq(&mut out, pos_by_cur.saturating_sub(1), len);
+
+    push_uniq(&mut out, 0, len);
+    push_uniq(&mut out, len, len);
+
+    if out.is_empty() {
+        out.push(len);
+    }
+    if out.len() > 5 {
+        out.truncate(5);
+    }
+    out
+}
+
+fn estimate_reassign_mk_fm(ds: &DisjSchedule, heads: &[u32], tails: &[u32], node: usize, new_machine: usize, new_pt: u32, insert_pos: usize, job_pred: &[usize], machine_pred: &[usize], machine_succ: &[usize]) -> u32 {
+    let jp=job_pred[node]; let js=ds.job_succ[node]; let old_mp=machine_pred[node]; let old_ms=machine_succ[node];
+    let jp_end=if jp!=NONE_USIZE{heads[jp].saturating_add(ds.node_pt[jp])}else{0};
+    let new_seq=&ds.machine_seq[new_machine];
+    let new_mp_end=if insert_pos>0&&!new_seq.is_empty(){let pred=new_seq[insert_pos.min(new_seq.len())-1];heads[pred].saturating_add(ds.node_pt[pred])}else{0};
+    let new_start=jp_end.max(new_mp_end); let new_end=new_start.saturating_add(new_pt);
+    let js_tail=if js!=NONE_USIZE{ds.node_pt[js].saturating_add(tails[js])}else{0};
+    let new_ms_tail=if insert_pos<new_seq.len(){let succ=new_seq[insert_pos];ds.node_pt[succ].saturating_add(tails[succ])}else{0};
+    let node_path=new_end.saturating_add(js_tail.max(new_ms_tail));
+    let old_reconnect=if old_mp!=NONE_USIZE&&old_ms!=NONE_USIZE{let old_mp_end=heads[old_mp].saturating_add(ds.node_pt[old_mp]);old_mp_end.saturating_add(ds.node_pt[old_ms]).saturating_add(tails[old_ms])}else{0};
+    node_path.max(old_reconnect)
+}
+
+#[inline]
+fn estimate_swap_mk_fm(u: usize, v: usize, heads: &[u32], tails: &[u32], pt: &[u32], job_pred: &[usize], job_succ: &[usize], machine_pred: &[usize], machine_succ: &[usize]) -> u32 {
+    let mp_u=machine_pred[u];let ms_v=machine_succ[v];let jp_v=job_pred[v];let jp_u=job_pred[u];let js_u=job_succ[u];let js_v=job_succ[v];
+    let r_jp_v=if jp_v!=NONE_USIZE{heads[jp_v].saturating_add(pt[jp_v])}else{0};let r_mp_u=if mp_u!=NONE_USIZE{heads[mp_u].saturating_add(pt[mp_u])}else{0};
+    let new_r_v=r_jp_v.max(r_mp_u);let r_jp_u=if jp_u!=NONE_USIZE{heads[jp_u].saturating_add(pt[jp_u])}else{0};let new_r_u=r_jp_u.max(new_r_v.saturating_add(pt[v]));
+    let q_js_u=if js_u!=NONE_USIZE{pt[js_u].saturating_add(tails[js_u])}else{0};let q_ms_v=if ms_v!=NONE_USIZE{pt[ms_v].saturating_add(tails[ms_v])}else{0};
+    let new_q_u=q_js_u.max(q_ms_v);let q_js_v=if js_v!=NONE_USIZE{pt[js_v].saturating_add(tails[js_v])}else{0};let new_q_v=q_js_v.max(pt[u].saturating_add(new_q_u));
+    (new_r_v.saturating_add(pt[v]).saturating_add(new_q_v)).max(new_r_u.saturating_add(pt[u]).saturating_add(new_q_u))
+}
+
+fn adaptive_budget(
+    base_ts_iters: usize,
+    base_cb_passes: usize,
+    base_cb_iters: usize,
+    base_alns_rounds: usize,
+    base_ils_rounds: usize,
+    base_final_ils_rounds: usize,
+    global_no_improve: usize,
+) -> (usize, usize, usize, usize, usize, usize, usize) {
+    let factor = (global_no_improve as f64 / 80.0).min(1.8);
+    let scale_up = 1.0 + 0.4 * factor;
+    let scale_down = 1.0 / (1.0 + 0.25 * factor).max(0.6);
+    let ts_iters = (base_ts_iters as f64 * scale_up).round() as usize;
+    let cb_passes = (base_cb_passes as f64 * scale_up).round() as usize;
+    let cb_iters = (base_cb_iters as f64 * scale_up).round() as usize;
+    let alns_rounds = (base_alns_rounds as f64 * scale_down).round() as usize;
+    let ils_rounds = (base_ils_rounds as f64 * scale_up).round() as usize;
+    let final_ils_rounds = (base_final_ils_rounds as f64 * scale_down).round() as usize;
+    let max_outer_iters = (65.0 * scale_down).round() as usize;
+    (ts_iters, cb_passes, cb_iters, alns_rounds, ils_rounds, final_ils_rounds, max_outer_iters)
+}
+
+pub fn solve(
+    challenge: &Challenge,
+    save_solution: &dyn Fn(&Solution) -> Result<()>,
+    pre: &Pre,
+    effort: &EffortConfig,
+) -> Result<()> {
+    let (greedy_sol, greedy_mk) = run_simple_greedy_baseline(challenge)?;
+    save_solution(&greedy_sol)?;
+
+    let mut rng = SmallRng::from_seed(challenge.seed);
+    let allow_flex_balance = pre.high_flex > 0.60 && pre.jobshopness > 0.38;
+    let mut rule_prios: Vec<(f64, Rule)> = Vec::with_capacity(9);
+    let cv_boost = if pre.load_cv > 0.8 { 2.0 } else { 0.0 };
+    let bn_boost = if pre.bn_focus > 0.7 { 2.0 } else { 0.0 };
+    let flex_boost = if allow_flex_balance { 1.0 } else { -1.0 };
+    rule_prios.push((cv_boost, Rule::Regret));
+    rule_prios.push((bn_boost, Rule::BnHeavy));
+    rule_prios.push((0.0, Rule::Adaptive));
+    rule_prios.push((-0.5, Rule::EndTight));
+    rule_prios.push((-0.5, Rule::CriticalPath));
+    rule_prios.push((-0.5, Rule::MostWork));
+    rule_prios.push((-0.5, Rule::LeastFlex));
+    rule_prios.push((-1.0, Rule::ShortestProc));
+    if allow_flex_balance {
+        rule_prios.push((flex_boost, Rule::FlexBalance));
+    }
+    rule_prios.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let mut rules: Vec<Rule> = rule_prios.into_iter().map(|(_, r)| r).collect();
+    let mut best_makespan = greedy_mk; let mut best_solution: Option<Solution> = Some(greedy_sol); let mut top_solutions: Vec<(Solution,u32)> = Vec::new();
+    let target_margin: u32 = ((pre.avg_op_min*(0.9+0.9*pre.high_flex+0.6*pre.jobshopness)).max(1.0)) as u32;
+    let route_w_base: f64 = if pre.chaotic_like { 0.0 } else { (0.050+0.12*pre.high_flex+0.10*pre.jobshopness+(0.08/pre.flex_avg.max(1.0))).clamp(0.04,0.28) };
+
+    if pre.flow_route.is_some()&&pre.flow_pt_by_job.is_some() {
+        if let Ok((sol,mk))=neh_reentrant_flow_solution(pre,challenge.num_jobs,challenge.num_machines) {
+            if mk<best_makespan{best_makespan=mk;best_solution=Some(sol.clone());save_solution(&sol)?;}
+            push_top_solutions(&mut top_solutions,&sol,mk,15);
+        }
+    }
+    let mut ranked: Vec<(Rule,u32,Solution)>=Vec::with_capacity(rules.len());
+    for &rule in &rules {
+        let (sol,mk)=construct_solution_conflict(challenge,pre,rule,0,None,&mut rng,None,None,None,0.0)?;
+        if mk<best_makespan{best_makespan=mk;best_solution=Some(sol.clone());save_solution(&sol)?;}
+        push_top_solutions(&mut top_solutions,&sol,mk,20); ranked.push((rule,mk,sol));
+    }
+    ranked.sort_by_key(|x|x.1);
+
+    if let Ok((jc_sol, jc_mk)) = construct_solution_job_centric(challenge, pre) {
+        if jc_mk < best_makespan {
+            best_makespan = jc_mk;
+            best_solution = Some(jc_sol.clone());
+            save_solution(&jc_sol)?;
+        }
+        push_top_solutions(&mut top_solutions, &jc_sol, jc_mk, 20);
+    }
+    
+    let r0=ranked[0].0; let r1=ranked.get(1).map(|x|x.0).unwrap_or(r0); let r2=ranked.get(2).map(|x|x.0).unwrap_or(r1);
+    let mut rule_best: Vec<u32>=vec![u32::MAX;10]; let mut rule_tries: Vec<u32>=vec![0u32;10];
+    for (rr,mk,_) in &ranked{let idx=rule_idx(*rr);rule_best[idx]=rule_best[idx].min(*mk);rule_tries[idx]=rule_tries[idx].saturating_add(1);}
+
+    let base = best_solution.as_ref().ok_or_else(|| anyhow!("No initial solution found"))?;
+    let mut learned_jb=Some(job_bias_from_solution(pre, base)?);
+    let mut learned_mp=Some(machine_penalty_from_solution(pre,base,challenge.num_machines)?);
+    let mut learned_rp=if route_w_base>0.0{Some(route_pref_from_solution_lite(pre,base,challenge)?)}else{None};
+    let mut learn_updates_left=10usize;
+    let num_restarts=effort.fjsp_medium_iters;
+    let mut k_hi=if pre.flex_avg>8.0{6}else if pre.flex_avg>6.5{4}else if pre.flex_avg>4.0{5}else{6};
+    if pre.jobshopness>0.60&&k_hi<6{k_hi+=1;} k_hi=k_hi.min(6).max(2);
+    let mut stuck: usize=0;
+    let base_ts_iters = (effort.fjsp_medium_iters*3/4).max(60);
+    let base_cb_passes = if effort.fjsp_medium_iters > 200 { 6 } else { 5 };
+    let base_cb_iters = (pre.total_ops / 8).max(30).min(120);
+    let base_alns_rounds = if effort.fjsp_medium_iters > 300 { 50 } else { 35 };
+    let base_ils_rounds = if effort.fjsp_medium_iters > 300 { 30 } else { 20 };
+    let base_final_ils_rounds = if effort.fjsp_medium_iters > 300 { 12 } else { 8 };
+    let mut global_stuck: usize = 0;
+    for r in 0..num_restarts {
+        let late=r>=(num_restarts*2)/3;
+        let (k_min,k_max)=if stuck>170{(4usize,6usize.min(k_hi))}else if stuck>90{(3usize,6usize.min(k_hi.max(4)))}else if stuck>35{(2usize,k_hi)}else{(2usize,k_hi.min(4))};
+        let rule=if r<35{let u: f64=rng.gen();if allow_flex_balance&&pre.high_flex>0.82&&u<0.10{Rule::FlexBalance}else if u<0.52{r0}else if u<0.80{r1}else if u<0.92{r2}else{rules[rng.gen_range(0..rules.len())]}}
+            else{choose_rule_bandit(&mut rng,&rules,&rule_best,&rule_tries,best_makespan,target_margin,stuck,pre.chaotic_like,late)};
+        let k=if k_max<=k_min{k_min}else{rng.gen_range(k_min..=k_max)};
+        let learn_base=if pre.chaotic_like{0.0}else{(0.08+0.22*pre.jobshopness+0.18*pre.high_flex).clamp(0.05,0.42)};
+        let learn_boost=(1.0+0.35*((stuck as f64)/120.0).clamp(0.0,1.0)).clamp(1.0,1.35);
+        let learn_p=(learn_base*learn_boost).clamp(0.0,0.60);
+        let use_learn=learned_jb.is_some()&&learned_mp.is_some()&&rng.gen::<f64>()<learn_p&&(route_w_base==0.0||learned_rp.is_some());
+        let target=if best_makespan<(u32::MAX/2){Some(best_makespan.saturating_add(target_margin))}else{None};
+        let (sol,mk)=if use_learn{construct_solution_conflict(challenge,pre,rule,k,target,&mut rng,learned_jb.as_deref(),learned_mp.as_deref(),learned_rp.as_ref(),route_w_base)?}
+            else{construct_solution_conflict(challenge,pre,rule,k,target,&mut rng,None,None,None,0.0)?};
+        let ridx=rule_idx(rule);rule_tries[ridx]=rule_tries[ridx].saturating_add(1);rule_best[ridx]=rule_best[ridx].min(mk);
+        if mk<best_makespan{best_makespan=mk;best_solution=Some(sol.clone());save_solution(&sol)?;stuck=0;}else{stuck=stuck.saturating_add(1);}
+        push_top_solutions(&mut top_solutions,&sol,mk,20);
+
+        if learn_updates_left > 0 && !pre.chaotic_like && !top_solutions.is_empty() {
+            let refresh = (r > 0 && r % 35 == 0) || stuck == 90 || stuck == 170;
+            if refresh {
+                let pool_size = top_solutions.len().min(10);
+                let mut elite: Vec<(u32, usize)> = top_solutions
+                    .iter()
+                    .take(pool_size)
+                    .enumerate()
+                    .map(|(i, (_s, mk))| (*mk, i))
+                    .collect();
+                elite.sort_by_key(|x| x.0);
+                let rep_i = elite[pool_size / 2].1;
+                let rep_sol = &top_solutions[rep_i].0;
+
+                learned_jb = Some(job_bias_from_solution(pre, rep_sol)?);
+                learned_mp = Some(machine_penalty_from_solution(pre, rep_sol, challenge.num_machines)?);
+                if route_w_base > 0.0 {
+                    learned_rp = Some(route_pref_from_solution_lite(pre, rep_sol, challenge)?);
+                }
+                learn_updates_left -= 1;
+            }
+        }
+    }
+    let route_w_ls: f64=if route_w_base>0.0{(route_w_base*1.40).clamp(route_w_base,0.40)}else{0.0};
+    let mut refine_results: Vec<(Solution,u32)>=Vec::new();
+    for (base_sol,_) in top_solutions.iter() {
+        let jb=job_bias_from_solution(pre,base_sol)?; let mp=machine_penalty_from_solution(pre,base_sol,challenge.num_machines)?;
+        let rp=if route_w_ls>0.0{Some(route_pref_from_solution_lite(pre,base_sol,challenge)?)}else{None};
+        let target_ls=if best_makespan<(u32::MAX/2){Some(best_makespan.saturating_add(target_margin/2))}else{None};
+        for attempt in 0..10 {
+            let rule=if pre.chaotic_like{match attempt%4{0=>Rule::Adaptive,1=>Rule::ShortestProc,2=>Rule::MostWork,_=>Rule::Regret}}else{match attempt{0=>r0,1=>Rule::Adaptive,2=>Rule::BnHeavy,3=>Rule::EndTight,4=>Rule::Regret,5=>Rule::CriticalPath,6=>Rule::LeastFlex,7=>Rule::MostWork,8=>if allow_flex_balance{Rule::FlexBalance}else{r1},_=>r1}};
+            let k=match attempt%4{0=>2,1=>3,2=>4,_=>2}.min(k_hi);
+            let (sol,mk)=construct_solution_conflict(challenge,pre,rule,k,target_ls,&mut rng,Some(&jb),Some(&mp),rp.as_ref(),if rp.is_some(){route_w_ls}else{0.0})?;
+            if mk<best_makespan{best_makespan=mk;best_solution=Some(sol.clone());save_solution(&sol)?;}
+            refine_results.push((sol,mk));
+        }
+    }
+    for (sol,mk) in refine_results{push_top_solutions(&mut top_solutions,&sol,mk,15);}
+    let (dyn_ts_iters, _, _, _, _, _, _) = adaptive_budget(base_ts_iters, base_cb_passes, base_cb_iters, base_alns_rounds, base_ils_rounds, base_final_ils_rounds, global_stuck);
+    let ts_iters = dyn_ts_iters;
+    let ts_starts=top_solutions.len().min(12);
+    let ts_tenure=((pre.total_ops as f64).sqrt() as usize).clamp(5,12);
+    let prev_best = best_makespan;
+    for i in 0..ts_starts {
+        let base_sol=&top_solutions[i].0;
+        if let Some((sol2,mk2))=tabu_search_hybrid(pre,challenge,base_sol,ts_iters,ts_tenure)?{
+            if mk2<best_makespan{best_makespan=mk2;best_solution=Some(sol2.clone());save_solution(&sol2)?;}
+        }
+    }
+    if best_makespan < prev_best { global_stuck = 0; } else { global_stuck += 1; }
+    let best_sol_clone = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone {
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+    }
+
+    if let Some(sol) = best_solution.as_ref() {
+        if let Ok(Some((ecr_sol, ecr_mk))) = exhaustive_critical_reroute_pass(pre, challenge, sol) {
+            if ecr_mk < best_makespan { best_makespan = ecr_mk; best_solution = Some(ecr_sol.clone()); save_solution(&ecr_sol)?; }
+        }
+    }
+
+    let (_, dyn_cb_passes, dyn_cb_iters, _, _, _, _) = adaptive_budget(base_ts_iters, base_cb_passes, base_cb_iters, base_alns_rounds, base_ils_rounds, base_final_ils_rounds, global_stuck);
+    let cb_passes = dyn_cb_passes;
+    let cb_iters = dyn_cb_iters;
+    let cb_no_improve = cb_iters / 2;
+
+    let cb_top_n = top_solutions.len().min(8);
+    let prev_best_cb = best_makespan;
+    for ci in 0..cb_top_n {
+        let base_sol = &top_solutions[ci].0;
+        if let Ok(Some((cb_sol, cb_mk))) = critical_block_move_local_search_ex(pre, challenge, base_sol, cb_passes, cb_iters, cb_no_improve) {
+            if cb_mk < best_makespan {
+                best_makespan = cb_mk;
+                best_solution = Some(cb_sol.clone());
+                save_solution(&cb_sol)?;
+            }
+            push_top_solutions(&mut top_solutions, &cb_sol, cb_mk, 20);
+        }
+    }
+    if best_makespan < prev_best_cb { global_stuck = 0; } else { global_stuck += 1; }
+
+    if let Some(sol) = best_solution.as_ref() {
+        if let Ok(Some((cb_sol, cb_mk))) = critical_block_move_local_search_ex(pre, challenge, sol, cb_passes, cb_iters, cb_no_improve) {
+            if cb_mk < best_makespan {
+                best_makespan = cb_mk;
+                best_solution = Some(cb_sol.clone());
+                save_solution(&cb_sol)?;
+            }
+        }
+    }
+
+    let best_sol_clone2 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone2 {
+        let prev_mk = best_makespan;
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+        if best_makespan < prev_mk {
+            if let Some(ref new_sol) = best_solution {
+                push_top_solutions(&mut top_solutions, new_sol, best_makespan, 20);
+            }
+        }
+    }
+
+    for i in 0..top_solutions.len().min(5) {
+        let base = top_solutions[i].0.clone();
+        if let Ok(Some((s, m))) = schrage_pass(pre, challenge, &base, 6) {
+            if m < best_makespan {
+                best_makespan = m;
+                best_solution = Some(s.clone());
+                save_solution(&s)?;
+            }
+            push_top_solutions(&mut top_solutions, &s, m, 20);
+        }
+    }
+    if !top_solutions.is_empty() {
+        apply_unified_reassign(pre, challenge, &top_solutions[0].0, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+    }
+
+    {
+        let ts_tenure = ((pre.total_ops as f64).sqrt() as usize).clamp(5, 12);
+        let ts_iters = (effort.fjsp_medium_iters * 3 / 4).max(60);
+        let max_outer_iters = 65usize;
+        let mut tb_no_improve = 0usize;
+
+        for loop_iter in 0..max_outer_iters {
+            if top_solutions.is_empty() {
+                break;
+            }
+
+            let pool_size = top_solutions.len().min(12);
+            let base_idx = loop_iter % pool_size;
+            let base_sol = top_solutions[base_idx].0.clone();
+
+            let kick_reassigns = rng.gen_range(2usize..=5);
+            let kick_swaps = rng.gen_range(1usize..=4);
+            let perturbed =
+                match targeted_cp_kick(pre, challenge, &base_sol, kick_reassigns, kick_swaps, &mut rng) {
+                    Ok(s) => s,
+                    Err(_) => base_sol.clone(),
+                };
+
+            let (cand_sol, cand_mk) = match tabu_search_hybrid(pre, challenge, &perturbed, ts_iters, ts_tenure)? {
+                Some((s, m)) => (s, m),
+                None => match critical_block_move_local_search_ex(pre, challenge, &perturbed, cb_passes, cb_iters, cb_no_improve) {
+                    Ok(Some((ls_sol, ls_mk))) => (ls_sol, ls_mk),
+                    _ => (perturbed, u32::MAX),
+                },
+            };
+
+            if cand_mk < best_makespan {
+                best_makespan = cand_mk;
+                best_solution = Some(cand_sol.clone());
+                save_solution(&cand_sol)?;
+                tb_no_improve = 0;
+            } else {
+                tb_no_improve += 1;
+            }
+
+            if cand_mk < u32::MAX {
+                push_top_solutions(&mut top_solutions, &cand_sol, cand_mk, 20);
+            }
+
+            if tb_no_improve > 160 {
+                break;
+            }
+        }
+    }
+
+    for i in 0..top_solutions.len().min(3) {
+        let base = top_solutions[i].0.clone();
+        if let Ok(Some((s, m))) = schrage_pass(pre, challenge, &base, 8) {
+            if m < best_makespan {
+                best_makespan = m;
+                best_solution = Some(s.clone());
+                save_solution(&s)?;
+            }
+        }
+    }
+    if !top_solutions.is_empty() {
+        if let Ok(Some((s, m))) = greedy_reassign_pass(pre, challenge, &top_solutions[0].0) {
+            if m < best_makespan {
+                best_makespan = m;
+                best_solution = Some(s.clone());
+                save_solution(&s)?;
+            }
+        }
+    }
+
+    let (_, _, _, _, dyn_ils_rounds, _, _) = adaptive_budget(base_ts_iters, base_cb_passes, base_cb_iters, base_alns_rounds, base_ils_rounds, base_final_ils_rounds, global_stuck);
+    let ils_rounds = dyn_ils_rounds;
+    let mut ils_best_sol = best_solution.clone();
+    let mut ils_best_mk = best_makespan;
+    let mut ils_no_improve = 0usize;
+    let ils_max_no_improve = (ils_rounds * 3) / 4 + 3;
+
+    const NUM_PERTURB_OPS: usize = 4;
+    const WINDOW_SIZE: usize = 20;
+    const EPSILON: f64 = 0.12;
+    let mut success_history: Vec<Vec<bool>> = vec![Vec::with_capacity(WINDOW_SIZE); NUM_PERTURB_OPS];
+
+    for ils_r in 0..ils_rounds {
+        if ils_no_improve >= ils_max_no_improve { break; }
+        let Some(base) = ils_best_sol.as_ref() else { break };
+        let mut ds = build_disj_from_solution(pre, challenge, base)?;
+        let mut buf = EvalBuf::new(ds.n);
+        let Some((_, mk_node)) = eval_disj(&ds, &mut buf) else { continue };
+        let n = ds.n;
+        let mut perturb_seed: u64 = (ils_r as u64).wrapping_mul(0x517CC1B727220A95)
+            .wrapping_add(ils_best_mk as u64)
+            .wrapping_add(challenge.seed[0] as u64)
+            .wrapping_add((ils_r as u64).wrapping_mul(0xDEADBEEF));
+        let k_perturb = (3 + ils_r / 3).min(8);
+
+        let strategy = if rng.gen::<f64>() < EPSILON {
+            rng.gen_range(0..NUM_PERTURB_OPS)
+        } else {
+            let mut best_rate = -1.0;
+            let mut best_s = 0usize;
+            for s in 0..NUM_PERTURB_OPS {
+                let hist = &success_history[s];
+                if hist.is_empty() {
+                    continue;
+                }
+                let rate = hist.iter().filter(|&&b| b).count() as f64 / hist.len() as f64;
+                if rate > best_rate {
+                    best_rate = rate;
+                    best_s = s;
+                }
+            }
+            if best_rate < 0.0 {
+                rng.gen_range(0..NUM_PERTURB_OPS)
+            } else {
+                best_s
+            }
+        };
+
+        if strategy == 0 {
+            let mut crit_nodes: Vec<usize> = Vec::with_capacity(64);
+            let mut u = mk_node;
+            while u != NONE_USIZE { crit_nodes.push(u); u = buf.best_pred[u]; }
+            let mut perturbed = 0; let mut attempts = 0;
+            while perturbed < k_perturb && attempts < crit_nodes.len() * 4 {
+                attempts += 1;
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                if crit_nodes.is_empty() { break; }
+                let idx = (perturb_seed as usize) % crit_nodes.len();
+                let node = crit_nodes[idx];
+                let job = ds.node_job[node]; let op_idx = ds.node_op[node]; let product = pre.job_products[job];
+                let op_info = &pre.product_ops[product][op_idx];
+                if op_info.machines.len() <= 1 { continue; }
+                let cur_machine = ds.node_machine[node];
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let alt_idx = (perturb_seed as usize) % op_info.machines.len();
+                let (new_m, new_pt) = op_info.machines[alt_idx];
+                if new_m == cur_machine { continue; }
+                let old_pos = match ds.machine_seq[cur_machine].iter().position(|&x| x == node) { Some(p) => p, None => continue };
+                ds.machine_seq[cur_machine].remove(old_pos);
+                ds.node_machine[node] = new_m; ds.node_pt[node] = new_pt;
+                let cur_start = buf.start[node];
+                let mut ins_pos = ds.machine_seq[new_m].len();
+                for (ki, &nd) in ds.machine_seq[new_m].iter().enumerate() { if buf.start[nd] >= cur_start { ins_pos = ki; break; } }
+                ds.machine_seq[new_m].insert(ins_pos, node);
+                perturbed += 1;
+            }
+        } else if strategy == 1 {
+            let mut machine_loads = vec![0u32; ds.num_machines];
+            for node in 0..n { let m = ds.node_machine[node]; machine_loads[m] = machine_loads[m].saturating_add(ds.node_pt[node]); }
+            let worst_m = machine_loads.iter().enumerate().max_by_key(|&(_, &v)| v).map(|(i, _)| i).unwrap_or(0);
+            if ds.machine_seq[worst_m].is_empty() { continue; }
+            let mut perturbed = 0; let mut attempts = 0;
+            while perturbed < k_perturb && attempts < ds.machine_seq[worst_m].len() * 4 {
+                attempts += 1;
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let cur_seq_len = ds.machine_seq[worst_m].len();
+                if cur_seq_len == 0 { break; }
+                let seq_idx = (perturb_seed as usize) % cur_seq_len;
+                let node = ds.machine_seq[worst_m][seq_idx];
+                let job = ds.node_job[node]; let op_idx = ds.node_op[node]; let product = pre.job_products[job];
+                let op_info = &pre.product_ops[product][op_idx];
+                if op_info.machines.len() <= 1 { continue; }
+                let mut best_alt_m = worst_m; let mut best_alt_pt = ds.node_pt[node];
+                for &(am, apt) in &op_info.machines { if am != worst_m && apt < best_alt_pt { best_alt_pt = apt; best_alt_m = am; } }
+                if best_alt_m == worst_m { continue; }
+                let old_pos = match ds.machine_seq[worst_m].iter().position(|&x| x == node) { Some(p) => p, None => continue };
+                ds.machine_seq[worst_m].remove(old_pos);
+                ds.node_machine[node] = best_alt_m; ds.node_pt[node] = best_alt_pt;
+                let cur_start = buf.start[node];
+                let mut ins_pos = ds.machine_seq[best_alt_m].len();
+                for (ki, &nd) in ds.machine_seq[best_alt_m].iter().enumerate() { if buf.start[nd] >= cur_start { ins_pos = ki; break; } }
+                ds.machine_seq[best_alt_m].insert(ins_pos, node);
+                perturbed += 1;
+            }
+        } else if strategy == 2 {
+            let mut crit_nodes: Vec<usize> = Vec::with_capacity(64);
+            let mut crit_machines: Vec<usize> = Vec::with_capacity(16);
+            let mut u = mk_node;
+            while u != NONE_USIZE {
+                crit_nodes.push(u);
+                let m = ds.node_machine[u];
+                if !crit_machines.contains(&m) { crit_machines.push(m); }
+                u = buf.best_pred[u];
+            }
+            let k_reassign = k_perturb / 2;
+            let mut perturbed = 0; let mut attempts = 0;
+            while perturbed < k_reassign && attempts < crit_nodes.len() * 3 {
+                attempts += 1;
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                if crit_nodes.is_empty() { break; }
+                let idx = (perturb_seed as usize) % crit_nodes.len();
+                let node = crit_nodes[idx];
+                let job = ds.node_job[node]; let op_idx = ds.node_op[node]; let product = pre.job_products[job];
+                let op_info = &pre.product_ops[product][op_idx];
+                if op_info.machines.len() <= 1 { continue; }
+                let cur_machine = ds.node_machine[node];
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let alt_idx = (perturb_seed as usize) % op_info.machines.len();
+                let (new_m, new_pt) = op_info.machines[alt_idx];
+                if new_m == cur_machine { continue; }
+                let old_pos = match ds.machine_seq[cur_machine].iter().position(|&x| x == node) { Some(p) => p, None => continue };
+                ds.machine_seq[cur_machine].remove(old_pos);
+                ds.node_machine[node] = new_m; ds.node_pt[node] = new_pt;
+                let cur_start = buf.start[node];
+                let mut ins_pos = ds.machine_seq[new_m].len();
+                for (ki, &nd) in ds.machine_seq[new_m].iter().enumerate() { if buf.start[nd] >= cur_start { ins_pos = ki; break; } }
+                ds.machine_seq[new_m].insert(ins_pos, node);
+                perturbed += 1;
+            }
+            let k_swaps = k_perturb - k_reassign;
+            let mut swapped = 0;
+            for _ in 0..(k_swaps * 4) {
+                if swapped >= k_swaps || crit_machines.is_empty() { break; }
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let m = crit_machines[(perturb_seed as usize) % crit_machines.len()];
+                if ds.machine_seq[m].len() < 2 { continue; }
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let pos = (perturb_seed as usize) % (ds.machine_seq[m].len() - 1);
+                ds.machine_seq[m].swap(pos, pos + 1);
+                swapped += 1;
+            }
+        } else {
+            let mut swapped = 0; let mut attempts = 0;
+            while swapped < k_perturb && attempts < 100 {
+                attempts += 1;
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let m = (perturb_seed as usize) % ds.num_machines;
+                if ds.machine_seq[m].len() < 2 { continue; }
+                perturb_seed ^= perturb_seed.wrapping_shl(13); perturb_seed ^= perturb_seed.wrapping_shr(7); perturb_seed ^= perturb_seed.wrapping_shl(17);
+                let pos = (perturb_seed as usize) % (ds.machine_seq[m].len() - 1);
+                ds.machine_seq[m].swap(pos, pos + 1);
+                swapped += 1;
+            }
+        }
+
+        let Some((_, _)) = eval_disj(&ds, &mut buf) else { ils_no_improve += 1; continue };
+        let perturbed_sol = match disj_to_solution(pre, &ds, &buf.start) { Ok(s) => s, Err(_) => { ils_no_improve += 1; continue; } };
+        let after_reassign = match greedy_reassign_pass(pre, challenge, &perturbed_sol)? {
+            Some((s, mk)) => (s, mk),
+            None => { if let Some((pmk, _)) = eval_disj(&ds, &mut buf) { (perturbed_sol.clone(), pmk) } else { ils_no_improve += 1; continue; } }
+        };
+        let ls_result = critical_block_move_local_search_ex(pre, challenge, &after_reassign.0, cb_passes, cb_iters, cb_no_improve);
+        let (candidate_sol, candidate_mk) = if let Ok(Some((ls_sol, ls_mk))) = ls_result {
+            (ls_sol, ls_mk)
+        } else {
+            (after_reassign.0.clone(), after_reassign.1)
+        };
+        
+        {
+            let success = candidate_mk < ils_best_mk;
+            let hist = &mut success_history[strategy];
+            if hist.len() >= WINDOW_SIZE {
+                hist.remove(0);
+            }
+            hist.push(success);
+        }
+
+        if candidate_mk < best_makespan {
+            best_makespan = candidate_mk; best_solution = Some(candidate_sol.clone()); save_solution(&candidate_sol)?;
+        }
+        
+        if candidate_mk < ils_best_mk {
+            ils_best_mk = candidate_mk; ils_best_sol = Some(candidate_sol); ils_no_improve = 0;
+        } else {
+            ils_no_improve += 1;
+        }
+    }
+
+    let best_sol_clone3 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone3 {
+        let prev_mk = best_makespan;
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+        if best_makespan < prev_mk {
+            if let Some(ref new_sol) = best_solution {
+                push_top_solutions(&mut top_solutions, new_sol, best_makespan, 20);
+            }
+        }
+    }
+
+    {
+        let (_, _, _, dyn_alns_rounds, _, _, _) = adaptive_budget(base_ts_iters, base_cb_passes, base_cb_iters, base_alns_rounds, base_ils_rounds, base_final_ils_rounds, global_stuck);
+        let alns_rounds = dyn_alns_rounds;
+        let mut alns_sa_mk = best_makespan;
+        let mut alns_sa_sol = best_solution.clone();
+        let mut alns_best_mk = best_makespan;
+        let mut alns_no_improve = 0usize;
+        let alns_max_no_improve = alns_rounds / 2 + 4;
+        let t_init = (best_makespan as f64) * 0.015;
+        let t_final = (best_makespan as f64) * 0.0005;
+        let cooling = if alns_rounds > 1 { (t_final / t_init.max(1.0)).powf(1.0 / (alns_rounds as f64)) } else { 0.95 };
+        let mut temperature = t_init;
+        let mut alns_seed: u64 = (challenge.seed[0] as u64).wrapping_mul(0xB7E151628AED2A6Bu64)
+            .wrapping_add(best_makespan as u64)
+            .wrapping_add(0x9E3779B97F4A7C15u64);
+
+        for alns_r in 0..alns_rounds {
+            if alns_no_improve >= alns_max_no_improve { break; }
+            let Some(base) = alns_sa_sol.as_ref() else { break };
+            let mut ds = match build_disj_from_solution(pre, challenge, base) { Ok(d) => d, Err(_) => { alns_no_improve += 1; temperature *= cooling; continue; } };
+            let mut buf = EvalBuf::new(ds.n);
+            let Some((_cur_mk, mk_node)) = eval_disj(&ds, &mut buf) else { alns_no_improve += 1; temperature *= cooling; continue };
+            let n = ds.n;
+
+            let mut crit_set = vec![false; n];
+            let mut uu = mk_node;
+            while uu != NONE_USIZE { crit_set[uu] = true; uu = buf.best_pred[uu]; }
+
+            alns_seed ^= alns_seed.wrapping_shl(13); alns_seed ^= alns_seed.wrapping_shr(7); alns_seed ^= alns_seed.wrapping_shl(17);
+            let k_destroy = 6 + (alns_r % 9);
+
+            let tails = compute_tails_pulsar(&ds, &buf);
+            let max_crit: f64 = (0..n)
+                .map(|nd| (buf.start[nd] + ds.node_pt[nd] + tails[nd]) as f64)
+                .fold(0.0f64, f64::max)
+                .max(1.0);
+
+            let mut scored: Vec<(f64, usize)> = Vec::with_capacity(n);
+            for nd in 0..n {
+                let job = ds.node_job[nd];
+                let op_idx = ds.node_op[nd];
+                let product = pre.job_products[job];
+                let flex = pre.product_ops[product][op_idx].flex.max(1) as f64;
+                let flex_inv = 1.0 / flex;
+                let m = ds.node_machine[nd];
+                let scarcity = pre.machine_scarcity[m];
+                let crit_val = (buf.start[nd] + ds.node_pt[nd] + tails[nd]) as f64 / max_crit;
+                let score = 0.4 * (scarcity * flex_inv) + 0.6 * crit_val;
+                scored.push((score, nd));
+            }
+
+            scored.sort_unstable_by(|a, b| {
+                b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            let mut destroyed: Vec<usize> = Vec::new();
+            if !scored.is_empty() {
+                let base = k_destroy.min(scored.len());
+                let window = if scored.len() > k_destroy {
+                    (k_destroy + ((alns_seed as usize) % k_destroy.max(1))).min(scored.len())
+                } else {
+                    base
+                };
+
+                destroyed = scored.iter().take(window).map(|x| x.1).collect();
+
+                for i in 0..destroyed.len() {
+                    alns_seed ^= alns_seed.wrapping_shl(13); alns_seed ^= alns_seed.wrapping_shr(7); alns_seed ^= alns_seed.wrapping_shl(17);
+                    let j = i + (alns_seed as usize) % (destroyed.len() - i);
+                    destroyed.swap(i, j);
+                }
+                destroyed.truncate(k_destroy.min(destroyed.len()));
+            }
+
+            if destroyed.is_empty() { alns_no_improve += 1; temperature *= cooling; continue; }
+
+            let mut removed_set = vec![false; n];
+            for &nd in &destroyed {
+                removed_set[nd] = true;
+                let m = ds.node_machine[nd];
+                if let Some(pos) = ds.machine_seq[m].iter().position(|&x| x == nd) {
+                    ds.machine_seq[m].remove(pos);
+                }
+            }
+
+            let _ = eval_disj(&ds, &mut buf);
+
+            let mut to_ins: Vec<usize> = destroyed.clone();
+            let max_repair = to_ins.len() * 6;
+            let mut rep_iter = 0;
+            while !to_ins.is_empty() && rep_iter < max_repair {
+                rep_iter += 1;
+                let mut best_regret = -1.0f64;
+                let mut best_ni = 0usize;
+                let mut best_ins_m = NONE_USIZE;
+                let mut best_ins_pt = 0u32;
+                let mut best_ins_pos = 0usize;
+                let mut found_any = false;
+
+                for (ti, &nd) in to_ins.iter().enumerate() {
+                    let job = ds.node_job[nd];
+                    let op_idx = ds.node_op[nd];
+                    let product = pre.job_products[job];
+                    let op_info = &pre.product_ops[product][op_idx];
+                    let job_start = ds.job_offsets[job];
+                    let jp = if nd > job_start { nd - 1 } else { NONE_USIZE };
+                    let jp_end = if jp != NONE_USIZE && !removed_set[jp] {
+                        buf.start[jp].saturating_add(ds.node_pt[jp])
+                    } else if jp != NONE_USIZE && removed_set[jp] {
+                        u32::MAX / 2
+                    } else { 0u32 };
+                    if jp_end >= u32::MAX / 2 { continue; }
+
+                    let mut node_best = u32::MAX;
+                    let mut node_second = u32::MAX;
+                    let mut node_bm = NONE_USIZE;
+                    let mut node_bpt = 0u32;
+                    let mut node_bpos = 0usize;
+
+                    for &(m, pt) in &op_info.machines {
+                        let seq = &ds.machine_seq[m];
+                        let mut pos_costs: Vec<(usize, u32)> = Vec::with_capacity(seq.len() + 1);
+                        for pos in 0..=seq.len() {
+                            let mp_end = if pos > 0 {
+                                let pred = seq[pos - 1];
+                                if !removed_set[pred] { buf.start[pred].saturating_add(ds.node_pt[pred]) } else { 0 }
+                            } else { 0 };
+                            let st = jp_end.max(mp_end);
+                            let et = st.saturating_add(pt);
+                            let suf = pre.product_suf_min[product][op_idx] as u32;
+                            let succ_pen = if pos < seq.len() {
+                                let succ = seq[pos];
+                                if !removed_set[succ] {
+                                    let new_succ_st = et.max(buf.start[succ]);
+                                    if new_succ_st > buf.start[succ] { (new_succ_st - buf.start[succ]) / 2 } else { 0 }
+                                } else { 0 }
+                            } else { 0 };
+                            let cost = et.saturating_add(suf).saturating_add(succ_pen);
+                            pos_costs.push((pos, cost));
+                        }
+                        pos_costs.sort_by_key(|&(_, c)| c);
+                        for &(pos, cost) in pos_costs.iter().take(3) {
+                            if cost < node_best {
+                                node_second = node_best;
+                                node_best = cost;
+                                node_bm = m; node_bpt = pt; node_bpos = pos;
+                            } else if cost < node_second {
+                                node_second = cost;
+                            }
+                        }
+                    }
+
+                    if node_bm == NONE_USIZE { continue; }
+                    found_any = true;
+                    let regret = if node_second < u32::MAX { (node_second - node_best) as f64 } else { pre.avg_op_min * 3.0 };
+                    if regret > best_regret {
+                        best_regret = regret; best_ni = ti;
+                        best_ins_m = node_bm; best_ins_pt = node_bpt;
+                        best_ins_pos = node_bpos;
+                    }
+                }
+
+                if !found_any || best_ins_m == NONE_USIZE {
+                    for ti in 0..to_ins.len() {
+                        let nd = to_ins[ti];
+                        let job = ds.node_job[nd]; let op_idx = ds.node_op[nd]; let product = pre.job_products[job];
+                        let op_info = &pre.product_ops[product][op_idx];
+                        if let Some(&(m, pt)) = op_info.machines.first() {
+                            let ins = ds.machine_seq[m].len();
+                            ds.machine_seq[m].insert(ins, nd);
+                            ds.node_machine[nd] = m; ds.node_pt[nd] = pt;
+                            removed_set[nd] = false; to_ins.remove(ti);
+                            break;
+                        }
+                    }
+                    continue;
+                }
+
+                let nd = to_ins[best_ni];
+                let ins = best_ins_pos.min(ds.machine_seq[best_ins_m].len());
+                ds.machine_seq[best_ins_m].insert(ins, nd);
+                ds.node_machine[nd] = best_ins_m; ds.node_pt[nd] = best_ins_pt;
+                removed_set[nd] = false; to_ins.remove(best_ni);
+                let _ = eval_disj(&ds, &mut buf);
+            }
+            for &nd in &to_ins {
+                let job = ds.node_job[nd]; let op_idx = ds.node_op[nd]; let product = pre.job_products[job];
+                let op_info = &pre.product_ops[product][op_idx];
+                if let Some(&(m, pt)) = op_info.machines.first() {
+                    let ins = ds.machine_seq[m].len();
+                    ds.machine_seq[m].insert(ins, nd);
+                    ds.node_machine[nd] = m; ds.node_pt[nd] = pt;
+                }
+            }
+
+            let Some((repaired_mk, _)) = eval_disj(&ds, &mut buf) else { alns_no_improve += 1; temperature *= cooling; continue };
+            let repaired_sol = match disj_to_solution(pre, &ds, &buf.start) { Ok(s) => s, Err(_) => { alns_no_improve += 1; temperature *= cooling; continue } };
+
+            let after_gr = match greedy_reassign_pass(pre, challenge, &repaired_sol) {
+                Ok(Some((s, mk))) => (s, mk),
+                _ => (repaired_sol, repaired_mk),
+            };
+            let (alns_cand_sol, alns_cand_mk) = if let Ok(Some((ls_sol, ls_mk))) = critical_block_move_local_search_ex(pre, challenge, &after_gr.0, cb_passes, cb_iters, cb_no_improve) {
+                (ls_sol, ls_mk)
+            } else { (after_gr.0, after_gr.1) };
+
+            if alns_cand_mk < best_makespan {
+                best_makespan = alns_cand_mk;
+                best_solution = Some(alns_cand_sol.clone());
+                save_solution(&alns_cand_sol)?;
+            }
+            if alns_cand_mk < alns_best_mk {
+                alns_best_mk = alns_cand_mk;
+                alns_no_improve = 0;
+            } else { alns_no_improve += 1; }
+
+            let delta = alns_cand_mk as f64 - alns_sa_mk as f64;
+            alns_seed ^= alns_seed.wrapping_shl(13); alns_seed ^= alns_seed.wrapping_shr(7); alns_seed ^= alns_seed.wrapping_shl(17);
+            let rand_val = (alns_seed as f64) / (u64::MAX as f64);
+            if delta < 0.0 || (temperature > 0.0 && rand_val < (-delta / temperature).exp()) {
+                alns_sa_mk = alns_cand_mk;
+                alns_sa_sol = Some(alns_cand_sol);
+            }
+            temperature *= cooling;
+        }
+    }
+
+    if top_solutions.len() >= 5 {
+        let vote_result2 = crossover_majority_vote(pre, challenge, &top_solutions, cb_passes + 1, cb_iters, cb_no_improve)?;
+        if let Some((vote_sol, vote_mk)) = vote_result2 {
+            if vote_mk < best_makespan {
+                best_makespan = vote_mk;
+                best_solution = Some(vote_sol.clone());
+                save_solution(&vote_sol)?;
+            }
+        }
+    }
+
+    let best_sol_clone4 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone4 {
+        let prev_mk = best_makespan;
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+        if best_makespan < prev_mk {
+            if let Some(ref new_sol) = best_solution {
+                push_top_solutions(&mut top_solutions, new_sol, best_makespan, 20);
+            }
+        }
+    }
+
+    let best_sol_clone5 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone5 {
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+    }
+
+    if let Some(sol) = best_solution.as_ref() {
+        if let Ok(Some((ecr_sol, ecr_mk))) = exhaustive_critical_reroute_pass(pre, challenge, sol) {
+            if ecr_mk < best_makespan { best_makespan = ecr_mk; best_solution = Some(ecr_sol.clone()); save_solution(&ecr_sol)?; }
+        }
+    }
+
+    if let Some(sol) = best_solution.as_ref() {
+        if let Ok(Some((cb_sol, cb_mk))) = critical_block_move_local_search_ex(pre, challenge, sol, cb_passes + 2, cb_iters, cb_no_improve) {
+            if cb_mk < best_makespan { best_makespan = cb_mk; best_solution = Some(cb_sol.clone()); save_solution(&cb_sol)?; }
+        }
+    }
+
+    if let Some(ref sol) = best_solution.clone() {
+        apply_unified_reassign(pre, challenge, sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+    }
+
+    if let Some(ref sol) = best_solution.clone() {
+        if let Ok(Some((ecr_sol, ecr_mk))) = exhaustive_critical_reroute_pass(pre, challenge, sol) {
+            if ecr_mk < best_makespan { best_makespan = ecr_mk; best_solution = Some(ecr_sol.clone()); save_solution(&ecr_sol)?; }
+        }
+    }
+
+    let best_sol_clone6 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone6 {
+        let prev_mk = best_makespan;
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+        if best_makespan < prev_mk {
+            if let Some(ref new_sol) = best_solution {
+                push_top_solutions(&mut top_solutions, new_sol, best_makespan, 20);
+            }
+        }
+    }
+
+    {
+        let (_, _, _, _, _, dyn_final_ils_rounds, _) = adaptive_budget(base_ts_iters, base_cb_passes, base_cb_iters, base_alns_rounds, base_ils_rounds, base_final_ils_rounds, global_stuck);
+        let final_ils_rounds = dyn_final_ils_rounds;
+        let mut final_ils_best_mk = best_makespan;
+        let mut final_ils_best_sol = best_solution.clone();
+        let mut final_no_improve = 0usize;
+        let final_max_no_improve = final_ils_rounds / 2 + 2;
+        let mut fpseed: u64 = (challenge.seed[0] as u64).wrapping_mul(0xDEADC0DEu64)
+            .wrapping_add(best_makespan as u64)
+            .wrapping_add(0xFEEDFACEu64);
+
+        for fir in 0..final_ils_rounds {
+            if final_no_improve >= final_max_no_improve { break; }
+            let Some(base) = final_ils_best_sol.as_ref() else { break };
+            let mut ds = match build_disj_from_solution(pre, challenge, base) { Ok(d) => d, Err(_) => { final_no_improve += 1; continue; } };
+            let mut buf = EvalBuf::new(ds.n);
+            let Some((_, mk_node)) = eval_disj(&ds, &mut buf) else { final_no_improve += 1; continue };
+            let n = ds.n;
+
+            let k_perturb = 5 + fir / 2;
+            let mut machine_loads = vec![0u32; ds.num_machines];
+            for nd in 0..n { let m = ds.node_machine[nd]; machine_loads[m] = machine_loads[m].saturating_add(ds.node_pt[nd]); }
+            let worst_m = machine_loads.iter().enumerate().max_by_key(|&(_, &v)| v).map(|(i, _)| i).unwrap_or(0);
+
+            let mut crit_nodes: Vec<usize> = Vec::with_capacity(64);
+            let mut u = mk_node;
+            while u != NONE_USIZE { crit_nodes.push(u); u = buf.best_pred[u]; }
+            let bn_nodes: Vec<usize> = ds.machine_seq[worst_m].clone();
+
+            let mut combined: Vec<usize> = crit_nodes.clone();
+            for &nd in &bn_nodes {
+                if !combined.contains(&nd) { combined.push(nd); }
+            }
+
+            let mut perturbed = 0;
+            for _ in 0..(k_perturb * 4) {
+                if perturbed >= k_perturb || combined.is_empty() { break; }
+                fpseed ^= fpseed.wrapping_shl(13); fpseed ^= fpseed.wrapping_shr(7); fpseed ^= fpseed.wrapping_shl(17);
+                let idx = (fpseed as usize) % combined.len();
+                let node = combined[idx];
+                let job = ds.node_job[node]; let op_idx = ds.node_op[node]; let product = pre.job_products[job];
+                let op_info = &pre.product_ops[product][op_idx];
+                if op_info.machines.len() <= 1 { continue; }
+                let cur_machine = ds.node_machine[node];
+                fpseed ^= fpseed.wrapping_shl(13); fpseed ^= fpseed.wrapping_shr(7); fpseed ^= fpseed.wrapping_shl(17);
+                let alt_idx = (fpseed as usize) % op_info.machines.len();
+                let (new_m, new_pt) = op_info.machines[alt_idx];
+                if new_m == cur_machine { continue; }
+                let old_pos = match ds.machine_seq[cur_machine].iter().position(|&x| x == node) { Some(p) => p, None => continue };
+                ds.machine_seq[cur_machine].remove(old_pos);
+                ds.node_machine[node] = new_m; ds.node_pt[node] = new_pt;
+                let cur_start = buf.start[node];
+                let mut ins_pos = ds.machine_seq[new_m].len();
+                for (ki, &nd) in ds.machine_seq[new_m].iter().enumerate() { if buf.start[nd] >= cur_start { ins_pos = ki; break; } }
+                ds.machine_seq[new_m].insert(ins_pos, node);
+                perturbed += 1;
+            }
+
+            let Some((_, _)) = eval_disj(&ds, &mut buf) else { final_no_improve += 1; continue };
+            let perturbed_sol = match disj_to_solution(pre, &ds, &buf.start) { Ok(s) => s, Err(_) => { final_no_improve += 1; continue; } };
+
+            let after_gr = match greedy_reassign_pass(pre, challenge, &perturbed_sol) {
+                Ok(Some((s, mk))) => (s, mk),
+                _ => { if let Some((pmk, _)) = eval_disj(&ds, &mut buf) { (perturbed_sol, pmk) } else { final_no_improve += 1; continue; } }
+            };
+
+            let (cand_sol, cand_mk) = if let Ok(Some((ls_sol, ls_mk))) = critical_block_move_local_search_ex(pre, challenge, &after_gr.0, cb_passes + 1, cb_iters, cb_no_improve) {
+                (ls_sol, ls_mk)
+            } else { (after_gr.0, after_gr.1) };
+
+            if cand_mk < best_makespan {
+                best_makespan = cand_mk; best_solution = Some(cand_sol.clone()); save_solution(&cand_sol)?;
+            }
+            if cand_mk < final_ils_best_mk {
+                final_ils_best_mk = cand_mk; final_ils_best_sol = Some(cand_sol); final_no_improve = 0;
+            } else { final_no_improve += 1; }
+        }
+    }
+
+    if top_solutions.len() >= 4 {
+        let vote_result3 = crossover_majority_vote(pre, challenge, &top_solutions, cb_passes + 2, cb_iters, cb_no_improve)?;
+        if let Some((vote_sol, vote_mk)) = vote_result3 {
+            if vote_mk < best_makespan {
+                best_makespan = vote_mk;
+                best_solution = Some(vote_sol.clone());
+                save_solution(&vote_sol)?;
+            }
+        }
+    }
+
+    let best_sol_clone7 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone7 {
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+    }
+    if let Some(sol) = best_solution.as_ref() {
+        if let Ok(Some((ecr_sol, ecr_mk))) = exhaustive_critical_reroute_pass(pre, challenge, sol) {
+            if ecr_mk < best_makespan { best_makespan = ecr_mk; best_solution = Some(ecr_sol.clone()); save_solution(&ecr_sol)?; }
+        }
+    }
+    let best_sol_clone8 = best_solution.as_ref().map(|s| s.clone());
+    if let Some(sol) = best_sol_clone8 {
+        let prev_mk = best_makespan;
+        apply_unified_reassign(pre, challenge, &sol, best_makespan, &mut best_makespan, &mut best_solution, save_solution, 3)?;
+        if best_makespan < prev_mk {
+            if let Some(ref new_sol) = best_solution {
+                push_top_solutions(&mut top_solutions, new_sol, best_makespan, 20);
+            }
+        }
+    }
+
+    if let Some(sol) = best_solution { save_solution(&sol)?; }
+    Ok(())
+}
+
+fn crossover_majority_vote(
+    pre: &Pre,
+    challenge: &Challenge,
+    top_solutions: &[(Solution, u32)],
+    cb_passes: usize,
+    cb_iters: usize,
+    cb_no_improve: usize,
+) -> Result<Option<(Solution, u32)>> {
+    let num_jobs = challenge.num_jobs;
+    let num_machines = challenge.num_machines;
+    let pool_size = top_solutions.len().min(10);
+    if pool_size < 2 { return Ok(None); }
+
+    let mut job_machine_choices: Vec<Vec<usize>> = Vec::with_capacity(num_jobs);
+    for job in 0..num_jobs {
+        let num_ops = pre.job_ops_len[job];
+        let mut vote_counts: Vec<HashMap<usize, usize>> = vec![HashMap::new(); num_ops];
+        for (sol, _mk) in top_solutions.iter().take(pool_size) {
+            if sol.job_schedule.len() <= job { continue; }
+            let job_sched = &sol.job_schedule[job];
+            for op_idx in 0..num_ops.min(job_sched.len()) {
+                let (machine, _) = job_sched[op_idx];
+                *vote_counts[op_idx].entry(machine).or_insert(0) += 1;
+            }
+        }
+        let product = pre.job_products[job];
+        let mut choices: Vec<usize> = Vec::with_capacity(num_ops);
+        for op_idx in 0..num_ops {
+            let op_info = &pre.product_ops[product][op_idx];
+            let mut best_machine = op_info.machines.first().map(|&(m, _)| m).unwrap_or(0);
+            let mut best_votes = 0usize;
+            for (&m, &cnt) in &vote_counts[op_idx] {
+                if !op_info.machines.iter().any(|&(em, _)| em == m) { continue; }
+                if cnt > best_votes {
+                    best_machine = m;
+                    best_votes = cnt;
+                }
+            }
+            if best_votes == 0 {
+                best_machine = op_info.machines.first().map(|&(m, _)| m).unwrap_or(0);
+            }
+            choices.push(best_machine);
+        }
+        job_machine_choices.push(choices);
+    }
+
+    let mut job_next_op = vec![0usize; num_jobs];
+    let mut job_ready_time = vec![0u32; num_jobs];
+    let mut machine_avail = vec![0u32; num_machines];
+    let mut job_schedule: Vec<Vec<(usize, u32)>> = vec![Vec::new(); num_jobs];
+    let total_ops = pre.total_ops;
+    let mut scheduled = 0usize;
+    let mut time = 0u32;
+    let mut stall_guard = 0usize;
+
+    while scheduled < total_ops && stall_guard < total_ops * 6 {
+        stall_guard += 1;
+        let mut any = false;
+        for job in 0..num_jobs {
+            let op_idx = job_next_op[job];
+            if op_idx >= job_machine_choices[job].len() { continue; }
+            if job_ready_time[job] > time { continue; }
+            let machine = job_machine_choices[job][op_idx];
+            if machine_avail[machine] > time { continue; }
+            let product = pre.job_products[job];
+            let op_info = &pre.product_ops[product][op_idx];
+            let pt = op_info.machines.iter().find(|&&(m, _)| m == machine).map(|&(_, pt)| pt).unwrap_or(0);
+            let end = time.saturating_add(pt);
+            job_schedule[job].push((machine, time));
+            job_next_op[job] += 1;
+            job_ready_time[job] = end;
+            machine_avail[machine] = end;
+            scheduled += 1;
+            any = true;
+        }
+        if !any {
+            let mut next_t = u32::MAX;
+            for &t in &machine_avail { if t > time { next_t = next_t.min(t); } }
+            for j in 0..num_jobs { if job_ready_time[j] > time { next_t = next_t.min(job_ready_time[j]); } }
+            if next_t == u32::MAX { break; }
+            time = next_t;
+        }
+    }
+
+    if scheduled < total_ops { return Ok(None); }
+    let vote_sol = Solution { job_schedule };
+
+    let ds = match build_disj_from_solution(pre, challenge, &vote_sol) { Ok(d) => d, Err(_) => return Ok(None) };
+    let mut buf = EvalBuf::new(ds.n);
+    let Some((base_mk, _)) = eval_disj(&ds, &mut buf) else { return Ok(None) };
+
+    let (gr_sol, gr_mk) = match greedy_reassign_pass(pre, challenge, &vote_sol) {
+        Ok(Some((s, mk))) => (s, mk),
+        _ => (vote_sol, base_mk),
+    };
+
+    let (final_sol, final_mk) = if let Ok(Some((cb_sol, cb_mk))) = critical_block_move_local_search_ex(pre, challenge, &gr_sol, cb_passes, cb_iters, cb_no_improve) {
+        (cb_sol, cb_mk)
+    } else {
+        (gr_sol, gr_mk)
+    };
+
+    let (result_sol, result_mk) = if let Ok(Some((ecr_sol, ecr_mk))) = exhaustive_critical_reroute_pass(pre, challenge, &final_sol) {
+        if ecr_mk < final_mk { (ecr_sol, ecr_mk) } else { (final_sol, final_mk) }
+    } else {
+        (final_sol, final_mk)
+    };
+
+    Ok(Some((result_sol, result_mk)))
+}
+
+fn apply_unified_reassign(
+    pre: &Pre,
+    challenge: &Challenge,
+    start_sol: &Solution,
+    start_mk: u32,
+    best_mk: &mut u32,
+    best_sol: &mut Option<Solution>,
+    save_solution: &dyn Fn(&Solution) -> Result<()>,
+    max_iters: usize,
+) -> Result<()> {
+    let mut current_sol = start_sol.clone();
+    let mut current_mk = start_mk;
+
+    let meaningful_abs = ((0.35 * pre.avg_op_min).round() as u32).max(2);
+    let strong_abs = ((0.80 * pre.avg_op_min).round() as u32).max(4);
+
+    let meaningful_gain = |before: u32, after: u32| -> bool {
+        if after >= before { return false; }
+        let gain = (before - after) as u64;
+        gain >= meaningful_abs as u64 || gain.saturating_mul(1000) >= before as u64
+    };
+    let strong_gain = |before: u32, after: u32| -> bool {
+        if after >= before { return false; }
+        let gain = (before - after) as u64;
+        gain >= strong_abs as u64 || gain.saturating_mul(500) >= before as u64
+    };
+
+    if max_iters > 0 {
+        let before1 = current_mk;
+        if let Some((s1, m1)) = unified_reassign_pass(pre, challenge, &current_sol)? {
+            if m1 < before1 {
+                current_sol = s1;
+                current_mk = m1;
+
+                if max_iters > 1 && meaningful_gain(before1, m1) {
+                    let before2 = current_mk;
+                    if let Some((s2, m2)) = unified_reassign_pass(pre, challenge, &current_sol)? {
+                        if m2 < before2 {
+                            current_sol = s2;
+                            current_mk = m2;
+
+                            if max_iters > 2 && (pre.high_flex > 0.58 || strong_gain(before2, m2)) {
+                                let before3 = current_mk;
+                                if let Some((s3, m3)) = unified_reassign_pass(pre, challenge, &current_sol)? {
+                                    if m3 < before3 {
+                                        current_sol = s3;
+                                        current_mk = m3;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if current_mk < *best_mk {
+        *best_mk = current_mk;
+        *best_sol = Some(current_sol.clone());
+        save_solution(&current_sol)?;
+    }
+    Ok(())
+}
