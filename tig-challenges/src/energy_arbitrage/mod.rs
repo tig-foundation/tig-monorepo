@@ -345,25 +345,13 @@ impl Challenge {
 
     conditional_pub!(
         fn compute_baseline(&self) -> Result<(Solution, f64)> {
-            let (greedy_schedule, state) = self.simulate(&baselines::greedy::policy)?;
-            let greedy_total_profit = state.total_profit;
-            let (conservative_schedule, state) = self.simulate(&baselines::conservative::policy)?;
-            let conservative_total_profit = state.total_profit;
-            if greedy_total_profit > conservative_total_profit {
-                Ok((
-                    Solution {
-                        schedule: greedy_schedule,
-                    },
-                    greedy_total_profit,
-                ))
-            } else {
-                Ok((
-                    Solution {
-                        schedule: conservative_schedule,
-                    },
-                    conservative_total_profit,
-                ))
-            }
+            let (schedule, state) = self.simulate(&baselines::energy_v1::policy)?;
+            Ok((
+                Solution {
+                    schedule,
+                },
+                state.total_profit,
+            ))
         }
     );
 
@@ -447,6 +435,55 @@ mod tests {
             let (_, total_profit) = result.unwrap();
             assert!(total_profit > 0.0);
         }
+    }
+
+    #[test]
+    fn benchmark_baselines() {
+        let scenarios = [
+            ("BASELINE", Scenario::BASELINE),
+            ("CONGESTED", Scenario::CONGESTED),
+            ("MULTIDAY", Scenario::MULTIDAY),
+            ("DENSE", Scenario::DENSE),
+            ("CAPSTONE", Scenario::CAPSTONE),
+        ];
+        let num_seeds = 5;
+
+        println!("\n{:<12} {:>12} {:>12} {:>12} {:>10}", "Track", "Greedy($)", "Conserv.($)", "Best Baseline", "Time(ms)");
+        println!("{}", "-".repeat(62));
+
+        for (name, scenario) in &scenarios {
+            let mut greedy_total = 0.0_f64;
+            let mut conservative_total = 0.0_f64;
+            let mut total_ms = 0u64;
+
+            for i in 0..num_seeds {
+                let seed = [i as u8; 32];
+                let challenge = Challenge::generate_instance(&seed, &Track { s: *scenario }).unwrap();
+
+                let start = std::time::Instant::now();
+                let (greedy_sched, greedy_state) = challenge.simulate(&baselines::greedy::policy).unwrap();
+                let (_, conservative_state) = challenge.simulate(&baselines::conservative::policy).unwrap();
+                total_ms += start.elapsed().as_millis() as u64;
+
+                greedy_total += greedy_state.total_profit;
+                conservative_total += conservative_state.total_profit;
+            }
+
+            let avg_greedy = greedy_total / num_seeds as f64;
+            let avg_conservative = conservative_total / num_seeds as f64;
+            let (best, best_name) = if avg_greedy >= avg_conservative {
+                (avg_greedy, "greedy")
+            } else {
+                (avg_conservative, "conserv.")
+            };
+            let avg_ms = total_ms as f64 / (num_seeds * 2) as f64;
+
+            println!(
+                "{:<12} {:>12.2} {:>12.2} {:>12.2} ({}) {:>8.1}",
+                name, avg_greedy, avg_conservative, best, best_name, avg_ms
+            );
+        }
+        println!();
     }
 
     #[test]
