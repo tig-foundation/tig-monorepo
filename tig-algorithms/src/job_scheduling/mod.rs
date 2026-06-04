@@ -42,7 +42,8 @@
 
 // c007_a022
 
-// c007_a023
+pub mod adaptive_js_v8;
+pub use adaptive_js_v8 as c007_a023;
 
 // c007_a024
 
