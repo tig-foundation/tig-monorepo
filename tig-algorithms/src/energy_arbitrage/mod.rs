@@ -50,7 +50,8 @@
 
 // c008_a026
 
-// c008_a027
+pub mod c008_exp04;
+pub use c008_exp04 as c008_a027;
 
 // c008_a028
 
