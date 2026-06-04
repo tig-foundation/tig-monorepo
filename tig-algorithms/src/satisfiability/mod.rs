@@ -196,7 +196,8 @@
 
 // c001_a099
 
-// c001_a100
+pub mod prom_claw_linen_hawk;
+pub use prom_claw_linen_hawk as c001_a100;
 
 // c001_a101
 
