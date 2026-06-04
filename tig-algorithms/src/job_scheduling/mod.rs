@@ -40,7 +40,8 @@
 
 // c007_a021
 
-// c007_a022
+pub mod task_two;
+pub use task_two as c007_a022;
 
 // c007_a023
 
