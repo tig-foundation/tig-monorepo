@@ -42,7 +42,7 @@ Algorithm Implementations are expressions of Algorithmic Methods in code and, in
 
 ## Token Rewards for Innovation
 
-To reflect the patentability of, and greater potential for significant impact on performance that, innovative Algorithmic Methods can have compared with Algorithm Implementations, the Game offers additional rewards for certain Algorithmic Methods that qualify as Advance Submissions. These additional rewards (so called "**Advance Rewards"**) persist for multiple Rounds where an Advance Submission continues to provide the basis of Code Submissions adopted by Benchmarkers.
+To reflect the patentability of, and greater potential for significant impact on performance that, innovative Algorithmic Methods can have compared with Algorithm Implementations, the Game offers additional rewards for certain Algorithmic Methods that qualify as Advance Submissions. These additional rewards (so called "**Advance Rewards"**) may persist for multiple Rounds where an Advance Submission continues to provide the basis of Code Submissions adopted by Benchmarkers.
 
 An Code Submission which does not embody an Advance Submission, only rewards the Contributor of that Code Submission with Code Rewards (subject to satisfaction of adoption thresholds). Where a Code Submission does not embody an Advance Submission, Advance Rewards notionally allocated by the Game for Advance Submissions will, instead, be allocated to the TIG treasury and be used to bootstrap Advance Submission development (these are referred to in the Game as "**Bootstrap Rewards**" because they are intended to be used to ultimately enable all Code Submissions to embody an Advance Submission).
 
@@ -82,11 +82,9 @@ If a Contributor believes that their Contribution may represent an Advance Submi
 
 For a Contribution to be eligible as an Advance Submission, the following must **ALL** be satisfied with respect to the Contribution:  
      
-1) It must be declared, by Token Holder Vote that the relevant Algorithmic Method is eligible to be an Advance Submission;  
+1) It must be declared, by Token Holder Vote that the relevant Algorithmic Method is eligible to be an Advance Submission; and  
      
-2) The intellectual property rights embodied in the Contribution must be irrevocably assigned to TIG in accordance with the TIG IP Policy; and
-     
-3) The Contributor must burn two hundred and fifty (250) TIG tokens for each requested Token Holder Vote. For an Advance Submission to start earning Advance Rewards for its Contributor, in a rolling 1 week window, the sum of all Code Submissions which embody the Advance Submission must achieve a sufficient degree of adoption by Benchmarkers (where for Code Rewards the adoption threshold by Benchmarkers is presently 25% to obtain Code Rewards, the corresponding adoption threshold by Benchmarkers for an Advance Submission will be 50%). The reason why the threshold of adoption is higher for Advance Submissions is that TIG wishes to reserve Advance Rewards for Algorithmic Methods that also offer a significant improvement in performance (which will be valued more highly by commercial licensees).   
+2) The Contributor must burn two hundred and fifty (250) TIG tokens for each requested Token Holder Vote. For an Advance Submission to start earning Advance Rewards for its Contributor, in a rolling 1 week window, the sum of all Code Submissions which embody the Advance Submission must achieve a sufficient degree of adoption by Benchmarkers (where for Code Rewards the adoption threshold by Benchmarkers is presently 25% to obtain Code Rewards, the corresponding adoption threshold by Benchmarkers for an Advance Submission will be 50%). The reason why the threshold of adoption is higher for Advance Submissions is that TIG wishes to reserve Advance Rewards for Algorithmic Methods that also offer a significant improvement in performance (which will be valued more highly by commercial licensees).   
      
 To maximise the likelihood that an Algorithmic Method will be approved as eligible to be an Advance Submission by a Token Holder Vote, a Contributor seeking eligibility for their Algorithmic Method must diligently complete the [Advance Evidence Template](../../tig-algorithms/advances/evidence_template.md).
 
