@@ -264,7 +264,8 @@
 
 // c003_a133
 
-// c003_a134
+pub mod prom_opencode_jade_s;
+pub use prom_opencode_jade_s as c003_a134;
 
 // c003_a135
 
