@@ -1,6 +1,6 @@
 ## UNIQUE ALGORITHM IDENTIFIER (UAI)
 
-> UAI PLACEHOLDER - ASSIGNED BY TIG PROTOCOL
+> UAI PLACEHOLDER - DO NOT EDIT
 
 # ADVANCE EVIDENCE TEMPLATE
 
@@ -48,11 +48,11 @@ WHEN PROVIDING EVIDENCE, YOU MAY CITE LINKS TO EXTERNAL DATA SOURCES.
 
 ## SECTION 1: DESCRIPTION OF YOUR ALGORITHMIC METHOD
 
-*IT IS IMPORTANT THAT THIS SECTION IS COMPLETED TO FULLY DESCRIBE THE METHOD THAT YOU WISH TO BE ASSESSED TOGETHER WITH ANY OTHER INNOVATIVE METHODS EMBODIED IN THE IMPLEMENTATION IN WHICH YOUR SELECTED METHOD IS EMBODIED BECAUSE THIS WILL DEFINE THE SUBJECT MATTER OF THE ASSIGNMENT THAT YOU ARE REQUIRED TO EXECUTE.*
+*IT IS IMPORTANT THAT THIS SECTION IS COMPLETED TO FULLY DESCRIBE THE METHOD THAT YOU WISH TO BE ASSESSED TOGETHER WITH ANY OTHER INNOVATIVE METHODS EMBODIED IN THE IMPLEMENTATION IN WHICH YOUR SELECTED METHOD IS EMBODIED.*
 
 PLEASE IDENTIFY WHICH TIG CHALLENGE THE METHOD ADDRESSES.
 
-> YOUR RESPONSE HERE (options are satisfiability, vehicle_routing, knapsack, vector_search, or hypergraph)
+> YOUR RESPONSE HERE
 
 PLEASE DESCRIBE THE METHOD THAT YOU HAVE SELECTED FOR ASSESSMENT.
 
@@ -63,8 +63,6 @@ PLEASE DESCRIBE ANY INNOVATIVE METHODS EMBODIED IN THE SPECIFICATION OR IMPLEMEN
 > YOUR RESPONSE HERE
 
 ## SECTION 2: IMPLEMENTATION EMBODYING YOUR METHOD
-
-*THE COPYRIGHT IN ANY IMPLEMENTATION WHICH EMBODIES THE METHOD WILL BE THE SUBJECT OF THE ASSIGNMENT THAT YOU EXECUTE.*
 
 TO THE EXTENT THAT YOU HAVE IMPLEMENTED THE METHOD IN CODE YOU SHOULD IDENTIFY THE CODE AND SUBMIT IT TOGETHER WITH THIS DOCUMENT.
 
@@ -110,15 +108,15 @@ PLEASE SHOW HOW THESE EXISTING METHODS FALL SHORT OF, OR LACK THE FEATURES THAT 
 
 > YOUR RESPONSE HERE
 
-IS THERE NOVELTY IN YOUR METHOD BECAUSE IT IS ENTIRELY NEW ?
+IS THERE NOVELTY IN YOUR METHOD BECAUSE IT IS ENTIRELY NEW?
 
 > YOUR RESPONSE HERE
 
-IS THERE NOVELTY IN YOUR METHOD BECAUSE IT IS A NEW COMBINATION OF PRIOR ART ?
+IS THERE NOVELTY IN YOUR METHOD BECAUSE IT IS A NEW COMBINATION OF PRIOR ART?
 
 > YOUR RESPONSE HERE
 
-IS THERE NOVELTY IN THE WAY THAT THE METHOD IS APPLIED TO CREATE A TECHNICAL EFFECT ?
+IS THERE NOVELTY IN THE WAY THAT THE METHOD IS APPLIED TO CREATE A TECHNICAL EFFECT?
 
 > YOUR RESPONSE HERE
 
@@ -158,7 +156,7 @@ TO SUPPORT YOUR CLAIM THAT YOUR METHOD IS INVENTIVE, YOU SHOULD PROVIDE EVIDENCE
 
 DEPENDING ON THE NATURE OF YOUR METHOD, THERE IS A VARYING DEGREE OF ADDITIONAL EVIDENCE THAT IS LIKELY TO BE NECESSARY TO SUPPORT A FINDING OF INVENTIVENESS. WE BELIEVE IT IS HELPFUL AND USEFUL TO FILTER METHODS FOR INVENTIVENESS BY ASSESSING THE SOURCE OF THE METHOD AND THE EXTENT TO WHICH THE METHOD DELIVERS AN UNEXPECTED RESULT.
 
-**METHOD CATEGORISATION**: PLEASE IDENTIFY WHICH CATEGORY A, B, C, D OR E FROM THE INVENTIVENESS GUIDELINES (SEE APPENDIX A TO THIS ADVANCE EVIDENCE TEMPLATE FOR EASE OF REFERENCE) YOU BELIEVE YOUR METHOD BELONGS TO.
+**METHOD CATEGORISATION**: PLEASE IDENTIFY WHICH CATEGORY A, B, C, D OR E FROM THE INVENTIVENESS GUIDELINES (SEE APPENDIX B TO THIS ADVANCE EVIDENCE TEMPLATE FOR EASE OF REFERENCE) YOU BELIEVE YOUR METHOD BELONGS TO.
 
 > YOUR RESPONSE HERE
 
@@ -166,7 +164,7 @@ DEPENDING ON THE NATURE OF YOUR METHOD, THERE IS A VARYING DEGREE OF ADDITIONAL 
 
 > YOUR RESPONSE HERE
 
-PLEASE STATE WHY IT WOULD BE UNLIKELY THAT A PERSON OF ORDINARY SKILL IN THE ART IN THE FIELD (POSITA) WOULD HAVE ARRIVED AT YOUR METHOD BY SIMPLY COMBINING EXISTING IDEAS OR EXTENDING KNOWN TECHNIQUES. PLEASE SEE APPENDIX B FOR GUIDANCE REGARDING RELEVANT EVIDENCE.
+PLEASE STATE WHY IT WOULD BE UNLIKELY THAT A PERSON OF ORDINARY SKILL IN THE ART IN THE FIELD (POSITA) WOULD HAVE ARRIVED AT YOUR METHOD BY SIMPLY COMBINING EXISTING IDEAS OR EXTENDING KNOWN TECHNIQUES. PLEASE SEE APPENDIX A FOR GUIDANCE REGARDING RELEVANT EVIDENCE.
 
 > YOUR RESPONSE HERE
 
@@ -182,7 +180,7 @@ YOUR RESPONSE ABOVE SHOULD CONSIDER AND PROVIDE EVIDENCE OF:
         
   * **TECHNICAL DIFFICULTY OR UNPREDICTABILITY**: EXPLAIN HOW YOUR METHOD DOES SOMETHING IN A WAY THAT WOULD NOT HAVE BEEN AN OBVIOUS CHOICE TO A POSITA.  
       
-  * **SURPRISING RESULTS OR IMPROVED PERFORMANCE**: DOES YOUR METHOD YIELD UNEXPECTED IMPROVEMENTS (E.G. BETTER ACCURACY, SPEED, EFFICIENCY) ?
+  * **SURPRISING RESULTS OR IMPROVED PERFORMANCE**: DOES YOUR METHOD YIELD UNEXPECTED IMPROVEMENTS (E.G. BETTER ACCURACY, SPEED, EFFICIENCY)?
 
   * **TEACHING AWAY IN PRIOR ART:** DOES PRIOR WORK SUGGEST THAT YOUR APPROACH WOULD NOT WORK OR WASN’T THE BEST DIRECTION?
 
@@ -212,10 +210,6 @@ PLEASE PROVIDE ANY OTHER EVIDENCE OR ARGUMENT THAT YOU THINK MIGHT HELP SUPPORT 
 
 # Appendix A
 
-<img src="../docs/images/inventiveness_guideline.jpg" width="100%"/>
-
-# Appendix B
-
 | Category | Evidence |
 | :---: | ----- |
 | **A** | **New Method or Method new to Field:** The newness of the Method or novelty in the Field should make overcoming obviousness relatively easy providing the Method solves the problem with a reasonable level of performance. If a method offering a reasonable level of performance would be obvious to a POSITA then they would likely have already tried it and the fact that they haven’t suggests it is therefore not obvious. Relevant evidence will therefore be an Unexpected Result (we suggest equal to or greater than 50% of the performance of the SOTA method) from benchmarking.  |
@@ -223,3 +217,15 @@ PLEASE PROVIDE ANY OTHER EVIDENCE OR ARGUMENT THAT YOU THINK MIGHT HELP SUPPORT 
 | **C** | **Method based on prior art seen in the Field applied to produce a Technical Effect also seen in the Field but not previously associated with the Method:** A POSITA will be deemed to have knowledge of the prior art in the Field and the nature of the Technical Effect. You should provide evidence that it would not be obvious for a POSITA to achieve the Technical Effect using the Method. You should also provide supporting evidence of commercial value or utility; the more evidence of this that you can provide the less likely it will be that the application will be deemed to be obvious (commercial value or utility provides a source of motivation for the creation of the Method which a POSITA would be assumed to have responded to already if it was obvious to do so). Relevant evidence will therefore be an Unexpected Result (we suggest equal to or greater than the performance of the SOTA method) from benchmarking.  |
 | **D** | **Prior art from same field combined in a new way:** A POSITA will be deemed to have knowledge of the prior art. If an improved outcome based on prior art known to the POSITA would be obvious, they would likely have tried it. The most compelling evidence of non-obviousness will therefore be an Unexpected Result (we suggest equal to or greater than the performance of the SOTA method) from benchmarking. You should also provide supporting evidence of commercial value or utility; the more evidence of this that you can provide the less likely it will be that the combination will be deemed to be obvious (commercial value or utility provides a source of motivation for the creation of the Method which a POSITA would be assumed to have responded to already if it was obvious to do so).  |
 | **E** | **Method incorporates prior art seen in the Field applied in a new way within the Method (i.e. the application of the prior art to solve a mathematical problem or subset of a mathematical problem in a way for which there is no known precedent):** A POSITA will be deemed to have knowledge of the mathematical method and so you should provide supporting evidence that it would not be obvious for a POSITA to apply the mathematical method to solve the relevant problem in the way that your Method does. If an improved outcome based on prior art known to the POSITA would be obvious, they would likely have tried it and the fact that they haven’t suggests it is therefore not obvious. As with Category D, the most compelling evidence of non-obviousness will be an Unexpected Result (we suggest equal to or greater than the performance of the SOTA method) from benchmarking. As for Category D, you should also provide supporting evidence of commercial value or utility.  |
+
+# Appendix B
+
+- **A** — Method based wholly on material not previously seen before, or not seen in the Field
+
+- **B** — Method based on a **combination** of prior art seen in the Field with prior art from outside the Field
+
+- **C** — Method based on prior art seen in the Field with a suggested **Technical Effect** seen in the Field but where such Technical Effect has not been previously associated with the Method
+
+- **D** — Method based on a combination of prior art seen in the Field **combined** in a new way
+
+- **E** — Method incorporates prior art seen in the Field **applied** in a new way within the Method
