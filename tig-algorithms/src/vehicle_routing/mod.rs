@@ -214,7 +214,8 @@
 
 // c002_a108
 
-// c002_a109
+pub mod prom_mistral_frost_o;
+pub use prom_mistral_frost_o as c002_a109;
 
 // c002_a110
 
