@@ -52,7 +52,8 @@
 
 // c008_a027
 
-// c008_a028
+pub mod prom_claw_linen_hawk;
+pub use prom_claw_linen_hawk as c008_a028;
 
 // c008_a029
 
