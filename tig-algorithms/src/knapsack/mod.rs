@@ -266,7 +266,8 @@
 
 // c003_a134
 
-// c003_a135
+pub mod prom_pulse_marlin_v2;
+pub use prom_pulse_marlin_v2 as c003_a135;
 
 // c003_a136
 
