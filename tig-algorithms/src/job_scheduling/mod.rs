@@ -44,7 +44,8 @@
 
 // c007_a023
 
-// c007_a024
+pub mod prom_pulse_marlin;
+pub use prom_pulse_marlin as c007_a024;
 
 // c007_a025
 
