@@ -54,7 +54,8 @@
 
 // c008_a028
 
-// c008_a029
+pub mod prom_opencode_quartz;
+pub use prom_opencode_quartz as c008_a029;
 
 // c008_a030
 
