@@ -204,7 +204,8 @@
 
 // c001_a103
 
-// c001_a104
+pub mod sat_vanguard_v7;
+pub use sat_vanguard_v7 as c001_a104;
 
 // c001_a105
 
