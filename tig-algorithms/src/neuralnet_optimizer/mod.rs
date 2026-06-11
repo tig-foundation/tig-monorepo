@@ -68,7 +68,8 @@
 
 // c006_a035
 
-// c006_a036
+pub mod prometheus_aidda;
+pub use prometheus_aidda as c006_a036;
 
 // c006_a037
 
