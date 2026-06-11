@@ -218,7 +218,8 @@
 
 // c002_a110
 
-// c002_a111
+pub mod prom_opencode_jade_s;
+pub use prom_opencode_jade_s as c002_a111;
 
 // c002_a112
 
