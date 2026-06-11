@@ -216,7 +216,8 @@
 
 // c002_a109
 
-// c002_a110
+pub mod hgs_advance;
+pub use hgs_advance as c002_a110;
 
 // c002_a111
 
