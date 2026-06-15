@@ -48,7 +48,8 @@
 
 // c005_a025
 
-// c005_a026
+pub mod prom_opencode_jade_f;
+pub use prom_opencode_jade_f as c005_a026;
 
 // c005_a027
 
