@@ -206,7 +206,8 @@
 
 // c001_a104
 
-// c001_a105
+pub mod prom_dusty_sat;
+pub use prom_dusty_sat as c001_a105;
 
 // c001_a106
 
