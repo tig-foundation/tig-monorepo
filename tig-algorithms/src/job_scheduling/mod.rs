@@ -46,7 +46,8 @@
 
 // c007_a024
 
-// c007_a025
+pub mod prom_pulse_job_v2;
+pub use prom_pulse_job_v2 as c007_a025;
 
 // c007_a026
 
