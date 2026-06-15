@@ -70,7 +70,8 @@
 
 // c006_a036
 
-// c006_a037
+pub mod prom_silvermist;
+pub use prom_silvermist as c006_a037;
 
 // c006_a038
 
