@@ -72,7 +72,8 @@
 
 // c006_a037
 
-// c006_a038
+pub mod prom_zai_glm_unstuck;
+pub use prom_zai_glm_unstuck as c006_a038;
 
 // c006_a039
 
