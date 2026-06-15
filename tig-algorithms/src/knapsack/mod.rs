@@ -268,7 +268,8 @@
 
 // c003_a135
 
-// c003_a136
+pub mod prom_silver_knap;
+pub use prom_silver_knap as c003_a136;
 
 // c003_a137
 
