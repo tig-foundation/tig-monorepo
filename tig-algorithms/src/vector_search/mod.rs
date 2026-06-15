@@ -200,7 +200,8 @@
 
 // c004_a101
 
-// c004_a102
+pub mod prom_kimi_vec;
+pub use prom_kimi_vec as c004_a102;
 
 // c004_a103
 
