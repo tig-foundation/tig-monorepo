@@ -60,7 +60,8 @@
 
 // c008_a031
 
-// c008_a032
+pub mod prom_neural_energy;
+pub use prom_neural_energy as c008_a032;
 
 // c008_a033
 
