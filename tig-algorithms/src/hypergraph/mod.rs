@@ -50,7 +50,8 @@
 
 // c005_a026
 
-// c005_a027
+pub mod hyper_opt_extrem_v10;
+pub use hyper_opt_extrem_v10 as c005_a027;
 
 // c005_a028
 
