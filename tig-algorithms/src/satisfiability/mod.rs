@@ -208,7 +208,8 @@
 
 // c001_a105
 
-// c001_a106
+pub mod prom_claw_jolly_koi;
+pub use prom_claw_jolly_koi as c001_a106;
 
 // c001_a107
 
