@@ -15,6 +15,18 @@ from fastapi import Request
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 CONFIG = {}
+ALLOWED_COMPUTE_TYPES = {
+    "aws_t3",
+    "aws_t3a",
+    "aws_t4g",
+    "aws_c7i",
+    "aws_c7a",
+    "aws_c7g",
+    "aws_m7i",
+    "aws_m7a",
+    "aws_m7g",
+    "aws_g4dn"
+}
 
 class ClientManager:
     def __init__(self):
@@ -76,6 +88,8 @@ class ClientManager:
                     raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} cannot be 0")
                 if (x["batch_size"] & (x["batch_size"] - 1)) != 0:
                     raise HTTPException(status_code=400, detail=f"Batch size for {x['algorithm_id']} must be a power of 2")
+                if x["compute_type"] not in ALLOWED_COMPUTE_TYPES:
+                    raise HTTPException(status_code=400, detail=f"Invalid compute type. Must be one of: {', '.join(ALLOWED_COMPUTE_TYPES)}")
             try:
                 new_config["player_id"] = new_config["player_id"].lower()
                 new_config["api_url"] = new_config["api_url"].rstrip('/')

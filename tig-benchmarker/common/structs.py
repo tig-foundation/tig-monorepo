@@ -57,6 +57,7 @@ class PrecommitDetails(FromDict):
     fee_paid: PreciseNumber
     hyperparameters: Optional[dict]
     fuel_budget: int
+    compute_type: str
 
 @dataclass
 class PrecommitState(FromDict):

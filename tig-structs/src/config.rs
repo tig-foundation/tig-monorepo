@@ -13,6 +13,7 @@ serializable_struct_with_getters! {
         erc20: ERC20Config,
         opow: OPoWConfig,
         rounds: RoundsConfig,
+        reports: ReportsConfig,
         rewards: RewardsConfig,
         topups: TopUpsConfig,
     }
@@ -116,6 +117,12 @@ serializable_struct_with_getters! {
         adoption_threshold: f64,
         merge_points_threshold: u32,
         push_delay_period: u32,
+    }
+}
+serializable_struct_with_getters! {
+    ReportsConfig {
+        report_fee: PreciseNumber,
+        penalty_amount: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {

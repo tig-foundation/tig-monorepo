@@ -117,49 +117,57 @@ SELECT '
       "algorithm_id": "c001_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c002_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c003_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c004_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c005_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c006_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c007_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     },
     {
       "algorithm_id": "c008_a001",
       "track_settings": {},
       "weight": 1,
-      "batch_size": 8
+      "batch_size": 8,
+      "compute_type": "aws_t3"
     }
   ],
   "time_before_batch_retry": 60000,

@@ -11,6 +11,7 @@ pub async fn submit_precommit<T: Context>(
     player_id: String,
     mut settings: BenchmarkSettings,
     mut track_settings: HashMap<String, TrackSettings>,
+    compute_type: ComputeType,
     seed: u64,
 ) -> Result<String> {
     if player_id != settings.player_id {
@@ -115,6 +116,7 @@ pub async fn submit_precommit<T: Context>(
                 fee_paid: submission_fee,
                 hyperparameters,
                 fuel_budget,
+                compute_type,
             },
         )
         .await?;

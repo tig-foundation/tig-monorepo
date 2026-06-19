@@ -407,6 +407,20 @@ serializable_struct_with_getters! {
         num_bundles: u64,
     }
 }
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ComputeType {
+    AWS_T3,
+    AWS_T3a,
+    AWS_T4g,
+    AWS_C7i,
+    AWS_C7a,
+    AWS_C7g,
+    AWS_M7i,
+    AWS_M7a,
+    AWS_M7g,
+    AWS_G4dn,
+}
 serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
@@ -416,6 +430,7 @@ serializable_struct_with_getters! {
         fee_paid: PreciseNumber,
         fuel_budget: u64,
         hyperparameters: Option<Map<String, Value>>,
+        compute_type: ComputeType,
     }
 }
 serializable_struct_with_getters! {
