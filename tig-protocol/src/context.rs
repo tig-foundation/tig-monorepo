@@ -1,5 +1,5 @@
 pub use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tig_structs::{config::*, core::*};
 
 #[allow(async_fn_in_trait)]
@@ -50,6 +50,11 @@ pub trait Context {
     ) -> Result<()>;
     async fn set_player_vote(&self, player_id: String, advance_id: String, yes: bool)
         -> Result<()>;
+    async fn get_reportable_benchmark(
+        &self,
+        benchmark_id: &String,
+    ) -> Option<(String, u64, HashSet<u64>)>;
+    async fn add_report_to_mempool(&self, details: ReportDetails) -> Result<String>;
     async fn get_precommit_settings(&self, benchmark_id: &String) -> Option<BenchmarkSettings>;
     async fn get_precommit_details(&self, benchmark_id: &String) -> Option<PrecommitDetails>;
     async fn add_precommit_to_mempool(

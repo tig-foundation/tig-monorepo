@@ -121,7 +121,8 @@ serializable_struct_with_getters! {
 }
 serializable_struct_with_getters! {
     ReportsConfig {
-        report_fee: PreciseNumber,
+        submission_fee: PreciseNumber,
+        submission_period: u32,
         penalty_amount: PreciseNumber,
     }
 }

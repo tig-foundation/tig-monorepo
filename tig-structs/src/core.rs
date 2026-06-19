@@ -106,6 +106,13 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    Report {
+        id: String,
+        details: ReportDetails,
+        state: ReportState,
+    }
+}
+serializable_struct_with_getters! {
     TopUp {
         id: String,
         details: TopUpDetails,
@@ -469,6 +476,30 @@ serializable_struct_with_getters! {
 impl OutputData {
     pub fn calc_solution_signature(&self) -> u64 {
         u64s_from_str(&jsonify(&self.solution))[0]
+    }
+}
+
+// Report child structs
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ArbitrationResult {
+    NONREPRODUCIBLE,
+    REPRODUCIBLE,
+    INCONCLUSIVE,
+}
+serializable_struct_with_getters! {
+    ReportDetails {
+        player_id: String,
+        benchmarker: String,
+        benchmark_id: String,
+        nonce: u64,
+    }
+}
+serializable_struct_with_getters! {
+    ReportState {
+        block_confirmed: u32,
+        block_arbitrated: u32,
+        result: Option<ArbitrationResult>,
     }
 }
 
