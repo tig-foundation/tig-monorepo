@@ -210,9 +210,18 @@ pub async fn submit_report<T: Context>(
 ) -> Result<String> {
     let config = ctx.get_config().await;
 
+    let latest_block_id = ctx.get_latest_block_id().await;
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+
     // check can report
     let benchmarker = match ctx.get_reportable_benchmark(&benchmark_id).await {
-        Some((benchmarker, num_nonces, reported_nonces)) => {
+        Some((benchmarker, round, num_nonces, reported_nonces)) => {
+            if latest_block_details.round > round + config.reports.submission_period {
+                return Err(anyhow!(
+                    "Can no longer submit report for benchmark '{}'",
+                    benchmark_id
+                ));
+            }
             if nonce >= num_nonces {
                 return Err(anyhow!(
                     "Nonce {} is out of range for benchmark '{}'",
