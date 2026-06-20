@@ -214,7 +214,7 @@ pub async fn submit_report<T: Context>(
     let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
 
     // check can report
-    let benchmarker = match ctx.get_reportable_benchmark(&benchmark_id).await {
+    let (benchmarker, round) = match ctx.get_reportable_benchmark(&benchmark_id).await {
         Some((benchmarker, round, num_nonces, reported_nonces)) => {
             if latest_block_details.round > round + config.reports.submission_period {
                 return Err(anyhow!(
@@ -236,7 +236,7 @@ pub async fn submit_report<T: Context>(
                     benchmark_id
                 ));
             }
-            benchmarker
+            (benchmarker, round)
         }
         None => return Err(anyhow!("Benchmark '{}' is not reportable", benchmark_id)),
     };
@@ -256,6 +256,9 @@ pub async fn submit_report<T: Context>(
             benchmarker,
             benchmark_id,
             nonce,
+            round,
+            fee_paid: config.reports.submission_fee,
+            penalty_amount: config.reports.penalty_amount,
         })
         .await?;
     Ok(report_id)

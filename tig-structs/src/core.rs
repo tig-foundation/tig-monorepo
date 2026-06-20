@@ -234,6 +234,7 @@ pub enum TxType {
     Fraud,
     Precommit,
     Proof,
+    Report,
     TopUp,
     Verified,
 }
@@ -254,6 +255,7 @@ pub enum EmissionsType {
     Advance,
     Benchmarker,
     Bootstrap,
+    Burnt,
     ChallengeOwner,
     Code,
     Delegator,
@@ -493,6 +495,9 @@ serializable_struct_with_getters! {
         benchmarker: String,
         benchmark_id: String,
         nonce: u64,
+        round: u32,
+        fee_paid: PreciseNumber,
+        penalty_amount: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
