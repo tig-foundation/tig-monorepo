@@ -53,8 +53,13 @@ pub trait Context {
     async fn get_reportable_benchmark(
         &self,
         benchmark_id: &String,
-    ) -> Option<(String, u32, u64, HashSet<u64>)>;
+    ) -> Option<(String, String, u32, u64, HashSet<u64>)>;
     async fn add_report_to_mempool(&self, details: ReportDetails) -> Result<String>;
+    async fn add_arbitration_to_mempool(
+        &self,
+        report_id: &String,
+        details: ArbitrationDetails,
+    ) -> Result<()>;
     async fn get_precommit_settings(&self, benchmark_id: &String) -> Option<BenchmarkSettings>;
     async fn get_precommit_details(&self, benchmark_id: &String) -> Option<PrecommitDetails>;
     async fn add_precommit_to_mempool(

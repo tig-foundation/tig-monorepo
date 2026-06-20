@@ -215,7 +215,7 @@ pub async fn submit_report<T: Context>(
 
     // check can report
     let (benchmarker, round) = match ctx.get_reportable_benchmark(&benchmark_id).await {
-        Some((benchmarker, round, num_nonces, reported_nonces)) => {
+        Some((benchmarker, _challenge_id, round, num_nonces, reported_nonces)) => {
             if latest_block_details.round > round + config.reports.submission_period {
                 return Err(anyhow!(
                     "Can no longer submit report for benchmark '{}'",
