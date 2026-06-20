@@ -258,7 +258,6 @@ pub async fn submit_report<T: Context>(
             nonce,
             round,
             fee_paid: config.reports.submission_fee,
-            penalty_amount: config.reports.penalty_amount,
         })
         .await?;
     Ok(report_id)

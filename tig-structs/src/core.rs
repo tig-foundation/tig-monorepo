@@ -113,6 +113,13 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    Arbitration {
+        report_id: String,
+        details: ArbitrationDetails,
+        state: ArbitrationState,
+    }
+}
+serializable_struct_with_getters! {
     TopUp {
         id: String,
         details: TopUpDetails,
@@ -226,6 +233,7 @@ serializable_struct_with_getters! {
 #[serde(rename_all = "lowercase")]
 pub enum TxType {
     Advance,
+    Arbitration,
     Benchmark,
     Binary,
     Challenge,
@@ -482,13 +490,6 @@ impl OutputData {
 }
 
 // Report child structs
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ArbitrationResult {
-    NONREPRODUCIBLE,
-    REPRODUCIBLE,
-    INCONCLUSIVE,
-}
 serializable_struct_with_getters! {
     ReportDetails {
         player_id: String,
@@ -497,14 +498,30 @@ serializable_struct_with_getters! {
         nonce: u64,
         round: u32,
         fee_paid: PreciseNumber,
-        penalty_amount: PreciseNumber,
     }
 }
 serializable_struct_with_getters! {
     ReportState {
         block_confirmed: u32,
-        block_arbitrated: u32,
-        result: Option<ArbitrationResult>,
+    }
+}
+
+// Arbitration child structs
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ArbitrationResult {
+    NONREPRODUCIBLE,
+    REPRODUCIBLE,
+    INCONCLUSIVE,
+}
+serializable_struct_with_getters! {
+    ArbitrationDetails {
+        result: ArbitrationResult,
+    }
+}
+serializable_struct_with_getters! {
+    ArbitrationState {
+        block_confirmed: u32,
     }
 }
 

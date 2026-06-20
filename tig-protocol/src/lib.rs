@@ -5,7 +5,7 @@ use context::*;
 pub use contracts::{
     algorithms::{submit_advance, submit_binary, submit_code},
     benchmarks::{submit_benchmark, submit_precommit, submit_proof},
-    players::{set_coinbase, set_delegatees, set_reward_share, set_vote},
+    players::{set_coinbase, set_delegatees, set_reward_share, set_vote, submit_report},
 };
 
 pub async fn add_block<T: Context>(ctx: &T) {
