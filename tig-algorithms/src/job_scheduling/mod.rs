@@ -50,7 +50,8 @@
 
 // c007_a026
 
-// c007_a027
+pub mod task_first_f;
+pub use task_first_f as c007_a027;
 
 // c007_a028
 
