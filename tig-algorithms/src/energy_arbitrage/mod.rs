@@ -64,7 +64,8 @@
 
 // c008_a033
 
-// c008_a034
+pub mod prom_inspired;
+pub use prom_inspired as c008_a034;
 
 // c008_a035
 
