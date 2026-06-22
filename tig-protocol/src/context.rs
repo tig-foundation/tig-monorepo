@@ -53,8 +53,9 @@ pub trait Context {
     async fn get_reportable_benchmark(
         &self,
         benchmark_id: &String,
-    ) -> Option<(String, String, u32, u64, HashSet<u64>)>;
+    ) -> Option<(String, String, u32, u64, u64, HashSet<u64>)>;
     async fn add_report_to_mempool(&self, details: ReportDetails) -> Result<String>;
+    async fn get_arbitration_details(&self, report_id: &String) -> Option<ArbitrationDetails>;
     async fn add_arbitration_to_mempool(
         &self,
         report_id: &String,
