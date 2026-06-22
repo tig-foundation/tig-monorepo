@@ -284,6 +284,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPlayerDataResponse'
+  /get-reportable-benchmark-ids:
+    get:
+      tags:
+        - GET
+      summary: Get all benchmark ids by a specific player for a specific challenge in a specific round
+      parameters:
+        - name: round
+          in: query
+          description: Id of round
+          required: true
+          schema:
+            type: integer
+            format: uint32
+        - name: player_id
+          in: query
+          description: Id of player
+          required: true
+          schema:
+            $ref: '#/components/schemas/Address'
+        - name: challenge_id
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/ChallengeId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReportableBenchmarkIdsResponse'
+  /get-reports:
+    get:
+      tags:
+        - GET
+      summary: Get reports made by players in a specific round
+      parameters:
+        - name: round
+          in: query
+          description: Id of round
+          required: true
+          schema:
+            type: integer
+            format: uint32
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReportsResponse'
   /get-round-emissions:
     get:
       tags:
@@ -642,6 +693,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubmitProofResponse'
+  /submit-report:
+    post:
+      tags:
+        - POST
+      summary: Submit a report
+      description: |-
+        Submit a report that a Benchmarker had submitted a solution quality that is non-reproducible
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitReportRequest'
+      parameters:
+        - in: header
+          name: X-Api-Key
+          description: <api_key> from /request-api-key endpoint
+          schema:
+            $ref: '#/components/schemas/MD5'
+      responses:
+        '200':
+          description: Success
 components:
   schemas:
     Address:
@@ -1064,6 +1136,27 @@ components:
               $ref: '#/components/schemas/PreciseNumber'
             false:
               $ref: '#/components/schemas/PreciseNumber'
+    Arbitration:
+      type: object
+      properties:
+        report_id:
+          $ref: '#/components/schemas/MD5'
+        details:
+          $ref: '#/components/schemas/ArbitrationDetails'
+        state:
+          $ref: '#/components/schemas/ArbitrationState'
+    ArbitrationDetails:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [nonreprodicible,reproducible,inconclusive]
+    ArbitrationState:
+      type: object
+      properties:
+        block_confirmed:
+          type: integer
+          format: uint32
     Challenge:
       type: object
       properties:
@@ -1356,13 +1449,25 @@ components:
         block_started:
           type: integer
           format: uint32
+        num_bundles:
+          type: integer
+          format: uint64
         num_nonces:
           type: integer
-          format: uint32
+          format: uint64
         rand_hash:
           $ref: '#/components/schemas/MD5'
         fee_paid:
           $ref: '#/components/schemas/PreciseNumber'
+        fuel_budget:
+          type: integer
+          format: uint64
+        hyperparameters:
+          type: object
+        compute_type:
+          type: string
+          enum: [aws_t3, aws_t3a, aws_t4g, aws_c7i, aws_c7a, aws_c7g, aws_m7i, aws_m7a, aws_m7g, aws_g4dn]
+          description: Compute that can reproduce the results
     PrecommitState:
       type: object
       properties:
@@ -1396,6 +1501,38 @@ components:
           type: integer
           format: uint32
         block_active:
+          type: integer
+          format: uint32
+    Report:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/MD5'
+        details:
+          $ref: '#/components/schemas/ReportDetails'
+        state:
+          $ref: '#/components/schemas/ReportState'
+    ReportDetails:
+      type: object
+      properties:
+        player_id:
+          $ref: '#/components/schemas/Address'
+        benchmarker:
+          $ref: '#/components/schemas/Address'
+        benchmark_id:
+          $ref: '#/components/schemas/MD5'
+        nonce:
+          type: integer
+          format: uint64
+        round:
+          type: integer
+          format: uint32
+        fee_paid:
+          $ref: '#/components/schemas/PreciseNumber'
+    ReportState:
+      type: object
+      properties:
+        block_confirmed:
           type: integer
           format: uint32
     Signature:
@@ -1517,16 +1654,6 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/PlayerDetails'
           description: Map of player_id to PlayerDetails
-    GetTracksDataResponse:
-      type: object
-      properties:
-        data:
-          type: object
-          description: "Map<TrackId, TracksData[]>"
-          additionalProperties:
-            type: array
-            items:
-              $ref: '#/components/schemas/TracksData'
     GetOPoWResponse:
       type: object
       properties:
@@ -1552,6 +1679,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TopUp'
+    GetReportableBenchmarkIdsResponse:
+      type: object
+      properties:
+        benchmark_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/MD5'
+    GetReportsResponse:
+      type: object
+      properties:
+        reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/Report'
+        arbitrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Arbitration'
     GetRoundEmissionsResponse:
      type: object
      properties:
@@ -1611,6 +1756,16 @@ components:
               $ref: '#/components/schemas/PreciseNumber'
             challenge_owner:
               $ref: '#/components/schemas/PreciseNumber'
+    GetTracksDataResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          description: "Map<TrackId, TracksData[]>"
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/TracksData'
     RequestApiKeyRequest:
       type: object
       properties:
@@ -1746,6 +1901,7 @@ components:
       required:
         - settings
         - track_settings
+        - compute_type
       properties:
         settings:
           $ref: '#/components/schemas/BenchmarkSettings'
@@ -1754,6 +1910,10 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/TrackSettings'
           description: Settings per active track (key = track_id). Must include all active tracks for the challenge.
+        compute_type:
+          type: string
+          enum: [aws_t3, aws_t3a, aws_t4g, aws_c7i, aws_c7a, aws_c7g, aws_m7i, aws_m7a, aws_m7g, aws_g4dn]
+          description: Compute that can reproduce the results
     SubmitPrecommitResponse:
       type: object
       properties:
@@ -1773,3 +1933,11 @@ components:
       properties:
         verified:
           type: string
+    SubmitReportRequest:
+      type: object
+      properties:
+        benchmark_id:
+          $ref: '#/components/schemas/MD5'
+        nonce:
+          type: integer
+          format: uint64
