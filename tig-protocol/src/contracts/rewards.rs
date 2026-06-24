@@ -1,6 +1,5 @@
 use crate::context::*;
 use logging_timer::time;
-use std::collections::HashMap;
 use tig_structs::core::*;
 
 #[time]
@@ -137,26 +136,33 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 )
         }
         let coinbase_amount = opow_data.reward - opow_data.reward_share;
+        let mut remaining_amount = coinbase_amount.clone();
+        if let Some(coinbase) = active_players_state[delegatee].coinbase.as_ref() {
+            for (output, fraction) in coinbase.value.iter().filter(|(id, _)| *id != delegatee) {
+                let fraction = PreciseNumber::from_f64(*fraction);
+                let reward = coinbase_amount * fraction;
+                remaining_amount -= reward.clone();
+                opow_data.coinbase.insert(output.clone(), reward.clone());
 
-        for (output, fraction) in active_players_state[delegatee]
-            .coinbase
-            .as_ref()
-            .map_or_else(
-                || HashMap::from([(delegatee.clone(), 1.0)]),
-                |x| x.value.clone(),
-            )
-            .iter()
+                let player_data = active_players_block_data.get_mut(output).unwrap();
+                *player_data
+                    .reward_by_type
+                    .entry(EmissionsType::Benchmarker)
+                    .or_insert_with(|| zero.clone()) += reward;
+                total_benchmarkers_reward += reward;
+            }
+        }
         {
-            let fraction = PreciseNumber::from_f64(*fraction);
-            let reward = coinbase_amount * fraction;
-            opow_data.coinbase.insert(output.clone(), reward.clone());
+            opow_data
+                .coinbase
+                .insert(delegatee.clone(), remaining_amount.clone());
 
-            let player_data = active_players_block_data.get_mut(output).unwrap();
+            let player_data = active_players_block_data.get_mut(delegatee).unwrap();
             *player_data
                 .reward_by_type
                 .entry(EmissionsType::Benchmarker)
-                .or_insert_with(|| zero.clone()) += reward;
-            total_benchmarkers_reward += reward;
+                .or_insert_with(|| zero.clone()) += remaining_amount;
+            total_benchmarkers_reward += remaining_amount;
         }
 
         if opow_data.reward_share == zero {
