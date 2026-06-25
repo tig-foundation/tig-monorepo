@@ -263,7 +263,7 @@ pub enum EmissionsType {
     Advance,
     Benchmarker,
     Bootstrap,
-    Burnt,
+    Penalty,
     ChallengeOwner,
     Code,
     Delegator,

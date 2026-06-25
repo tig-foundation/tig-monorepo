@@ -124,6 +124,7 @@ serializable_struct_with_getters! {
         submission_fee: PreciseNumber,
         submission_period: u32,
         penalty_amount: PreciseNumber,
+        penalty_address: String,
     }
 }
 serializable_struct_with_getters! {
