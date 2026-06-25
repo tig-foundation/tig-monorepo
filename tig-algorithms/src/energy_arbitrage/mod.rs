@@ -66,7 +66,8 @@
 
 // c008_a034
 
-// c008_a035
+pub mod delta_machine_ea_v3;
+pub use delta_machine_ea_v3 as c008_a035;
 
 // c008_a036
 
