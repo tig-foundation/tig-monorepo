@@ -168,25 +168,30 @@
 
 // c002_a085
 
-// c002_a086
+pub mod vrptw_ultimate;
+pub use vrptw_ultimate as c002_a086;
 
-// c002_a087
+pub mod vrptw_high;
+pub use vrptw_high as c002_a087;
 
 // c002_a088
 
-// c002_a089
+pub mod hgs_v1;
+pub use hgs_v1 as c002_a089;
 
 // c002_a090
 
 // c002_a091
 
-// c002_a092
+pub mod fast_lane;
+pub use fast_lane as c002_a092;
 
 // c002_a093
 
 // c002_a094
 
-// c002_a095
+pub mod fast_lane_v2;
+pub use fast_lane_v2 as c002_a095;
 
 // c002_a096
 
@@ -196,13 +201,16 @@
 
 // c002_a099
 
-// c002_a100
+pub mod v2_fast;
+pub use v2_fast as c002_a100;
 
-// c002_a101
+pub mod fast_lane_v3;
+pub use fast_lane_v3 as c002_a101;
 
 // c002_a102
 
-// c002_a103
+pub mod fast_lane_v4;
+pub use fast_lane_v4 as c002_a103;
 
 // c002_a104
 
@@ -210,9 +218,11 @@
 
 // c002_a106
 
-// c002_a107
+pub mod fast_lane_v5;
+pub use fast_lane_v5 as c002_a107;
 
-// c002_a108
+pub mod fast_lane_v6;
+pub use fast_lane_v6 as c002_a108;
 
 // c002_a109
 

@@ -128,15 +128,18 @@
 
 // c001_a065
 
-// c001_a066
+pub mod sat_suma;
+pub use sat_suma as c001_a066;
 
 // c001_a067
 
-// c001_a068
+pub mod super_sat;
+pub use super_sat as c001_a068;
 
 // c001_a069
 
-// c001_a070
+pub mod sat_excelled;
+pub use sat_excelled as c001_a070;
 
 // c001_a071
 
@@ -152,7 +155,8 @@
 
 // c001_a077
 
-// c001_a078
+pub mod sat_turbo_fix;
+pub use sat_turbo_fix as c001_a078;
 
 // c001_a079
 
@@ -160,7 +164,8 @@
 
 // c001_a081
 
-// c001_a082
+pub mod sat_vanguard;
+pub use sat_vanguard as c001_a082;
 
 // c001_a083
 
@@ -174,7 +179,8 @@
 
 // c001_a088
 
-// c001_a089
+pub mod sat_vanguard_v3;
+pub use sat_vanguard_v3 as c001_a089;
 
 // c001_a090
 
@@ -186,7 +192,8 @@
 
 // c001_a094
 
-// c001_a095
+pub mod sat_imp_v3;
+pub use sat_imp_v3 as c001_a095;
 
 // c001_a096
 

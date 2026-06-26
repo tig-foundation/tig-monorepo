@@ -1,4 +1,5 @@
-// c007_a001
+pub mod adaptive_js;
+pub use adaptive_js as c007_a001;
 
 // c007_a002
 
@@ -6,23 +7,28 @@
 
 // c007_a004
 
-// c007_a005
+pub mod adaptive_js_v2;
+pub use adaptive_js_v2 as c007_a005;
 
 // c007_a006
 
-// c007_a007
+pub mod job_two;
+pub use job_two as c007_a007;
 
-// c007_a008
+pub mod adaptive_js_v3;
+pub use adaptive_js_v3 as c007_a008;
 
 // c007_a009
 
 // c007_a010
 
-// c007_a011
+pub mod adaptive_js_v4;
+pub use adaptive_js_v4 as c007_a011;
 
 // c007_a012
 
-// c007_a013
+pub mod adaptive_js_v5;
+pub use adaptive_js_v5 as c007_a013;
 
 // c007_a014
 
@@ -34,7 +40,8 @@
 
 // c007_a018
 
-// c007_a019
+pub mod task_first;
+pub use task_first as c007_a019;
 
 // c007_a020
 

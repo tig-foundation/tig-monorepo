@@ -1,4 +1,5 @@
-// c008_a001
+pub mod titan;
+pub use titan as c008_a001;
 
 // c008_a002
 
@@ -18,7 +19,8 @@
 
 // c008_a010
 
-// c008_a011
+pub mod titan_v2;
+pub use titan_v2 as c008_a011;
 
 // c008_a012
 

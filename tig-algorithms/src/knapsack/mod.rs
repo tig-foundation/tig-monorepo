@@ -192,25 +192,30 @@
 
 // c003_a097
 
-// c003_a098
+pub mod knapsplatt;
+pub use knapsplatt as c003_a098;
 
 // c003_a099
 
-// c003_a100
+pub mod knap_supreme;
+pub use knap_supreme as c003_a100;
 
 // c003_a101
 
-// c003_a102
+pub mod knapsplat_hyper_s;
+pub use knapsplat_hyper_s as c003_a102;
 
 // c003_a103
 
 // c003_a104
 
-// c003_a105
+pub mod fast_and_furious;
+pub use fast_and_furious as c003_a105;
 
 // c003_a106
 
-// c003_a107
+pub mod near_knap;
+pub use near_knap as c003_a107;
 
 // c003_a108
 
@@ -218,15 +223,18 @@
 
 // c003_a110
 
-// c003_a111
+pub mod near_knap_improve_v1;
+pub use near_knap_improve_v1 as c003_a111;
 
 // c003_a112
 
 // c003_a113
 
-// c003_a114
+pub mod near_knap_v3;
+pub use near_knap_v3 as c003_a114;
 
-// c003_a115
+pub mod knap_quality_opt;
+pub use knap_quality_opt as c003_a115;
 
 // c003_a116
 
@@ -236,7 +244,8 @@
 
 // c003_a119
 
-// c003_a120
+pub mod near_knap_v4;
+pub use near_knap_v4 as c003_a120;
 
 // c003_a121
 
@@ -248,7 +257,8 @@
 
 // c003_a125
 
-// c003_a126
+pub mod knap_quality_opt_v6;
+pub use knap_quality_opt_v6 as c003_a126;
 
 // c003_a127
 

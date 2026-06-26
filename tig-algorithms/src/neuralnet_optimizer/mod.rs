@@ -1,14 +1,18 @@
-// c006_a001
+pub mod neural_alchemist;
+pub use neural_alchemist as c006_a001;
 
-// c006_a002
+pub mod nn_iza;
+pub use nn_iza as c006_a002;
 
-// c006_a003
+pub mod adamlaterrt;
+pub use adamlaterrt as c006_a003;
 
 // c006_a004
 
 // c006_a005
 
-// c006_a006
+pub mod neural_advanced;
+pub use neural_advanced as c006_a006;
 
 // c006_a007
 
@@ -34,11 +38,13 @@
 
 // c006_a018
 
-// c006_a019
+pub mod neural_advanced_v3;
+pub use neural_advanced_v3 as c006_a019;
 
 // c006_a020
 
-// c006_a021
+pub mod neural_advanced_v4;
+pub use neural_advanced_v4 as c006_a021;
 
 // c006_a022
 
@@ -48,7 +54,8 @@
 
 // c006_a025
 
-// c006_a026
+pub mod neural_extrem_v3;
+pub use neural_extrem_v3 as c006_a026;
 
 // c006_a027
 
