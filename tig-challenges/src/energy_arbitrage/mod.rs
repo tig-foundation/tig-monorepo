@@ -366,6 +366,16 @@ impl Challenge {
             Ok(quality)
         }
     );
+
+    #[cfg(not(feature = "hide_verification"))]
+    pub fn hidden_seed_bytes(&self) -> &[u8; 32] {
+        &self.hidden_seed
+    }
+
+    #[cfg(not(feature = "hide_verification"))]
+    pub fn hidden_seed_offset() -> usize {
+        std::mem::offset_of!(Challenge, hidden_seed)
+    }
 }
 
 #[cfg(test)]
