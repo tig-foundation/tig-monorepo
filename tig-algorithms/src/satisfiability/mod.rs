@@ -199,7 +199,8 @@ pub use sat_imp_v3 as c001_a095;
 
 // c001_a097
 
-// c001_a098
+pub mod sat_imp_v4;
+pub use sat_imp_v4 as c001_a098;
 
 // c001_a099
 
