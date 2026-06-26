@@ -224,7 +224,8 @@
 
 // c002_a113
 
-// c002_a114
+pub mod hgs_adv_imp;
+pub use hgs_adv_imp as c002_a114;
 
 // c002_a115
 
