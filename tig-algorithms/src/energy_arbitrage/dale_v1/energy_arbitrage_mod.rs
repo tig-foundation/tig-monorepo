@@ -1,4 +1,5 @@
-// c008_a001
+pub mod titan;
+pub use titan as c008_a001;
 
 // c008_a002
 
@@ -18,7 +19,8 @@
 
 // c008_a010
 
-// c008_a011
+pub mod titan_v2;
+pub use titan_v2 as c008_a011;
 
 // c008_a012
 
@@ -44,9 +46,13 @@
 
 // c008_a023
 
-// c008_a024
+pub mod prometheus_eb1;
+pub use prometheus_eb1 as c008_a024;
 
-// c008_a025
+pub mod dale_v1;
+pub use dale_v1 as c008_a025;
+
+// c008_a026
 
 // c008_a026
 
@@ -68,8 +74,7 @@
 
 // c008_a035
 
-pub mod dale_v1;
-pub use dale_v1 as c008_a036;
+// c008_a036
 
 // c008_a037
 
