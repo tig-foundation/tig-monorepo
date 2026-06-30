@@ -17,3 +17,8 @@ __pycache__/
 db_data/
 
 .DS_Store
+
+# Compiled pentest payload artifacts
+tig-algorithms/lib/
+export_symbols.map
+output.map

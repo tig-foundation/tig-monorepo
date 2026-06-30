@@ -23,6 +23,7 @@ fn compute_flows(challenge: &Challenge, state: &State, action: &[f64]) -> Vec<f6
         .collect()
 }
 
+#[allow(dead_code)]
 fn most_violated_line(challenge: &Challenge, flows: &[f64]) -> Option<Violation> {
     let mut best: Option<Violation> = None;
     for (l, &flow) in flows.iter().enumerate() {

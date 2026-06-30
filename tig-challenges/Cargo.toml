@@ -49,4 +49,4 @@ energy_arbitrage = ["c008"]
 [[bin]]
 name = "pentest-harness"
 path = "src/bin/pentest_harness.rs"
-required-features = ["c008", "c009"]
+required-features = ["c008"]
