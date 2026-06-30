@@ -45,8 +45,6 @@ c007 = []
 job_scheduling = ["c007"]
 c008 = []
 energy_arbitrage = ["c008"]
-c009 = []
-max_cut = ["c009"]
 
 [[bin]]
 name = "pentest-harness"
