@@ -70,7 +70,8 @@
 
 // c008_a036
 
-// c008_a037
+pub mod ic_energy_v1;
+pub use ic_energy_v1 as c008_a037;
 
 // c008_a038
 
