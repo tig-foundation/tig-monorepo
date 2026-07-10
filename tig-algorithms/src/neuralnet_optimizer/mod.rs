@@ -76,7 +76,8 @@ pub use neural_extrem_v3 as c006_a026;
 pub mod neural_extrem_imp;
 pub use neural_extrem_imp as c006_a035;
 
-// c006_a036
+pub mod prometheus_aidda;
+pub use prometheus_aidda as c006_a036;
 
 // c006_a037
 
