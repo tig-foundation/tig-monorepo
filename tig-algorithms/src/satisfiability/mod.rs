@@ -218,7 +218,8 @@ pub use sat_imp_v4 as c001_a098;
 
 // c001_a106
 
-// c001_a107
+pub mod sat_vanguard_v9;
+pub use sat_vanguard_v9 as c001_a107;
 
 // c001_a108
 
