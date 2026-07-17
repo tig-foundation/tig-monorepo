@@ -80,7 +80,8 @@
 
 // c006_a041
 
-// c006_a042
+pub mod neural_extrem_v8;
+pub use neural_extrem_v8 as c006_a042;
 
 // c006_a043
 
