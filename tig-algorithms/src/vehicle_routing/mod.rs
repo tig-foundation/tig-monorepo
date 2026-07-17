@@ -226,7 +226,8 @@
 
 // c002_a114
 
-// c002_a115
+pub mod prometheus_hgs_adv;
+pub use prometheus_hgs_adv as c002_a115;
 
 // c002_a116
 
