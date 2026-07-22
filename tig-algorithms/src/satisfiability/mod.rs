@@ -214,7 +214,8 @@
 
 // c001_a108
 
-// c001_a109
+pub mod sat_hybrid;
+pub use sat_hybrid as c001_a109;
 
 // c001_a110
 
