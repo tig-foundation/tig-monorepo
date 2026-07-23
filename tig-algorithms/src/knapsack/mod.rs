@@ -276,7 +276,8 @@
 
 // c003_a139
 
-// c003_a140
+pub mod knap_master_v2;
+pub use knap_master_v2 as c003_a140;
 
 // c003_a141
 
