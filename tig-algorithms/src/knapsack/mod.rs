@@ -281,7 +281,8 @@ pub use knap_quality_opt_v11 as c003_a133;
 
 // c003_a136
 
-// c003_a137
+pub mod superfast_knap_v1;
+pub use superfast_knap_v1 as c003_a137;
 
 // c003_a138
 
