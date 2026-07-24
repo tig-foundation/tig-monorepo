@@ -62,7 +62,8 @@
 
 // c007_a032
 
-// c007_a033
+pub mod adaptive_js_opt;
+pub use adaptive_js_opt as c007_a033;
 
 // c007_a034
 
