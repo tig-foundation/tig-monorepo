@@ -76,7 +76,8 @@
 
 // c008_a039
 
-// c008_a040
+pub mod cryp_energy;
+pub use cryp_energy as c008_a040;
 
 // c008_a041
 
