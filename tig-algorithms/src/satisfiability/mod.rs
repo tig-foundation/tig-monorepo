@@ -216,7 +216,8 @@
 
 // c001_a109
 
-// c001_a110
+pub mod stinger_bell;
+pub use stinger_bell as c001_a110;
 
 // c001_a111
 
