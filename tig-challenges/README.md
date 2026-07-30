@@ -23,4 +23,4 @@ Each challenge is a Cargo feature (e.g. `--features c003` for knapsack). CUDA-en
 
 ## License
 
-[End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)
+[End User License Agreement](../docs/licenses/TIG_Game_Code_End_User_License_Agreement_v2.0.pdf)
