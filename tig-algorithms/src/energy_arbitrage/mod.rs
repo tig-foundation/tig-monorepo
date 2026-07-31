@@ -82,7 +82,8 @@
 
 // c008_a042
 
-// c008_a043
+pub mod first_energy;
+pub use first_energy as c008_a043;
 
 // c008_a044
 
