@@ -228,7 +228,8 @@
 
 // c002_a115
 
-// c002_a116
+pub mod hgs_prometheus;
+pub use hgs_prometheus as c002_a116;
 
 // c002_a117
 
