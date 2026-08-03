@@ -282,7 +282,8 @@
 
 // c003_a142
 
-// c003_a143
+pub mod combination_alg;
+pub use combination_alg as c003_a143;
 
 // c003_a144
 
