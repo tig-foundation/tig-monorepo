@@ -56,7 +56,8 @@
 
 // c005_a029
 
-// c005_a030
+pub mod hyper_sigma_v2;
+pub use hyper_sigma_v2 as c005_a030;
 
 // c005_a031
 
