@@ -84,7 +84,8 @@
 
 // c008_a043
 
-// c008_a044
+pub mod e_tide_multi_v01;
+pub use e_tide_multi_v01 as c008_a044;
 
 // c008_a045
 
