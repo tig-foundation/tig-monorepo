@@ -82,7 +82,8 @@
 
 // c006_a042
 
-// c006_a043
+pub mod parallax_cygni;
+pub use parallax_cygni as c006_a043;
 
 // c006_a044
 
