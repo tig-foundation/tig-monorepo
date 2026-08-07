@@ -58,7 +58,8 @@
 
 // c005_a030
 
-// c005_a031
+pub mod sigma_freud_opt;
+pub use sigma_freud_opt as c005_a031;
 
 // c005_a032
 
