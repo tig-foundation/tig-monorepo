@@ -84,7 +84,8 @@
 
 // c006_a043
 
-// c006_a044
+pub mod dc_steer_v6;
+pub use dc_steer_v6 as c006_a044;
 
 // c006_a045
 
