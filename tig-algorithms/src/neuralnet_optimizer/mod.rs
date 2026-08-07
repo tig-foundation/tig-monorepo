@@ -86,7 +86,8 @@
 
 // c006_a044
 
-// c006_a045
+pub mod parallax_altair;
+pub use parallax_altair as c006_a045;
 
 // c006_a046
 
