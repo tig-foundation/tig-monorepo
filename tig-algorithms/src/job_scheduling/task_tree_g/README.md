@@ -1,0 +1,27 @@
+# TIG Code Submission
+
+## Submission Details
+
+* **Challenge Name:** job_scheduling
+* **Algorithm Name:** task_tree_g
+* **Copyright:** 2026 NVX
+* **Identity of Submitter:** NVX
+* **Identity of Creator of Algorithmic Method:** NVX
+* **Unique Algorithm Identifier (UAI):** null
+
+## Additional Details
+
+A per-instance job-scheduling solver that detects the instance family 
+
+## License
+
+The files in this folder are under the following licenses:
+* TIG Benchmarker Outbound License
+* TIG Commercial License
+* TIG Inbound Game License
+* TIG Innovator Outbound Game License
+* TIG Open Data License
+* TIG THV Game License
+
+Copies of the licenses can be obtained at:
+https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses

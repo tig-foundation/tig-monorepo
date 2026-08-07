@@ -62,7 +62,8 @@ pub use sigma_freud_v8 as c005_a025;
 
 // c005_a027
 
-// c005_a028
+pub mod hyper_opt_extrem_v11;
+pub use hyper_opt_extrem_v11 as c005_a028;
 
 // c005_a029
 

@@ -68,7 +68,8 @@ pub use task_two_f as c007_a028;
 
 // c007_a030
 
-// c007_a031
+pub mod task_tree_g;
+pub use task_tree_g as c007_a031;
 
 // c007_a032
 
