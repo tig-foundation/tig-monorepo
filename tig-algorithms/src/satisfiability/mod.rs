@@ -220,7 +220,8 @@
 
 // c001_a111
 
-// c001_a112
+pub mod sat_imp_giveup2;
+pub use sat_imp_giveup2 as c001_a112;
 
 // c001_a113
 
