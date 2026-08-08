@@ -286,7 +286,8 @@
 
 // c003_a144
 
-// c003_a145
+pub mod croesus_v1;
+pub use croesus_v1 as c003_a145;
 
 // c003_a146
 
