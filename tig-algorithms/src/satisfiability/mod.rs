@@ -222,7 +222,8 @@
 
 // c001_a112
 
-// c001_a113
+pub mod sat_valknut;
+pub use sat_valknut as c001_a113;
 
 // c001_a114
 
