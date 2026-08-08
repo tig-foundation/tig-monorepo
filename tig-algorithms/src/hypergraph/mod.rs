@@ -60,7 +60,8 @@
 
 // c005_a031
 
-// c005_a032
+pub mod gordian_v1;
+pub use gordian_v1 as c005_a032;
 
 // c005_a033
 
