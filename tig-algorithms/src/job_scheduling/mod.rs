@@ -74,7 +74,8 @@
 
 // c007_a038
 
-// c007_a039
+pub mod chronoloom_v2;
+pub use chronoloom_v2 as c007_a039;
 
 // c007_a040
 
