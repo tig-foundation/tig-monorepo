@@ -206,7 +206,8 @@
 
 // c004_a104
 
-// c004_a105
+pub mod solve_hybrid;
+pub use solve_hybrid as c004_a105;
 
 // c004_a106
 
