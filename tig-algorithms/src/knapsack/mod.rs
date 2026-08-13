@@ -288,7 +288,8 @@
 
 // c003_a145
 
-// c003_a146
+pub mod superfast_knap_v3;
+pub use superfast_knap_v3 as c003_a146;
 
 // c003_a147
 
