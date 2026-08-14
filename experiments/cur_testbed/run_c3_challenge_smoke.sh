@@ -32,13 +32,13 @@ nvcc --ptx experiments/cur_testbed/portable_kernels.cu \
   --optimize 3
 
 export RUSTFLAGS='--cfg feature="cuda-12020"'
-cargo test -p tig-challenges --features c008 --lib
-cargo check -p tig-runtime --features c008
-cargo check -p tig-verifier --features c008
+cargo test -p tig-challenges --features c009 --lib
+cargo check -p tig-runtime --features c009
+cargo check -p tig-verifier --features c009
 cargo check -p tig-algorithms --features cur_decomposition --examples
 cargo run --release -p tig-challenges \
   --example cur_decomposition_smoke \
-  --features c008 -- \
+  --features c009 -- \
   /tmp/cur-challenge.ptx
 
 cp /tmp/cur-challenge.ptx "$C3_ARTIFACTS_DIR/cur_challenge_smoke.ptx"

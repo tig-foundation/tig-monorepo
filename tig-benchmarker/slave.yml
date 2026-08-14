@@ -66,3 +66,8 @@ services:
     <<: *common
     image: ghcr.io/tig-foundation/tig-monorepo/energy_arbitrage/runtime:${VERSION}
     container_name: energy_arbitrage
+
+  cur_decomposition:
+    <<: [*common, *common-gpu]
+    image: ghcr.io/tig-foundation/tig-monorepo/cur_decomposition/runtime:${VERSION}
+    container_name: cur_decomposition

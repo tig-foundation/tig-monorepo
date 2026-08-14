@@ -2,7 +2,7 @@ pub const BUILD_TIME_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
 pub const QUALITY_PRECISION: i32 = 1_000_000;
 
-#[cfg(any(feature = "c008", test))]
+#[cfg(any(feature = "c009", test))]
 mod cur_decomposition_scoring;
 
 macro_rules! conditional_pub {
@@ -215,3 +215,7 @@ pub use job_scheduling as c007;
 pub mod energy_arbitrage;
 #[cfg(feature = "c008")]
 pub use energy_arbitrage as c008;
+#[cfg(feature = "c009")]
+pub mod cur_decomposition;
+#[cfg(feature = "c009")]
+pub use cur_decomposition as c009;

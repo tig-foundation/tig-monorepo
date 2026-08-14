@@ -139,7 +139,7 @@ sub-solution makes the submitted nonce invalid.
 
 ## Runtime integration
 
-Challenge ID c008 has dedicated runtime and verifier dispatch because one nonce
+Challenge ID c009 has dedicated runtime and verifier dispatch because one nonce
 contains eight solver calls and eight returned solutions.
 
 Key files:

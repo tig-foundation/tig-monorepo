@@ -1,7 +1,7 @@
 # CUR decomposition implementation walkthrough
 
 The authoritative design is in docs/cur.tex. This walkthrough maps that design
-onto challenge ID c008.
+onto challenge ID c009.
 
 ## Per-nonce flow
 
