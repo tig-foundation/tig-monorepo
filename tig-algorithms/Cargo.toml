@@ -34,6 +34,11 @@ required-features = ["cur_decomposition"]
 name = "test_multi_instance"
 required-features = ["cur_decomposition"]
 
+[[example]]
+name = "cur_testbed"
+path = "examples/cur_stage_experiment.rs"
+required-features = ["cur_decomposition"]
+
 [features]
 c001 = ["tig-challenges/c001"]
 satisfiability = ["c001"]

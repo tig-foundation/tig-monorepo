@@ -340,12 +340,12 @@ pub fn compute_solution(
             panic!("tig-runtime was not compiled with '--features c008'");
             #[cfg(feature = "c008")]
             {
-                let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
-                {
-                    settings.track_id.clone()
-                } else {
-                    format!(r#""{}""#, settings.track_id)
-                };
+                let track_id =
+                    if settings.track_id.starts_with('"') && settings.track_id.ends_with('"') {
+                        settings.track_id.clone()
+                    } else {
+                        format!(r#""{}""#, settings.track_id)
+                    };
                 let track = serde_json::from_str(&track_id).map_err(|_| {
                     anyhow::anyhow!(
                         "Failed to parse track_id '{}' as c008::Track",
@@ -417,8 +417,8 @@ pub fn compute_solution(
 
                 for (sub_idx, challenge) in challenges.iter().enumerate() {
                     // Reset GPU fuel counter
-                    let sub_signature = u64::from_be_bytes(seed[8..16].try_into().unwrap())
-                        ^ (sub_idx as u64);
+                    let sub_signature =
+                        u64::from_be_bytes(seed[8..16].try_into().unwrap()) ^ (sub_idx as u64);
                     unsafe {
                         solve_stream
                             .launch_builder(&initialize_kernel)
@@ -460,15 +460,13 @@ pub fn compute_solution(
                             .arg(&mut error_stat)
                             .launch(init_cfg)?;
                     }
-                    let gpu_fuel =
-                        solve_stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
+                    let gpu_fuel = solve_stream.memcpy_dtov(&fuel_usage)?[0] / gpu_fuel_scale;
                     let cpu_fuel = fuel_per_instance
                         - unsafe { **library.get::<*const u64>(b"__fuel_remaining")? };
                     total_fuel_consumed += (gpu_fuel + cpu_fuel).min(fuel_per_instance + 1);
 
                     let gpu_sig = solve_stream.memcpy_dtov(&signature)?[0];
-                    let cpu_sig =
-                        unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
+                    let cpu_sig = unsafe { **library.get::<*const u64>(b"__runtime_signature")? };
                     combined_runtime_signature ^= gpu_sig ^ cpu_sig;
 
                     // Continue to next sub-instance regardless of result

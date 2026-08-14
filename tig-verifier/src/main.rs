@@ -214,12 +214,12 @@ pub fn verify_solution(
             panic!("tig-verifier was not compiled with '--features c008'");
             #[cfg(feature = "c008")]
             {
-                let track_id = if settings.track_id.starts_with('"') && settings.track_id.ends_with('"')
-                {
-                    settings.track_id.clone()
-                } else {
-                    format!(r#""{}""#, settings.track_id)
-                };
+                let track_id =
+                    if settings.track_id.starts_with('"') && settings.track_id.ends_with('"') {
+                        settings.track_id.clone()
+                    } else {
+                        format!(r#""{}""#, settings.track_id)
+                    };
                 let track = serde_json::from_str(&track_id).map_err(|_| {
                     anyhow::anyhow!(
                         "Failed to parse track_id '{}' as c008::Track",
@@ -261,8 +261,8 @@ pub fn verify_solution(
                                 solutions.len()
                             ));
                         } else {
-                            let mut quality_result: Result<i32> = Ok(0);
-                            let mut sum: f64 = 0.0;
+                            let mut quality_result: Result<()> = Ok(());
+                            let mut sub_scores = Vec::with_capacity(challenges.len());
                             'eval: for (challenge, sol) in challenges.iter().zip(solutions.iter()) {
                                 match challenge.evaluate_solution(
                                     sol,
@@ -270,7 +270,7 @@ pub fn verify_solution(
                                     stream.clone(),
                                     &prop,
                                 ) {
-                                    Ok(q) => sum += q,
+                                    Ok(q) => sub_scores.push(q),
                                     Err(e) => {
                                         quality_result = Err(e);
                                         break 'eval;
@@ -282,9 +282,13 @@ pub fn verify_solution(
                                 Ok(_) => {
                                     stream.synchronize()?;
                                     ctx.synchronize()?;
-                                    let mean = sum / challenges.len() as f64;
-                                    let quality = (mean * QUALITY_PRECISION as f64).round() as i32;
-                                    println!("quality: {}", quality);
+                                    match c008::aggregate_sub_scores(&sub_scores) {
+                                        Ok(quality) => println!("quality: {}", quality),
+                                        Err(e) => {
+                                            err_msg =
+                                                Some(format!("Invalid solution scores: {}", e))
+                                        }
+                                    }
                                 }
                             }
                         }

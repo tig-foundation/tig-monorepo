@@ -1,0 +1,93 @@
+{
+  "generations": [
+    {
+      "m": 512,
+      "n": 640,
+      "poly": true,
+      "seed": 0,
+      "delta": 10000.0,
+      "spectrum_a": 13.0,
+      "spectrum_perturbation": 0.05,
+      "gaussian_u_ms": 1.444197,
+      "qr_u_ms": 27.246844,
+      "gaussian_v_ms": 1.240467,
+      "qr_v_ms": 1.9916159999999998,
+      "matrix_multiply_ms": [
+        4.811055,
+        0.118492,
+        0.057707999999999995,
+        0.057998999999999995,
+        0.061124000000000005,
+        0.053980999999999994
+      ],
+      "qr_plus_matrix_multiply_ms": 34.398819,
+      "wall_ms": 45.936626000000004
+    }
+  ],
+  "solver_aggregates": [
+    {
+      "selector": "block_krylov_maxvol",
+      "u_method": "qr_least_squares",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 19.745511166666667,
+      "mean_extraction_ms": 0.09255199999999998,
+      "mean_u_ms": 0.9349200000000001,
+      "mean_verification_ms": 0.397676,
+      "mean_total_ms": 21.170659166666667,
+      "mean_error_ratio": 53.68156604349056,
+      "mean_score": 0.7548959282598683,
+      "full_score_fraction": 0.6666666666666666,
+      "total_raw_u_bytes": 32632,
+      "serialized_solutions_bytes": 42307
+    },
+    {
+      "selector": "block_krylov_maxvol",
+      "u_method": "svd_pseudoinverse",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 19.745511166666667,
+      "mean_extraction_ms": 0.09255199999999998,
+      "mean_u_ms": 4.0767885,
+      "mean_verification_ms": 0.40815533333333337,
+      "mean_total_ms": 24.323007,
+      "mean_error_ratio": 65.86527455607026,
+      "mean_score": 0.7367732407850965,
+      "full_score_fraction": 0.6666666666666666,
+      "total_raw_u_bytes": 32632,
+      "serialized_solutions_bytes": 42239
+    },
+    {
+      "selector": "matrix_norms",
+      "u_method": "qr_least_squares",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 0.5260638333333334,
+      "mean_extraction_ms": 0.105942,
+      "mean_u_ms": 0.9523161666666665,
+      "mean_verification_ms": 0.4177851666666667,
+      "mean_total_ms": 2.0021071666666668,
+      "mean_error_ratio": 395.7298848978506,
+      "mean_score": 0.24134025771810633,
+      "full_score_fraction": 0.0,
+      "total_raw_u_bytes": 32632,
+      "serialized_solutions_bytes": 42327
+    },
+    {
+      "selector": "matrix_norms",
+      "u_method": "svd_pseudoinverse",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 0.5260638333333334,
+      "mean_extraction_ms": 0.105942,
+      "mean_u_ms": 3.9931171666666665,
+      "mean_verification_ms": 0.40179349999999997,
+      "mean_total_ms": 5.0269165000000005,
+      "mean_error_ratio": 307.8707753641507,
+      "mean_score": 0.29276667284976304,
+      "full_score_fraction": 0.0,
+      "total_raw_u_bytes": 32632,
+      "serialized_solutions_bytes": 42259
+    }
+  ]
+}

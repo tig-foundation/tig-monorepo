@@ -1,0 +1,58 @@
+[
+  {
+    "selector": "matrix_norms",
+    "u_method": "intersection_inverse",
+    "attempted": 36,
+    "succeeded": 36,
+    "mean_selection_ms": 1.7686347777777778,
+    "mean_extraction_ms": 0.13599411111111112,
+    "mean_u_ms": 4.581084944444444,
+    "mean_verification_ms": 0.8195324999999998,
+    "mean_total_ms": 7.305246333333333,
+    "mean_error_ratio": 698.9784900672532,
+    "mean_score": 0.8627611466813814,
+    "full_score_fraction": 0.75
+  },
+  {
+    "selector": "matrix_norms",
+    "u_method": "svd_pseudoinverse",
+    "attempted": 36,
+    "succeeded": 36,
+    "mean_selection_ms": 1.7686347777777778,
+    "mean_extraction_ms": 0.13599411111111112,
+    "mean_u_ms": 35.66834294444445,
+    "mean_verification_ms": 0.9384253333333334,
+    "mean_total_ms": 38.51139716666668,
+    "mean_error_ratio": 4.377300680889781,
+    "mean_score": 1.0,
+    "full_score_fraction": 1.0
+  },
+  {
+    "selector": "randomized_range",
+    "u_method": "intersection_inverse",
+    "attempted": 36,
+    "succeeded": 36,
+    "mean_selection_ms": 8.720193250000001,
+    "mean_extraction_ms": 0.1586800277777778,
+    "mean_u_ms": 4.579684972222221,
+    "mean_verification_ms": 0.8163888333333333,
+    "mean_total_ms": 14.274947083333334,
+    "mean_error_ratio": 686.8523785970968,
+    "mean_score": 0.8695658567390567,
+    "full_score_fraction": 0.75
+  },
+  {
+    "selector": "randomized_range",
+    "u_method": "svd_pseudoinverse",
+    "attempted": 36,
+    "succeeded": 36,
+    "mean_selection_ms": 8.720193250000001,
+    "mean_extraction_ms": 0.1586800277777778,
+    "mean_u_ms": 35.25457130555557,
+    "mean_verification_ms": 0.9274879722222225,
+    "mean_total_ms": 45.06093255555557,
+    "mean_error_ratio": 4.377990240473854,
+    "mean_score": 1.0,
+    "full_score_fraction": 1.0
+  }
+]

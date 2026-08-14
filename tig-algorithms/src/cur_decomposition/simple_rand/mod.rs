@@ -6,7 +6,10 @@ use cudarc::{
         sys::{self as cublas_sys, cublasOperation_t},
         CudaBlas, Gemm, GemmConfig,
     },
-    driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut, PushKernelArg},
+    driver::{
+        safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut,
+        PushKernelArg,
+    },
     runtime::sys::cudaDeviceProp,
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -112,10 +115,8 @@ pub fn solve_challenge(
     _prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let hp = match hyperparameters {
-        Some(hp) => {
-            serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
-                .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?
-        }
+        Some(hp) => serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
+            .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?,
         None => Hyperparameters { num_trials: 5 },
     };
 
@@ -197,10 +198,18 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k, n: k, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
-                &d_c, &d_c, &mut d_ctc,
+                &d_c,
+                &d_c,
+                &mut d_ctc,
             )?;
 
             // R R^T  (k×k)
@@ -208,10 +217,18 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k, n: k, k: n,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
-                &d_r, &d_r, &mut d_rrt,
+                &d_r,
+                &d_r,
+                &mut d_rrt,
             )?;
 
             // C^T A  (k×n)
@@ -219,10 +236,18 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k, n, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
-                &d_c, &challenge.d_a_mat, &mut d_cta,
+                &d_c,
+                &challenge.d_a_mat,
+                &mut d_cta,
             )?;
 
             // (C^T A) R^T  (k×k)
@@ -230,10 +255,18 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k, n: k, k: n,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
-                &d_cta, &d_r, &mut d_m,
+                &d_cta,
+                &d_r,
+                &mut d_m,
             )?;
         }
 
@@ -264,10 +297,18 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n: k, k,
-                    alpha: 1.0f32, lda: m, ldb: k, beta: 0.0f32, ldc: m,
+                    m,
+                    n: k,
+                    k,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
-                &d_c, &d_u, &mut d_cu,
+                &d_c,
+                &d_u,
+                &mut d_cu,
             )?;
         }
 
@@ -277,10 +318,18 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n, k,
-                    alpha: 1.0f32, lda: m, ldb: k, beta: 0.0f32, ldc: m,
+                    m,
+                    n,
+                    k,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
-                &d_cu, &d_r, &mut d_cur_buf,
+                &d_cu,
+                &d_r,
+                &mut d_cur_buf,
             )?;
         }
 
@@ -292,15 +341,20 @@ pub fn solve_challenge(
             let (a_ptr, _ag) = challenge.d_a_mat.device_ptr(&stream);
             let (cur_ptr, _cg) = d_cur_buf.device_ptr_mut(&stream);
             cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(), mn,
+                *cublas.handle(),
+                mn,
                 &alpha_neg as *const f32,
-                a_ptr as *const f32, 1,
-                cur_ptr as *mut f32, 1,
+                a_ptr as *const f32,
+                1,
+                cur_ptr as *mut f32,
+                1,
             )
             .result()?;
             cublas_sys::cublasSnrm2_v2(
-                *cublas.handle(), mn,
-                cur_ptr as *const f32, 1,
+                *cublas.handle(),
+                mn,
+                cur_ptr as *const f32,
+                1,
                 &mut fnorm as *mut f32,
             )
             .result()?;
@@ -310,7 +364,11 @@ pub fn solve_challenge(
         // ── Save if this trial is the best so far ─────────────────────────────
         if fnorm < best_fnorm {
             best_fnorm = fnorm;
-            let sol = Solution { c_idxs: c_i32, u_mat, r_idxs: r_i32 };
+            let sol = Solution {
+                c_idxs: c_i32,
+                u_mat,
+                r_idxs: r_i32,
+            };
             save_solution(&sol)?;
             best_solution = Some(sol);
         }

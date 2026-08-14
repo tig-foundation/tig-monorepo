@@ -1,0 +1,93 @@
+{
+  "generations": [
+    {
+      "m": 2000,
+      "n": 3000,
+      "poly": true,
+      "seed": 0,
+      "delta": 10000.0,
+      "spectrum_a": 13.0,
+      "spectrum_perturbation": 0.05,
+      "gaussian_u_ms": 12.105509,
+      "qr_u_ms": 9.741937,
+      "gaussian_v_ms": 17.957161,
+      "qr_v_ms": 13.345642,
+      "matrix_multiply_ms": [
+        0.12277999999999999,
+        0.174408,
+        5.155542,
+        0.233981,
+        0.211449,
+        0.227649
+      ],
+      "qr_plus_matrix_multiply_ms": 29.213388,
+      "wall_ms": 64.515774
+    }
+  ],
+  "solver_aggregates": [
+    {
+      "selector": "block_krylov_maxvol",
+      "u_method": "adaptive_svd_pseudoinverse",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 79.563478,
+      "mean_extraction_ms": 0.1412955,
+      "mean_u_ms": 136.85627566666665,
+      "mean_verification_ms": 1.2503905,
+      "mean_total_ms": 217.8114396666667,
+      "mean_error_ratio": 7.66686653616033,
+      "mean_score": 1.0,
+      "full_score_fraction": 1.0,
+      "total_raw_u_bytes": 499232,
+      "serialized_solutions_bytes": 622023
+    },
+    {
+      "selector": "block_krylov_maxvol",
+      "u_method": "qr_least_squares",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 79.563478,
+      "mean_extraction_ms": 0.1412955,
+      "mean_u_ms": 2.5639973333333335,
+      "mean_verification_ms": 1.2884054999999999,
+      "mean_total_ms": 83.55717633333335,
+      "mean_error_ratio": 35.17723640528662,
+      "mean_score": 1.0,
+      "full_score_fraction": 1.0,
+      "total_raw_u_bytes": 499232,
+      "serialized_solutions_bytes": 623047
+    },
+    {
+      "selector": "matrix_norms",
+      "u_method": "adaptive_svd_pseudoinverse",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 1.6650648333333333,
+      "mean_extraction_ms": 0.15820933333333334,
+      "mean_u_ms": 145.8653285,
+      "mean_verification_ms": 1.2382111666666669,
+      "mean_total_ms": 148.9268138333333,
+      "mean_error_ratio": 13.587313194621577,
+      "mean_score": 1.0,
+      "full_score_fraction": 1.0,
+      "total_raw_u_bytes": 499232,
+      "serialized_solutions_bytes": 623755
+    },
+    {
+      "selector": "matrix_norms",
+      "u_method": "qr_least_squares",
+      "attempted": 6,
+      "succeeded": 6,
+      "mean_selection_ms": 1.6650648333333333,
+      "mean_extraction_ms": 0.15820933333333334,
+      "mean_u_ms": 2.886699166666667,
+      "mean_verification_ms": 1.3563935,
+      "mean_total_ms": 6.066366833333333,
+      "mean_error_ratio": 193.8781274515102,
+      "mean_score": 0.6847469349350508,
+      "full_score_fraction": 0.5,
+      "total_raw_u_bytes": 499232,
+      "serialized_solutions_bytes": 623291
+    }
+  ]
+}

@@ -36,31 +36,18 @@ impl Stats {
         self.values.iter().cloned().fold(f64::INFINITY, f64::min)
     }
     fn max(&self) -> f64 {
-        self.values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+        self.values
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max)
     }
     fn std(&self) -> f64 {
         let m = self.mean();
-        (self.values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / self.values.len() as f64)
-            .sqrt()
+        (self.values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / self.values.len() as f64).sqrt()
     }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/// The singular values used in challenge generation are strictly decreasing
-/// (exp(-l5*sqrt(j+1)/sqrt(T)) for j=0..T), so their sorted order is fixed
-/// regardless of the seed shuffle. optimal_fnorm is purely a function of T and K.
-fn compute_optimal_fnorm(true_rank: i32, target_rank: i32) -> f32 {
-    let l5: f32 = 2.0;
-    (0..true_rank)
-        .skip(target_rank as usize)
-        .map(|j| {
-            let s = (-l5 * ((j + 1) as f32).sqrt() / (true_rank as f32).sqrt()).exp();
-            s * s
-        })
-        .sum::<f32>()
-        .sqrt()
-}
 
 fn make_seed(index: u64) -> [u8; 32] {
     let mut seed = [0u8; 32];
@@ -75,6 +62,7 @@ fn run_config(
     n: i32,
     true_rank: i32,
     target_rank: i32,
+    poly: bool,
     num_seeds: usize,
     algo_name: &str,
     hyperparameters: &Option<serde_json::Map<String, serde_json::Value>>,
@@ -89,8 +77,7 @@ fn run_config(
     );
     println!("╟{}", "─".repeat(44));
 
-    let track = Track { m, n };
-    let optimal = compute_optimal_fnorm(true_rank, target_rank);
+    let track = Track { m, n, poly };
 
     let mut solve_ms = Stats::new();
     let mut gv_ms = Stats::new();
@@ -160,20 +147,17 @@ fn run_config(
 
         match solution {
             None => {
-                println!(
-                    "║ {:>5}  {:>10.1}  {:>12}  no solution",
-                    s, s_ms, "-"
-                );
+                println!("║ {:>5}  {:>10.1}  {:>12}  no solution", s, s_ms, "-");
             }
             Some(sol) => {
                 let t2 = Instant::now();
-                let fnorm =
-                    challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)?;
+                let fnorm = challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)?;
                 let vrfy_elapsed = t2.elapsed().as_secs_f64() * 1000.0;
                 let total_gv = gen_elapsed + vrfy_elapsed;
                 gv_ms.push(total_gv);
 
-                let score = fnorm / optimal;
+                let score =
+                    score_from_errors(fnorm as f64, challenge.optimal_fnorm() as f64, target_rank)?;
                 score_stats.push(score as f64);
 
                 println!(
@@ -237,6 +221,7 @@ fn print_usage(prog: &str) {
     eprintln!("  --seeds  N     Number of seeds to test per config   (default: 5)");
     eprintln!("  --trials N     Trials per solve                     (default: algorithm default)");
     eprintln!("  --cheap-u      Use cheap U computation (leverage only, default: false)");
+    eprintln!("  --poly         Use the polynomial singular-value spectrum (default: exponential)");
     eprintln!("  --gpu    N     GPU device index                     (default: 0)");
 }
 
@@ -256,6 +241,7 @@ fn main() -> Result<()> {
     let mut num_seeds: usize = 5;
     let mut num_trials: Option<usize> = None;
     let mut cheap_u: bool = false;
+    let mut poly: bool = false;
     let mut gpu_device: usize = 0;
 
     let mut i = 2;
@@ -290,6 +276,9 @@ fn main() -> Result<()> {
             }
             "--cheap-u" => {
                 cheap_u = true;
+            }
+            "--poly" => {
+                poly = true;
             }
             "--gpu" => {
                 i += 1;
@@ -380,6 +369,7 @@ fn main() -> Result<()> {
             *n,
             *true_rank,
             *target_rank,
+            poly,
             num_seeds,
             &algo_name,
             &hyperparameters,

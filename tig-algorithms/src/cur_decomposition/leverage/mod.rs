@@ -7,7 +7,10 @@ use cudarc::{
         CudaBlas, Gemm, GemmConfig,
     },
     cusolver::{sys as cusolver_sys, DnHandle},
-    driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut, PushKernelArg},
+    driver::{
+        safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut,
+        PushKernelArg,
+    },
     runtime::sys::cudaDeviceProp,
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -271,11 +274,12 @@ pub fn solve_challenge(
     prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let hp = match hyperparameters {
-        Some(hp) => {
-            serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
-                .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?
-        }
-        None => Hyperparameters { num_trials: 4, cheap_u: false },
+        Some(hp) => serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
+            .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?,
+        None => Hyperparameters {
+            num_trials: 4,
+            cheap_u: false,
+        },
     };
 
     let m = challenge.m;
@@ -318,9 +322,9 @@ pub fn solve_challenge(
     let cheap_u = hp.cheap_u;
 
     let mut run_trial = |c_idxs_i32: Vec<i32>,
-                          r_idxs_i32: Vec<i32>,
-                          rng_inner: &mut SmallRng,
-                          compute_fnorm: bool|
+                         r_idxs_i32: Vec<i32>,
+                         rng_inner: &mut SmallRng,
+                         compute_fnorm: bool|
      -> Result<Option<(Vec<i32>, Vec<f32>, Vec<i32>, f32)>> {
         let d_c_idxs = stream.memcpy_stod(&c_idxs_i32)?;
         let d_r_idxs = stream.memcpy_stod(&r_idxs_i32)?;
@@ -421,8 +425,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k, n: k, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_c,
                 &d_c,
@@ -437,8 +447,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k, n: k, k: n,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_r,
                 &d_r,
@@ -453,8 +469,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k, n, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_c,
                 &challenge.d_a_mat,
@@ -469,8 +491,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k, n: k, k: n,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_cta,
                 &d_r,
@@ -512,8 +540,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n: k, k,
-                    alpha: 1.0f32, lda: m, ldb: k, beta: 0.0f32, ldc: m,
+                    m,
+                    n: k,
+                    k,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &d_c,
                 &d_u,
@@ -527,8 +561,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n, k,
-                    alpha: 1.0f32, lda: m, ldb: k, beta: 0.0f32, ldc: m,
+                    m,
+                    n,
+                    k,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &d_cu,
                 &d_r,
@@ -571,8 +611,24 @@ pub fn solve_challenge(
     {
         let mut d_col_norms = stream.alloc_zeros::<f32>(n_sz)?;
         let mut d_row_norms = stream.alloc_zeros::<f32>(m_sz)?;
-        launch_norm_kernel(&stream, &col_norms_kernel, &challenge.d_a_mat, &mut d_col_norms, m, n, n as u32)?;
-        launch_norm_kernel(&stream, &row_norms_kernel, &challenge.d_a_mat, &mut d_row_norms, m, n, m as u32)?;
+        launch_norm_kernel(
+            &stream,
+            &col_norms_kernel,
+            &challenge.d_a_mat,
+            &mut d_col_norms,
+            m,
+            n,
+            n as u32,
+        )?;
+        launch_norm_kernel(
+            &stream,
+            &row_norms_kernel,
+            &challenge.d_a_mat,
+            &mut d_row_norms,
+            m,
+            n,
+            m as u32,
+        )?;
         stream.synchronize()?;
         let col_norms = stream.memcpy_dtov(&d_col_norms)?;
         let row_norms = stream.memcpy_dtov(&d_row_norms)?;
@@ -583,7 +639,11 @@ pub fn solve_challenge(
         let r_i32: Vec<i32> = r_idxs.iter().map(|&i| i as i32).collect();
 
         if let Ok(Some((ci, u, ri, fnorm))) = run_trial(c_i32, r_i32, &mut rng, !only_one_trial) {
-            let sol = Solution { c_idxs: ci, u_mat: u, r_idxs: ri };
+            let sol = Solution {
+                c_idxs: ci,
+                u_mat: u,
+                r_idxs: ri,
+            };
             save_solution(&sol)?;
             if only_one_trial {
                 return Ok(Some(sol));
@@ -626,8 +686,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n: s, k: n,
-                    alpha: 1.0f32, lda: m, ldb: n, beta: 0.0f32, ldc: m,
+                    m,
+                    n: s,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: n,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &challenge.d_a_mat,
                 &d_omega_c,
@@ -647,8 +713,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: s, n, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: s,
+                    m: s,
+                    n,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: s,
                 },
                 &d_q_c,
                 &challenge.d_a_mat,
@@ -659,7 +731,15 @@ pub fn solve_challenge(
 
         // col_lev[j] = ||Z_c[:, j]||²
         let mut d_col_lev = stream.alloc_zeros::<f32>(n_sz)?;
-        launch_norm_kernel(&stream, &col_norms_kernel, &d_z_c, &mut d_col_lev, s, n, n as u32)?;
+        launch_norm_kernel(
+            &stream,
+            &col_norms_kernel,
+            &d_z_c,
+            &mut d_col_lev,
+            s,
+            n,
+            n as u32,
+        )?;
         drop(d_z_c);
 
         // ── Row leverage scores ─────────────────────────────────────────────
@@ -686,8 +766,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: n, n: s, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: n,
+                    m: n,
+                    n: s,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: n,
                 },
                 &challenge.d_a_mat,
                 &d_omega_r,
@@ -707,8 +793,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n: s, k: n,
-                    alpha: 1.0f32, lda: m, ldb: n, beta: 0.0f32, ldc: m,
+                    m,
+                    n: s,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: n,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &challenge.d_a_mat,
                 &d_q_r,
@@ -719,7 +811,15 @@ pub fn solve_challenge(
 
         // row_lev[i] = ||Z_r[i, :]||²
         let mut d_row_lev = stream.alloc_zeros::<f32>(m_sz)?;
-        launch_norm_kernel(&stream, &row_norms_kernel, &d_z_r, &mut d_row_lev, m, s, m as u32)?;
+        launch_norm_kernel(
+            &stream,
+            &row_norms_kernel,
+            &d_z_r,
+            &mut d_row_lev,
+            m,
+            s,
+            m as u32,
+        )?;
         drop(d_z_r);
 
         // ── Copy scores to CPU and sample ───────────────────────────────────
@@ -736,7 +836,11 @@ pub fn solve_challenge(
         if let Ok(Some((ci, u, ri, fnorm))) = run_trial(c_i32, r_i32, &mut rng, true) {
             if fnorm < best_fnorm {
                 best_fnorm = fnorm;
-                let sol = Solution { c_idxs: ci, u_mat: u, r_idxs: ri };
+                let sol = Solution {
+                    c_idxs: ci,
+                    u_mat: u,
+                    r_idxs: ri,
+                };
                 save_solution(&sol)?;
                 best_solution = Some(sol);
             }

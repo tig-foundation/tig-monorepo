@@ -2,11 +2,16 @@ pub const BUILD_TIME_PATH: &str = env!("CARGO_MANIFEST_DIR");
 
 pub const QUALITY_PRECISION: i32 = 1_000_000;
 
+#[cfg(any(feature = "c008", test))]
+mod cur_decomposition_scoring;
+
 macro_rules! conditional_pub {
-    (fn $name:ident $($rest:tt)*) => {
+    ($(#[$meta:meta])* fn $name:ident $($rest:tt)*) => {
+        $(#[$meta])*
         #[cfg(not(feature = "hide_verification"))]
         pub fn $name $($rest)*
 
+        $(#[$meta])*
         #[cfg(feature = "hide_verification")]
         fn $name $($rest)*
     };

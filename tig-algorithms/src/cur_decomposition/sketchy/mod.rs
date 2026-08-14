@@ -7,7 +7,10 @@ use cudarc::{
         CudaBlas, Gemm, GemmConfig,
     },
     cusolver::{sys as cusolver_sys, DnHandle},
-    driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut, PushKernelArg},
+    driver::{
+        safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut,
+        PushKernelArg,
+    },
     runtime::sys::cudaDeviceProp,
 };
 use serde::{Deserialize, Serialize};
@@ -49,10 +52,14 @@ fn gpu_qr(
     let mut lwork = 0i32;
     unsafe {
         if cusolver_sys::cusolverDnSgeqrf_bufferSize(
-            cusolver.cu(), m, n,
-            d_mat.device_ptr_mut(stream).0 as *mut f32, m,
+            cusolver.cu(),
+            m,
+            n,
+            d_mat.device_ptr_mut(stream).0 as *mut f32,
+            m,
             &mut lwork,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
+        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS
+        {
             return Err(anyhow!("cusolverDnSgeqrf_bufferSize failed"));
         }
     }
@@ -61,12 +68,17 @@ fn gpu_qr(
     let mut d_tau = stream.alloc_zeros::<f32>(min_mn as usize)?;
     unsafe {
         if cusolver_sys::cusolverDnSgeqrf(
-            cusolver.cu(), m, n,
-            d_mat.device_ptr_mut(stream).0 as *mut f32, m,
+            cusolver.cu(),
+            m,
+            n,
+            d_mat.device_ptr_mut(stream).0 as *mut f32,
+            m,
             d_tau.device_ptr_mut(stream).0 as *mut f32,
-            d_work.device_ptr_mut(stream).0 as *mut f32, lwork,
+            d_work.device_ptr_mut(stream).0 as *mut f32,
+            lwork,
             d_info.device_ptr_mut(stream).0 as *mut i32,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
+        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS
+        {
             return Err(anyhow!("cusolverDnSgeqrf failed"));
         }
     }
@@ -74,23 +86,34 @@ fn gpu_qr(
     let mut lwork_q = 0i32;
     unsafe {
         if cusolver_sys::cusolverDnSorgqr_bufferSize(
-            cusolver.cu(), m, n, min_mn,
-            d_mat.device_ptr_mut(stream).0 as *const f32, m,
+            cusolver.cu(),
+            m,
+            n,
+            min_mn,
+            d_mat.device_ptr_mut(stream).0 as *const f32,
+            m,
             d_tau.device_ptr_mut(stream).0 as *const f32,
             &mut lwork_q,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
+        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS
+        {
             return Err(anyhow!("cusolverDnSorgqr_bufferSize failed"));
         }
     }
     let mut d_work_q = stream.alloc_zeros::<f32>((lwork_q as usize).max(1))?;
     unsafe {
         if cusolver_sys::cusolverDnSorgqr(
-            cusolver.cu(), m, n, min_mn,
-            d_mat.device_ptr_mut(stream).0 as *mut f32, m,
+            cusolver.cu(),
+            m,
+            n,
+            min_mn,
+            d_mat.device_ptr_mut(stream).0 as *mut f32,
+            m,
             d_tau.device_ptr_mut(stream).0 as *const f32,
-            d_work_q.device_ptr_mut(stream).0 as *mut f32, lwork_q,
+            d_work_q.device_ptr_mut(stream).0 as *mut f32,
+            lwork_q,
             d_info.device_ptr_mut(stream).0 as *mut i32,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
+        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS
+        {
             return Err(anyhow!("cusolverDnSorgqr failed"));
         }
     }
@@ -180,10 +203,9 @@ fn gpu_svd_thin(
     let mut d_info = stream.alloc_zeros::<i32>(1)?;
     let mut lwork = 0i32;
     unsafe {
-        if cusolver_sys::cusolverDnSgesvd_bufferSize(
-            cusolver.cu(), m, n,
-            &mut lwork,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
+        if cusolver_sys::cusolverDnSgesvd_bufferSize(cusolver.cu(), m, n, &mut lwork)
+            != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS
+        {
             return Err(anyhow!("cusolverDnSgesvd_bufferSize failed"));
         }
     }
@@ -193,16 +215,23 @@ fn gpu_svd_thin(
     unsafe {
         if cusolver_sys::cusolverDnSgesvd(
             cusolver.cu(),
-            jobu, jobvt,
-            m, n,
-            d_mat.device_ptr_mut(stream).0 as *mut f32, m,
+            jobu,
+            jobvt,
+            m,
+            n,
+            d_mat.device_ptr_mut(stream).0 as *mut f32,
+            m,
             d_s.device_ptr_mut(stream).0 as *mut f32,
-            d_u.device_ptr_mut(stream).0 as *mut f32, m,
-            d_vt.device_ptr_mut(stream).0 as *mut f32, p,
-            d_work.device_ptr_mut(stream).0 as *mut f32, lwork,
+            d_u.device_ptr_mut(stream).0 as *mut f32,
+            m,
+            d_vt.device_ptr_mut(stream).0 as *mut f32,
+            p,
+            d_work.device_ptr_mut(stream).0 as *mut f32,
+            lwork,
             std::ptr::null_mut(),
             d_info.device_ptr_mut(stream).0 as *mut i32,
-        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS {
+        ) != cusolver_sys::cusolverStatus_t::CUSOLVER_STATUS_SUCCESS
+        {
             return Err(anyhow!("cusolverDnSgesvd failed"));
         }
     }
@@ -210,7 +239,10 @@ fn gpu_svd_thin(
     // Check d_info: >0 means SVD didn't converge; U/Vt may contain NaN.
     let info_vec = stream.memcpy_dtov(&d_info)?;
     if info_vec[0] != 0 {
-        return Err(anyhow!("cusolverDnSgesvd did not converge (info={})", info_vec[0]));
+        return Err(anyhow!(
+            "cusolverDnSgesvd did not converge (info={})",
+            info_vec[0]
+        ));
     }
     let s_cpu = stream.memcpy_dtov(&d_s)?;
     Ok((d_u, s_cpu, d_vt))
@@ -227,11 +259,13 @@ pub fn solve_challenge(
     _prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let hp = match hyperparameters {
-        Some(hp) => {
-            serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
-                .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?
-        }
-        None => Hyperparameters { num_trials: 3, sketch_extra: 20, sv_thresh: 1e-6 },
+        Some(hp) => serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
+            .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?,
+        None => Hyperparameters {
+            num_trials: 3,
+            sketch_extra: 20,
+            sv_thresh: 1e-6,
+        },
     };
 
     let m = challenge.m;
@@ -294,8 +328,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n: s, k: n,
-                    alpha: 1.0f32, lda: m, ldb: n, beta: 0.0f32, ldc: m,
+                    m,
+                    n: s,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: n,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &challenge.d_a_mat,
                 &d_s_mat,
@@ -315,8 +355,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: s, n, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: s,
+                    m: s,
+                    n,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: s,
                 },
                 &d_q_c,
                 &challenge.d_a_mat,
@@ -356,8 +402,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: n, n: s, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: n,
+                    m: n,
+                    n: s,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: n,
                 },
                 &challenge.d_a_mat,
                 &d_t_mat,
@@ -380,8 +432,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: s, n: m, k: n,
-                    alpha: 1.0f32, lda: n, ldb: m, beta: 0.0f32, ldc: s,
+                    m: s,
+                    n: m,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: n,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: s,
                 },
                 &d_q_r,
                 &challenge.d_a_mat,
@@ -439,15 +497,25 @@ pub fn solve_challenge(
         let mut d_r_svd = stream.alloc_zeros::<f32>(r_size)?;
         unsafe {
             cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(), c_size as c_int, &1.0f32,
-                d_c.device_ptr(&stream).0 as *const f32, 1,
-                d_c_svd.device_ptr_mut(&stream).0 as *mut f32, 1,
-            ).result()?;
+                *cublas.handle(),
+                c_size as c_int,
+                &1.0f32,
+                d_c.device_ptr(&stream).0 as *const f32,
+                1,
+                d_c_svd.device_ptr_mut(&stream).0 as *mut f32,
+                1,
+            )
+            .result()?;
             cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(), r_size as c_int, &1.0f32,
-                d_r.device_ptr(&stream).0 as *const f32, 1,
-                d_r_svd.device_ptr_mut(&stream).0 as *mut f32, 1,
-            ).result()?;
+                *cublas.handle(),
+                r_size as c_int,
+                &1.0f32,
+                d_r.device_ptr(&stream).0 as *const f32,
+                1,
+                d_r_svd.device_ptr_mut(&stream).0 as *mut f32,
+                1,
+            )
+            .result()?;
         }
 
         // ── Thin SVD of C (m×k) and R (k×n) ─────────────────────────────────
@@ -469,12 +537,26 @@ pub fn solve_challenge(
 
         // Compute truncated inverse singular values
         let sc_max = sigma_c[0].max(1e-30f32);
-        let inv_sc: Vec<f32> = sigma_c.iter()
-            .map(|&v| if v.is_finite() && v >= sv_thresh * sc_max { 1.0 / v } else { 0.0 })
+        let inv_sc: Vec<f32> = sigma_c
+            .iter()
+            .map(|&v| {
+                if v.is_finite() && v >= sv_thresh * sc_max {
+                    1.0 / v
+                } else {
+                    0.0
+                }
+            })
             .collect();
         let sr_max = sigma_r[0].max(1e-30f32);
-        let inv_sr: Vec<f32> = sigma_r.iter()
-            .map(|&v| if v.is_finite() && v >= sv_thresh * sr_max { 1.0 / v } else { 0.0 })
+        let inv_sr: Vec<f32> = sigma_r
+            .iter()
+            .map(|&v| {
+                if v.is_finite() && v >= sv_thresh * sr_max {
+                    1.0 / v
+                } else {
+                    0.0
+                }
+            })
             .collect();
 
         let d_inv_sc = stream.memcpy_stod(&inv_sc)?;
@@ -490,8 +572,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k, n, k: m,
-                    alpha: 1.0f32, lda: m, ldb: m, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n,
+                    k: m,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: m,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_uc,
                 &challenge.d_a_mat,
@@ -522,8 +610,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_T,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k, n, k,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n,
+                    k,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_vct,
                 &d_t1,
@@ -540,8 +634,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k, n: k, k: n,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k: n,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_t2,
                 &d_vrt,
@@ -573,8 +673,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k, n: k, k,
-                    alpha: 1.0f32, lda: k, ldb: k, beta: 0.0f32, ldc: k,
+                    m: k,
+                    n: k,
+                    k,
+                    alpha: 1.0f32,
+                    lda: k,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: k,
                 },
                 &d_t3,
                 &d_ur,
@@ -592,8 +698,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n: k, k,
-                    alpha: 1.0f32, lda: m, ldb: k, beta: 0.0f32, ldc: m,
+                    m,
+                    n: k,
+                    k,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &d_c,
                 &d_u,
@@ -607,8 +719,14 @@ pub fn solve_challenge(
                 GemmConfig {
                     transa: cublasOperation_t::CUBLAS_OP_N,
                     transb: cublasOperation_t::CUBLAS_OP_N,
-                    m, n, k,
-                    alpha: 1.0f32, lda: m, ldb: k, beta: 0.0f32, ldc: m,
+                    m,
+                    n,
+                    k,
+                    alpha: 1.0f32,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0f32,
+                    ldc: m,
                 },
                 &d_cu,
                 &d_r,
@@ -624,16 +742,23 @@ pub fn solve_challenge(
             let (a_ptr, _ag) = challenge.d_a_mat.device_ptr(&stream);
             let (cur_ptr, _cg) = d_cur_buf.device_ptr_mut(&stream);
             cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(), mn,
+                *cublas.handle(),
+                mn,
                 &alpha_neg as *const f32,
-                a_ptr as *const f32, 1,
-                cur_ptr as *mut f32, 1,
-            ).result()?;
+                a_ptr as *const f32,
+                1,
+                cur_ptr as *mut f32,
+                1,
+            )
+            .result()?;
             cublas_sys::cublasSnrm2_v2(
-                *cublas.handle(), mn,
-                cur_ptr as *const f32, 1,
+                *cublas.handle(),
+                mn,
+                cur_ptr as *const f32,
+                1,
                 &mut fnorm as *mut f32,
-            ).result()?;
+            )
+            .result()?;
         }
         stream.synchronize()?;
 
@@ -641,7 +766,11 @@ pub fn solve_challenge(
         let u_mat = stream.memcpy_dtov(&d_u)?;
         if fnorm < best_fnorm {
             best_fnorm = fnorm;
-            let sol = Solution { c_idxs: c_i32, u_mat, r_idxs: r_i32 };
+            let sol = Solution {
+                c_idxs: c_i32,
+                u_mat,
+                r_idxs: r_i32,
+            };
             save_solution(&sol)?;
             best_solution = Some(sol);
         }

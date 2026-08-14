@@ -1,0 +1,498 @@
+\documentclass[12pt, legalpaper]{article}
+
+\usepackage[margin=3cm]{geometry}
+\usepackage{natbib}
+\usepackage{lipsum}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{algorithm}
+\bibliographystyle{unsrt} % or another style like unsrt, abbrv, etc.
+
+\usepackage{xcolor}
+
+\usepackage{color}
+
+\newcommand{\rr}[1]{\textcolor{red}{#1}}
+\newcommand{\rrr}[2]{\textcolor{blue}{(#1)}\textnormal{$\leftarrow$}\textcolor{red}{#2}}
+%\newcommand{\rrrr}[1]{\textcolor{blue}{(#1) $\leftarrow$ (remove)}}
+\usepackage[normalem]{ulem}\newcommand{\rrrr}[1]{\textcolor{blue}{\sout{(#1)}}}
+% \newcommand{\rrrr}[1]{\textcolor{blue}{(#1)}\textnormal{$\leftarrow$}\textcolor{blue}{{\rm remove}}}
+\newcommand{\bb}[1]{\textcolor{blue}{#1}}
+\newcommand{\bbb}[2]{\textcolor{blue}{(#1) $\leftarrow$ #2}}
+\newcommand{\bbbb}[1]{\textcolor{blue}{(#1) $\leftarrow$ (remove)}}
+\newcommand{\ignore}[1]{}
+
+%\usepackage{algorithm}\usepackage{algorithmic}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage{graphicx} % Required for inserting images
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\usepackage{datetime}
+
+\newdateformat{monthyeardate}{%
+  \monthname[\THEMONTH], \THEYEAR}
+
+
+
+
+\title{TIG CUR Decomposition Challenge}
+\author{TIG Labs - Yuji Nakatsukasa}
+\date{\monthyeardate\today}
+
+\begin{document}
+
+\maketitle
+
+% \begin{abstract}
+%    We propose an ...
+% \end{abstract}
+
+
+%%%
+\section{Introduction}
+
+
+
+In the era of big data, analysts routinely work with matrices containing tens or even hundreds of thousands of rows and columns. This scale is computationally taxing; however, the data can contain redundancy. Isolating the informative low-dimensional structure has therefore become a critical first step in any analysis. Matrix factorizations, in particular, low-rank decompositions and low-rank approximations sit at the heart of modern data science and numerical analysis, providing the theoretical backbone for fast solvers in scientific computing. Within this landscape, CUR approximations have gained popularity because they preserve the actual rows and columns of the original matrix, yielding interpretable, sparsity-aware low rank approximations. CUR approximations have been used in a variety of areas including genetic data \cite{bodor2012rcur}, imaging \cite{abdelgawad2024efficient}, and recommender systems \cite{mahoney2006tensor}.
+
+\section{The TIG Challenge}
+A challenge instance is defined by the track parameters
+\[
+m,\qquad n,
+\]
+a singular-value structure, and a random seed.  The generator uses fixed
+design constants $\Delta=10{,}000$, $a=13$, and spectral perturbation
+$\varepsilon_\sigma=0.15$.  From these parameters it constructs $S=8$
+related CUR sub-instances as described in Section~\ref{sec: instancegen}.
+The challenge proceeds in three steps:
+\begin{itemize}
+    \item \textbf{Step 1. Generation.} The generator computes shared
+    orthonormal bases $U$ and $V$ once, then constructs
+    \[
+    (A_1,k_1),\ldots,(A_S,k_S),
+    \]
+    where $A_s\in\mathbb{R}^{m\times n}$ has true rank $r_s$ and $k_s$ is
+    the target rank.  True ranks and target-rank ratios are sampled using the
+    stratified procedure in Section~\ref{sec: instancegen}.
+    \item \textbf{Step 2. Solving.} For every $(A_s,k_s)$, the innovator's
+    algorithm selects exactly $k_s$ distinct columns and $k_s$ distinct rows
+    and returns a finite linking matrix $U_s^{\mathrm{link}}$.  These define
+    \[
+    CUR_s=C_sU_s^{\mathrm{link}}R_s.
+    \]
+    \item \textbf{Step 3. Verification and scoring.} Each CUR approximation
+    is scored by the continuous rule in Section~\ref{sec: score}; the final
+    challenge score is the arithmetic mean over all eight sub-instances.
+\end{itemize}
+The multiple sub-instances amortise expensive generation while testing the
+algorithm across a range of true-rank and target-rank regimes.
+
+
+%%
+
+%%%# Sub-instance Generation
+
+\section{Sub-instance Generation}\label{sec: instancegen}
+
+An instance is specified by a random seed, matrix dimensions $m,n$, and a
+choice of singular-value structure.  The initial design fixes
+$\Delta=10{,}000$, $a=13$, and $\varepsilon_\sigma=0.15$.
+Let
+\[
+\tau=\min\{m,n\}.
+\]
+
+Using the random seed, generate Gaussian matrices
+\[
+G_U\in\mathbb{R}^{m\times\tau},
+\qquad
+G_V\in\mathbb{R}^{n\times\tau}.
+\]
+The columns are scaled
+using the diagonal matrix $D$ determined by $\Delta$, and QR decompositions
+are computed:
+\[
+G_UD=UR_U,
+\qquad
+G_VD=VR_V.
+\]
+This gives orthonormal bases
+\[
+U=(u_1,\ldots,u_\tau),
+\qquad
+V=(v_1,\ldots,v_\tau).
+\]
+The costly QR decompositions are therefore performed only once and the
+resulting pools of singular vectors are reused to construct all
+sub-instances.\\
+
+We generate $S=8$ sub-instances.
+
+\subsection{True ranks}
+
+For each sub-instance $s$, define
+\[
+\alpha_s=\frac{r_s}{\tau},
+\]
+where $r_s$ is the true rank of the matrix. We sample one $\alpha_s$ from
+each of the stratified intervals
+\[
+\mathcal A_1=[0.03,0.055],\;
+\mathcal A_2=[0.055,0.08],\;
+\mathcal A_3=[0.08,0.105],\;
+\mathcal A_4=[0.105,0.13],
+\]
+\[
+\mathcal A_5=[0.13,0.155],\;
+\mathcal A_6=[0.155,0.18],\;
+\mathcal A_7=[0.18,0.20],\;
+\mathcal A_8=[0.20,0.22].
+\]
+and set
+\[
+r_s=\left\lfloor\alpha_s\tau\right\rceil.
+\]
+
+Thus every challenge instance contains sub-instances spanning a range of
+true ranks, while the precise ranks vary with the random seed.
+
+\subsection{Randomly overlapping singular-vector sets}
+
+For each sub-instance independently sample
+\[
+I_s\subseteq\{1,\ldots,\tau\},
+\qquad |I_s|=r_s,
+\]
+uniformly without replacement.
+
+The sets $I_s$ are not required to be disjoint. Consequently different
+sub-instances naturally share some of the singular directions generated by
+the common QR factorisations.
+
+For two sub-instances $s,t$, by the law of total expectation,
+\[
+\mathbb E\!\left[|I_s\cap I_t|\right]
+=
+\frac{r_sr_t}{\tau}.
+\]
+Equivalently, the expected overlap as a fraction of the smaller
+sub-instance is
+\[
+\frac{\mathbb E[|I_s\cap I_t|]}
+     {\min\{r_s,r_t\}}
+=
+\max\{\alpha_s,\alpha_t\}.
+\]
+The chosen $\alpha$ ranges therefore control the typical amount of
+structural information shared between sub-instances. So over all sub instances the maximum expected pairwise overlap as a fraction of the smaller of the two instances is given by $\max_{s\in \{1,\ldots,S\}} \alpha_s$.\footnote{We are using $\frac{\mathbb E[|I_s\cap I_t|]}
+     {\min\{r_s,r_t\}}$ as a measure of how much information is shared between subinstances. There may be better measures.}
+
+\subsection{Singular values and random re-pairing}
+
+For each sub-instance, write
+\[
+I_s=\{i_1,\ldots,i_{r_s}\}.
+\]
+
+First generate a base singular-value profile
+\[
+\bar{\sigma}^{(s)}_j
+=
+f_{\mathrm{type}}(r_s,j),
+\qquad j=1,\ldots,r_s,
+\]
+using the singular-value structure specified by the instance.
+
+To avoid all sub-instances with the same singular-value type having
+identical spectra up to rank, independently perturb these values:
+\[
+\sigma^{(s)}_j
+=
+\bar{\sigma}^{(s)}_j
+\left(1+\varepsilon^{(s)}_j\right),
+\qquad
+\varepsilon^{(s)}_j
+\sim
+\operatorname{Uniform}(-0.15,0.15).
+\]
+Thus each singular value is independently perturbed by up to $15\%$,
+giving each sub-instance a slightly different spectrum while preserving
+the overall singular-value structure.
+
+Next generate an independent random permutation
+\[
+\pi_s:\{1,\ldots,r_s\}\rightarrow\{1,\ldots,r_s\}.
+\]
+The selected left and right singular vectors are then randomly re-paired
+when constructing the matrix:
+\[
+A_s
+=
+\sum_{j=1}^{r_s}
+\sigma^{(s)}_j
+u_{i_j}
+v_{i_{\pi_s(j)}}^T.
+\]
+
+Equivalently,
+\[
+A_s
+=
+U[:,I_s]\,
+\Sigma_s\,
+V[:,I_s^{\pi_s}]^T,
+\]
+where
+\[
+\Sigma_s
+=
+\operatorname{diag}
+\left(
+\sigma^{(s)}_1,\ldots,\sigma^{(s)}_{r_s}
+\right).
+\]
+
+Since both selected bases remain orthonormal,
+\[
+\operatorname{rank}(A_s)=r_s.
+\]
+
+Thus sub-instances may share some underlying singular vectors, allowing the
+cost of the original QR factorisations to be amortised, while the random
+index sets, perturbed singular values, and independently randomised
+left--right pairings make the resulting matrices structurally different.
+
+\subsection{Target ranks}
+
+For each sub-instance define
+\[
+\rho_s=\frac{k_s}{r_s},
+\]
+where $k_s$ is the target rank of the CUR approximation.
+
+Sample one value from each of
+\[
+\mathcal R_1=[0.10,0.19],\;
+\mathcal R_2=[0.19,0.28],\;
+\mathcal R_3=[0.28,0.37],\;
+\mathcal R_4=[0.37,0.46],
+\]
+\[
+\mathcal R_5=[0.46,0.55],\;
+\mathcal R_6=[0.55,0.64],\;
+\mathcal R_7=[0.64,0.72],\;
+\mathcal R_8=[0.72,0.80].
+\]
+
+The eight sampled values are randomly permuted before being paired with the
+eight true ranks, preventing a fixed relationship between $\alpha_s$ and
+$\rho_s$. Finally, set
+\[
+k_s=\left\lfloor\rho_s r_s\right\rceil.
+\]
+
+The resulting challenge instance consists of
+\[
+(A_1,k_1),\ldots,(A_S,k_S).
+\]
+
+
+\section{Scoring}\label{sec: score}
+
+Each challenge instance consists of multiple sub-instances, where sub-instance $i$
+is given by a matrix $A_i$ and target rank $k_i$. For each sub-instance, define
+the approximation-quality ratio
+\begin{equation}\label{eq err}
+q_i
+:=
+\frac{\|A_i-CUR_i\|_F}
+     {\|A_i-SVD_{k_i}(A_i)\|_F},
+\end{equation}
+where $SVD_{k_i}(A_i)$ denotes the optimal rank-$k_i$ approximation to $A_i$.
+
+Since the truncated SVD is the optimal rank-$k_i$ approximation, $q_i=1$
+corresponds to SVD-quality performance, while larger values of $q_i$ indicate
+worse approximations. From the CUR approximation literature, the value
+\[
+k_i+1
+\]
+provides a natural failure threshold.
+
+Because the target ranks $k_i$ vary between sub-instances, the raw values
+$q_i$ are not directly on the same scale. In particular, the failure threshold
+itself changes with $k_i$. We therefore normalise the approximation quality by
+defining\footnote{We use a max below in case numerical error decreases $q_i$ below 1.}
+\begin{equation}\label{eq normalized_quality}
+z_i
+:=
+\frac{\log(\max\{q_i,1\})}
+     {\log(k_i+1)}.
+\end{equation}
+
+Thus $z_i$ measures the multiplicative degradation from SVD-quality relative
+to the literature threshold, on a scale that is comparable across different
+target ranks.
+
+The score for sub-instance $i$ is then defined as
+\begin{equation}\label{eq scoring}
+s_i
+:=
+\frac{1}{1+z_i}.
+\end{equation}
+
+Hence
+\[
+q_i=1
+\quad\Longrightarrow\quad
+s_i=1,
+\]
+and
+\[
+q_i=k_i+1
+\quad\Longrightarrow\quad
+s_i=\frac{1}{2}.
+\]
+Results better than the literature threshold therefore receive scores in
+$(1/2,1]$, while results worse than the threshold receive scores below $1/2$.
+The scoring rule continuously differentiates between solutions without
+clipping all successful or unsuccessful solutions to the same value.
+
+The final score for a challenge instance is the average over its $S$
+sub-instances:
+\[
+\mathrm{Score}
+=
+\frac{1}{S}
+\sum_{i=1}^{S}s_i.
+\]
+
+
+
+%%%
+\section{Challenge Tracks}\label{sec:diffparams}
+Within each challenge, there are various challenges tracks. These can range over instance size and/or type. Currently, the challenge supports varying sizes of matrices as well as the singular value structure.
+\begin{itemize}
+
+    \item \texttt{Track \{ m: 2000, n: 3000, poly: false \}}
+    \item \texttt{Track \{ m: 4000, n: 4000, poly: false \}}
+    \item \texttt{Track \{ m: 2000, n: 2000, poly: true \}}
+    \item \texttt{Track \{ m: 2000, n: 3000, poly: true \}}
+    \item \texttt{Track \{ m: 8000, n: 8000, poly: true \}}
+\end{itemize}
+
+
+ The value $\Delta=10{,}000$ and spectral-decay parameter $a=13$ are fixed
+ across the initial tracks. They could be varied in future designs, and
+ sparsity could also be introduced.
+
+Here we give our choice for the decay functions $f$, for a constant $a\in \mathbb{R}_+$ :
+\begin{itemize}
+    \item Exponential decay
+    \begin{equation}
+   f(\tau,j,a)=\exp\Bigg(-\frac{a\sqrt{j+1}}{\sqrt{\tau+1}}\Bigg)
+    \end{equation}
+
+  Note the $\sqrt{\tau}$ to stop the majority of $\sigma$ being $0$ as $\tau$ increased.
+
+\item
+Polynomial decaying singular values
+\begin{equation}
+   f(\tau,j,a)=\frac{c}{\left(\frac{j}{\tau}\right)^{2}+c}
+\end{equation}
+for $c=-\frac{e^{-a}}{e^{-a}-1}$ to match the exponential decay.
+\end{itemize}
+
+\section{Asymmetry Characteristics}\label{sec:asymmetry} To maintain the asymmetry required by the TIG protocol, the total time required by an innovator to solve the sub-instances should be significantly greater than the time required to generate the instance and verify the submitted solution. The sub-instance construction is designed to improve this asymmetry by amortising the expensive generation of the orthonormal bases across several CUR problems. In particular, the Gaussian matrices and QR decompositions \[ G_UD=UR_U, \qquad G_VD=VR_V \] are computed only once. The resulting pools of singular vectors are then reused to construct all $S$ sub-instances. The singular-vector index sets $I_s$ are sampled independently and are allowed to overlap. This is important for generation efficiency: the total number of singular directions used across all sub-instances may exceed $\tau$ without requiring a larger QR factorisation. At the same time, each sub-instance uses a different random subset of these directions, independently perturbed singular values, and an independently randomised pairing between its left and right singular vectors. Consequently, some structural information is necessarily shared between sub-instances. Verification is also simplified by the fact that the singular values of every generated matrix are known. Let \[ \sigma^{(s)}_{(1)} \geq \sigma^{(s)}_{(2)} \geq \cdots \geq \sigma^{(s)}_{(r_s)} \] denote the perturbed singular values of $A_s$, ordered from largest to smallest. For target rank $k_s$, the optimal rank-$k_s$ approximation error is therefore \[ \|A_s-SVD_{k_s}(A_s)\|_F = \left( \sum_{j=k_s+1}^{r_s} \left(\sigma^{(s)}_{(j)}\right)^2 \right)^{1/2}. \] Hence the denominator of the scoring rule can be calculated directly from the instance-generation data and does not require computing an SVD during verification.
+
+\section{Pseudo Code}
+This section summarises the generator, harness, and verifier.
+
+\begin{algorithm}
+\caption{\textbf{Generate} the eight CUR sub-instances.}
+\label{sec:algorithm_generate}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} track $(m,n,\mathrm{poly})$ and random seed
+\STATE \textbf{Output:} $S=8$ matrix--target-rank pairs $(A_s,k_s)$
+\STATE Set $\tau\gets\min\{m,n\}$, $\Delta\gets10{,}000$, $a\gets13$,
+and $\varepsilon_\sigma\gets0.15$
+\STATE Generate $G_U\in\mathbb R^{m\times\tau}$ and
+$G_V\in\mathbb R^{n\times\tau}$ from the seed
+\STATE Compute $G_UD=UR_U$ and $G_VD=VR_V$
+\FOR{$s=1,\ldots,S$}
+    \STATE Sample $\alpha_s\sim\operatorname{Uniform}(\mathcal A_s)$ and set
+    $r_s\gets\lfloor\alpha_s\tau\rceil$
+    \STATE Sample $\widetilde\rho_s\sim\operatorname{Uniform}(\mathcal R_s)$
+\ENDFOR
+\STATE Randomly permute $(\widetilde\rho_1,\ldots,\widetilde\rho_S)$ to obtain
+$(\rho_1,\ldots,\rho_S)$
+\FOR{$s=1,\ldots,S$}
+    \STATE Sample $I_s\subseteq\{1,\ldots,\tau\}$ uniformly without replacement,
+    with $|I_s|=r_s$
+    \FOR{$j=1,\ldots,r_s$}
+        \STATE Sample $\varepsilon_j^{(s)}\sim
+        \operatorname{Uniform}(-\varepsilon_\sigma,\varepsilon_\sigma)$
+        \STATE $\sigma_j^{(s)}\gets
+        f_{\mathrm{type}}(r_s,j,a)(1+\varepsilon_j^{(s)})$
+    \ENDFOR
+    \STATE Sample an independent permutation $\pi_s$ of
+    $\{1,\ldots,r_s\}$
+    \STATE Construct
+    $A_s\gets\sum_{j=1}^{r_s}\sigma_j^{(s)}
+    u_{i_j}v_{i_{\pi_s(j)}}^T$
+    \STATE $k_s\gets\lfloor\rho_s r_s\rceil$
+\ENDFOR
+\STATE \textbf{return} $(A_s,k_s)_{s=1}^S$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{\textbf{TIG harness} that runs innovator submissions.}
+\label{sec:algorithm_harness}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $S=8$ sub-instances $(A_s,k_s)$
+\STATE $\mathrm{Solutions}\gets()$
+\FOR{$s=1,\ldots,S$}
+    \STATE $(\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})
+    \gets\mathrm{Innovator\_Submission}(A_s,k_s)$
+    \STATE Append $(\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})$ to
+    $\mathrm{Solutions}$
+\ENDFOR
+\STATE \textbf{return} $\mathrm{Solutions}$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{\textbf{Verify} and score the submitted solutions.}
+\label{sec:algorithm_verify}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $(A_s,k_s)_{s=1}^S$ and submitted solutions
+\STATE $\mathrm{TotalScore}\gets0$
+\FOR{$s=1,\ldots,S$}
+    \STATE Require $k_s$ distinct in-bounds row indices, $k_s$ distinct
+    in-bounds column indices, and a finite $k_s\times k_s$ linking matrix
+    \STATE $C_s\gets A_s[:,\mathcal J_s]$ and
+    $R_s\gets A_s[\mathcal I_s,:]$
+    \STATE $CUR_s\gets C_sU_s^{\mathrm{link}}R_s$
+    \STATE Sort the known singular values as
+    $\sigma_{(1)}^{(s)}\geq\cdots\geq\sigma_{(r_s)}^{(s)}$
+    \STATE $E_s^*\gets
+    \left(\sum_{j=k_s+1}^{r_s}(\sigma_{(j)}^{(s)})^2\right)^{1/2}$
+    \STATE $q_s\gets\|A_s-CUR_s\|_F/E_s^*$
+    \STATE $z_s\gets\log(\max\{q_s,1\})/\log(k_s+1)$
+    \STATE $\mathrm{TotalScore}\gets\mathrm{TotalScore}+1/(1+z_s)$
+\ENDFOR
+\STATE \textbf{return} $\mathrm{TotalScore}/S$
+\end{algorithmic}
+\end{algorithm}
+
+\bibliography{references} % references.bib is the file containing the bib entries
+
+
+\end{document}

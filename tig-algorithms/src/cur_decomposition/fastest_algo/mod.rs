@@ -1,6 +1,9 @@
 // TIG's UI uses the pattern `tig_challenges::<challenge_name>` to automatically detect your algorithm's challenge
 use anyhow::Result;
-use cudarc::{driver::{CudaModule, CudaStream}, runtime::sys::cudaDeviceProp};
+use cudarc::{
+    driver::{CudaModule, CudaStream},
+    runtime::sys::cudaDeviceProp,
+};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -11,7 +14,9 @@ use tig_challenges::cur_decomposition::*;
 pub struct Hyperparameters {}
 
 pub fn help() {
-    println!("Instant CUR: random row/col indices, U filled with uniform random values in [1, 1.5].");
+    println!(
+        "Instant CUR: random row/col indices, U filled with uniform random values in [1, 1.5]."
+    );
     println!("No GPU work. Intentionally produces awful scores — baseline only.");
 }
 
@@ -50,7 +55,11 @@ pub fn solve_challenge(
     // U is k×k col-major, all entries set to 1.0
     let u_mat: Vec<f32> = vec![1.0f32; k_sz * k_sz];
 
-    let sol = Solution { c_idxs, u_mat, r_idxs };
+    let sol = Solution {
+        c_idxs,
+        u_mat,
+        r_idxs,
+    };
     save_solution(&sol)?;
     Ok(Some(sol))
 }

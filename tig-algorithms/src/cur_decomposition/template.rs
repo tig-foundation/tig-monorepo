@@ -30,7 +30,7 @@ pub fn help() {
 //   - target_k: i32      - number of columns/rows to select for CUR decomposition
 //   - d_a_mat: CudaSlice - the matrix A on GPU (m x n, column-major)
 //
-// Your algorithm is called 13 times per nonce (once per sub-instance).
+// Your algorithm is called 8 times per nonce (once per sub-instance).
 // Information cannot be transferred between sub-instance calls.
 // Use save_solution to save intermediate results in case of fuel exhaustion.
 pub fn solve_challenge(
