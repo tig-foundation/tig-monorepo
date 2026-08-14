@@ -1,8 +1,10 @@
-// c005_a001
+pub mod hyper_cluster;
+pub use hyper_cluster as c005_a001;
 
 // c005_a002
 
-// c005_a003
+pub mod hyper_improved;
+pub use hyper_improved as c005_a003;
 
 // c005_a004
 
@@ -14,27 +16,34 @@
 
 // c005_a008
 
-// c005_a009
+pub mod hyper_advanced_v2;
+pub use hyper_advanced_v2 as c005_a009;
 
-// c005_a010
+pub mod sigma_freud;
+pub use sigma_freud as c005_a010;
 
 // c005_a011
 
-// c005_a012
+pub mod freud_opt;
+pub use freud_opt as c005_a012;
 
 // c005_a013
 
-// c005_a014
+pub mod sigma_freud_v3;
+pub use sigma_freud_v3 as c005_a014;
 
 // c005_a015
 
-// c005_a016
+pub mod sigma_freud_v4;
+pub use sigma_freud_v4 as c005_a016;
 
-// c005_a017
+pub mod sigma_freud_v5;
+pub use sigma_freud_v5 as c005_a017;
 
 // c005_a018
 
-// c005_a019
+pub mod sigma_freud_v6;
+pub use sigma_freud_v6 as c005_a019;
 
 // c005_a020
 

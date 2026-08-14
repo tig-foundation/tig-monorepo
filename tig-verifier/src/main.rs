@@ -209,97 +209,17 @@ pub fn verify_solution(
             #[cfg(feature = "c006")]
             dispatch_challenge!(c006, gpu)
         }
+        "c007" => {
+            #[cfg(not(feature = "c007"))]
+            panic!("tig-verifier was not compiled with '--features c007'");
+            #[cfg(feature = "c007")]
+            dispatch_challenge!(c007, cpu)
+        }
         "c008" => {
             #[cfg(not(feature = "c008"))]
             panic!("tig-verifier was not compiled with '--features c008'");
             #[cfg(feature = "c008")]
-            {
-                let track_id =
-                    if settings.track_id.starts_with('"') && settings.track_id.ends_with('"') {
-                        settings.track_id.clone()
-                    } else {
-                        format!(r#""{}""#, settings.track_id)
-                    };
-                let track = serde_json::from_str(&track_id).map_err(|_| {
-                    anyhow::anyhow!(
-                        "Failed to parse track_id '{}' as c008::Track",
-                        settings.track_id,
-                    )
-                })?;
-
-                if ptx_path.is_none() {
-                    panic!("PTX file is required for GPU challenges.");
-                }
-
-                let num_gpus = CudaContext::device_count()?;
-                if num_gpus == 0 {
-                    panic!("No CUDA devices found");
-                }
-                let gpu_device = gpu_device.unwrap_or((nonce % num_gpus as u64) as usize);
-                let ptx = Ptx::from_file(ptx_path.unwrap());
-                let ctx = CudaContext::new(gpu_device)?;
-                ctx.set_blocking_synchronize()?;
-                let module = ctx.load_module(ptx)?;
-                let stream = ctx.default_stream();
-                let prop = get_device_prop(gpu_device as i32)?;
-
-                let challenges = c008::Challenge::generate_multiple_instances(
-                    &seed,
-                    &track,
-                    module.clone(),
-                    stream.clone(),
-                    &prop,
-                )?;
-
-                let solution = load_solution(&solution_path);
-                match serde_json::from_str::<Vec<c008::Solution>>(&solution) {
-                    Ok(solutions) => {
-                        if solutions.len() != challenges.len() {
-                            err_msg = Some(format!(
-                                "Expected {} solutions, got {}",
-                                challenges.len(),
-                                solutions.len()
-                            ));
-                        } else {
-                            let mut quality_result: Result<()> = Ok(());
-                            let mut sub_scores = Vec::with_capacity(challenges.len());
-                            'eval: for (challenge, sol) in challenges.iter().zip(solutions.iter()) {
-                                match challenge.evaluate_solution(
-                                    sol,
-                                    module.clone(),
-                                    stream.clone(),
-                                    &prop,
-                                ) {
-                                    Ok(q) => sub_scores.push(q),
-                                    Err(e) => {
-                                        quality_result = Err(e);
-                                        break 'eval;
-                                    }
-                                }
-                            }
-                            match quality_result {
-                                Err(e) => err_msg = Some(format!("Invalid solution: {}", e)),
-                                Ok(_) => {
-                                    stream.synchronize()?;
-                                    ctx.synchronize()?;
-                                    match c008::aggregate_sub_scores(&sub_scores) {
-                                        Ok(quality) => println!("quality: {}", quality),
-                                        Err(e) => {
-                                            err_msg =
-                                                Some(format!("Invalid solution scores: {}", e))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        err_msg = Some(format!(
-                            "Invalid solution. Cannot convert to Vec<c008::Solution>"
-                        ))
-                    }
-                }
-            }
+            dispatch_challenge!(c008, cpu)
         }
         _ => panic!("Unsupported challenge"),
     }

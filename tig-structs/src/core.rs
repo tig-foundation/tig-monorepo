@@ -1,5 +1,5 @@
 use crate::{
-    config::{ChallengeConfig, ProtocolConfig, RuntimeConfig},
+    config::{ChallengeConfig, ProtocolConfig},
     serializable_struct_with_getters,
 };
 use serde::{Deserialize, Serialize};
@@ -369,6 +369,9 @@ serializable_struct_with_getters! {
 serializable_struct_with_getters! {
     PlayerDetails {
         name: Option<String>,
+        x: Option<String>,
+        telegram: Option<String>,
+        discord: Option<String>,
         is_multisig: bool,
     }
 }
@@ -398,13 +401,20 @@ serializable_struct_with_getters! {
 
 // Precommit child structs
 serializable_struct_with_getters! {
+    TrackSettings {
+        hyperparameters: Option<Map<String, Value>>,
+        fuel_budget: u64,
+        num_bundles: u64,
+    }
+}
+serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
         num_nonces: u64,
         num_bundles: u64,
         rand_hash: String,
         fee_paid: PreciseNumber,
-        runtime_config: RuntimeConfig,
+        fuel_budget: u64,
         hyperparameters: Option<Map<String, Value>>,
     }
 }

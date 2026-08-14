@@ -104,13 +104,13 @@ better_than_baseline = 1 - connectivity_metric / baseline_connectivity_metric
                      = 0.077
 ```
 
- ## Our Challenge
+## Our Challenge
 
-At TIG, the baseline connectivity is determined using a greedy bipartition approach. The nodes are ordered by degree, then at each bipartition, nodes are assigned to the left or right part based on the number of hyperedges in common with the nodes already in each part. This process is repeated until the desired number of partitions is reached (eg: 64). 
+At TIG, the baseline connectivity is determined using a greedy bipartition approach. The nodes are ordered by degree, then at each bipartition, nodes are assigned to the left or right part based on the number of hyperedges in common with the nodes already in each part. This process is repeated until the desired number of partitions is reached (e.g. 64).
 
-Each instance of TIG's hypergraph partitioning problem contains 4 random sub-instances, each with its own baseline connectivity metric. For each sub-instance, we calculate how much your connectivity metric is better than the baseline connectivity metric, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 4 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
+Your algorithm does not return a solution; it calls `save_solution` as it runs. The **last** saved solution is evaluated. A valid solution must meet all constraints: every node assigned to exactly one part, every part non-empty, and part sizes at most 1.03× the average. Invalid solutions are not scored.
 
-For precision, `better_than_baseline` is stored as an integer where each unit represents 0.1%. For example, a `better_than_baseline` value of 22 corresponds to 22/1000 = 2.2%.
+The evaluated metric is **quality** (a fixed-point integer with 6 decimal places). For this challenge, quality functions as improvement over the baseline: `quality = 1 − (connectivity_metric / baseline_connectivity_metric)` (expressed in the fixed-point format). Higher quality is better. See the challenge code for the precise definition.
 
 ## Applications
 

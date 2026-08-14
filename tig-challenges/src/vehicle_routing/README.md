@@ -81,11 +81,11 @@ better_than_baseline = 1 - total_distance / baseline_total_distance
 ```
 
 ## Our Challenge
-In TIG, the baseline route is determined by using Solomon's I1 insertion heuristic that iteratively inserts customers into routes based on a cost function that balances distance and time constraints. The routes are built one by one until all customers are served. 
+In TIG, the baseline route is determined by using Solomon's I1 insertion heuristic that iteratively inserts customers into routes based on a cost function that balances distance and time constraints. The routes are built one by one until all customers are served.
 
-Each instance of TIG's vehicle routing problem contains 16 random sub-instances, each with its own baseline routes and baseline distance. For each sub-instance, we calculate how much your routes' total distance is shorter than the baseline distance, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 16 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
+Your algorithm does not return a solution; it calls `save_solution` as it runs. The **last** saved solution is evaluated. A valid solution must meet all constraints: each customer visited exactly once, capacity and time windows respected, routes start and end at the depot, and fleet size not exceeded. Invalid solutions are not scored.
 
-For precision, `better_than_baseline` is stored as an integer where each unit represents 0.1%. For example, a `better_than_baseline` value of 22 corresponds to 22/1000 = 2.2%.
+The evaluated metric is **quality** (a fixed-point integer with 6 decimal places). For this challenge, quality functions as improvement over the baseline: quality = 1 − (total_distance / baseline_total_distance) (expressed in the fixed-point format). Higher quality is better. See the challenge code for the precise definition.
 
 ## Applications
 * **Logistics & Delivery Services:** Optimizes parcel and ship routing by ensuring vehicles meet customer and operational time constraints, reducing operational costs and environmental impact [^1].

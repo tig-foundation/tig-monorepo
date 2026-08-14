@@ -12,11 +12,15 @@ from master.client_manager import CONFIG
 logger = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 @dataclass
-class SubmitPrecommitRequest(FromDict):
-    settings: BenchmarkSettings
+class TrackSettings(FromDict):
     num_bundles: int
     hyperparameters: Optional[dict]
-    runtime_config: dict
+    fuel_budget: int
+
+@dataclass
+class SubmitPrecommitRequest(FromDict):
+    settings: BenchmarkSettings
+    track_settings: Dict[str, TrackSettings]
 
 @dataclass
 class SubmitBenchmarkRequest(FromDict):

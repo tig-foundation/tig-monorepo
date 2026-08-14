@@ -43,6 +43,8 @@ def main():
             status = f"pending compilation"
         elif not compile_success[a["id"]]:
             status = f"failed to compile"
+        elif a["state"]["banned"]:
+            status = f"banned"
         elif a["state"]["round_merged"] is not None:
             status = f"merged @ round {a['state']['round_merged']}"
         elif a["state"]["round_active"] <= block["details"]["round"]:

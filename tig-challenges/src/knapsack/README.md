@@ -1,26 +1,29 @@
 # Knapsack Problem
 
-The quadratic knapsack problem is one of the most popular variants of the single knapsack problem, with applications in many optimization contexts. The aim is to maximize the value of individual items placed in the knapsack while satisfying a weight constraint. However, pairs of items also have positive interaction values, contributing to the total value within the knapsack.
+The quadratic knapsack problem is one of the most popular variants of the single knapsack problem, with applications in many optimization contexts. The aim is to select items to maximize the value of the knapsack while satisfying a weight constraint. Pairs of items also have positive interaction values, contributing to the total value within the knapsack.
 
 
 ## Challenge Overview
 
-For our challenge, we use a version of the quadratic knapsack problem with configurable difficulty, where the following two parameters can be adjusted in order to vary the difficulty of the challenge:
+For our challenge, we use a version of the quadratic knapsack problem with configurable difficulty, framed as **team formation**. Each "item" is a **participant**; you select a subset of participants (a team) subject to a weight (budget) constraint. Value comes from how well participants work together, based on shared projects.
 
-- Parameter 1:  $num\textunderscore{ }items$ is the number of items from which you need to select a subset to put in the knapsack. 
-- Parameter 2: $better\textunderscore{ }than\textunderscore{ }baseline \geq 1$ (see Our Challenge)
+- Parameter 1: $num\textunderscore{ }items$ is the number of participants (items) from which you select a subset.
+- Parameter 2: quality target (see Our Challenge).
 
-The larger the $num\textunderscore{ }items$, the more number of possible $S_{knapsack}$, making the challenge more difficult. Also, the higher $better\textunderscore{ }than\textunderscore{ }baseline$, the less likely a given $S_{knapsack}$ will be a solution, making the challenge more difficult.
+The larger $num\textunderscore{ }items$, the larger the search space. The generation method is as follows (see the challenge code for full detail):
 
-The weight $w_i$ of each of the $num\textunderscore{ }items$ is an integer, chosen independently, uniformly at random, and such that each of the item weights $1 <= w_i <= 50$, for $i=1,2,...,num\textunderscore{ }items$. The values of the items are nonzero  with a density of 25%, meaning they have a 25% probability of being nonzero. The nonzero individual values of the item, $v_i$, and the nonzero interaction values of pairs of items,  $V_{ij}$, are selected at random from the range $[1,100]$.
+- **Participants and projects:** There is a large pool of projects. Each participant is assigned a set of projects (cardinality and assignment follow a lognormal-based process so that participants often share projects with others in the same "region" of the project space).
+- **Weights:** Each participant has an integer weight in $[1, 10]$, chosen uniformly at random. The knapsack capacity (max weight) is a percentage of the total weight of all participants.
+- **Individual values:** $v_i = 0$ for all $i$ (no linear term).
+- **Interaction values:** For $i \neq j$, $V_{ij}$ is based on participants $i$ and $j$ being in the same projects: it is the **Jaccard similarity** of their project sets (intersection size / union size), scaled to an integer (e.g. multiplied by 1000). If they share no projects or the union is empty, $V_{ij} = 0$. The matrix is symmetric: $V_{ij} = V_{ji}$.
 
-The total value of a knapsack is determined by summing up the individual values of items in the knapsack, as well as the interaction values of every pair of items \((i,j)\), where \( i > j \), in the knapsack:
+The total value of a knapsack (team) is the sum of individual values plus the sum of interaction values for every pair in the selection:
 
 $$
-V_{knapsack} = \sum_{i \in knapsack}{v_i} + \sum_{(i,j)\in knapsack}{V_{ij}}
+V_{knapsack} = \sum_{i \in knapsack}{v_i} + \sum_{(i,j)\in knapsack,\, i < j}{V_{ij}}
 $$
 
-We impose a weight constraint $W(S_{knapsack}) <= 0.5 \cdot W(S_{all})$, where the knapsack can hold at most half the total weight of all items.
+A valid solution must use unique participant indices and have total weight at most the given capacity.
 
 
 # Example
@@ -62,6 +65,6 @@ better_than_baseline = total_value / baseline_value - 1
 # Our Challenge 
 In TIG, the baseline value is determined by a two-stage approach. First, items are selected based on their value-to-weight ratio, including interaction values, until the capacity is reached. Then, a tabu-based local search refines the solution by swapping items to improve value while avoiding reversals, with early termination for unpromising swaps.
 
-Each instance of TIG's knapsack problem contains 16 random sub-instances, each with its own baseline selection and baseline value. For each sub-instance, we calculate how much your selection's total value exceeds the baseline value, expressed as a percentage improvement. This improvement percentage is called `better_than_baseline`. Your overall performance is measured by taking the root mean square of these 16 `better_than_baseline` percentages. To pass a difficulty level, this overall score must meet or exceed the specified difficulty target.
+Your algorithm does not return a solution; it calls `save_solution` as it runs. The **last** saved solution is evaluated. A valid solution must meet the constraints: only **unique** item indices may be selected, and total weight must **not exceed** the knapsack capacity. Invalid solutions are not scored.
 
-For precision, `better_than_baseline` is stored as an integer where each unit represents 0.01%. For example, a `better_than_baseline` value of 150 corresponds to 150/10000 = 1.5%.
+The evaluated metric is **quality** (a fixed-point integer with 6 decimal places). For knapsack, quality functions as improvement over the baseline: `quality = (total_value / baseline_value) − 1` (expressed in the fixed-point format). Higher quality is better. See the challenge code for the precise definition.

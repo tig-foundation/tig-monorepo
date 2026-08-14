@@ -56,7 +56,7 @@ class PrecommitDetails(FromDict):
     rand_hash: str
     fee_paid: PreciseNumber
     hyperparameters: Optional[dict]
-    runtime_config: dict
+    fuel_budget: int
 
 @dataclass
 class PrecommitState(FromDict):
