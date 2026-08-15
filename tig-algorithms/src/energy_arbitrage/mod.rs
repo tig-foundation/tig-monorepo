@@ -79,7 +79,8 @@ pub use titan_v6 as c008_a033;
 
 // c008_a038
 
-// c008_a039
+pub mod titan_v7;
+pub use titan_v7 as c008_a039;
 
 // c008_a040
 
