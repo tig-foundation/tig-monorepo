@@ -5,7 +5,17 @@ export DEBIAN_FRONTEND=noninteractive
 export CARGO_HOME=/tmp/cur-challenge-cargo
 export RUSTUP_HOME=/tmp/cur-challenge-rustup
 
-apt-get update
+if ! apt-get update; then
+  # C3 base images may include unrelated third-party repositories. A transient
+  # mirror-sync failure there should not prevent the CUR validation job from
+  # installing packages from Ubuntu and NVIDIA.
+  for source in /etc/apt/sources.list.d/*; do
+    if [ -f "$source" ] && grep -q 'packages.fluentbit.io' "$source"; then
+      mv "$source" "$source.disabled"
+    fi
+  done
+  apt-get update
+fi
 apt-get install -y --no-install-recommends \
   build-essential ca-certificates curl git libssl-dev pkg-config
 
