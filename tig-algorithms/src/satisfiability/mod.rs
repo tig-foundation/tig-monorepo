@@ -228,7 +228,8 @@
 
 // c001_a115
 
-// c001_a116
+pub mod super_satis;
+pub use super_satis as c001_a116;
 
 // c001_a117
 
