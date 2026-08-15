@@ -88,7 +88,8 @@
 
 // c008_a045
 
-// c008_a046
+pub mod super_energy;
+pub use super_energy as c008_a046;
 
 // c008_a047
 
