@@ -90,7 +90,8 @@
 
 // c008_a046
 
-// c008_a047
+pub mod titan_v7_ch3b;
+pub use titan_v7_ch3b as c008_a047;
 
 // c008_a048
 
