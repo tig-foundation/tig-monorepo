@@ -92,7 +92,8 @@
 
 // c008_a047
 
-// c008_a048
+pub mod titan_v11;
+pub use titan_v11 as c008_a048;
 
 // c008_a049
 
