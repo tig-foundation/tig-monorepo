@@ -232,7 +232,8 @@
 
 // c001_a117
 
-// c001_a118
+pub mod sat_hybrid_v4;
+pub use sat_hybrid_v4 as c001_a118;
 
 // c001_a119
 
