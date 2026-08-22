@@ -234,7 +234,8 @@
 
 // c001_a118
 
-// c001_a119
+pub mod sat_imp_v5;
+pub use sat_imp_v5 as c001_a119;
 
 // c001_a120
 
