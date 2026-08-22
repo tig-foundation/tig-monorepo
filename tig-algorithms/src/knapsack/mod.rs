@@ -292,7 +292,8 @@
 
 // c003_a147
 
-// c003_a148
+pub mod knap_leanx4;
+pub use knap_leanx4 as c003_a148;
 
 // c003_a149
 
