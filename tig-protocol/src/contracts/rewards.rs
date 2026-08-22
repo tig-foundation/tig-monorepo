@@ -226,6 +226,21 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         }
     }
 
+    println!("challenge_owners_reward_pool: {}", challenge_owners_reward_pool);
+    println!("total_challenge_owners_reward: {}", total_challenge_owners_reward);
+    println!("advances_reward_pool: {}", advances_reward_pool);
+    println!("total_advances_reward: {}", total_advances_reward);
+    println!("codes_reward_pool: {}", codes_reward_pool);
+    println!("total_codes_reward: {}", total_codes_reward);
+    println!("block_reward: {}", block_reward);
+    println!("total_benchmarkers_reward: {}", total_benchmarkers_reward);
+    println!("total_delegators_reward: {}", total_delegators_reward);
+    println!("total_challenge_owners_reward: {}", total_challenge_owners_reward);
+    println!("total_codes_reward: {}", total_codes_reward);
+    println!("total_advances_reward: {}", total_advances_reward);
+    println!("total_benchmarkers_reward: {}", total_benchmarkers_reward);
+    println!("total_delegators_reward: {}", total_delegators_reward);
+    println!("total_challenge_owners_reward: {}", total_challenge_owners_reward);
     block_details.emissions.insert(
         EmissionsType::Bootstrap,
         (challenge_owners_reward_pool - total_challenge_owners_reward) + 
