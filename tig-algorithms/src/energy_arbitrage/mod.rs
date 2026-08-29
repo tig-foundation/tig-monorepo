@@ -96,7 +96,8 @@
 
 // c008_a049
 
-// c008_a050
+pub mod titan_killer;
+pub use titan_killer as c008_a050;
 
 // c008_a051
 
