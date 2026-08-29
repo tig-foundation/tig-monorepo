@@ -90,7 +90,8 @@
 
 // c006_a046
 
-// c006_a047
+pub mod parallax_vega;
+pub use parallax_vega as c006_a047;
 
 // c006_a048
 
