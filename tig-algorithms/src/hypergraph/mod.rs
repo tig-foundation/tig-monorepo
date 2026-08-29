@@ -62,7 +62,8 @@
 
 // c005_a032
 
-// c005_a033
+pub mod mica_muscovite;
+pub use mica_muscovite as c005_a033;
 
 // c005_a034
 
