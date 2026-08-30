@@ -92,7 +92,8 @@
 
 // c006_a047
 
-// c006_a048
+pub mod neural_opti;
+pub use neural_opti as c006_a048;
 
 // c006_a049
 
