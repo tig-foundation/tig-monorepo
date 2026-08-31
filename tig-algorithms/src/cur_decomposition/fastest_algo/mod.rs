@@ -14,10 +14,8 @@ use tig_challenges::cur_decomposition::*;
 pub struct Hyperparameters {}
 
 pub fn help() {
-    println!(
-        "Instant CUR: random row/col indices, U filled with uniform random values in [1, 1.5]."
-    );
-    println!("No GPU work. Intentionally produces awful scores — baseline only.");
+    println!("Instant CUR: random row/col indices and an all-ones submitted U.");
+    println!("Uses mandatory shared QR fast-U where required; baseline only.");
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -39,8 +37,8 @@ pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
     _hyperparameters: &Option<Map<String, Value>>,
-    _module: Arc<CudaModule>,
-    _stream: Arc<CudaStream>,
+    module: Arc<CudaModule>,
+    stream: Arc<CudaStream>,
     _prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let m_sz = challenge.m as usize;
@@ -52,8 +50,15 @@ pub fn solve_challenge(
     let c_idxs = uniform_sample_k(n_sz, k_sz, &mut rng);
     let r_idxs = uniform_sample_k(m_sz, k_sz, &mut rng);
 
-    // U is k×k col-major, all entries set to 1.0
-    let u_mat: Vec<f32> = vec![1.0f32; k_sz * k_sz];
+    let u_mat = if challenge.verifier_computes_u {
+        // Even this intentionally weak baseline evaluates the canonical fast
+        // U locally, then omits it as required by the hybrid solution format.
+        challenge.fast_linking_matrix(&c_idxs, &r_idxs, module, stream)?;
+        Vec::new()
+    } else {
+        // U is k×k col-major, all entries set to 1.0.
+        vec![1.0f32; k_sz * k_sz]
+    };
 
     let sol = Solution {
         c_idxs,

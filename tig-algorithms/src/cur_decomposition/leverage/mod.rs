@@ -24,7 +24,8 @@ const MAX_THREADS: u32 = 1024;
 #[derive(Serialize, Deserialize)]
 pub struct Hyperparameters {
     pub num_trials: usize,
-    /// Use intersection inverse W⁻¹ instead of full least-squares U.
+    /// Use intersection inverse W⁻¹ instead of full least-squares U on the
+    /// four sub-instances where the innovator controls U.
     /// Avoids all O(mnk) GEMMs; only reads k² elements from A.
     #[serde(default)]
     pub cheap_u: bool,
@@ -32,6 +33,7 @@ pub struct Hyperparameters {
 
 pub fn help() {
     println!("Classic leverage score CUR decomposition (GPU).");
+    println!("Uses the mandatory shared QR fast-U for verifier-computed sub-instances.");
     println!("Hyperparameters:");
     println!("  num_trials: number of random leverage-score trials (default: 3)");
 }
@@ -323,9 +325,33 @@ pub fn solve_challenge(
 
     let mut run_trial = |c_idxs_i32: Vec<i32>,
                          r_idxs_i32: Vec<i32>,
-                         rng_inner: &mut SmallRng,
+                         _rng_inner: &mut SmallRng,
                          compute_fnorm: bool|
      -> Result<Option<(Vec<i32>, Vec<f32>, Vec<i32>, f32)>> {
+        // These four sub-instances are scored with the verifier's canonical
+        // QR-based U. Use that exact shared implementation while selecting the
+        // best indices, then omit U from the serialized solution.
+        if challenge.verifier_computes_u {
+            let fnorm = if compute_fnorm {
+                challenge.evaluate_fast_fnorm(
+                    &c_idxs_i32,
+                    &r_idxs_i32,
+                    module.clone(),
+                    stream.clone(),
+                    prop,
+                )?
+            } else {
+                challenge.fast_linking_matrix(
+                    &c_idxs_i32,
+                    &r_idxs_i32,
+                    module.clone(),
+                    stream.clone(),
+                )?;
+                0.0
+            };
+            return Ok(Some((c_idxs_i32, Vec::new(), r_idxs_i32, fnorm)));
+        }
+
         let d_c_idxs = stream.memcpy_stod(&c_idxs_i32)?;
         let d_r_idxs = stream.memcpy_stod(&r_idxs_i32)?;
 

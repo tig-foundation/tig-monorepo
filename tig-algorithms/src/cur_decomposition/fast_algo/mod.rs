@@ -21,7 +21,7 @@ pub struct Hyperparameters {
 pub fn help() {
     println!("Fast CUR via intersection-block inverse.");
     println!("  U = W^{{-1}} where W = A[r_idxs, c_idxs] (k×k intersection block).");
-    println!("  Only reads k² elements from A — no O(mnk) GEMM for U, no fnorm eval.");
+    println!("  On verifier-computed sub-instances, uses the mandatory shared QR fast-U.");
     println!("Hyperparameters:");
     println!("  num_trials  max retries on singular W  (default: 5)");
 }
@@ -93,7 +93,7 @@ pub fn solve_challenge(
     hyperparameters: &Option<Map<String, Value>>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
-    prop: &cudaDeviceProp,
+    _prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let hp = match hyperparameters {
         Some(hp) => serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
@@ -123,6 +123,23 @@ pub fn solve_challenge(
         let r_idxs = uniform_sample_k(m_sz, k_sz, &mut rng);
         let c_i32: Vec<i32> = c_idxs.iter().map(|&i| i as i32).collect();
         let r_i32: Vec<i32> = r_idxs.iter().map(|&i| i as i32).collect();
+
+        if challenge.verifier_computes_u {
+            // Run the same QR path as verification so local quality checks use
+            // the exact matrix that will be scored, but do not serialize U.
+            match challenge.fast_linking_matrix(&c_i32, &r_i32, module.clone(), stream.clone()) {
+                Ok(_) => {
+                    let sol = Solution {
+                        c_idxs: c_i32,
+                        u_mat: Vec::new(),
+                        r_idxs: r_i32,
+                    };
+                    save_solution(&sol)?;
+                    return Ok(Some(sol));
+                }
+                Err(_) => continue,
+            }
+        }
 
         let d_c_idxs = stream.memcpy_stod(&c_i32)?;
         let d_r_idxs = stream.memcpy_stod(&r_i32)?;
@@ -174,7 +191,11 @@ pub fn solve_challenge(
         };
 
         // ── Step 4: Submit and return immediately ───────────────────────────
-        let sol = Solution { c_idxs: c_i32, u_mat, r_idxs: r_i32 };
+        let sol = Solution {
+            c_idxs: c_i32,
+            u_mat,
+            r_idxs: r_i32,
+        };
         save_solution(&sol)?;
         return Ok(Some(sol));
     }

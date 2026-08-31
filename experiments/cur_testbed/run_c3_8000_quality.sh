@@ -2,13 +2,13 @@
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
-export CARGO_HOME=/tmp/cur-challenge-cargo
-export RUSTUP_HOME=/tmp/cur-challenge-rustup
+export CARGO_HOME=/tmp/cur-quality-cargo
+export RUSTUP_HOME=/tmp/cur-quality-rustup
+CUR_M=${CUR_M:-8000}
+CUR_N=${CUR_N:-8000}
+CUR_REPORT_NAME=${CUR_REPORT_NAME:-cur_quality_8000_report.json}
 
 if ! apt-get update; then
-  # C3 base images may include unrelated third-party repositories. A transient
-  # mirror-sync failure there should not prevent the CUR validation job from
-  # installing packages from Ubuntu and NVIDIA.
   for source in /etc/apt/sources.list.d/*; do
     if [ -f "$source" ] && grep -q 'packages.fluentbit.io' "$source"; then
       mv "$source" "$source.disabled"
@@ -36,31 +36,21 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 . "$CARGO_HOME/env"
 
 nvcc --ptx experiments/cur_testbed/portable_kernels.cu \
-  --output-file /tmp/cur-challenge.ptx \
+  --output-file /tmp/cur-quality.ptx \
   --gpu-architecture compute_70 \
   --use_fast_math \
   --optimize 3
 
 export RUSTFLAGS='--cfg feature="cuda-12020"'
-cargo test -p tig-challenges --features c009 --lib
-cargo check -p tig-runtime --features c009
-cargo check -p tig-verifier --features c009
-cargo check -p tig-algorithms --features cur_decomposition --examples
-cargo run --release -p tig-challenges \
-  --example cur_decomposition_smoke \
-  --features c009 -- \
-  /tmp/cur-challenge.ptx
-
-# Exercise an innovator algorithm across the complete hybrid solution format:
-# four empty U payloads evaluated with the shared QR routine and four submitted
-# U matrices. `--seeds 0` performs one warm-up nonce without a benchmark sweep.
+cargo check -p tig-algorithms \
+  --features cur_decomposition \
+  --example cur_quality_benchmark
 cargo run --release -p tig-algorithms \
-  --example test_multi_instance \
-  --features cur_decomposition -- \
-  /tmp/cur-challenge.ptx \
-  --seeds 0 \
-  --algos 'leverage (1t+cheap)' \
-  --sizes 2000x2000 \
-  --poly
+  --features cur_decomposition \
+  --example cur_quality_benchmark -- \
+  /tmp/cur-quality.ptx \
+  "$C3_ARTIFACTS_DIR/$CUR_REPORT_NAME" \
+  "$CUR_M" \
+  "$CUR_N"
 
-cp /tmp/cur-challenge.ptx "$C3_ARTIFACTS_DIR/cur_challenge_smoke.ptx"
+cp /tmp/cur-quality.ptx "$C3_ARTIFACTS_DIR/cur_quality_8000.ptx"

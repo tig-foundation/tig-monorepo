@@ -65,34 +65,41 @@ In the era of big data, analysts routinely work with matrices containing tens or
 \section{The TIG Challenge}
 A challenge instance is defined by the track parameters
 \[
-m,\qquad n,
+m,\qquad n,\qquad \Delta,
 \]
-a singular-value structure, and a random seed.  The generator uses fixed
-design constants $\Delta=10{,}000$, $a=13$, and spectral perturbation
-$\varepsilon_\sigma=0.15$.  From these parameters it constructs $S=8$
-related CUR sub-instances as described in Section~\ref{sec: instancegen}.
-The challenge proceeds in three steps:
+a singular-value structure, and a random seed. From these parameters, the
+generator constructs $S=8$ related CUR sub-instances as described in
+Section~\ref{sec: instancegen}. The challenge proceeds in three steps:
 \begin{itemize}
     \item \textbf{Step 1. Generation.} The generator computes shared
-    orthonormal bases $U$ and $V$ once, then constructs
+    orthonormal bases $U$ and $V$ once, then uses them to construct
     \[
     (A_1,k_1),\ldots,(A_S,k_S),
     \]
     where $A_s\in\mathbb{R}^{m\times n}$ has true rank $r_s$ and $k_s$ is
-    the target rank.  True ranks and target-rank ratios are sampled using the
-    stratified procedure in Section~\ref{sec: instancegen}.
-    \item \textbf{Step 2. Solving.} For every $(A_s,k_s)$, the innovator's
-    algorithm selects exactly $k_s$ distinct columns and $k_s$ distinct rows
-    and returns a finite linking matrix $U_s^{\mathrm{link}}$.  These define
-    \[
-    CUR_s=C_sU_s^{\mathrm{link}}R_s.
-    \]
-    \item \textbf{Step 3. Verification and scoring.} Each CUR approximation
-    is scored by the continuous rule in Section~\ref{sec: score}; the final
-    challenge score is the arithmetic mean over all eight sub-instances.
+    the target rank of the CUR approximation. The true ranks and
+    target-rank ratios are sampled using the stratified procedure described
+    in Section~\ref{sec: instancegen}.
+    \item \textbf{Step 2. Solving.} For each sub-instance $(A_s,k_s)$, the
+    innovator's algorithm selects exactly $k_s$ columns and $k_s$ rows of
+    $A_s$. Let $\mathcal F$ contain the four sub-instances with the largest
+    target ranks, with ties resolved in favour of the lower sub-instance
+    index. For
+    $s\in\mathcal F$, the innovator uses the challenge's fixed fast linking
+    matrix calculation when searching and assessing solution quality, but
+    returns only the row and column indices. For $s\notin\mathcal F$, the
+    innovator also returns a finite linking matrix $U_s^{\mathrm{link}}$.
+    \item \textbf{Step 3. Verification and scoring.} For
+    $s\in\mathcal F$, the verifier reconstructs $U_s^{\mathrm{link}}$ using
+    exactly the same fixed fast calculation. It uses the submitted linking
+    matrix for the other four sub-instances. Each resulting approximation
+    $CUR_s=C_sU_s^{\mathrm{link}}R_s$ is scored by the continuous rule in
+    Section~\ref{sec: score}, and the final score is the arithmetic mean over
+    all eight sub-instances.
 \end{itemize}
-The multiple sub-instances amortise expensive generation while testing the
-algorithm across a range of true-rank and target-rank regimes.
+The use of multiple sub-instances allows the expensive instance-generation
+work to be amortised while testing an innovator's algorithm across a range
+of true-rank and target-rank regimes.
 
 
 %%
@@ -101,9 +108,8 @@ algorithm across a range of true-rank and target-rank regimes.
 
 \section{Sub-instance Generation}\label{sec: instancegen}
 
-An instance is specified by a random seed, matrix dimensions $m,n$, and a
-choice of singular-value structure.  The initial design fixes
-$\Delta=10{,}000$, $a=13$, and $\varepsilon_\sigma=0.15$.
+An instance is specified by a random seed, matrix dimensions $m,n$, a
+coherence parameter $\Delta$, and a choice of singular-value structure.
 Let
 \[
 \tau=\min\{m,n\}.
@@ -304,6 +310,69 @@ The resulting challenge instance consists of
 \]
 
 
+\section{Linking Matrices and Solution Size}\label{sec:linking-matrices}
+
+Once the column and row indices have been selected, the CUR approximation
+still requires a linking matrix $U_s^{\mathrm{link}}\in
+\mathbb{R}^{k_s\times k_s}$.  There are two natural ways to compute this
+matrix.  A fast method uses thin QR factorisations
+\[
+C_s=Q_C T_C,
+\qquad
+R_s^T=Q_R T_R,
+\]
+followed by triangular solves to form
+\[
+U_{s,\mathrm{fast}}^{\mathrm{link}}
+=
+T_C^{-1}\bigl(Q_C^T A_s Q_R\bigr)T_R^{-T}.
+\]
+A slower, more accurate method uses rank-revealing SVD pseudoinverses to
+approximate the optimal linking matrix
+\[
+U_s^*=C_s^+A_sR_s^+.
+\]
+The fast method is substantially cheaper, whereas the SVD method is more
+robust when the selected rows or columns are poorly conditioned.
+
+Returning every linking matrix can consume a large part of the TIG solution
+limit.  In single-precision format, one linking matrix requires
+\[
+4k_s^2\ \text{bytes},
+\]
+before serialisation overhead. To reduce this output size, let $\mathcal F$
+contain the four sub-instances having the largest target ranks $k_s$, with
+ties resolved in favour of the lower sub-instance index. These are the four
+largest linking matrices because their storage grows as $k_s^2$.
+
+For $s\in\mathcal F$, the innovator must use the fixed fast QR calculation
+above when evaluating candidate row and column sets and when calculating the
+quality of its final selection. It returns only the selected column and row
+index sets $(\mathcal J_s,\mathcal I_s)$; it does not return the resulting
+linking matrix. The verifier reconstructs
+\[
+C_s=A_s[:,\mathcal J_s],
+\qquad
+R_s=A_s[\mathcal I_s,:],
+\]
+and computes $U_{s,\mathrm{fast}}^{\mathrm{link}}$ with exactly the same
+routine. The challenge implementation provides this routine to both the
+innovator and verifier, including its arithmetic precision, QR convention,
+and solve order. Thus the innovator can calculate the same CUR approximation
+and solution quality that the verifier will score; the verifier's result
+remains authoritative.
+
+For each of the remaining four sub-instances, $s\notin\mathcal F$, the
+innovator returns $U_s^{\mathrm{link}}$ as well as the two index sets and may
+use the slower, more accurate SVD construction. Choosing the four largest
+$k_s$ values for verifier-side reconstruction maximises the reduction in
+returned data while leaving linking-matrix construction under innovator
+control for the other four sub-instances.
+
+
+
+
+
 \section{Scoring}\label{sec: score}
 
 Each challenge instance consists of multiple sub-instances, where sub-instance $i$
@@ -388,9 +457,7 @@ Within each challenge, there are various challenges tracks. These can range over
 \end{itemize}
 
 
- The value $\Delta=10{,}000$ and spectral-decay parameter $a=13$ are fixed
- across the initial tracks. They could be varied in future designs, and
- sparsity could also be introduced.
+ The coherence $\Delta$ is fixed but could be varied in the future to adapt the difficulty. Moreover we could introduce sparsity too.
 
 Here we give our choice for the decay functions $f$, for a constant $a\in \mathbb{R}_+$ :
 \begin{itemize}
@@ -412,43 +479,57 @@ for $c=-\frac{e^{-a}}{e^{-a}-1}$ to match the exponential decay.
 \section{Asymmetry Characteristics}\label{sec:asymmetry} To maintain the asymmetry required by the TIG protocol, the total time required by an innovator to solve the sub-instances should be significantly greater than the time required to generate the instance and verify the submitted solution. The sub-instance construction is designed to improve this asymmetry by amortising the expensive generation of the orthonormal bases across several CUR problems. In particular, the Gaussian matrices and QR decompositions \[ G_UD=UR_U, \qquad G_VD=VR_V \] are computed only once. The resulting pools of singular vectors are then reused to construct all $S$ sub-instances. The singular-vector index sets $I_s$ are sampled independently and are allowed to overlap. This is important for generation efficiency: the total number of singular directions used across all sub-instances may exceed $\tau$ without requiring a larger QR factorisation. At the same time, each sub-instance uses a different random subset of these directions, independently perturbed singular values, and an independently randomised pairing between its left and right singular vectors. Consequently, some structural information is necessarily shared between sub-instances. Verification is also simplified by the fact that the singular values of every generated matrix are known. Let \[ \sigma^{(s)}_{(1)} \geq \sigma^{(s)}_{(2)} \geq \cdots \geq \sigma^{(s)}_{(r_s)} \] denote the perturbed singular values of $A_s$, ordered from largest to smallest. For target rank $k_s$, the optimal rank-$k_s$ approximation error is therefore \[ \|A_s-SVD_{k_s}(A_s)\|_F = \left( \sum_{j=k_s+1}^{r_s} \left(\sigma^{(s)}_{(j)}\right)^2 \right)^{1/2}. \] Hence the denominator of the scoring rule can be calculated directly from the instance-generation data and does not require computing an SVD during verification.
 
 \section{Pseudo Code}
-This section summarises the generator, harness, and verifier.
+This section contains pseudocode for the three main components of the
+challenge:
+\[
+\textbf{generate} \;\longrightarrow\; \textbf{TIG harness}
+\;\longrightarrow\; \textbf{verify}.
+\]
 
 \begin{algorithm}
 \caption{\textbf{Generate} the eight CUR sub-instances.}
 \label{sec:algorithm_generate}
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} track $(m,n,\mathrm{poly})$ and random seed
+\STATE \textbf{Input:} $m,n,\Delta$, singular-value type $f$, spectral
+perturbation $\varepsilon_\sigma$, and random seed
 \STATE \textbf{Output:} $S=8$ matrix--target-rank pairs $(A_s,k_s)$
-\STATE Set $\tau\gets\min\{m,n\}$, $\Delta\gets10{,}000$, $a\gets13$,
-and $\varepsilon_\sigma\gets0.15$
-\STATE Generate $G_U\in\mathbb R^{m\times\tau}$ and
-$G_V\in\mathbb R^{n\times\tau}$ from the seed
+\STATE Initialise all randomness from the supplied seed
+\STATE $\tau \gets \min\{m,n\}$
+\STATE Sample Gaussian matrices $G_U\in\mathbb{R}^{m\times\tau}$ and
+$G_V\in\mathbb{R}^{n\times\tau}$
+\STATE Construct $D=\mathrm{diag}(d_1,\ldots,d_\tau)$ with entries decreasing
+linearly from $\Delta$ to $1$
 \STATE Compute $G_UD=UR_U$ and $G_VD=VR_V$
+\STATE Define $\mathcal A_1,\ldots,\mathcal A_8$ and
+$\mathcal R_1,\ldots,\mathcal R_8$ as in Section~\ref{sec: instancegen}
 \FOR{$s=1,\ldots,S$}
-    \STATE Sample $\alpha_s\sim\operatorname{Uniform}(\mathcal A_s)$ and set
+    \STATE Sample $\alpha_s\sim\mathrm{Uniform}(\mathcal A_s)$ and set
     $r_s\gets\lfloor\alpha_s\tau\rceil$
-    \STATE Sample $\widetilde\rho_s\sim\operatorname{Uniform}(\mathcal R_s)$
+    \STATE Sample $\widetilde{\rho}_s\sim\mathrm{Uniform}(\mathcal R_s)$
 \ENDFOR
-\STATE Randomly permute $(\widetilde\rho_1,\ldots,\widetilde\rho_S)$ to obtain
-$(\rho_1,\ldots,\rho_S)$
+\STATE Randomly permute $(\widetilde{\rho}_1,\ldots,\widetilde{\rho}_S)$ to
+obtain $(\rho_1,\ldots,\rho_S)$
+\STATE $\mathrm{SubInstances}\gets ()$
 \FOR{$s=1,\ldots,S$}
-    \STATE Sample $I_s\subseteq\{1,\ldots,\tau\}$ uniformly without replacement,
-    with $|I_s|=r_s$
+    \STATE Sample $I_s\subseteq\{1,\ldots,\tau\}$ uniformly without
+    replacement, with $|I_s|=r_s$
     \FOR{$j=1,\ldots,r_s$}
-        \STATE Sample $\varepsilon_j^{(s)}\sim
-        \operatorname{Uniform}(-\varepsilon_\sigma,\varepsilon_\sigma)$
-        \STATE $\sigma_j^{(s)}\gets
-        f_{\mathrm{type}}(r_s,j,a)(1+\varepsilon_j^{(s)})$
+        \STATE $\bar{\sigma}^{(s)}_j \gets f(r_s,j)$
+        \STATE Sample $\varepsilon^{(s)}_j \sim
+        \mathrm{Uniform}(-\varepsilon_\sigma,\varepsilon_\sigma)$
+        \STATE $\sigma^{(s)}_j \gets \bar{\sigma}^{(s)}_j
+        (1+\varepsilon^{(s)}_j)$
     \ENDFOR
-    \STATE Sample an independent permutation $\pi_s$ of
+    \STATE Sample an independent random permutation $\pi_s$ of
     $\{1,\ldots,r_s\}$
+    \STATE Write $I_s=\{i_1,\ldots,i_{r_s}\}$
     \STATE Construct
-    $A_s\gets\sum_{j=1}^{r_s}\sigma_j^{(s)}
+    $A_s \gets \sum_{j=1}^{r_s}\sigma^{(s)}_j
     u_{i_j}v_{i_{\pi_s(j)}}^T$
     \STATE $k_s\gets\lfloor\rho_s r_s\rceil$
+    \STATE $\mathrm{SubInstances.append}\big((A_s,k_s)\big)$
 \ENDFOR
-\STATE \textbf{return} $(A_s,k_s)_{s=1}^S$
+\STATE \textbf{return} $\mathrm{SubInstances}$
 \end{algorithmic}
 \end{algorithm}
 
@@ -457,36 +538,72 @@ $(\rho_1,\ldots,\rho_S)$
 \label{sec:algorithm_harness}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} $S=8$ sub-instances $(A_s,k_s)$
-\STATE $\mathrm{Solutions}\gets()$
+\STATE Let $\mathcal F$ be the four indices with the largest $k_s$, resolving
+ties in favour of the lower sub-instance index
+\STATE $\mathrm{Solution}\gets ()$
 \FOR{$s=1,\ldots,S$}
-    \STATE $(\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})
-    \gets\mathrm{Innovator\_Submission}(A_s,k_s)$
-    \STATE Append $(\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})$ to
-    $\mathrm{Solutions}$
+    \STATE $(\mathcal J_s,\mathcal I_s)\gets
+    \mathrm{Innovator\_Select}(A_s,k_s)$, using the prescribed linking rule
+    for $s$
+    \STATE $C_s\gets A_s[:,\mathcal J_s]$ and
+    $R_s\gets A_s[\mathcal I_s,:]$
+    \IF{$s\in\mathcal F$}
+        \STATE $U_s^{\mathrm{link}}\gets
+        \mathrm{FixedFastLink}(A_s,C_s,R_s)$ for the innovator's own quality
+        calculation
+        \STATE $\mathrm{Solution.append}\big((\mathcal J_s,\mathcal I_s)\big)$
+    \ELSE
+        \STATE $U_s^{\mathrm{link}}\gets
+        \mathrm{Innovator\_Link}(A_s,C_s,R_s)$
+        \STATE $\mathrm{Solution.append}
+        \big((\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})\big)$
+    \ENDIF
 \ENDFOR
-\STATE \textbf{return} $\mathrm{Solutions}$
+\STATE \textbf{return} $\mathrm{Solution}$
 \end{algorithmic}
 \end{algorithm}
 
+For every sub-instance, $\mathcal J_s$ contains the selected column indices
+and $\mathcal I_s$ contains the selected row indices. For
+$s\in\mathcal F$, the innovator must call the same
+$\mathrm{FixedFastLink}$ implementation used by the verifier whenever it
+calculates or reports the quality of its selection, but omits the resulting
+matrix from its solution. For $s\notin\mathcal F$, it submits its chosen
+$U_s^{\mathrm{link}}$. The matrices $C_s$ and $R_s$ are never returned
+explicitly.
+
 \begin{algorithm}
-\caption{\textbf{Verify} and score the submitted solutions.}
+\caption{\textbf{Verification} that scores the submitted solutions.}
 \label{sec:algorithm_verify}
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} $(A_s,k_s)_{s=1}^S$ and submitted solutions
+\STATE \textbf{Input:} $S=8$ sub-instances $(A_s,k_s)$ and submitted
+solutions
+\STATE Let $\mathcal F$ be the four indices with the largest $k_s$, resolving
+ties in favour of the lower sub-instance index
 \STATE $\mathrm{TotalScore}\gets0$
 \FOR{$s=1,\ldots,S$}
-    \STATE Require $k_s$ distinct in-bounds row indices, $k_s$ distinct
-    in-bounds column indices, and a finite $k_s\times k_s$ linking matrix
+    \IF{$s\in\mathcal F$}
+        \STATE $(\mathcal J_s,\mathcal I_s)\gets\mathrm{Solution}[s]$
+    \ELSE
+        \STATE $(\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})
+        \gets\mathrm{Solution}[s]$
+        \STATE Require a finite $k_s\times k_s$ submitted linking matrix
+    \ENDIF
+    \STATE Require $k_s$ distinct in-bounds row indices and $k_s$ distinct
+    in-bounds column indices
     \STATE $C_s\gets A_s[:,\mathcal J_s]$ and
     $R_s\gets A_s[\mathcal I_s,:]$
+    \IF{$s\in\mathcal F$}
+        \STATE $U_s^{\mathrm{link}}\gets
+        \mathrm{FixedFastLink}(A_s,C_s,R_s)$
+    \ENDIF
     \STATE $CUR_s\gets C_sU_s^{\mathrm{link}}R_s$
-    \STATE Sort the known singular values as
-    $\sigma_{(1)}^{(s)}\geq\cdots\geq\sigma_{(r_s)}^{(s)}$
     \STATE $E_s^*\gets
     \left(\sum_{j=k_s+1}^{r_s}(\sigma_{(j)}^{(s)})^2\right)^{1/2}$
     \STATE $q_s\gets\|A_s-CUR_s\|_F/E_s^*$
     \STATE $z_s\gets\log(\max\{q_s,1\})/\log(k_s+1)$
-    \STATE $\mathrm{TotalScore}\gets\mathrm{TotalScore}+1/(1+z_s)$
+    \STATE $\mathrm{TotalScore}\gets
+    \mathrm{TotalScore}+1/(1+z_s)$
 \ENDFOR
 \STATE \textbf{return} $\mathrm{TotalScore}/S$
 \end{algorithmic}

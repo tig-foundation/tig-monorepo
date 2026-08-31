@@ -28,11 +28,18 @@ pub fn help() {
 //   - n: i32             - number of columns in the matrix
 //   - m: i32             - number of rows in the matrix
 //   - target_k: i32      - number of columns/rows to select for CUR decomposition
+//   - verifier_computes_u - true for the four largest-k sub-instances
 //   - d_a_mat: CudaSlice - the matrix A on GPU (m x n, column-major)
 //
 // Your algorithm is called 8 times per nonce (once per sub-instance).
 // Information cannot be transferred between sub-instance calls.
 // Use save_solution to save intermediate results in case of fuel exhaustion.
+//
+// When verifier_computes_u is true, evaluate candidate index sets with
+// challenge.evaluate_fast_fnorm(...). This calls the exact same optimized QR
+// routine as the verifier. Submit c_idxs and r_idxs with an empty u_mat.
+// For the other four calls, compute and submit a finite target_k x target_k
+// column-major u_mat of your choice.
 pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,

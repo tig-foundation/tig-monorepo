@@ -267,7 +267,18 @@ fn run_algo(
 
                 if let Some(sol) = solution {
                     let t_verify = Instant::now();
-                    match challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop) {
+                    let fnorm_result = if challenge.verifier_computes_u {
+                        challenge.evaluate_fast_fnorm(
+                            &sol.c_idxs,
+                            &sol.r_idxs,
+                            module.clone(),
+                            stream.clone(),
+                            prop,
+                        )
+                    } else {
+                        challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)
+                    };
+                    match fnorm_result {
                         Ok(fnorm) => {
                             total_verify_ms += t_verify.elapsed().as_secs_f64() * 1000.0;
                             Some(score_from_errors(

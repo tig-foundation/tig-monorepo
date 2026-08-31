@@ -7,10 +7,11 @@ A ≈ C U R
 ~~~
 
 for each of eight related matrix/target-rank sub-instances. For target rank
-k, the algorithm must return exactly k distinct column indices, exactly k
-distinct row indices, and a finite k × k float32 linking matrix. The selected
-columns and rows define C and R; constructing U is part of the innovator's
-work.
+k, the algorithm must return exactly k distinct column indices and exactly k
+distinct row indices. For the four smallest target ranks it also returns a
+finite k × k float32 linking matrix. For the four largest target ranks, the
+linking matrix is omitted and reconstructed by the verifier with the shared
+fast QR routine described below.
 
 The authoritative mathematical specification is docs/cur.tex.
 
@@ -83,6 +84,7 @@ pub struct Challenge {
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
+    pub verifier_computes_u: bool,
     pub d_a_mat: CudaSlice<f32>, // column-major m × n matrix
 }
 ~~~
@@ -94,10 +96,36 @@ A solution is:
 ~~~rust
 pub struct Solution {
     pub c_idxs: Vec<i32>, // length k, distinct and in [0, n)
-    pub u_mat: Vec<f32>,  // length k², finite, column-major
+    pub u_mat: Vec<f32>,  // empty when verifier_computes_u; otherwise k² finite values
     pub r_idxs: Vec<i32>, // length k, distinct and in [0, m)
 }
 ~~~
+
+The four `verifier_computes_u` flags are assigned to the largest target ranks,
+with ties resolved in favour of the lower sub-instance index. On those calls,
+innovators must use the challenge's `fast_linking_matrix` or
+`evaluate_fast_fnorm` method while
+searching so that their local quality uses the same U as verification. They
+then submit an empty `u_mat`.
+
+The shared fast routine extracts C and R directly on the GPU, computes thin QR
+factorizations
+
+~~~
+C = Qc Tc
+R^T = Qr Tr
+~~~
+
+and forms
+
+~~~
+U = Tc^-1 (Qc^T A Qr) Tr^-T.
+~~~
+
+It uses cuSOLVER for QR, cuBLAS GEMMs and triangular solves, and chooses the
+smaller of the `k × n` and `m × k` intermediate projections. The verifier
+calls the same implementation rather than maintaining a separate numerical
+version.
 
 The runtime calls the innovator once for each of the eight sub-instances and
 collects the eight solutions into one JSON array. CPU and GPU fuel counters are
@@ -113,7 +141,9 @@ C = A[:, c_idxs]
 R = A[r_idxs, :]
 ~~~
 
-and computes ||A - C U R||_F on the GPU. Because generation already knows the
+For the four largest-k sub-instances it first reconstructs U with the fixed
+fast QR routine; for the other four it uses the submitted U. It then computes
+||A - C U R||_F on the GPU. Because generation already knows the
 perturbed singular values, the optimal rank-k denominator is evaluated without
 running another SVD:
 

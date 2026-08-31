@@ -108,6 +108,9 @@ pub struct Challenge {
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
+    /// When true, the submitted solution must omit `u_mat`; both the
+    /// innovator and verifier use `fast_linking_matrix` for this sub-instance.
+    pub verifier_computes_u: bool,
     optimal_fnorm: f32,
     pub d_a_mat: CudaSlice<f32>,
 }
@@ -128,6 +131,9 @@ pub struct IndependentGenerationTimings {
 
 /// Number of sub-instances in the design specified by `docs/cur.tex`.
 pub const DESIGN_NUM_SUB_INSTANCES: usize = NUM_SUB_INSTANCES;
+
+/// The four largest linking matrices are reconstructed by the verifier.
+pub const NUM_VERIFIER_FAST_U_SUB_INSTANCES: usize = DESIGN_NUM_SUB_INSTANCES / 2;
 
 /// Fixed design parameters from `docs/cur.tex` used by the official tracks.
 pub const DESIGN_DELTA: f32 = 10_000.0;
@@ -219,6 +225,29 @@ const TARGET_RATIO_STRATA: [(f64, f64); DESIGN_NUM_SUB_INSTANCES] = [
     (0.64, 0.72),
     (0.72, 0.80),
 ];
+
+/// Select the four largest target ranks, preferring lower sub-instance indices
+/// when the cutoff contains a tie.
+/// A `true` entry means that the solution omits U and the verifier reconstructs
+/// it with the shared fast QR implementation.
+pub fn verifier_fast_u_mask(target_ranks: &[i32]) -> Result<Vec<bool>> {
+    if target_ranks.len() != DESIGN_NUM_SUB_INSTANCES {
+        return Err(anyhow!(
+            "expected {} target ranks, got {}",
+            DESIGN_NUM_SUB_INSTANCES,
+            target_ranks.len()
+        ));
+    }
+    let mut ranked: Vec<(usize, i32)> = target_ranks.iter().copied().enumerate().collect();
+    ranked.sort_unstable_by(|(left_idx, left_k), (right_idx, right_k)| {
+        right_k.cmp(left_k).then_with(|| left_idx.cmp(right_idx))
+    });
+    let mut mask = vec![false; target_ranks.len()];
+    for (sub_idx, _) in ranked.into_iter().take(NUM_VERIFIER_FAST_U_SUB_INSTANCES) {
+        mask[sub_idx] = true;
+    }
+    Ok(mask)
+}
 
 fn milliseconds(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
@@ -323,6 +352,124 @@ pub fn sample_design_metadata(
         });
     }
     Ok(metadata)
+}
+
+const FAST_U_THREADS_PER_BLOCK: u32 = 256;
+
+fn fast_u_launch_config(elements: usize) -> Result<LaunchConfig> {
+    let blocks = elements
+        .div_ceil(FAST_U_THREADS_PER_BLOCK as usize)
+        .try_into()
+        .map_err(|_| anyhow!("fast-U kernel launch is too large"))?;
+    Ok(LaunchConfig {
+        grid_dim: (blocks, 1, 1),
+        block_dim: (FAST_U_THREADS_PER_BLOCK, 1, 1),
+        shared_mem_bytes: 0,
+    })
+}
+
+/// Compute a thin QR factorisation in place and retain the k x k upper
+/// triangular factor before GEQRF's packed reflectors are expanded into Q.
+fn thin_qr_with_r(
+    cusolver: &DnHandle,
+    module: &Arc<CudaModule>,
+    stream: &Arc<CudaStream>,
+    d_q: &mut CudaSlice<f32>,
+    rows: i32,
+    rank: i32,
+) -> Result<CudaSlice<f32>> {
+    if rows < rank || rank < 1 {
+        return Err(anyhow!(
+            "thin QR requires rows >= rank >= 1, got {}x{}",
+            rows,
+            rank
+        ));
+    }
+
+    let mut geqrf_lwork = 0;
+    unsafe {
+        sys::cusolverDnSgeqrf_bufferSize(
+            cusolver.cu(),
+            rows,
+            rank,
+            d_q.device_ptr_mut(stream).0 as *mut f32,
+            rows,
+            &mut geqrf_lwork,
+        )
+        .result()?;
+    }
+    let mut d_geqrf_work = stream.alloc_zeros::<f32>((geqrf_lwork as usize).max(1))?;
+    let mut d_info = stream.alloc_zeros::<c_int>(1)?;
+    let mut d_tau = stream.alloc_zeros::<f32>(rank as usize)?;
+    unsafe {
+        sys::cusolverDnSgeqrf(
+            cusolver.cu(),
+            rows,
+            rank,
+            d_q.device_ptr_mut(stream).0 as *mut f32,
+            rows,
+            d_tau.device_ptr_mut(stream).0 as *mut f32,
+            d_geqrf_work.device_ptr_mut(stream).0 as *mut f32,
+            geqrf_lwork,
+            d_info.device_ptr_mut(stream).0 as *mut c_int,
+        )
+        .result()?;
+    }
+    stream.synchronize()?;
+    let info = stream.memcpy_dtov(&d_info)?[0];
+    if info != 0 {
+        return Err(anyhow!("fast-U GEQRF failed with info={}", info));
+    }
+    drop(d_geqrf_work);
+
+    let mut d_r = stream.alloc_zeros::<f32>((rank * rank) as usize)?;
+    let extract_upper = module.load_function("extract_upper_triangular_kernel")?;
+    unsafe {
+        stream
+            .launch_builder(&extract_upper)
+            .arg(&*d_q)
+            .arg(&mut d_r)
+            .arg(&rows)
+            .arg(&rank)
+            .launch(fast_u_launch_config((rank * rank) as usize)?)?;
+    }
+
+    let mut orgqr_lwork = 0;
+    unsafe {
+        sys::cusolverDnSorgqr_bufferSize(
+            cusolver.cu(),
+            rows,
+            rank,
+            rank,
+            d_q.device_ptr_mut(stream).0 as *const f32,
+            rows,
+            d_tau.device_ptr_mut(stream).0 as *const f32,
+            &mut orgqr_lwork,
+        )
+        .result()?;
+    }
+    let mut d_orgqr_work = stream.alloc_zeros::<f32>((orgqr_lwork as usize).max(1))?;
+    unsafe {
+        sys::cusolverDnSorgqr(
+            cusolver.cu(),
+            rows,
+            rank,
+            rank,
+            d_q.device_ptr_mut(stream).0 as *mut f32,
+            rows,
+            d_tau.device_ptr_mut(stream).0 as *const f32,
+            d_orgqr_work.device_ptr_mut(stream).0 as *mut f32,
+            orgqr_lwork,
+            d_info.device_ptr_mut(stream).0 as *mut c_int,
+        )
+        .result()?;
+    }
+    stream.synchronize()?;
+    let info = stream.memcpy_dtov(&d_info)?[0];
+    if info != 0 {
+        return Err(anyhow!("fast-U ORGQR failed with info={}", info));
+    }
+    Ok(d_r)
 }
 
 impl Challenge {
@@ -570,6 +717,8 @@ impl Challenge {
     ) -> Result<DesignInstance> {
         let wall_started = Instant::now();
         let metadata = sample_design_metadata(seed, config)?;
+        let target_ranks: Vec<i32> = metadata.iter().map(|md| md.target_k).collect();
+        let fast_u_mask = verifier_fast_u_mask(&target_ranks)?;
         let tau = config.m.min(config.n);
         let u_seed = u64::from_le_bytes(seed[0..8].try_into()?)
             ^ u64::from_le_bytes(seed[8..16].try_into()?);
@@ -706,6 +855,7 @@ impl Challenge {
                     n: config.n,
                     m: config.m,
                     target_k: md.target_k,
+                    verifier_computes_u: fast_u_mask[md.sub_idx],
                     optimal_fnorm,
                     d_a_mat,
                 },
@@ -825,6 +975,7 @@ impl Challenge {
             n,
             m,
             target_k: target_rank,
+            verifier_computes_u: false,
             optimal_fnorm,
             d_a_mat,
         })
@@ -953,6 +1104,7 @@ impl Challenge {
                 n,
                 m,
                 target_k: target_rank,
+                verifier_computes_u: false,
                 optimal_fnorm,
                 d_a_mat: d_a_copy,
             });
@@ -1002,7 +1154,373 @@ impl Challenge {
         self.optimal_fnorm
     }
 
-    /// Evaluate the Frobenius norm of the CUR reconstruction error ||A - C*U*R||_F
+    fn validate_index_sets(&self, c_idxs: &[i32], r_idxs: &[i32]) -> Result<()> {
+        let target_k = self.target_k as usize;
+        if c_idxs.len() != target_k {
+            return Err(anyhow!(
+                "Solution must select exactly {} columns, but got {}",
+                target_k,
+                c_idxs.len()
+            ));
+        }
+        if r_idxs.len() != target_k {
+            return Err(anyhow!(
+                "Solution must select exactly {} rows, but got {}",
+                target_k,
+                r_idxs.len()
+            ));
+        }
+        for (position, &idx) in c_idxs.iter().enumerate() {
+            if !(0..self.n).contains(&idx) {
+                return Err(anyhow!(
+                    "c_idxs[{}] = {} is out of bounds [0, {})",
+                    position,
+                    idx,
+                    self.n
+                ));
+            }
+        }
+        for (position, &idx) in r_idxs.iter().enumerate() {
+            if !(0..self.m).contains(&idx) {
+                return Err(anyhow!(
+                    "r_idxs[{}] = {} is out of bounds [0, {})",
+                    position,
+                    idx,
+                    self.m
+                ));
+            }
+        }
+        let unique_columns: std::collections::HashSet<_> = c_idxs.iter().collect();
+        if unique_columns.len() != c_idxs.len() {
+            return Err(anyhow!("Solution column indices must be distinct"));
+        }
+        let unique_rows: std::collections::HashSet<_> = r_idxs.iter().collect();
+        if unique_rows.len() != r_idxs.len() {
+            return Err(anyhow!("Solution row indices must be distinct"));
+        }
+        Ok(())
+    }
+
+    /// Shared deterministic fast-U implementation used by innovators and the
+    /// verifier. It computes C=Qc*Tc and R^T=Qr*Tr with thin GPU QR, forms
+    /// Qc^T*A*Qr with cuBLAS GEMMs, and applies the two triangular solves
+    /// U=Tc^{-1}(Qc^T*A*Qr)Tr^{-T}. The smaller of the two possible projection
+    /// buffers (k*n or m*k) is selected to reduce peak GPU memory.
+    fn fast_linking_matrix_device(
+        &self,
+        c_idxs: &[i32],
+        r_idxs: &[i32],
+        module: &Arc<CudaModule>,
+        stream: &Arc<CudaStream>,
+    ) -> Result<CudaSlice<f32>> {
+        use cublas_sys::{cublasDiagType_t, cublasFillMode_t, cublasSideMode_t};
+
+        self.validate_index_sets(c_idxs, r_idxs)?;
+        let m = self.m;
+        let n = self.n;
+        let k = self.target_k;
+        let m_size = m as usize;
+        let n_size = n as usize;
+        let k_size = k as usize;
+
+        let d_c_idxs = stream.memcpy_stod(c_idxs)?;
+        let d_r_idxs = stream.memcpy_stod(r_idxs)?;
+        let mut d_qc = stream.alloc_zeros::<f32>(m_size * k_size)?;
+        let mut d_qr = stream.alloc_zeros::<f32>(n_size * k_size)?;
+        let extract_columns = module.load_function("extract_columns_kernel")?;
+        let extract_rows_transposed = module.load_function("extract_rows_transposed_kernel")?;
+        unsafe {
+            stream
+                .launch_builder(&extract_columns)
+                .arg(&self.d_a_mat)
+                .arg(&mut d_qc)
+                .arg(&m)
+                .arg(&n)
+                .arg(&k)
+                .arg(&d_c_idxs)
+                .launch(fast_u_launch_config(m_size * k_size)?)?;
+            stream
+                .launch_builder(&extract_rows_transposed)
+                .arg(&self.d_a_mat)
+                .arg(&mut d_qr)
+                .arg(&m)
+                .arg(&n)
+                .arg(&k)
+                .arg(&d_r_idxs)
+                .launch(fast_u_launch_config(n_size * k_size)?)?;
+        }
+
+        let cublas = CudaBlas::new(stream.clone())?;
+        let cusolver = DnHandle::new(stream.clone())?;
+        let d_tc = thin_qr_with_r(&cusolver, module, stream, &mut d_qc, m, k)?;
+        let d_tr = thin_qr_with_r(&cusolver, module, stream, &mut d_qr, n, k)?;
+        let mut d_u = stream.alloc_zeros::<f32>(k_size * k_size)?;
+
+        if n <= m {
+            // projected = Qc^T*A (k x n), then U numerator = projected*Qr.
+            let mut d_projected = stream.alloc_zeros::<f32>(k_size * n_size)?;
+            unsafe {
+                cublas.gemm(
+                    GemmConfig {
+                        transa: cublasOperation_t::CUBLAS_OP_T,
+                        transb: cublasOperation_t::CUBLAS_OP_N,
+                        m: k,
+                        n,
+                        k: m,
+                        alpha: 1.0,
+                        lda: m,
+                        ldb: m,
+                        beta: 0.0,
+                        ldc: k,
+                    },
+                    &d_qc,
+                    &self.d_a_mat,
+                    &mut d_projected,
+                )?;
+                cublas.gemm(
+                    GemmConfig {
+                        transa: cublasOperation_t::CUBLAS_OP_N,
+                        transb: cublasOperation_t::CUBLAS_OP_N,
+                        m: k,
+                        n: k,
+                        k: n,
+                        alpha: 1.0,
+                        lda: k,
+                        ldb: n,
+                        beta: 0.0,
+                        ldc: k,
+                    },
+                    &d_projected,
+                    &d_qr,
+                    &mut d_u,
+                )?;
+            }
+        } else {
+            // projected = A*Qr (m x k), then U numerator = Qc^T*projected.
+            let mut d_projected = stream.alloc_zeros::<f32>(m_size * k_size)?;
+            unsafe {
+                cublas.gemm(
+                    GemmConfig {
+                        transa: cublasOperation_t::CUBLAS_OP_N,
+                        transb: cublasOperation_t::CUBLAS_OP_N,
+                        m,
+                        n: k,
+                        k: n,
+                        alpha: 1.0,
+                        lda: m,
+                        ldb: n,
+                        beta: 0.0,
+                        ldc: m,
+                    },
+                    &self.d_a_mat,
+                    &d_qr,
+                    &mut d_projected,
+                )?;
+                cublas.gemm(
+                    GemmConfig {
+                        transa: cublasOperation_t::CUBLAS_OP_T,
+                        transb: cublasOperation_t::CUBLAS_OP_N,
+                        m: k,
+                        n: k,
+                        k: m,
+                        alpha: 1.0,
+                        lda: m,
+                        ldb: m,
+                        beta: 0.0,
+                        ldc: k,
+                    },
+                    &d_qc,
+                    &d_projected,
+                    &mut d_u,
+                )?;
+            }
+        }
+
+        let one = 1.0f32;
+        unsafe {
+            cublas_sys::cublasStrsm_v2(
+                *cublas.handle(),
+                cublasSideMode_t::CUBLAS_SIDE_LEFT,
+                cublasFillMode_t::CUBLAS_FILL_MODE_UPPER,
+                cublasOperation_t::CUBLAS_OP_N,
+                cublasDiagType_t::CUBLAS_DIAG_NON_UNIT,
+                k,
+                k,
+                &one,
+                d_tc.device_ptr(stream).0 as *const f32,
+                k,
+                d_u.device_ptr_mut(stream).0 as *mut f32,
+                k,
+            )
+            .result()?;
+            cublas_sys::cublasStrsm_v2(
+                *cublas.handle(),
+                cublasSideMode_t::CUBLAS_SIDE_RIGHT,
+                cublasFillMode_t::CUBLAS_FILL_MODE_UPPER,
+                cublasOperation_t::CUBLAS_OP_T,
+                cublasDiagType_t::CUBLAS_DIAG_NON_UNIT,
+                k,
+                k,
+                &one,
+                d_tr.device_ptr(stream).0 as *const f32,
+                k,
+                d_u.device_ptr_mut(stream).0 as *mut f32,
+                k,
+            )
+            .result()?;
+        }
+
+        // Validate the GPU result without copying the full k x k matrix back.
+        let mut u_norm = 0.0f32;
+        unsafe {
+            cublas_sys::cublasSnrm2_v2(
+                *cublas.handle(),
+                (k * k) as c_int,
+                d_u.device_ptr(stream).0 as *const f32,
+                1,
+                &mut u_norm,
+            )
+            .result()?;
+        }
+        stream.synchronize()?;
+        if !u_norm.is_finite() {
+            return Err(anyhow!(
+                "fast-U QR solve produced a non-finite linking matrix"
+            ));
+        }
+        Ok(d_u)
+    }
+
+    /// Calculate the canonical fast linking matrix on the GPU and return it in
+    /// column-major order. Innovators can call this exact routine when they
+    /// need U itself for local diagnostics; U is still omitted from the four
+    /// verifier-computed submissions.
+    pub fn fast_linking_matrix(
+        &self,
+        c_idxs: &[i32],
+        r_idxs: &[i32],
+        module: Arc<CudaModule>,
+        stream: Arc<CudaStream>,
+    ) -> Result<Vec<f32>> {
+        let d_u = self.fast_linking_matrix_device(c_idxs, r_idxs, &module, &stream)?;
+        Ok(stream.memcpy_dtov(&d_u)?)
+    }
+
+    fn evaluate_fnorm_with_device_u(
+        &self,
+        c_idxs: &[i32],
+        r_idxs: &[i32],
+        d_u: &CudaSlice<f32>,
+        module: &Arc<CudaModule>,
+        stream: &Arc<CudaStream>,
+    ) -> Result<f32> {
+        let m = self.m;
+        let n = self.n;
+        let k = self.target_k;
+        let c_size = m as usize * k as usize;
+        let r_size = k as usize * n as usize;
+        let mut d_c = stream.alloc_zeros::<f32>(c_size)?;
+        let mut d_r = stream.alloc_zeros::<f32>(r_size)?;
+        let mut d_cu = stream.alloc_zeros::<f32>(c_size)?;
+        let mut d_cur = stream.alloc_zeros::<f32>(m as usize * n as usize)?;
+        let d_c_idxs = stream.memcpy_stod(c_idxs)?;
+        let d_r_idxs = stream.memcpy_stod(r_idxs)?;
+        let extract_columns = module.load_function("extract_columns_kernel")?;
+        let extract_rows = module.load_function("extract_rows_kernel")?;
+        unsafe {
+            stream
+                .launch_builder(&extract_columns)
+                .arg(&self.d_a_mat)
+                .arg(&mut d_c)
+                .arg(&m)
+                .arg(&n)
+                .arg(&k)
+                .arg(&d_c_idxs)
+                .launch(fast_u_launch_config(c_size)?)?;
+            stream
+                .launch_builder(&extract_rows)
+                .arg(&self.d_a_mat)
+                .arg(&mut d_r)
+                .arg(&m)
+                .arg(&n)
+                .arg(&k)
+                .arg(&d_r_idxs)
+                .launch(fast_u_launch_config(r_size)?)?;
+        }
+
+        let cublas = CudaBlas::new(stream.clone())?;
+        unsafe {
+            cublas.gemm(
+                GemmConfig {
+                    transa: cublasOperation_t::CUBLAS_OP_N,
+                    transb: cublasOperation_t::CUBLAS_OP_N,
+                    m,
+                    n: k,
+                    k,
+                    alpha: 1.0,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0,
+                    ldc: m,
+                },
+                &d_c,
+                d_u,
+                &mut d_cu,
+            )?;
+            cublas.gemm(
+                GemmConfig {
+                    transa: cublasOperation_t::CUBLAS_OP_N,
+                    transb: cublasOperation_t::CUBLAS_OP_N,
+                    m,
+                    n,
+                    k,
+                    alpha: 1.0,
+                    lda: m,
+                    ldb: k,
+                    beta: 0.0,
+                    ldc: m,
+                },
+                &d_cu,
+                &d_r,
+                &mut d_cur,
+            )?;
+        }
+
+        let element_count = (m * n) as c_int;
+        let minus_one = -1.0f32;
+        let (a_ptr, _a_record) = self.d_a_mat.device_ptr(stream);
+        let (cur_ptr, _cur_record) = d_cur.device_ptr_mut(stream);
+        let mut fnorm = 0.0f32;
+        unsafe {
+            cublas_sys::cublasSaxpy_v2(
+                *cublas.handle(),
+                element_count,
+                &minus_one,
+                a_ptr as *const f32,
+                1,
+                cur_ptr as *mut f32,
+                1,
+            )
+            .result()?;
+            cublas_sys::cublasSnrm2_v2(
+                *cublas.handle(),
+                element_count,
+                cur_ptr as *const f32,
+                1,
+                &mut fnorm,
+            )
+            .result()?;
+        }
+        stream.synchronize()?;
+        if !fnorm.is_finite() {
+            return Err(anyhow!("CUR reconstruction error is not finite"));
+        }
+        Ok(fnorm)
+    }
+
+    /// Evaluate an explicitly supplied linking matrix. This remains available
+    /// for experiments and for the four sub-instances where innovators submit
+    /// U themselves.
     pub fn evaluate_fnorm(
         &self,
         solution: &Solution,
@@ -1010,182 +1528,41 @@ impl Challenge {
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<f32> {
-        let target_k = self.target_k;
-        let m = self.m;
-        let n = self.n;
-
-        if solution.c_idxs.len() != target_k as usize {
-            return Err(anyhow!(
-                "Solution must select exactly {} columns, but got {}",
-                target_k,
-                solution.c_idxs.len()
-            ));
-        }
-        if solution.r_idxs.len() != target_k as usize {
-            return Err(anyhow!(
-                "Solution must select exactly {} rows, but got {}",
-                target_k,
-                solution.r_idxs.len()
-            ));
-        }
-        if solution.u_mat.len() != (target_k * target_k) as usize {
+        self.validate_index_sets(&solution.c_idxs, &solution.r_idxs)?;
+        let expected_u_len = self.target_k as usize * self.target_k as usize;
+        if solution.u_mat.len() != expected_u_len {
             return Err(anyhow!(
                 "Solution U matrix must be size {}x{}",
-                target_k,
-                target_k
+                self.target_k,
+                self.target_k
             ));
-        }
-        for (i, &idx) in solution.c_idxs.iter().enumerate() {
-            if idx < 0 || idx >= n {
-                return Err(anyhow!(
-                    "c_idxs[{}] = {} is out of bounds [0, {})",
-                    i,
-                    idx,
-                    n
-                ));
-            }
-        }
-        for (i, &idx) in solution.r_idxs.iter().enumerate() {
-            if idx < 0 || idx >= m {
-                return Err(anyhow!(
-                    "r_idxs[{}] = {} is out of bounds [0, {})",
-                    i,
-                    idx,
-                    m
-                ));
-            }
-        }
-        let unique_columns: std::collections::HashSet<_> = solution.c_idxs.iter().collect();
-        if unique_columns.len() != solution.c_idxs.len() {
-            return Err(anyhow!("Solution column indices must be distinct"));
-        }
-        let unique_rows: std::collections::HashSet<_> = solution.r_idxs.iter().collect();
-        if unique_rows.len() != solution.r_idxs.len() {
-            return Err(anyhow!("Solution row indices must be distinct"));
         }
         if solution.u_mat.iter().any(|value| !value.is_finite()) {
             return Err(anyhow!("Solution U matrix must contain only finite values"));
         }
+        let d_u = stream.memcpy_stod(&solution.u_mat)?;
+        self.evaluate_fnorm_with_device_u(
+            &solution.c_idxs,
+            &solution.r_idxs,
+            &d_u,
+            &module,
+            &stream,
+        )
+    }
 
-        let cublas = CudaBlas::new(stream.clone())?;
-        let extract_columns_kernel = module.load_function("extract_columns_kernel")?;
-        let extract_rows_kernel = module.load_function("extract_rows_kernel")?;
-
-        let c_mat_size = (m * target_k) as usize;
-        let r_mat_size = (target_k * n) as usize;
-        let mut d_c_mat = stream.alloc_zeros::<f32>(c_mat_size)?;
-        let d_u_mat = stream.memcpy_stod(&solution.u_mat)?;
-        let mut d_r_mat = stream.alloc_zeros::<f32>(r_mat_size)?;
-        let mut d_cu_mat = stream.alloc_zeros::<f32>((m * target_k) as usize)?;
-        let mut d_cur_mat = stream.alloc_zeros::<f32>((m * n) as usize)?;
-        let d_c_idxs = stream.memcpy_stod(&solution.c_idxs)?;
-        let d_r_idxs = stream.memcpy_stod(&solution.r_idxs)?;
-
-        unsafe {
-            stream
-                .launch_builder(&extract_columns_kernel)
-                .arg(&self.d_a_mat)
-                .arg(&mut d_c_mat)
-                .arg(&m)
-                .arg(&n)
-                .arg(&target_k)
-                .arg(&d_c_idxs)
-                .launch(LaunchConfig {
-                    grid_dim: (
-                        (c_mat_size as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
-                        1,
-                        1,
-                    ),
-                    block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-        }
-        unsafe {
-            stream
-                .launch_builder(&extract_rows_kernel)
-                .arg(&self.d_a_mat)
-                .arg(&mut d_r_mat)
-                .arg(&m)
-                .arg(&n)
-                .arg(&target_k)
-                .arg(&d_r_idxs)
-                .launch(LaunchConfig {
-                    grid_dim: (
-                        (r_mat_size as u32 + MAX_THREADS_PER_BLOCK - 1) / MAX_THREADS_PER_BLOCK,
-                        1,
-                        1,
-                    ),
-                    block_dim: (MAX_THREADS_PER_BLOCK, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-        }
-
-        // C * U
-        let gemm_config = GemmConfig {
-            transa: cublasOperation_t::CUBLAS_OP_N,
-            transb: cublasOperation_t::CUBLAS_OP_N,
-            m,
-            n: target_k,
-            k: target_k,
-            alpha: 1.0f32,
-            lda: m,
-            ldb: target_k,
-            beta: 0.0f32,
-            ldc: m,
-        };
-        unsafe {
-            cublas.gemm(gemm_config, &d_c_mat, &d_u_mat, &mut d_cu_mat)?;
-        }
-
-        // (C * U) * R
-        let gemm_config = GemmConfig {
-            transa: cublasOperation_t::CUBLAS_OP_N,
-            transb: cublasOperation_t::CUBLAS_OP_N,
-            m,
-            n,
-            k: target_k,
-            alpha: 1.0f32,
-            lda: m,
-            ldb: target_k,
-            beta: 0.0f32,
-            ldc: m,
-        };
-        unsafe {
-            cublas.gemm(gemm_config, &d_cu_mat, &d_r_mat, &mut d_cur_mat)?;
-        }
-
-        // ||A - CUR||_F
-        let num_elems = (m * n) as c_int;
-        let alpha: f32 = -1.0;
-        let (a_ptr, _a_record) = self.d_a_mat.device_ptr(&stream);
-        let (cur_ptr, _cur_record) = d_cur_mat.device_ptr_mut(&stream);
-
-        unsafe {
-            cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(),
-                num_elems,
-                &alpha as *const f32,
-                a_ptr as *const f32,
-                1,
-                cur_ptr as *mut f32,
-                1,
-            )
-            .result()?;
-        }
-
-        let mut fnorm: f32 = 0.0;
-        unsafe {
-            cublas_sys::cublasSnrm2_v2(
-                *cublas.handle(),
-                num_elems,
-                cur_ptr as *const f32,
-                1,
-                &mut fnorm as *mut f32,
-            )
-            .result()?;
-        }
-        stream.synchronize()?;
-        Ok(fnorm)
+    /// Compute and evaluate the canonical fast linking matrix without a
+    /// device-to-host-to-device round trip. Innovators should use this when
+    /// comparing candidate index sets for verifier-computed sub-instances.
+    pub fn evaluate_fast_fnorm(
+        &self,
+        c_idxs: &[i32],
+        r_idxs: &[i32],
+        module: Arc<CudaModule>,
+        stream: Arc<CudaStream>,
+        _prop: &cudaDeviceProp,
+    ) -> Result<f32> {
+        let d_u = self.fast_linking_matrix_device(c_idxs, r_idxs, &module, &stream)?;
+        self.evaluate_fnorm_with_device_u(c_idxs, r_idxs, &d_u, &module, &stream)
     }
 
     conditional_pub!(
@@ -1200,7 +1577,16 @@ impl Challenge {
             stream: Arc<CudaStream>,
             prop: &cudaDeviceProp,
         ) -> Result<f64> {
-            let fnorm = self.evaluate_fnorm(solution, module, stream, prop)? as f64;
+            let fnorm = if self.verifier_computes_u {
+                if !solution.u_mat.is_empty() {
+                    return Err(anyhow!(
+                        "Solution U matrix must be omitted for verifier-computed fast-U sub-instances"
+                    ));
+                }
+                self.evaluate_fast_fnorm(&solution.c_idxs, &solution.r_idxs, module, stream, prop)?
+            } else {
+                self.evaluate_fnorm(solution, module, stream, prop)?
+            } as f64;
             score_from_errors(fnorm, self.optimal_fnorm as f64, self.target_k)
         }
     );
@@ -1209,9 +1595,10 @@ impl Challenge {
 #[cfg(test)]
 mod design_tests {
     use super::{
-        gaussian_launch_config, sample_design_metadata, DesignGenerationConfig, DESIGN_DELTA,
-        DESIGN_NUM_SUB_INSTANCES, DESIGN_SPECTRUM_A, DESIGN_SPECTRUM_PERTURBATION,
-        GAUSSIAN_MAX_BLOCKS, GAUSSIAN_THREADS_PER_BLOCK, TARGET_RATIO_STRATA, TRACKS,
+        gaussian_launch_config, sample_design_metadata, verifier_fast_u_mask,
+        DesignGenerationConfig, Solution, DESIGN_DELTA, DESIGN_NUM_SUB_INSTANCES,
+        DESIGN_SPECTRUM_A, DESIGN_SPECTRUM_PERTURBATION, GAUSSIAN_MAX_BLOCKS,
+        GAUSSIAN_THREADS_PER_BLOCK, NUM_VERIFIER_FAST_U_SUB_INSTANCES, TARGET_RATIO_STRATA, TRACKS,
         TRUE_RANK_STRATA,
     };
     use std::collections::HashSet;
@@ -1283,6 +1670,7 @@ mod design_tests {
     #[test]
     fn design_constants_match_the_eight_strata_specification() {
         assert_eq!(DESIGN_NUM_SUB_INSTANCES, 8);
+        assert_eq!(NUM_VERIFIER_FAST_U_SUB_INSTANCES, 4);
         assert_eq!(DESIGN_DELTA, 10_000.0);
         assert_eq!(DESIGN_SPECTRUM_A, 13.0);
         assert_eq!(DESIGN_SPECTRUM_PERTURBATION, 0.15);
@@ -1312,6 +1700,40 @@ mod design_tests {
                 (0.72, 0.80),
             ]
         );
+    }
+
+    #[test]
+    fn verifier_fast_u_uses_four_largest_target_ranks_with_stable_ties() {
+        let mask = verifier_fast_u_mask(&[13, 5, 21, 8, 21, 3, 13, 1]).unwrap();
+        assert_eq!(
+            mask,
+            vec![true, false, true, false, true, false, true, false]
+        );
+        assert_eq!(
+            mask.into_iter()
+                .filter(|verifier_computes_u| *verifier_computes_u)
+                .count(),
+            NUM_VERIFIER_FAST_U_SUB_INSTANCES
+        );
+        assert_eq!(
+            verifier_fast_u_mask(&[7, 7, 7, 7, 7, 7, 7, 7]).unwrap(),
+            vec![true, true, true, true, false, false, false, false]
+        );
+        assert!(verifier_fast_u_mask(&[1, 2]).is_err());
+    }
+
+    #[test]
+    fn hybrid_solution_format_round_trips_an_omitted_u_matrix() {
+        let solution = Solution {
+            c_idxs: vec![1, 4],
+            u_mat: Vec::new(),
+            r_idxs: vec![2, 5],
+        };
+        let encoded = serde_json::to_string(&solution).unwrap();
+        let decoded: Solution = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.c_idxs, solution.c_idxs);
+        assert!(decoded.u_mat.is_empty());
+        assert_eq!(decoded.r_idxs, solution.r_idxs);
     }
 
     #[test]

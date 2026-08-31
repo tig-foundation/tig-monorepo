@@ -108,3 +108,43 @@ extern "C" __global__ void extract_rows_kernel(
         dest_matrix[idx] = source_matrix[row + col * num_rows];
     }
 }
+
+
+// Extract selected rows directly into the transposed n x k layout used by
+// thin QR. This avoids materialising R followed by a separate transpose.
+extern "C" __global__ void extract_rows_transposed_kernel(
+    const float* source_matrix,
+    float* dest_matrix,
+    int num_rows,
+    int num_cols,
+    int num_dest_rows,
+    const int* extract_row_idxs
+) {
+    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    const int total = num_dest_rows * num_cols;
+    if (idx < total) {
+        const int source_col = idx % num_cols;
+        const int selected_row = idx / num_cols;
+        const int source_row = extract_row_idxs[selected_row];
+        // dest is n x k column-major: source_col + selected_row * n.
+        dest_matrix[idx] = source_matrix[source_row + source_col * num_rows];
+    }
+}
+
+
+// Copy the upper triangular factor from packed GEQRF output into a dense k x k
+// matrix. Explicitly zeroing the lower triangle keeps the representation
+// unambiguous even though TRSM only reads the upper triangle.
+extern "C" __global__ void extract_upper_triangular_kernel(
+    const float* packed_qr,
+    float* upper,
+    int leading_dimension,
+    int rank
+) {
+    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    if (idx < rank * rank) {
+        const int row = idx % rank;
+        const int col = idx / rank;
+        upper[idx] = row <= col ? packed_qr[row + col * leading_dimension] : 0.0f;
+    }
+}

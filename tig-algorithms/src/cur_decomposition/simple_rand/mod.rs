@@ -6,10 +6,7 @@ use cudarc::{
         sys::{self as cublas_sys, cublasOperation_t},
         CudaBlas, Gemm, GemmConfig,
     },
-    driver::{
-        safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, DevicePtr, DevicePtrMut,
-        PushKernelArg,
-    },
+    driver::{safe::LaunchConfig, CudaModule, CudaStream, DevicePtr, DevicePtrMut, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -112,7 +109,7 @@ pub fn solve_challenge(
     hyperparameters: &Option<Map<String, Value>>,
     module: Arc<CudaModule>,
     stream: Arc<CudaStream>,
-    _prop: &cudaDeviceProp,
+    prop: &cudaDeviceProp,
 ) -> anyhow::Result<Option<Solution>> {
     let hp = match hyperparameters {
         Some(hp) => serde_json::from_value::<Hyperparameters>(Value::Object(hp.clone()))
@@ -146,6 +143,30 @@ pub fn solve_challenge(
         let r_idxs = uniform_sample_k(m_sz, k_sz, &mut rng);
         let c_i32: Vec<i32> = c_idxs.iter().map(|&i| i as i32).collect();
         let r_i32: Vec<i32> = r_idxs.iter().map(|&i| i as i32).collect();
+
+        if challenge.verifier_computes_u {
+            let fnorm = match challenge.evaluate_fast_fnorm(
+                &c_i32,
+                &r_i32,
+                module.clone(),
+                stream.clone(),
+                prop,
+            ) {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+            if fnorm < best_fnorm {
+                best_fnorm = fnorm;
+                let sol = Solution {
+                    c_idxs: c_i32,
+                    u_mat: Vec::new(),
+                    r_idxs: r_i32,
+                };
+                save_solution(&sol)?;
+                best_solution = Some(sol);
+            }
+            continue;
+        }
 
         // ── Extract C and R on GPU ────────────────────────────────────────────
         let d_c_idxs = stream.memcpy_stod(&c_i32)?;
