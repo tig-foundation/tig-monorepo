@@ -94,7 +94,8 @@
 
 // c006_a048
 
-// c006_a049
+pub mod parallax_imp;
+pub use parallax_imp as c006_a049;
 
 // c006_a050
 
