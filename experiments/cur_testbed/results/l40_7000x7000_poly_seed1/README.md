@@ -1,5 +1,9 @@
 # L40 7000x7000 polynomial-spectrum run
 
+> Historical calibration artifact: this run predates the verifier-only fast-U
+> redesign. Its linking-matrix payloads and method comparisons are not the
+> current index-only TIG solution protocol.
+
 This is the audited report for C3 job `job_1786699035255_rxqh7h`, run on one
 NVIDIA L40 with seed 0. The experiment used the portable Philox Gaussian
 generator, six randomized shared-basis sub-instances, the `matrix_norms` and

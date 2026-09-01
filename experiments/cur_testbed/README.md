@@ -3,6 +3,10 @@
 This standalone CUDA experiment implements the design in `docs/cur.tex`. It is
 not coupled to the TIG runtime or Docker harness.
 
+Its linking-matrix comparisons are calibration-only. Production TIG solutions
+contain only row and column indices; verification computes the canonical fast
+U for every sub-instance.
+
 For each seed and spectrum type it generates exactly eight sub-instances from one
 shared pair of orthonormal bases. It samples one true-rank ratio from each of the
 eight specified strata, samples and shuffles one target-rank ratio from each of
@@ -59,10 +63,11 @@ Audited L40 runs and their compact reports are in:
 - `results/l40_6000x6000_poly_seed1/`
 - `results/l40_7000x7000_poly_seed1/`
 - `results/l40_7000x7000_poly_seed1_eight/`
+- `results/l40_8000x8000_poly_seed0_verifier_fast_u/`
 
-The directories without the `_eight` suffix predate the eight-sub-instance,
-fixed-15%-noise revision and are retained as historical six-sub-instance
-results.
+The 2000x3000, 6000x6000, and first 7000x7000 directories predate the
+eight-sub-instance, fixed-15%-noise revision and are retained as historical
+six-sub-instance results.
 
 By default, a small unmeasured 64x80 generator and one solver sub-instance warm
 the CUDA libraries before recorded work. This prevents one-time cuBLAS and
@@ -90,11 +95,11 @@ sizes; unlike the legacy challenge, they need not have the form 2^p+1.
 
 ## C3 L40 run
 
-The repository `.c3` file points at `run_c3_7000.sh`. Submit with `c3 deploy`
-and retrieve the CSV, JSON, and portable PTX artifacts with
-`c3 pull <job-id>`. Environment
-variables corresponding to the command-line options are listed in the script.
-`run_c3_smoke.sh` selects a smaller 512x640 track for end-to-end validation.
+The repository `.c3` file points at `run_c3_8000_quality.sh`, which runs the
+production-design 8000x8000 polynomial benchmark with index-only solutions and
+verifier-computed fast U. Submit with `c3 deploy` and retrieve its JSON report
+and portable PTX with `c3 pull <job-id>`. The `run_c3_smoke.sh` and
+`run_c3_challenge_smoke.sh` scripts provide smaller end-to-end checks.
 
 The runner compiles the testbed kernel bundle from source for virtual
 architecture `compute_70`. This is forward-compatible PTX rather than an

@@ -1,5 +1,9 @@
 # L40 7000x7000 eight-sub-instance run
 
+> Historical calibration artifact: this run predates the verifier-only fast-U
+> redesign. Its linking-matrix payloads and method comparisons are not the
+> current index-only TIG solution protocol.
+
 This is the audited report for C3 job `job_1786702545740_ohuj6v`, run on one
 NVIDIA L40 with seed 0. It uses the revised `docs/cur.tex` design: eight
 stratified shared-basis sub-instances and independent fixed multiplicative

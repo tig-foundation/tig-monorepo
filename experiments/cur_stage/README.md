@@ -1,5 +1,10 @@
 # CUR design-calibration experiment
 
+This experiment intentionally compares alternative linking-matrix methods for
+design research. Those experimental U payloads are not valid TIG challenge
+solutions: the production protocol accepts only row and column indices and the
+verifier always computes U with its canonical fast QR method.
+
 This is a controlled 2x2 experiment over the CUR challenge's 18 `(true rank,
 target rank)` cases. Unlike the production generator, its five matrix groups are
 independent: a fresh `A` is generated for every `(m, n, true_rank, spectrum,

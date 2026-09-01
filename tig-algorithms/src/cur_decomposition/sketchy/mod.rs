@@ -33,8 +33,6 @@ pub struct Hyperparameters {
     pub maxvol_swaps: usize,
     /// Stop max-volume refinement once all interpolation coefficients are below this value.
     pub maxvol_tolerance: f32,
-    /// Relative singular value threshold for pseudoinverse truncation.
-    pub sv_thresh: f32,
 }
 
 impl Default for Hyperparameters {
@@ -45,21 +43,19 @@ impl Default for Hyperparameters {
             power_iters: 2,
             maxvol_swaps: 16,
             maxvol_tolerance: 1.01,
-            sv_thresh: 1e-6,
         }
     }
 }
 
 pub fn help() {
     println!("High-quality block-Krylov/max-volume CUR decomposition (GPU).");
-    println!("Randomized SVD → max-volume row/column selection → adaptive SVD U.");
+    println!("Randomized SVD → max-volume row/column selection → verifier fast U.");
     println!("Hyperparameters:");
     println!("  num_trials:       residual-scored randomized restarts (default: 3)");
     println!("  sketch_extra:     s = k + sketch_extra (default: 32)");
     println!("  power_iters:      block-Krylov subspace iterations (default: 2)");
     println!("  maxvol_swaps:     max-volume swaps per side (default: 16)");
     println!("  maxvol_tolerance: max-volume stopping threshold (default: 1.01)");
-    println!("  sv_thresh:        base pseudoinverse cutoff (default: 1e-6)");
 }
 
 // ─── GPU helpers ─────────────────────────────────────────────────────────────
@@ -718,183 +714,6 @@ fn block_krylov_maxvol_candidate(
     Ok((c_idxs, r_idxs))
 }
 
-/// Form C^+ A R^+ from precomputed thin SVD factors using one relative
-/// truncation threshold. The expensive C and R factorizations are shared
-/// across all thresholds tested by the adaptive linking-matrix stage.
-#[allow(clippy::too_many_arguments)]
-fn linking_matrix_from_svd(
-    challenge: &Challenge,
-    sigma_c: &[f32],
-    d_uc: &CudaSlice<f32>,
-    d_vct: &CudaSlice<f32>,
-    sigma_r: &[f32],
-    d_ur: &CudaSlice<f32>,
-    d_vrt: &CudaSlice<f32>,
-    threshold: f32,
-    module: &Arc<CudaModule>,
-    stream: &Arc<CudaStream>,
-    cublas: &CudaBlas,
-) -> Result<Vec<f32>> {
-    let m = challenge.m;
-    let n = challenge.n;
-    let k = challenge.target_k;
-    let k_size = k as usize;
-    let n_size = n as usize;
-    let sc_max = sigma_c.first().copied().unwrap_or(0.0).max(1e-30);
-    let sr_max = sigma_r.first().copied().unwrap_or(0.0).max(1e-30);
-    let inv_sc: Vec<f32> = sigma_c
-        .iter()
-        .map(|&value| {
-            if value.is_finite() && value > 0.0 && value >= threshold * sc_max {
-                1.0 / value
-            } else {
-                0.0
-            }
-        })
-        .collect();
-    let inv_sr: Vec<f32> = sigma_r
-        .iter()
-        .map(|&value| {
-            if value.is_finite() && value > 0.0 && value >= threshold * sr_max {
-                1.0 / value
-            } else {
-                0.0
-            }
-        })
-        .collect();
-    let d_inv_sc = stream.memcpy_stod(&inv_sc)?;
-    let d_inv_sr = stream.memcpy_stod(&inv_sr)?;
-
-    // U = Vc Sigma_c^+ Uc^T A Vr Sigma_r^+ Ur^T.
-    let mut d_t1 = stream.alloc_zeros::<f32>(k_size * n_size)?;
-    unsafe {
-        cublas.gemm(
-            GemmConfig {
-                transa: cublasOperation_t::CUBLAS_OP_T,
-                transb: cublasOperation_t::CUBLAS_OP_N,
-                m: k,
-                n,
-                k: m,
-                alpha: 1.0,
-                lda: m,
-                ldb: m,
-                beta: 0.0,
-                ldc: k,
-            },
-            d_uc,
-            &challenge.d_a_mat,
-            &mut d_t1,
-        )?;
-    }
-    let scale_rows = module.load_function("scale_rows_kernel")?;
-    unsafe {
-        stream
-            .launch_builder(&scale_rows)
-            .arg(&mut d_t1)
-            .arg(&d_inv_sc)
-            .arg(&k)
-            .arg(&n)
-            .launch(LaunchConfig {
-                grid_dim: (
-                    ((k_size * n_size) as u32 + MAX_THREADS - 1) / MAX_THREADS,
-                    1,
-                    1,
-                ),
-                block_dim: (MAX_THREADS, 1, 1),
-                shared_mem_bytes: 0,
-            })?;
-    }
-
-    let mut d_t2 = stream.alloc_zeros::<f32>(k_size * n_size)?;
-    unsafe {
-        cublas.gemm(
-            GemmConfig {
-                transa: cublasOperation_t::CUBLAS_OP_T,
-                transb: cublasOperation_t::CUBLAS_OP_N,
-                m: k,
-                n,
-                k,
-                alpha: 1.0,
-                lda: k,
-                ldb: k,
-                beta: 0.0,
-                ldc: k,
-            },
-            d_vct,
-            &d_t1,
-            &mut d_t2,
-        )?;
-    }
-
-    let mut d_t3 = stream.alloc_zeros::<f32>(k_size * k_size)?;
-    unsafe {
-        cublas.gemm(
-            GemmConfig {
-                transa: cublasOperation_t::CUBLAS_OP_N,
-                transb: cublasOperation_t::CUBLAS_OP_T,
-                m: k,
-                n: k,
-                k: n,
-                alpha: 1.0,
-                lda: k,
-                ldb: k,
-                beta: 0.0,
-                ldc: k,
-            },
-            &d_t2,
-            d_vrt,
-            &mut d_t3,
-        )?;
-    }
-    let scale_cols = module.load_function("scale_cols_kernel")?;
-    unsafe {
-        stream
-            .launch_builder(&scale_cols)
-            .arg(&mut d_t3)
-            .arg(&d_inv_sr)
-            .arg(&k)
-            .arg(&k)
-            .launch(LaunchConfig {
-                grid_dim: (
-                    ((k_size * k_size) as u32 + MAX_THREADS - 1) / MAX_THREADS,
-                    1,
-                    1,
-                ),
-                block_dim: (MAX_THREADS, 1, 1),
-                shared_mem_bytes: 0,
-            })?;
-    }
-
-    let mut d_u = stream.alloc_zeros::<f32>(k_size * k_size)?;
-    unsafe {
-        cublas.gemm(
-            GemmConfig {
-                transa: cublasOperation_t::CUBLAS_OP_N,
-                transb: cublasOperation_t::CUBLAS_OP_T,
-                m: k,
-                n: k,
-                k,
-                alpha: 1.0,
-                lda: k,
-                ldb: k,
-                beta: 0.0,
-                ldc: k,
-            },
-            &d_t3,
-            d_ur,
-            &mut d_u,
-        )?;
-    }
-    stream.synchronize()?;
-    let u = stream.memcpy_dtov(&d_u)?;
-    if u.iter().any(|value| !value.is_finite()) {
-        return Err(anyhow!(
-            "adaptive SVD linking matrix contains non-finite values"
-        ));
-    }
-    Ok(u)
-}
-
 // ─── Solver ──────────────────────────────────────────────────────────────────
 
 pub fn solve_challenge(
@@ -910,12 +729,7 @@ pub fn solve_challenge(
             .map_err(|e| anyhow!("Failed to parse hyperparameters: {}", e))?,
         None => Hyperparameters::default(),
     };
-    if hp.num_trials == 0
-        || !hp.maxvol_tolerance.is_finite()
-        || hp.maxvol_tolerance < 1.0
-        || !hp.sv_thresh.is_finite()
-        || !(0.0..1.0).contains(&hp.sv_thresh)
-    {
+    if hp.num_trials == 0 || !hp.maxvol_tolerance.is_finite() || hp.maxvol_tolerance < 1.0 {
         return Err(anyhow!("invalid high-quality CUR hyperparameters"));
     }
 
@@ -926,8 +740,6 @@ pub fn solve_challenge(
     let n_sz = n as usize;
     let k_sz = k as usize;
     let num_trials = hp.num_trials.max(1);
-    let sv_thresh = hp.sv_thresh.max(1e-9f32);
-
     let seed0 = u64::from_le_bytes(challenge.seed[0..8].try_into()?);
     let seed1 = u64::from_le_bytes(challenge.seed[8..16].try_into()?);
 
@@ -940,11 +752,6 @@ pub fn solve_challenge(
     let cusolver = DnHandle::new(stream.clone())?;
 
     let gaussian_kernel = module.load_function("standard_gaussian_kernel")?;
-    let scale_rows_kernel = module.load_function("scale_rows_kernel")?;
-    let scale_cols_kernel = module.load_function("scale_cols_kernel")?;
-    let extract_cols_kernel = module.load_function("extract_columns_kernel")?;
-    let extract_rows_kernel = module.load_function("extract_rows_kernel")?;
-
     let mut best_fnorm = f32::INFINITY;
     let mut best_solution: Option<Solution> = None;
 
@@ -1123,406 +930,22 @@ pub fn solve_challenge(
             }
         };
 
-        if challenge.verifier_computes_u {
-            // Candidate quality must be measured with the verifier's shared
-            // QR-based linking matrix, not this algorithm's SVD-based U.
-            let fnorm = match challenge.evaluate_fast_fnorm(
-                &c_i32,
-                &r_i32,
-                module.clone(),
-                stream.clone(),
-                prop,
-            ) {
-                Ok(value) => value,
-                Err(_) => continue,
-            };
-            if fnorm < best_fnorm {
-                best_fnorm = fnorm;
-                let sol = Solution {
-                    c_idxs: c_i32,
-                    u_mat: Vec::new(),
-                    r_idxs: r_i32,
-                };
-                save_solution(&sol)?;
-                best_solution = Some(sol);
-            }
-            continue;
-        }
-
-        // ── Extract C (m×k) and R (k×n) ──────────────────────────────────────
-        let d_c_idxs = stream.memcpy_stod(&c_i32)?;
-        let d_r_idxs = stream.memcpy_stod(&r_i32)?;
-        let c_size = m_sz * k_sz;
-        let r_size = k_sz * n_sz;
-
-        // Extract C and R — kept for CUR reconstruction.
-        let mut d_c = stream.alloc_zeros::<f32>(c_size)?;
-        let mut d_r = stream.alloc_zeros::<f32>(r_size)?;
-        unsafe {
-            stream
-                .launch_builder(&extract_cols_kernel)
-                .arg(&challenge.d_a_mat)
-                .arg(&mut d_c)
-                .arg(&m)
-                .arg(&n)
-                .arg(&k)
-                .arg(&d_c_idxs)
-                .launch(LaunchConfig {
-                    grid_dim: ((c_size as u32 + MAX_THREADS - 1) / MAX_THREADS, 1, 1),
-                    block_dim: (MAX_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-            stream
-                .launch_builder(&extract_rows_kernel)
-                .arg(&challenge.d_a_mat)
-                .arg(&mut d_r)
-                .arg(&m)
-                .arg(&n)
-                .arg(&k)
-                .arg(&d_r_idxs)
-                .launch(LaunchConfig {
-                    grid_dim: ((r_size as u32 + MAX_THREADS - 1) / MAX_THREADS, 1, 1),
-                    block_dim: (MAX_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-        }
-
-        // Copy C and R for SVD — gesvd overwrites its input.
-        let mut d_c_svd = stream.alloc_zeros::<f32>(c_size)?;
-        let mut d_r_svd = stream.alloc_zeros::<f32>(r_size)?;
-        unsafe {
-            cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(),
-                c_size as c_int,
-                &1.0f32,
-                d_c.device_ptr(&stream).0 as *const f32,
-                1,
-                d_c_svd.device_ptr_mut(&stream).0 as *mut f32,
-                1,
-            )
-            .result()?;
-            cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(),
-                r_size as c_int,
-                &1.0f32,
-                d_r.device_ptr(&stream).0 as *const f32,
-                1,
-                d_r_svd.device_ptr_mut(&stream).0 as *mut f32,
-                1,
-            )
-            .result()?;
-        }
-
-        // ── Thin SVD of C (m×k) and R (k×n) ─────────────────────────────────
-        // C = Uc(m×k) · diag(σc) · Vc^T(k×k)
-        // Skip trial if SVD fails to converge (try next random sketch instead).
-        let svd_c = gpu_svd_thin(&cusolver, &stream, &mut d_c_svd, m, k);
-        drop(d_c_svd);
-        let (d_uc, sigma_c, d_vct) = match svd_c {
-            Ok(x) => x,
+        // Candidate quality is measured with the same canonical fast U
+        // that verification computes for every submitted index pair.
+        let fnorm = match challenge.evaluate_fast_fnorm(
+            &c_i32,
+            &r_i32,
+            module.clone(),
+            stream.clone(),
+            prop,
+        ) {
+            Ok(value) => value,
             Err(_) => continue,
         };
-        // R = Ur(k×k) · diag(σr) · Vr^T(k×n)
-        let svd_r = gpu_svd_thin(&cusolver, &stream, &mut d_r_svd, k, n);
-        drop(d_r_svd);
-        let (d_ur, sigma_r, d_vrt) = match svd_r {
-            Ok(x) => x,
-            Err(_) => continue,
-        };
-
-        // Compare a QR fallback and several truncated-SVD pseudoinverses using
-        // the actual CUR residual. C and R are factorized only once per trial;
-        // each threshold reuses those factors. This is materially more robust
-        // than fixing one cutoff across all target ranks and spectra.
-        let mut produced_finite_candidate = false;
-        let mut consider_u = |u_mat: Vec<f32>| -> Result<()> {
-            let solution = Solution {
-                c_idxs: c_i32.clone(),
-                u_mat,
-                r_idxs: r_i32.clone(),
-            };
-            let fnorm =
-                challenge.evaluate_fnorm(&solution, module.clone(), stream.clone(), prop)?;
-            if !fnorm.is_finite() {
-                return Ok(());
-            }
-            produced_finite_candidate = true;
-            if fnorm < best_fnorm {
-                best_fnorm = fnorm;
-                save_solution(&solution)?;
-                best_solution = Some(solution);
-            }
-            Ok(())
-        };
-
-        if let Ok(qr_u) =
-            challenge.fast_linking_matrix(&c_i32, &r_i32, module.clone(), stream.clone())
-        {
-            let _ = consider_u(qr_u);
-        }
-        let mut thresholds = vec![
-            sv_thresh * 100.0,
-            sv_thresh * 10.0,
-            sv_thresh,
-            sv_thresh * 0.1,
-            sv_thresh * 0.01,
-            0.0,
-        ];
-        thresholds.retain(|value| value.is_finite() && *value >= 0.0 && *value < 1.0);
-        thresholds.sort_by(|left, right| right.total_cmp(left));
-        thresholds.dedup_by(|left, right| left.to_bits() == right.to_bits());
-        for threshold in thresholds {
-            if let Ok(u_mat) = linking_matrix_from_svd(
-                challenge, &sigma_c, &d_uc, &d_vct, &sigma_r, &d_ur, &d_vrt, threshold, &module,
-                &stream, &cublas,
-            ) {
-                let _ = consider_u(u_mat);
-            }
-        }
-        drop(consider_u);
-        if produced_finite_candidate {
-            continue;
-        }
-
-        // Defensive legacy fallback: reached only if every adaptive candidate
-        // failed. Allocate the full residual buffer lazily so it does not
-        // contribute to the normal solver's peak memory.
-        let mut d_cur_buf = stream.alloc_zeros::<f32>(m_sz * n_sz)?;
-
-        // Compute truncated inverse singular values
-        let sc_max = sigma_c[0].max(1e-30f32);
-        let inv_sc: Vec<f32> = sigma_c
-            .iter()
-            .map(|&v| {
-                if v.is_finite() && v >= sv_thresh * sc_max {
-                    1.0 / v
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-        let sr_max = sigma_r[0].max(1e-30f32);
-        let inv_sr: Vec<f32> = sigma_r
-            .iter()
-            .map(|&v| {
-                if v.is_finite() && v >= sv_thresh * sr_max {
-                    1.0 / v
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-
-        let d_inv_sc = stream.memcpy_stod(&inv_sc)?;
-        let d_inv_sr = stream.memcpy_stod(&inv_sr)?;
-
-        // ── Compute U = C† · A · R† ───────────────────────────────────────────
-        // = Vc · diag(1/σc) · Uc^T · A · Vr · diag(1/σr) · Ur^T
-
-        // T1 = Uc^T · A  (k×n)
-        let mut d_t1 = stream.alloc_zeros::<f32>(k_sz * n_sz)?;
-        unsafe {
-            cublas.gemm(
-                GemmConfig {
-                    transa: cublasOperation_t::CUBLAS_OP_T,
-                    transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k,
-                    n,
-                    k: m,
-                    alpha: 1.0f32,
-                    lda: m,
-                    ldb: m,
-                    beta: 0.0f32,
-                    ldc: k,
-                },
-                &d_uc,
-                &challenge.d_a_mat,
-                &mut d_t1,
-            )?;
-        }
-        drop(d_uc);
-
-        // Scale rows of T1 by inv_sc  (row i ← row i / σc[i])
-        unsafe {
-            stream
-                .launch_builder(&scale_rows_kernel)
-                .arg(&mut d_t1)
-                .arg(&d_inv_sc)
-                .arg(&k)
-                .arg(&n)
-                .launch(LaunchConfig {
-                    grid_dim: ((k_sz * n_sz) as u32 / MAX_THREADS + 1, 1, 1),
-                    block_dim: (MAX_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-        }
-
-        // T2 = Vc · T1  (k×n)  — Vc^T stored as k×k, Vc = (Vc^T)^T, transa=T
-        let mut d_t2 = stream.alloc_zeros::<f32>(k_sz * n_sz)?;
-        unsafe {
-            cublas.gemm(
-                GemmConfig {
-                    transa: cublasOperation_t::CUBLAS_OP_T,
-                    transb: cublasOperation_t::CUBLAS_OP_N,
-                    m: k,
-                    n,
-                    k,
-                    alpha: 1.0f32,
-                    lda: k,
-                    ldb: k,
-                    beta: 0.0f32,
-                    ldc: k,
-                },
-                &d_vct,
-                &d_t1,
-                &mut d_t2,
-            )?;
-        }
-        drop(d_t1);
-        drop(d_vct);
-
-        // T3 = T2 · Vr  (k×k)  — Vr^T stored as k×n, Vr = (Vr^T)^T, transb=T
-        let mut d_t3 = stream.alloc_zeros::<f32>(k_sz * k_sz)?;
-        unsafe {
-            cublas.gemm(
-                GemmConfig {
-                    transa: cublasOperation_t::CUBLAS_OP_N,
-                    transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k,
-                    n: k,
-                    k: n,
-                    alpha: 1.0f32,
-                    lda: k,
-                    ldb: k,
-                    beta: 0.0f32,
-                    ldc: k,
-                },
-                &d_t2,
-                &d_vrt,
-                &mut d_t3,
-            )?;
-        }
-        drop(d_t2);
-        drop(d_vrt);
-
-        // Scale cols of T3 by inv_sr  (col j ← col j / σr[j])
-        unsafe {
-            stream
-                .launch_builder(&scale_cols_kernel)
-                .arg(&mut d_t3)
-                .arg(&d_inv_sr)
-                .arg(&k)
-                .arg(&k)
-                .launch(LaunchConfig {
-                    grid_dim: ((k_sz * k_sz) as u32 / MAX_THREADS + 1, 1, 1),
-                    block_dim: (MAX_THREADS, 1, 1),
-                    shared_mem_bytes: 0,
-                })?;
-        }
-
-        // U = T3 · Ur^T  (k×k)
-        let mut d_u = stream.alloc_zeros::<f32>(k_sz * k_sz)?;
-        unsafe {
-            cublas.gemm(
-                GemmConfig {
-                    transa: cublasOperation_t::CUBLAS_OP_N,
-                    transb: cublasOperation_t::CUBLAS_OP_T,
-                    m: k,
-                    n: k,
-                    k,
-                    alpha: 1.0f32,
-                    lda: k,
-                    ldb: k,
-                    beta: 0.0f32,
-                    ldc: k,
-                },
-                &d_t3,
-                &d_ur,
-                &mut d_u,
-            )?;
-        }
-        drop(d_t3);
-        drop(d_ur);
-
-        // ── CUR = C · U · R and evaluate ‖A − CUR‖_F ────────────────────────
-        // CU = C · U  (m×k)
-        let mut d_cu = stream.alloc_zeros::<f32>(m_sz * k_sz)?;
-        unsafe {
-            cublas.gemm(
-                GemmConfig {
-                    transa: cublasOperation_t::CUBLAS_OP_N,
-                    transb: cublasOperation_t::CUBLAS_OP_N,
-                    m,
-                    n: k,
-                    k,
-                    alpha: 1.0f32,
-                    lda: m,
-                    ldb: k,
-                    beta: 0.0f32,
-                    ldc: m,
-                },
-                &d_c,
-                &d_u,
-                &mut d_cu,
-            )?;
-        }
-
-        // CUR = CU · R  (m×n)
-        unsafe {
-            cublas.gemm(
-                GemmConfig {
-                    transa: cublasOperation_t::CUBLAS_OP_N,
-                    transb: cublasOperation_t::CUBLAS_OP_N,
-                    m,
-                    n,
-                    k,
-                    alpha: 1.0f32,
-                    lda: m,
-                    ldb: k,
-                    beta: 0.0f32,
-                    ldc: m,
-                },
-                &d_cu,
-                &d_r,
-                &mut d_cur_buf,
-            )?;
-        }
-
-        // fnorm = ‖A − CUR‖_F  via axpy + nrm2
-        let mn = (m * n) as c_int;
-        let alpha_neg: f32 = -1.0;
-        let mut fnorm = 0.0f32;
-        unsafe {
-            let (a_ptr, _ag) = challenge.d_a_mat.device_ptr(&stream);
-            let (cur_ptr, _cg) = d_cur_buf.device_ptr_mut(&stream);
-            cublas_sys::cublasSaxpy_v2(
-                *cublas.handle(),
-                mn,
-                &alpha_neg as *const f32,
-                a_ptr as *const f32,
-                1,
-                cur_ptr as *mut f32,
-                1,
-            )
-            .result()?;
-            cublas_sys::cublasSnrm2_v2(
-                *cublas.handle(),
-                mn,
-                cur_ptr as *const f32,
-                1,
-                &mut fnorm as *mut f32,
-            )
-            .result()?;
-        }
-        stream.synchronize()?;
-
-        // Download U and save if this trial is the best so far
-        let u_mat = stream.memcpy_dtov(&d_u)?;
         if fnorm < best_fnorm {
             best_fnorm = fnorm;
             let sol = Solution {
                 c_idxs: c_i32,
-                u_mat,
                 r_idxs: r_i32,
             };
             save_solution(&sol)?;

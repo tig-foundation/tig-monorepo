@@ -39,11 +39,9 @@ struct SubInstanceReport {
     true_rank: i32,
     target_k: i32,
     k_over_true_rank: f64,
-    verifier_computes_u: bool,
     solve_ms: f64,
     verification_ms: f64,
     raw_index_bytes: usize,
-    raw_u_bytes: usize,
     serialized_solution_bytes: usize,
     cur_fnorm: f64,
     optimal_svd_fnorm: f64,
@@ -64,7 +62,6 @@ struct BenchmarkReport {
     solve_total_ms: f64,
     verification_total_ms: f64,
     raw_index_bytes: usize,
-    raw_u_bytes: usize,
     raw_solution_payload_bytes: usize,
     serialized_solution_bytes: usize,
     average_score: f64,
@@ -137,7 +134,7 @@ fn solve_one(
         .ok_or_else(|| anyhow!("high-quality solver produced no solution"))
 }
 
-/// Warm CUDA libraries, PTX kernels, and both hybrid solution paths without
+/// Warm CUDA libraries, PTX kernels, and the canonical fast-U path without
 /// contaminating the measured 8000x8000 nonce.
 fn warm_up(module: Arc<CudaModule>, stream: Arc<CudaStream>, prop: &cudaDeviceProp) -> Result<()> {
     let warm_seed = [0xA5u8; 32];
@@ -150,18 +147,13 @@ fn warm_up(module: Arc<CudaModule>, stream: Arc<CudaStream>, prop: &cudaDevicePr
     )?;
     for sub in &warm.sub_instances {
         let solution = solve_one(&sub.challenge, module.clone(), stream.clone(), prop)?;
-        if sub.challenge.verifier_computes_u {
-            sub.challenge.evaluate_fast_fnorm(
-                &solution.c_idxs,
-                &solution.r_idxs,
-                module.clone(),
-                stream.clone(),
-                prop,
-            )?;
-        } else {
-            sub.challenge
-                .evaluate_fnorm(&solution, module.clone(), stream.clone(), prop)?;
-        }
+        sub.challenge.evaluate_fast_fnorm(
+            &solution.c_idxs,
+            &solution.r_idxs,
+            module.clone(),
+            stream.clone(),
+            prop,
+        )?;
     }
     stream.synchronize()?;
     Ok(())
@@ -195,7 +187,7 @@ fn main() -> Result<()> {
         .unwrap_or_else(|| PathBuf::from(format!("cur_quality_{m}x{n}_report.json")));
     let (module, stream, prop) = load_cuda(&arguments[1])?;
     println!("GPU: {}", gpu_name(&prop));
-    println!("Warming CUDA and both solution paths on 384x384...");
+    println!("Warming CUDA and canonical fast-U verification on 384x384...");
     warm_up(module.clone(), stream.clone(), &prop)?;
 
     let seed = make_seed(0);
@@ -227,12 +219,8 @@ fn main() -> Result<()> {
         stream.synchronize()?;
         let solve_ms = sub_started.elapsed().as_secs_f64() * 1000.0;
         println!(
-            "Solved sub {}: rank={} k={} verifier_fast_u={} in {:.3} ms",
-            sub.metadata.sub_idx,
-            sub.metadata.true_rank,
-            sub.challenge.target_k,
-            sub.challenge.verifier_computes_u,
-            solve_ms
+            "Solved sub {}: rank={} k={} in {:.3} ms",
+            sub.metadata.sub_idx, sub.metadata.true_rank, sub.challenge.target_k, solve_ms
         );
         solve_times.push(solve_ms);
         solutions.push(solution);
@@ -245,11 +233,6 @@ fn main() -> Result<()> {
         .iter()
         .map(|solution| (solution.c_idxs.len() + solution.r_idxs.len()) * size_of::<i32>())
         .sum::<usize>();
-    let raw_u_bytes = solutions
-        .iter()
-        .map(|solution| solution.u_mat.len() * size_of::<f32>())
-        .sum::<usize>();
-
     let mut sub_reports = Vec::with_capacity(DESIGN_NUM_SUB_INSTANCES);
     let mut scores = Vec::with_capacity(DESIGN_NUM_SUB_INSTANCES);
     stream.synchronize()?;
@@ -260,34 +243,15 @@ fn main() -> Result<()> {
         .zip(&solutions)
         .zip(&solve_times)
     {
-        let k = sub.challenge.target_k as usize;
-        if sub.challenge.verifier_computes_u {
-            if !solution.u_mat.is_empty() {
-                return Err(anyhow!("subinstance {} must omit U", sub.metadata.sub_idx));
-            }
-        } else if solution.u_mat.len() != k * k
-            || solution.u_mat.iter().any(|value| !value.is_finite())
-        {
-            return Err(anyhow!(
-                "subinstance {} has an invalid submitted U",
-                sub.metadata.sub_idx
-            ));
-        }
-
         stream.synchronize()?;
         let sub_verify_started = Instant::now();
-        let fnorm = if sub.challenge.verifier_computes_u {
-            sub.challenge.evaluate_fast_fnorm(
-                &solution.c_idxs,
-                &solution.r_idxs,
-                module.clone(),
-                stream.clone(),
-                &prop,
-            )?
-        } else {
-            sub.challenge
-                .evaluate_fnorm(solution, module.clone(), stream.clone(), &prop)?
-        };
+        let fnorm = sub.challenge.evaluate_fast_fnorm(
+            &solution.c_idxs,
+            &solution.r_idxs,
+            module.clone(),
+            stream.clone(),
+            &prop,
+        )?;
         let optimal = sub.challenge.optimal_fnorm();
         let score = score_from_errors(fnorm as f64, optimal as f64, sub.challenge.target_k)?;
         stream.synchronize()?;
@@ -305,11 +269,9 @@ fn main() -> Result<()> {
             true_rank: sub.metadata.true_rank,
             target_k: sub.challenge.target_k,
             k_over_true_rank: sub.challenge.target_k as f64 / sub.metadata.true_rank as f64,
-            verifier_computes_u: sub.challenge.verifier_computes_u,
             solve_ms,
             verification_ms,
             raw_index_bytes: (solution.c_idxs.len() + solution.r_idxs.len()) * size_of::<i32>(),
-            raw_u_bytes: solution.u_mat.len() * size_of::<f32>(),
             serialized_solution_bytes: serde_json::to_vec(solution)?.len(),
             cur_fnorm: fnorm as f64,
             optimal_svd_fnorm: optimal as f64,
@@ -322,7 +284,7 @@ fn main() -> Result<()> {
     let average_score = scores.iter().sum::<f64>() / scores.len() as f64;
     let generation = &design.generation;
     let report = BenchmarkReport {
-        algorithm: "block_krylov_maxvol_adaptive_svd",
+        algorithm: "block_krylov_maxvol_fast_u",
         algorithm_parameters: high_quality::Hyperparameters::default(),
         gpu: gpu_name(&prop),
         m,
@@ -351,8 +313,7 @@ fn main() -> Result<()> {
         solve_total_ms,
         verification_total_ms,
         raw_index_bytes,
-        raw_u_bytes,
-        raw_solution_payload_bytes: raw_index_bytes + raw_u_bytes,
+        raw_solution_payload_bytes: raw_index_bytes,
         serialized_solution_bytes: serialized_solution.len(),
         average_score,
         protocol_quality: aggregate_sub_scores(&scores)?,
@@ -366,10 +327,7 @@ fn main() -> Result<()> {
     println!("solve_ms={:.3}", solve_total_ms);
     println!("verification_ms={:.3}", verification_total_ms);
     println!("solution_json_bytes={}", serialized_solution.len());
-    println!(
-        "raw_solution_payload_bytes={}",
-        raw_index_bytes + raw_u_bytes
-    );
+    println!("raw_solution_payload_bytes={}", raw_index_bytes);
     println!("average_score={:.9}", average_score);
     println!("protocol_quality={}", aggregate_sub_scores(&scores)?);
     println!("report={}", output_path.display());

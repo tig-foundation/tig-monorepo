@@ -1,5 +1,9 @@
 # L40 10000x5000 high-quality CUR run
 
+> Historical artifact: this run predates the verifier-only fast-U redesign.
+> Its hybrid solution sizes, solve times, and quality are not measurements of
+> the current index-only protocol.
+
 This is the audited report for C3 job `job_1787484828768_v7do0z`, run on one
 NVIDIA L40 with deterministic seed 0. It uses the same polynomial spectrum,
 eight-subinstance generator, solver parameters, warm-up, scoring, and hybrid

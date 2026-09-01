@@ -8,10 +8,9 @@ A ≈ C U R
 
 for each of eight related matrix/target-rank sub-instances. For target rank
 k, the algorithm must return exactly k distinct column indices and exactly k
-distinct row indices. For the four smallest target ranks it also returns a
-finite k × k float32 linking matrix. For the four largest target ranks, the
-linking matrix is omitted and reconstructed by the verifier with the shared
-fast QR routine described below.
+distinct row indices. The verifier reconstructs every linking matrix with the
+canonical fast QR routine described below; linking matrices are never part of
+the submitted solution.
 
 The authoritative mathematical specification is docs/cur.tex.
 
@@ -84,7 +83,6 @@ pub struct Challenge {
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
-    pub verifier_computes_u: bool,
     pub d_a_mat: CudaSlice<f32>, // column-major m × n matrix
 }
 ~~~
@@ -96,17 +94,13 @@ A solution is:
 ~~~rust
 pub struct Solution {
     pub c_idxs: Vec<i32>, // length k, distinct and in [0, n)
-    pub u_mat: Vec<f32>,  // empty when verifier_computes_u; otherwise k² finite values
     pub r_idxs: Vec<i32>, // length k, distinct and in [0, m)
 }
 ~~~
 
-The four `verifier_computes_u` flags are assigned to the largest target ranks,
-with ties resolved in favour of the lower sub-instance index. On those calls,
-innovators must use the challenge's `fast_linking_matrix` or
-`evaluate_fast_fnorm` method while
-searching so that their local quality uses the same U as verification. They
-then submit an empty `u_mat`.
+Innovators can use the challenge's `fast_linking_matrix` or
+`evaluate_fast_fnorm` method while searching so their local quality uses the
+same U as verification. U itself is never serialized.
 
 The shared fast routine extracts C and R directly on the GPU, computes thin QR
 factorizations
@@ -141,9 +135,8 @@ C = A[:, c_idxs]
 R = A[r_idxs, :]
 ~~~
 
-For the four largest-k sub-instances it first reconstructs U with the fixed
-fast QR routine; for the other four it uses the submitted U. It then computes
-||A - C U R||_F on the GPU. Because generation already knows the
+For every sub-instance it reconstructs U with the fixed fast QR routine, then
+computes ||A - C U R||_F on the GPU. Because generation already knows the
 perturbed singular values, the optimal rank-k denominator is evaluated without
 running another SVD:
 

@@ -1,10 +1,12 @@
-//! Shared-basis eight-sub-instance CUR testbed specified by `docs/cur.tex`.
+//! Shared-basis eight-sub-instance CUR design-calibration testbed.
 //!
 //!   selectors: cheap matrix norms | block-Krylov SVD + max-volume + restarts
 //!   U methods: QR least squares | SVD-based least-squares pseudoinverse
 //!
 //! Every measured GPU stage is bracketed by stream synchronization. Detailed
 //! per-sub-instance results and full generation timings are written to CSV/JSON.
+//! Experimental U payloads here are not production protocol solutions; the
+//! verifier computes canonical fast U for every submitted index pair.
 
 use anyhow::{anyhow, Context, Result};
 use core::ffi::c_int;
@@ -32,11 +34,20 @@ use std::{
 };
 use tig_challenges::cur_decomposition::{
     score_from_errors, Challenge, DesignGenerationConfig, DesignGenerationTimings, DesignInstance,
-    DesignSubInstanceGenerationTimings, DesignSubInstanceMetadata, Solution,
-    DESIGN_NUM_SUB_INSTANCES, DESIGN_SPECTRUM_PERTURBATION,
+    DesignSubInstanceGenerationTimings, DesignSubInstanceMetadata, DESIGN_NUM_SUB_INSTANCES,
+    DESIGN_SPECTRUM_PERTURBATION,
 };
 
 const MAX_THREADS: u32 = 1024;
+
+/// Calibration-only payload used to compare linking-matrix methods. This is
+/// deliberately separate from the index-only protocol `Solution`.
+#[derive(Serialize)]
+struct ExperimentalSolution<'a> {
+    c_idxs: &'a [i32],
+    u_mat: &'a [f32],
+    r_idxs: &'a [i32],
+}
 
 #[derive(Debug)]
 struct Config {
@@ -1438,12 +1449,14 @@ fn adaptive_svd_u(
 ) -> Result<Vec<f32>> {
     let mut best: Option<(f32, Vec<f32>)> = None;
     let mut consider = |u_mat: Vec<f32>| -> Result<()> {
-        let solution = Solution {
-            c_idxs: selected.c_idxs.clone(),
-            u_mat: u_mat.clone(),
-            r_idxs: selected.r_idxs.clone(),
-        };
-        let residual = challenge.evaluate_fnorm(&solution, module.clone(), stream.clone(), prop)?;
+        let residual = challenge.evaluate_fnorm_with_linking_matrix(
+            &selected.c_idxs,
+            &selected.r_idxs,
+            &u_mat,
+            module.clone(),
+            stream.clone(),
+            prop,
+        )?;
         if best
             .as_ref()
             .is_none_or(|(best_residual, _)| residual < *best_residual)
@@ -1514,12 +1527,14 @@ fn sophisticated_select(
         )?;
         let extracted = extract_selected(challenge, &candidate, module, stream)?;
         let u_mat = qr_least_squares_u(challenge, &extracted, module, stream, cublas, cusolver)?;
-        let solution = Solution {
-            c_idxs: candidate.c_idxs.clone(),
-            u_mat,
-            r_idxs: candidate.r_idxs.clone(),
-        };
-        let residual = challenge.evaluate_fnorm(&solution, module.clone(), stream.clone(), prop)?;
+        let residual = challenge.evaluate_fnorm_with_linking_matrix(
+            &candidate.c_idxs,
+            &candidate.r_idxs,
+            &u_mat,
+            module.clone(),
+            stream.clone(),
+            prop,
+        )?;
         if best.as_ref().map_or(true, |(value, _)| residual < *value) {
             best = Some((residual, candidate));
         }
@@ -1620,16 +1635,22 @@ fn evaluate_methods(
                 records.push(failed);
             }
             Ok(u_mat) => {
-                let solution = Solution {
-                    c_idxs: selected.c_idxs.clone(),
-                    u_mat,
-                    r_idxs: selected.r_idxs.clone(),
+                let solution = ExperimentalSolution {
+                    c_idxs: &selected.c_idxs,
+                    u_mat: &u_mat,
+                    r_idxs: &selected.r_idxs,
                 };
                 let serialized_solution_bytes = serde_json::to_vec(&solution)?.len();
                 stream.synchronize()?;
                 let verify_started = Instant::now();
-                let fnorm_result =
-                    challenge.evaluate_fnorm(&solution, module.clone(), stream.clone(), prop);
+                let fnorm_result = challenge.evaluate_fnorm_with_linking_matrix(
+                    &selected.c_idxs,
+                    &selected.r_idxs,
+                    &u_mat,
+                    module.clone(),
+                    stream.clone(),
+                    prop,
+                );
                 stream.synchronize()?;
                 let verification_ms = elapsed_ms(verify_started);
                 match fnorm_result {

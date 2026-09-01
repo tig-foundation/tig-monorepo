@@ -1,7 +1,11 @@
 # L40 8000x8000 high-quality CUR run
 
+> Historical artifact: this run predates the verifier-only fast-U redesign.
+> Its hybrid solution sizes, solve times, and quality are not measurements of
+> the current index-only protocol.
+
 This is the audited report for C3 job `job_1787482766173_mk1p5w`, run on one
-NVIDIA L40 with deterministic seed 0. It exercises the current eight-subinstance
+NVIDIA L40 with deterministic seed 0. It exercises the then-current eight-subinstance
 polynomial CUR track and the hybrid solution format: innovators submit `U` for
 four subinstances, while the verifier reconstructs the four largest linking
 matrices with the canonical fast method.

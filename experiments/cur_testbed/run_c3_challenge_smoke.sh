@@ -51,15 +51,15 @@ cargo run --release -p tig-challenges \
   --features c009 -- \
   /tmp/cur-challenge.ptx
 
-# Exercise an innovator algorithm across the complete hybrid solution format:
-# four empty U payloads evaluated with the shared QR routine and four submitted
-# U matrices. `--seeds 0` performs one warm-up nonce without a benchmark sweep.
+# Exercise an innovator algorithm across the complete index-only solution
+# format. The verifier's shared fast-QR routine computes U for all eight
+# sub-instances. `--seeds 0` performs one warm-up nonce without a benchmark sweep.
 cargo run --release -p tig-algorithms \
   --example test_multi_instance \
   --features cur_decomposition -- \
   /tmp/cur-challenge.ptx \
   --seeds 0 \
-  --algos 'leverage (1t+cheap)' \
+  --algos 'leverage (1t)' \
   --sizes 2000x2000 \
   --poly
 

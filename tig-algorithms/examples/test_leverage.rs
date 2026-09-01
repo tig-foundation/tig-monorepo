@@ -151,7 +151,13 @@ fn run_config(
             }
             Some(sol) => {
                 let t2 = Instant::now();
-                let fnorm = challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)?;
+                let fnorm = challenge.evaluate_fast_fnorm(
+                    &sol.c_idxs,
+                    &sol.r_idxs,
+                    module.clone(),
+                    stream.clone(),
+                    prop,
+                )?;
                 let vrfy_elapsed = t2.elapsed().as_secs_f64() * 1000.0;
                 let total_gv = gen_elapsed + vrfy_elapsed;
                 gv_ms.push(total_gv);
@@ -220,7 +226,6 @@ fn print_usage(prog: &str) {
     eprintln!("  --algo   NAME  Algorithm: leverage or simple_rand   (default: leverage)");
     eprintln!("  --seeds  N     Number of seeds to test per config   (default: 5)");
     eprintln!("  --trials N     Trials per solve                     (default: algorithm default)");
-    eprintln!("  --cheap-u      Use cheap U computation (leverage only, default: false)");
     eprintln!("  --poly         Use the polynomial singular-value spectrum (default: exponential)");
     eprintln!("  --gpu    N     GPU device index                     (default: 0)");
 }
@@ -240,7 +245,6 @@ fn main() -> Result<()> {
     let mut algo_name = "leverage".to_string();
     let mut num_seeds: usize = 5;
     let mut num_trials: Option<usize> = None;
-    let mut cheap_u: bool = false;
     let mut poly: bool = false;
     let mut gpu_device: usize = 0;
 
@@ -273,9 +277,6 @@ fn main() -> Result<()> {
                         .parse()
                         .map_err(|_| anyhow!("--trials must be a positive integer"))?,
                 );
-            }
-            "--cheap-u" => {
-                cheap_u = true;
             }
             "--poly" => {
                 poly = true;
@@ -319,13 +320,10 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    let hyperparameters = if num_trials.is_some() || cheap_u {
+    let hyperparameters = if num_trials.is_some() {
         let mut map = serde_json::Map::new();
         if let Some(t) = num_trials {
             map.insert("num_trials".to_string(), serde_json::json!(t));
-        }
-        if cheap_u {
-            map.insert("cheap_u".to_string(), serde_json::json!(true));
         }
         Some(map)
     } else {
@@ -350,9 +348,6 @@ fn main() -> Result<()> {
     println!("Seeds  : {}", num_seeds);
     if let Some(t) = num_trials {
         println!("Trials : {}", t);
-    }
-    if cheap_u {
-        println!("CheapU : true");
     }
     println!("Configs: {}", configs.len());
 

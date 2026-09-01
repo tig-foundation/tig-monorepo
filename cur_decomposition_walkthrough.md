@@ -15,8 +15,8 @@ Each sub-instance asks for an approximation
 A ≈ C U R
 ~~~
 
-at target rank k. The innovator returns k distinct column indices, k distinct
-row indices, and a finite k × k float32 linking matrix U.
+at target rank k. The innovator returns only k distinct column indices and k
+distinct row indices. The verifier computes the linking matrix U.
 
 ## Shared-basis generation
 
@@ -66,13 +66,13 @@ and returns:
 ~~~rust
 pub struct Solution {
     pub c_idxs: Vec<i32>,
-    pub u_mat: Vec<f32>,
     pub r_idxs: Vec<i32>,
 }
 ~~~
 
-Constructing the linking matrix is explicitly part of the innovator's
-algorithm. The verifier does not reconstruct U.
+The solution never contains U. Innovators can call `evaluate_fast_fnorm` while
+searching to preview the exact approximation that verification will score, but
+only the selected indices are serialized.
 
 The runtime divides the total nonce fuel equally among eight calls. It resets
 CPU fuel, GPU fuel, and the runtime signature before every sub-instance, while
@@ -83,12 +83,12 @@ retaining the last solution saved for that sub-instance.
 For each solution, the verifier checks:
 
 - exactly k row and column indices;
-- all indices in bounds and distinct;
-- exactly k² linking-matrix values; and
-- every linking-matrix value is finite.
+- all indices in bounds and distinct.
 
-It extracts C and R from A, forms C U R with GPU matrix multiplications, and
-computes the Frobenius residual.
+It extracts C and R from A, computes the canonical fast linking matrix using
+thin QR factorizations and triangular solves, forms C U R with GPU matrix
+multiplications, and computes the Frobenius residual. This same fast-U path is
+used for all eight sub-instances.
 
 For q = residual / optimal_residual, verification computes
 

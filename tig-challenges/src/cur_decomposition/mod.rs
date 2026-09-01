@@ -28,7 +28,6 @@ impl_kv_string_serde! {
 impl_base64_serde! {
     Solution {
         c_idxs: Vec<i32>,
-        u_mat: Vec<f32>,
         r_idxs: Vec<i32>,
     }
 }
@@ -37,7 +36,6 @@ impl Solution {
     pub fn new() -> Self {
         Self {
             c_idxs: Vec::new(),
-            u_mat: Vec::new(),
             r_idxs: Vec::new(),
         }
     }
@@ -108,9 +106,6 @@ pub struct Challenge {
     pub n: i32,
     pub m: i32,
     pub target_k: i32,
-    /// When true, the submitted solution must omit `u_mat`; both the
-    /// innovator and verifier use `fast_linking_matrix` for this sub-instance.
-    pub verifier_computes_u: bool,
     optimal_fnorm: f32,
     pub d_a_mat: CudaSlice<f32>,
 }
@@ -131,9 +126,6 @@ pub struct IndependentGenerationTimings {
 
 /// Number of sub-instances in the design specified by `docs/cur.tex`.
 pub const DESIGN_NUM_SUB_INSTANCES: usize = NUM_SUB_INSTANCES;
-
-/// The four largest linking matrices are reconstructed by the verifier.
-pub const NUM_VERIFIER_FAST_U_SUB_INSTANCES: usize = DESIGN_NUM_SUB_INSTANCES / 2;
 
 /// Fixed design parameters from `docs/cur.tex` used by the official tracks.
 pub const DESIGN_DELTA: f32 = 10_000.0;
@@ -225,29 +217,6 @@ const TARGET_RATIO_STRATA: [(f64, f64); DESIGN_NUM_SUB_INSTANCES] = [
     (0.64, 0.72),
     (0.72, 0.80),
 ];
-
-/// Select the four largest target ranks, preferring lower sub-instance indices
-/// when the cutoff contains a tie.
-/// A `true` entry means that the solution omits U and the verifier reconstructs
-/// it with the shared fast QR implementation.
-pub fn verifier_fast_u_mask(target_ranks: &[i32]) -> Result<Vec<bool>> {
-    if target_ranks.len() != DESIGN_NUM_SUB_INSTANCES {
-        return Err(anyhow!(
-            "expected {} target ranks, got {}",
-            DESIGN_NUM_SUB_INSTANCES,
-            target_ranks.len()
-        ));
-    }
-    let mut ranked: Vec<(usize, i32)> = target_ranks.iter().copied().enumerate().collect();
-    ranked.sort_unstable_by(|(left_idx, left_k), (right_idx, right_k)| {
-        right_k.cmp(left_k).then_with(|| left_idx.cmp(right_idx))
-    });
-    let mut mask = vec![false; target_ranks.len()];
-    for (sub_idx, _) in ranked.into_iter().take(NUM_VERIFIER_FAST_U_SUB_INSTANCES) {
-        mask[sub_idx] = true;
-    }
-    Ok(mask)
-}
 
 fn milliseconds(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
@@ -717,8 +686,6 @@ impl Challenge {
     ) -> Result<DesignInstance> {
         let wall_started = Instant::now();
         let metadata = sample_design_metadata(seed, config)?;
-        let target_ranks: Vec<i32> = metadata.iter().map(|md| md.target_k).collect();
-        let fast_u_mask = verifier_fast_u_mask(&target_ranks)?;
         let tau = config.m.min(config.n);
         let u_seed = u64::from_le_bytes(seed[0..8].try_into()?)
             ^ u64::from_le_bytes(seed[8..16].try_into()?);
@@ -855,7 +822,6 @@ impl Challenge {
                     n: config.n,
                     m: config.m,
                     target_k: md.target_k,
-                    verifier_computes_u: fast_u_mask[md.sub_idx],
                     optimal_fnorm,
                     d_a_mat,
                 },
@@ -975,7 +941,6 @@ impl Challenge {
             n,
             m,
             target_k: target_rank,
-            verifier_computes_u: false,
             optimal_fnorm,
             d_a_mat,
         })
@@ -1104,7 +1069,6 @@ impl Challenge {
                 n,
                 m,
                 target_k: target_rank,
-                verifier_computes_u: false,
                 optimal_fnorm,
                 d_a_mat: d_a_copy,
             });
@@ -1201,8 +1165,9 @@ impl Challenge {
         Ok(())
     }
 
-    /// Shared deterministic fast-U implementation used by innovators and the
-    /// verifier. It computes C=Qc*Tc and R^T=Qr*Tr with thin GPU QR, forms
+    /// Canonical deterministic fast-U implementation used by the verifier.
+    /// Innovators may call it to assess candidate index sets locally. It
+    /// computes C=Qc*Tc and R^T=Qr*Tr with thin GPU QR, forms
     /// Qc^T*A*Qr with cuBLAS GEMMs, and applies the two triangular solves
     /// U=Tc^{-1}(Qc^T*A*Qr)Tr^{-T}. The smaller of the two possible projection
     /// buffers (k*n or m*k) is selected to reduce peak GPU memory.
@@ -1391,10 +1356,9 @@ impl Challenge {
         Ok(d_u)
     }
 
-    /// Calculate the canonical fast linking matrix on the GPU and return it in
-    /// column-major order. Innovators can call this exact routine when they
-    /// need U itself for local diagnostics; U is still omitted from the four
-    /// verifier-computed submissions.
+    /// Calculate the canonical verifier linking matrix on the GPU and return it
+    /// in column-major order. Innovators can call this exact routine for local
+    /// diagnostics, but U is never part of a submitted solution.
     pub fn fast_linking_matrix(
         &self,
         c_idxs: &[i32],
@@ -1518,41 +1482,38 @@ impl Challenge {
         Ok(fnorm)
     }
 
-    /// Evaluate an explicitly supplied linking matrix. This remains available
-    /// for experiments and for the four sub-instances where innovators submit
-    /// U themselves.
-    pub fn evaluate_fnorm(
+    /// Evaluate an explicitly supplied linking matrix for design-calibration
+    /// experiments. Protocol verification never calls this method: every
+    /// submitted solution is evaluated with `evaluate_fast_fnorm`.
+    pub fn evaluate_fnorm_with_linking_matrix(
         &self,
-        solution: &Solution,
+        c_idxs: &[i32],
+        r_idxs: &[i32],
+        u_mat: &[f32],
         module: Arc<CudaModule>,
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<f32> {
-        self.validate_index_sets(&solution.c_idxs, &solution.r_idxs)?;
+        self.validate_index_sets(c_idxs, r_idxs)?;
         let expected_u_len = self.target_k as usize * self.target_k as usize;
-        if solution.u_mat.len() != expected_u_len {
+        if u_mat.len() != expected_u_len {
             return Err(anyhow!(
-                "Solution U matrix must be size {}x{}",
+                "Linking matrix must be size {}x{}",
                 self.target_k,
                 self.target_k
             ));
         }
-        if solution.u_mat.iter().any(|value| !value.is_finite()) {
-            return Err(anyhow!("Solution U matrix must contain only finite values"));
+        if u_mat.iter().any(|value| !value.is_finite()) {
+            return Err(anyhow!("Linking matrix must contain only finite values"));
         }
-        let d_u = stream.memcpy_stod(&solution.u_mat)?;
-        self.evaluate_fnorm_with_device_u(
-            &solution.c_idxs,
-            &solution.r_idxs,
-            &d_u,
-            &module,
-            &stream,
-        )
+        let d_u = stream.memcpy_stod(u_mat)?;
+        self.evaluate_fnorm_with_device_u(c_idxs, r_idxs, &d_u, &module, &stream)
     }
 
     /// Compute and evaluate the canonical fast linking matrix without a
     /// device-to-host-to-device round trip. Innovators should use this when
-    /// comparing candidate index sets for verifier-computed sub-instances.
+    /// comparing candidate index sets because the verifier uses this path for
+    /// every sub-instance.
     pub fn evaluate_fast_fnorm(
         &self,
         c_idxs: &[i32],
@@ -1577,16 +1538,9 @@ impl Challenge {
             stream: Arc<CudaStream>,
             prop: &cudaDeviceProp,
         ) -> Result<f64> {
-            let fnorm = if self.verifier_computes_u {
-                if !solution.u_mat.is_empty() {
-                    return Err(anyhow!(
-                        "Solution U matrix must be omitted for verifier-computed fast-U sub-instances"
-                    ));
-                }
+            let fnorm =
                 self.evaluate_fast_fnorm(&solution.c_idxs, &solution.r_idxs, module, stream, prop)?
-            } else {
-                self.evaluate_fnorm(solution, module, stream, prop)?
-            } as f64;
+                    as f64;
             score_from_errors(fnorm, self.optimal_fnorm as f64, self.target_k)
         }
     );
@@ -1595,10 +1549,9 @@ impl Challenge {
 #[cfg(test)]
 mod design_tests {
     use super::{
-        gaussian_launch_config, sample_design_metadata, verifier_fast_u_mask,
-        DesignGenerationConfig, Solution, DESIGN_DELTA, DESIGN_NUM_SUB_INSTANCES,
-        DESIGN_SPECTRUM_A, DESIGN_SPECTRUM_PERTURBATION, GAUSSIAN_MAX_BLOCKS,
-        GAUSSIAN_THREADS_PER_BLOCK, NUM_VERIFIER_FAST_U_SUB_INSTANCES, TARGET_RATIO_STRATA, TRACKS,
+        gaussian_launch_config, sample_design_metadata, DesignGenerationConfig, Solution,
+        DESIGN_DELTA, DESIGN_NUM_SUB_INSTANCES, DESIGN_SPECTRUM_A, DESIGN_SPECTRUM_PERTURBATION,
+        GAUSSIAN_MAX_BLOCKS, GAUSSIAN_THREADS_PER_BLOCK, TARGET_RATIO_STRATA, TRACKS,
         TRUE_RANK_STRATA,
     };
     use std::collections::HashSet;
@@ -1670,7 +1623,6 @@ mod design_tests {
     #[test]
     fn design_constants_match_the_eight_strata_specification() {
         assert_eq!(DESIGN_NUM_SUB_INSTANCES, 8);
-        assert_eq!(NUM_VERIFIER_FAST_U_SUB_INSTANCES, 4);
         assert_eq!(DESIGN_DELTA, 10_000.0);
         assert_eq!(DESIGN_SPECTRUM_A, 13.0);
         assert_eq!(DESIGN_SPECTRUM_PERTURBATION, 0.15);
@@ -1703,36 +1655,14 @@ mod design_tests {
     }
 
     #[test]
-    fn verifier_fast_u_uses_four_largest_target_ranks_with_stable_ties() {
-        let mask = verifier_fast_u_mask(&[13, 5, 21, 8, 21, 3, 13, 1]).unwrap();
-        assert_eq!(
-            mask,
-            vec![true, false, true, false, true, false, true, false]
-        );
-        assert_eq!(
-            mask.into_iter()
-                .filter(|verifier_computes_u| *verifier_computes_u)
-                .count(),
-            NUM_VERIFIER_FAST_U_SUB_INSTANCES
-        );
-        assert_eq!(
-            verifier_fast_u_mask(&[7, 7, 7, 7, 7, 7, 7, 7]).unwrap(),
-            vec![true, true, true, true, false, false, false, false]
-        );
-        assert!(verifier_fast_u_mask(&[1, 2]).is_err());
-    }
-
-    #[test]
-    fn hybrid_solution_format_round_trips_an_omitted_u_matrix() {
+    fn index_only_solution_format_round_trips() {
         let solution = Solution {
             c_idxs: vec![1, 4],
-            u_mat: Vec::new(),
             r_idxs: vec![2, 5],
         };
         let encoded = serde_json::to_string(&solution).unwrap();
         let decoded: Solution = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded.c_idxs, solution.c_idxs);
-        assert!(decoded.u_mat.is_empty());
         assert_eq!(decoded.r_idxs, solution.r_idxs);
     }
 

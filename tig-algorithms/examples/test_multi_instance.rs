@@ -1,6 +1,6 @@
 // Large benchmark for CUR decomposition.
 //
-// Algorithms : fastest_algo | leverage (1t+cheap) | leverage (10t) | leverage (15t) | sketchy
+// Algorithms : fastest_algo | leverage (1t) | leverage (10t) | leverage (15t) | sketchy
 // Sizes      : official CUR tracks from tig-challenges
 // Seeds      : N real + 1 warmup per (algo, size)
 //
@@ -267,17 +267,13 @@ fn run_algo(
 
                 if let Some(sol) = solution {
                     let t_verify = Instant::now();
-                    let fnorm_result = if challenge.verifier_computes_u {
-                        challenge.evaluate_fast_fnorm(
-                            &sol.c_idxs,
-                            &sol.r_idxs,
-                            module.clone(),
-                            stream.clone(),
-                            prop,
-                        )
-                    } else {
-                        challenge.evaluate_fnorm(&sol, module.clone(), stream.clone(), prop)
-                    };
+                    let fnorm_result = challenge.evaluate_fast_fnorm(
+                        &sol.c_idxs,
+                        &sol.r_idxs,
+                        module.clone(),
+                        stream.clone(),
+                        prop,
+                    );
                     match fnorm_result {
                         Ok(fnorm) => {
                             total_verify_ms += t_verify.elapsed().as_secs_f64() * 1000.0;
@@ -479,10 +475,9 @@ fn main() -> Result<()> {
     let prop = get_device_prop(gpu_device as i32)?;
 
     // ── Algorithm configs ──────────────────────────────────────────────────────
-    let hp_1t_cheap = {
+    let hp_1t = {
         let mut m = serde_json::Map::new();
         m.insert("num_trials".into(), serde_json::json!(1));
-        m.insert("cheap_u".into(), serde_json::json!(true));
         m
     };
     let hp_10t = {
@@ -503,9 +498,9 @@ fn main() -> Result<()> {
             hyperparameters: None,
         },
         AlgoConfig {
-            label: "leverage (1t+cheap)",
+            label: "leverage (1t)",
             algo: "leverage",
-            hyperparameters: Some(hp_1t_cheap),
+            hyperparameters: Some(hp_1t),
         },
         AlgoConfig {
             label: "leverage (10t)",

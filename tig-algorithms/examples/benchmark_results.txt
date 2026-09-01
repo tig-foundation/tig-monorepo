@@ -1,4 +1,5 @@
 CUR Decomposition Benchmark Results
+HISTORICAL: predates verifier-only fast U; labels and timings are not current.
 Matrix : 1025×1025  max_rank=1025
 Seeds  : 20 (+ 1 warmup per algorithm, warmup excluded)
 PTX    : tig-algorithms/lib/cur_decomposition/ptx/leverage.ptx

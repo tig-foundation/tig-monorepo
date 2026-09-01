@@ -1,5 +1,9 @@
 # L40 result: 2000 x 3000 polynomial spectrum, seed 0
 
+> Historical calibration artifact: this run predates the verifier-only fast-U
+> redesign. Its linking-matrix payloads and method comparisons are not the
+> current index-only TIG solution protocol.
+
 This directory contains the measured artifacts from C3 job
 `job_1786643054555_2lrmhp`. The job ran on an NVIDIA L40 (48 GiB), CUDA 12.2,
 with one measured seed, `delta=10000`, spectrum parameter `a=13`, spectrum

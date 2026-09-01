@@ -82,17 +82,12 @@ Section~\ref{sec: instancegen}. The challenge proceeds in three steps:
     in Section~\ref{sec: instancegen}.
     \item \textbf{Step 2. Solving.} For each sub-instance $(A_s,k_s)$, the
     innovator's algorithm selects exactly $k_s$ columns and $k_s$ rows of
-    $A_s$. Let $\mathcal F$ contain the four sub-instances with the largest
-    target ranks, with ties resolved in favour of the lower sub-instance
-    index. For
-    $s\in\mathcal F$, the innovator uses the challenge's fixed fast linking
-    matrix calculation when searching and assessing solution quality, but
-    returns only the row and column indices. For $s\notin\mathcal F$, the
-    innovator also returns a finite linking matrix $U_s^{\mathrm{link}}$.
-    \item \textbf{Step 3. Verification and scoring.} For
-    $s\in\mathcal F$, the verifier reconstructs $U_s^{\mathrm{link}}$ using
-    exactly the same fixed fast calculation. It uses the submitted linking
-    matrix for the other four sub-instances. Each resulting approximation
+    $A_s$. The submitted solution contains only these row and column indices;
+    the innovator never submits a linking matrix.
+    \item \textbf{Step 3. Verification and scoring.} For every sub-instance,
+    the verifier constructs $C_s$ and $R_s$ from the submitted indices and
+    computes $U_s^{\mathrm{link}}$ using the fixed fast QR calculation in
+    Section~\ref{sec:linking-matrices}. Each resulting approximation
     $CUR_s=C_sU_s^{\mathrm{link}}R_s$ is scored by the continuous rule in
     Section~\ref{sec: score}, and the final score is the arithmetic mean over
     all eight sub-instances.
@@ -310,12 +305,13 @@ The resulting challenge instance consists of
 \]
 
 
-\section{Linking Matrices and Solution Size}\label{sec:linking-matrices}
+\section{Verifier-Computed Linking Matrices}\label{sec:linking-matrices}
 
 Once the column and row indices have been selected, the CUR approximation
 still requires a linking matrix $U_s^{\mathrm{link}}\in
-\mathbb{R}^{k_s\times k_s}$.  There are two natural ways to compute this
-matrix.  A fast method uses thin QR factorisations
+\mathbb{R}^{k_s\times k_s}$. The linking matrix is not part of an innovator's
+solution. For every sub-instance, the verifier computes it with one canonical
+fast method using thin QR factorisations
 \[
 C_s=Q_C T_C,
 \qquad
@@ -323,51 +319,31 @@ R_s^T=Q_R T_R,
 \]
 followed by triangular solves to form
 \[
-U_{s,\mathrm{fast}}^{\mathrm{link}}
+U_s^{\mathrm{link}}
 =
 T_C^{-1}\bigl(Q_C^T A_s Q_R\bigr)T_R^{-T}.
 \]
-A slower, more accurate method uses rank-revealing SVD pseudoinverses to
-approximate the optimal linking matrix
-\[
-U_s^*=C_s^+A_sR_s^+.
-\]
-The fast method is substantially cheaper, whereas the SVD method is more
-robust when the selected rows or columns are poorly conditioned.
-
-Returning every linking matrix can consume a large part of the TIG solution
-limit.  In single-precision format, one linking matrix requires
-\[
-4k_s^2\ \text{bytes},
-\]
-before serialisation overhead. To reduce this output size, let $\mathcal F$
-contain the four sub-instances having the largest target ranks $k_s$, with
-ties resolved in favour of the lower sub-instance index. These are the four
-largest linking matrices because their storage grows as $k_s^2$.
-
-For $s\in\mathcal F$, the innovator must use the fixed fast QR calculation
-above when evaluating candidate row and column sets and when calculating the
-quality of its final selection. It returns only the selected column and row
-index sets $(\mathcal J_s,\mathcal I_s)$; it does not return the resulting
-linking matrix. The verifier reconstructs
+Here
 \[
 C_s=A_s[:,\mathcal J_s],
 \qquad
 R_s=A_s[\mathcal I_s,:],
 \]
-and computes $U_{s,\mathrm{fast}}^{\mathrm{link}}$ with exactly the same
-routine. The challenge implementation provides this routine to both the
-innovator and verifier, including its arithmetic precision, QR convention,
-and solve order. Thus the innovator can calculate the same CUR approximation
-and solution quality that the verifier will score; the verifier's result
-remains authoritative.
+where $\mathcal J_s$ and $\mathcal I_s$ are the submitted column and row
+indices. The implementation fixes the arithmetic precision, QR convention,
+projection order, and triangular-solve order so verification is deterministic.
+The verifier's result is authoritative.
 
-For each of the remaining four sub-instances, $s\notin\mathcal F$, the
-innovator returns $U_s^{\mathrm{link}}$ as well as the two index sets and may
-use the slower, more accurate SVD construction. Choosing the four largest
-$k_s$ values for verifier-side reconstruction maximises the reduction in
-returned data while leaving linking-matrix construction under innovator
-control for the other four sub-instances.
+An innovator may call the challenge's shared fast-link evaluation helper while
+searching over candidate index sets. This is only a local preview of the
+verifier's calculation and is not serialized. The submitted solution for each
+sub-instance is exactly
+\[
+(\mathcal J_s,\mathcal I_s).
+\]
+Consequently, the raw solution payload contains only $2k_s$ integer indices,
+or $8k_s$ bytes when indices are represented as 32-bit integers, before
+serialization overhead. No $k_s^2$ linking-matrix payload is returned.
 
 
 
@@ -538,38 +514,21 @@ obtain $(\rho_1,\ldots,\rho_S)$
 \label{sec:algorithm_harness}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} $S=8$ sub-instances $(A_s,k_s)$
-\STATE Let $\mathcal F$ be the four indices with the largest $k_s$, resolving
-ties in favour of the lower sub-instance index
 \STATE $\mathrm{Solution}\gets ()$
 \FOR{$s=1,\ldots,S$}
     \STATE $(\mathcal J_s,\mathcal I_s)\gets
-    \mathrm{Innovator\_Select}(A_s,k_s)$, using the prescribed linking rule
-    for $s$
-    \STATE $C_s\gets A_s[:,\mathcal J_s]$ and
-    $R_s\gets A_s[\mathcal I_s,:]$
-    \IF{$s\in\mathcal F$}
-        \STATE $U_s^{\mathrm{link}}\gets
-        \mathrm{FixedFastLink}(A_s,C_s,R_s)$ for the innovator's own quality
-        calculation
-        \STATE $\mathrm{Solution.append}\big((\mathcal J_s,\mathcal I_s)\big)$
-    \ELSE
-        \STATE $U_s^{\mathrm{link}}\gets
-        \mathrm{Innovator\_Link}(A_s,C_s,R_s)$
-        \STATE $\mathrm{Solution.append}
-        \big((\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})\big)$
-    \ENDIF
+    \mathrm{Innovator\_Select}(A_s,k_s)$
+    \STATE $\mathrm{Solution.append}\big((\mathcal J_s,\mathcal I_s)\big)$
 \ENDFOR
 \STATE \textbf{return} $\mathrm{Solution}$
 \end{algorithmic}
 \end{algorithm}
 
 For every sub-instance, $\mathcal J_s$ contains the selected column indices
-and $\mathcal I_s$ contains the selected row indices. For
-$s\in\mathcal F$, the innovator must call the same
-$\mathrm{FixedFastLink}$ implementation used by the verifier whenever it
-calculates or reports the quality of its selection, but omits the resulting
-matrix from its solution. For $s\notin\mathcal F$, it submits its chosen
-$U_s^{\mathrm{link}}$. The matrices $C_s$ and $R_s$ are never returned
+and $\mathcal I_s$ contains the selected row indices. The innovator may use
+$\mathrm{FixedFastLink}$ locally to estimate the quality the verifier will
+assign, but no linking matrix is accepted in the solution. The matrices $C_s$
+and $R_s$ are also reconstructed by the verifier and are never returned
 explicitly.
 
 \begin{algorithm}
@@ -578,25 +537,15 @@ explicitly.
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} $S=8$ sub-instances $(A_s,k_s)$ and submitted
 solutions
-\STATE Let $\mathcal F$ be the four indices with the largest $k_s$, resolving
-ties in favour of the lower sub-instance index
 \STATE $\mathrm{TotalScore}\gets0$
 \FOR{$s=1,\ldots,S$}
-    \IF{$s\in\mathcal F$}
-        \STATE $(\mathcal J_s,\mathcal I_s)\gets\mathrm{Solution}[s]$
-    \ELSE
-        \STATE $(\mathcal J_s,\mathcal I_s,U_s^{\mathrm{link}})
-        \gets\mathrm{Solution}[s]$
-        \STATE Require a finite $k_s\times k_s$ submitted linking matrix
-    \ENDIF
+    \STATE $(\mathcal J_s,\mathcal I_s)\gets\mathrm{Solution}[s]$
     \STATE Require $k_s$ distinct in-bounds row indices and $k_s$ distinct
     in-bounds column indices
     \STATE $C_s\gets A_s[:,\mathcal J_s]$ and
     $R_s\gets A_s[\mathcal I_s,:]$
-    \IF{$s\in\mathcal F$}
-        \STATE $U_s^{\mathrm{link}}\gets
-        \mathrm{FixedFastLink}(A_s,C_s,R_s)$
-    \ENDIF
+    \STATE $U_s^{\mathrm{link}}\gets
+    \mathrm{FixedFastLink}(A_s,C_s,R_s)$
     \STATE $CUR_s\gets C_sU_s^{\mathrm{link}}R_s$
     \STATE $E_s^*\gets
     \left(\sum_{j=k_s+1}^{r_s}(\sigma_{(j)}^{(s)})^2\right)^{1/2}$
