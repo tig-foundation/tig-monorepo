@@ -141,8 +141,11 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         if let Some(coinbase) = active_players_state[delegatee].coinbase.as_ref() {
             for (output, fraction) in coinbase.value.iter().filter(|(id, _)| *id != delegatee) {
                 let fraction = PreciseNumber::from_f64(*fraction);
-                let reward = coinbase_amount * fraction;
-                remaining_amount -= reward.clone();
+                let mut reward = coinbase_amount * fraction;
+                if reward > remaining_amount {
+                    reward = remaining_amount.clone();
+                }
+                remaining_amount -= reward;
                 opow_data.coinbase.insert(output.clone(), reward.clone());
 
                 let player_data = active_players_block_data.get_mut(output).unwrap();
