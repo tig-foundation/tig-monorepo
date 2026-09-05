@@ -240,7 +240,8 @@
 
 // c001_a121
 
-// c001_a122
+pub mod sat_imp_v6;
+pub use sat_imp_v6 as c001_a122;
 
 // c001_a123
 
