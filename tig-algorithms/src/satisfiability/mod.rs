@@ -238,7 +238,8 @@
 
 // c001_a120
 
-// c001_a121
+pub mod clausal_ember;
+pub use clausal_ember as c001_a121;
 
 // c001_a122
 
