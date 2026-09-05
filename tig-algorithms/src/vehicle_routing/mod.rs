@@ -230,7 +230,8 @@
 
 // c002_a116
 
-// c002_a117
+pub mod hgs_kairos;
+pub use hgs_kairos as c002_a117;
 
 // c002_a118
 
