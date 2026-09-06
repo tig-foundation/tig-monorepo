@@ -89,7 +89,8 @@ pub use titan_v7 as c008_a039;
 pub mod titan_v9;
 pub use titan_v9 as c008_a042;
 
-// c008_a043
+pub mod first_energy;
+pub use first_energy as c008_a043;
 
 // c008_a044
 

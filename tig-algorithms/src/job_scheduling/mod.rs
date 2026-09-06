@@ -80,7 +80,8 @@ pub use task_tree_h as c007_a032;
 
 // c007_a035
 
-// c007_a036
+pub mod task_tree_j;
+pub use task_tree_j as c007_a036;
 
 // c007_a037
 

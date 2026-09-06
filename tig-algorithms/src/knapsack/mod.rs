@@ -296,7 +296,8 @@ pub use superfast_knap_v1 as c003_a137;
 
 // c003_a143
 
-// c003_a144
+pub mod knap_lean;
+pub use knap_lean as c003_a144;
 
 // c003_a145
 
