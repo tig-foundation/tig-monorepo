@@ -80,7 +80,8 @@
 
 // c007_a041
 
-// c007_a042
+pub mod ttj_shuttle_ember;
+pub use ttj_shuttle_ember as c007_a042;
 
 // c007_a043
 
