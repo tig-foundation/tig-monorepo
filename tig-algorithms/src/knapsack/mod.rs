@@ -296,7 +296,8 @@
 
 // c003_a149
 
-// c003_a150
+pub mod knap_exact16;
+pub use knap_exact16 as c003_a150;
 
 // c003_a151
 
