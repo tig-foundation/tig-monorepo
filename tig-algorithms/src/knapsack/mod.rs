@@ -298,7 +298,8 @@
 
 // c003_a150
 
-// c003_a151
+pub mod knap_capacity_env;
+pub use knap_capacity_env as c003_a151;
 
 // c003_a152
 
