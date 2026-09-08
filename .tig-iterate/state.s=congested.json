@@ -1,0 +1,18 @@
+{
+  "challenge": "energy_arbitrage",
+  "track": "s=congested",
+  "stem": "energy_solver_congested",
+  "seed_algorithm": "energy_solver_1",
+  "next_version": 1,
+  "seed": "iterate-v1",
+  "nonces": 100,
+  "grid_points": 12,
+  "current_best": {
+    "name": "energy_solver_1",
+    "hyperparameters": {"charge_threshold": 8.0, "discharge_threshold": 5.0},
+    "score": 0
+  },
+  "history": [
+    {"event": "track_init", "note": "Per-track state created after rename of energy_solverv4_v19 → energy_solver_1. Score reset to 0 per CLAUDE.md (first child auto-promotes). Reference: pre-rename s=congested loop reached 2,390,789 with v19 at charge=8 discharge=5 (full history in state.legacy.json). Post-cleanup, plateau-busting structural changes attempted (counter-help, end-window re-tune, lookahead/slope re-tune, profit-weight refine, quantile-shifted ref, mean-vs-median blend) all failed to beat 2,390,789."}
+  ]
+}

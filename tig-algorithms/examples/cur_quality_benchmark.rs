@@ -1,4 +1,4 @@
-//! One-seed audit benchmark for a polynomial CUR track.
+//! Seed-selectable audit benchmark for a polynomial CUR track.
 //!
 //! It measures the complete eight-subinstance generator, the high-quality
 //! block-Krylov/max-volume solver, protocol-equivalent verification, exact JSON
@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::{cell::RefCell, fs, path::PathBuf, sync::Arc, time::Instant};
 use tig_challenges::cur_decomposition::*;
 
-#[path = "../src/cur_decomposition/sketchy/mod.rs"]
+#[path = "../src/cur_decomposition/sketchy_v2/mod.rs"]
 mod high_quality;
 
 const DEFAULT_M: i32 = 8000;
@@ -57,10 +57,12 @@ struct BenchmarkReport {
     m: i32,
     n: i32,
     poly: bool,
+    seed_index: u64,
     seed_hex: String,
     generation: GenerationReport,
     solve_total_ms: f64,
     verification_total_ms: f64,
+    measured_total_ms: f64,
     raw_index_bytes: usize,
     raw_solution_payload_bytes: usize,
     serialized_solution_bytes: usize,
@@ -162,10 +164,13 @@ fn warm_up(module: Arc<CudaModule>, stream: Arc<CudaStream>, prop: &cudaDevicePr
 fn main() -> Result<()> {
     let arguments: Vec<String> = std::env::args().collect();
     if arguments.len() < 2
-        || arguments.len() > 5
+        || arguments.len() > 6
         || arguments.iter().any(|argument| argument == "--help")
     {
-        eprintln!("Usage: {} <PTX_PATH> [OUTPUT_JSON] [M] [N]", arguments[0]);
+        eprintln!(
+            "Usage: {} <PTX_PATH> [OUTPUT_JSON] [M] [N] [SEED_INDEX]",
+            arguments[0]
+        );
         std::process::exit((arguments.len() < 2) as i32);
     }
     let m = arguments
@@ -181,6 +186,15 @@ fn main() -> Result<()> {
     if m < 2 || n < 2 {
         return Err(anyhow!("matrix dimensions must both be at least 2"));
     }
+    let seed_index = arguments
+        .get(5)
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .context("SEED_INDEX must be a non-negative integer")
+        })
+        .transpose()?
+        .unwrap_or(0);
     let output_path = arguments
         .get(2)
         .map(PathBuf::from)
@@ -190,8 +204,9 @@ fn main() -> Result<()> {
     println!("Warming CUDA and canonical fast-U verification on 384x384...");
     warm_up(module.clone(), stream.clone(), &prop)?;
 
-    let seed = make_seed(0);
+    let seed = make_seed(seed_index);
     stream.synchronize()?;
+    let instance_started = Instant::now();
     let generation_started = Instant::now();
     let design = Challenge::generate_design_instance(
         &seed,
@@ -281,15 +296,17 @@ fn main() -> Result<()> {
     }
     stream.synchronize()?;
     let verification_total_ms = verification_started.elapsed().as_secs_f64() * 1000.0;
+    let measured_total_ms = instance_started.elapsed().as_secs_f64() * 1000.0;
     let average_score = scores.iter().sum::<f64>() / scores.len() as f64;
     let generation = &design.generation;
     let report = BenchmarkReport {
-        algorithm: "block_krylov_maxvol_fast_u",
+        algorithm: "sketchy_v2_quality_portfolio_fast_u",
         algorithm_parameters: high_quality::Hyperparameters::default(),
         gpu: gpu_name(&prop),
         m,
         n,
         poly: true,
+        seed_index,
         seed_hex: seed_hex(&seed),
         generation: GenerationReport {
             measured_wall_ms: measured_generation_ms,
@@ -312,6 +329,7 @@ fn main() -> Result<()> {
         },
         solve_total_ms,
         verification_total_ms,
+        measured_total_ms,
         raw_index_bytes,
         raw_solution_payload_bytes: raw_index_bytes,
         serialized_solution_bytes: serialized_solution.len(),
@@ -326,6 +344,7 @@ fn main() -> Result<()> {
     println!("generation_ms={:.3}", measured_generation_ms);
     println!("solve_ms={:.3}", solve_total_ms);
     println!("verification_ms={:.3}", verification_total_ms);
+    println!("measured_total_ms={:.3}", measured_total_ms);
     println!("solution_json_bytes={}", serialized_solution.len());
     println!("raw_solution_payload_bytes={}", raw_index_bytes);
     println!("average_score={:.9}", average_score);

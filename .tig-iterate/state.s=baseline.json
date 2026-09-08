@@ -1,0 +1,18 @@
+{
+  "challenge": "energy_arbitrage",
+  "track": "s=baseline",
+  "stem": "energy_solver_baseline",
+  "seed_algorithm": "energy_solver_1",
+  "next_version": 1,
+  "seed": "iterate-v1",
+  "nonces": 100,
+  "grid_points": 12,
+  "current_best": {
+    "name": "energy_solver_1",
+    "hyperparameters": {"charge_threshold": 8.0, "discharge_threshold": 6.0},
+    "score": 0
+  },
+  "history": [
+    {"event": "track_init", "note": "Per-track state created after rename of energy_solverv4_v19 → energy_solver_1. Score reset to 0 per CLAUDE.md (first child auto-promotes). Reference: energy_solver_1 at default hp scored 2,755,198 on s=baseline @ 100 nonces (off-loop test 2026-04-28)."}
+  ]
+}

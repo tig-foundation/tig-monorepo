@@ -238,6 +238,9 @@
 
 // c009_a120
 
+// Local quality-focused reference implementation for the redesigned challenge.
+pub mod sketchy_v2;
+
 // c009_a121
 
 // c009_a122

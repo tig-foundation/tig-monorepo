@@ -481,7 +481,7 @@ fn maxvol_select(
 /// Construct one coupled row/column candidate from an oversampled randomized
 /// block-Krylov SVD. Both index sets come from the same approximate SVD of A.
 #[allow(clippy::too_many_arguments)]
-fn block_krylov_maxvol_candidate(
+pub(super) fn block_krylov_maxvol_candidate(
     challenge: &Challenge,
     sketch_extra: usize,
     power_iters: usize,

@@ -1,0 +1,84 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+
+      "Edit(/root/tig-project/tig-monorepo/tig-algorithms/src/energy_arbitrage/**)",
+      "Edit(/root/tig-project/tig-monorepo/.tig-iterate/**)",
+      "Write(/root/tig-project/tig-monorepo/tig-algorithms/src/energy_arbitrage/**)",
+      "Write(/root/tig-project/tig-monorepo/.tig-iterate/**)",
+
+      "Bash(*)",
+
+      "Bash(docker ps)",
+      "Bash(docker ps:*)",
+      "Bash(docker run -d --name tig-dev-energy_arbitrage:*)",
+      "Bash(docker exec tig-dev-energy_arbitrage:*)",
+      "Bash(docker rm -f tig-dev-energy_arbitrage)",
+      "Bash(docker stop tig-dev-energy_arbitrage)",
+      "Bash(docker start tig-dev-energy_arbitrage)",
+      "Bash(docker logs tig-dev-energy_arbitrage)",
+      "Bash(docker logs tig-dev-energy_arbitrage:*)",
+      "Bash(docker inspect tig-dev-energy_arbitrage)",
+      "Bash(docker inspect tig-dev-energy_arbitrage:*)",
+      "Bash(docker image inspect:*)",
+
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git log)",
+      "Bash(git log:*)",
+      "Bash(git diff)",
+      "Bash(git diff:*)",
+      "Bash(git show)",
+      "Bash(git show:*)",
+      "Bash(git branch)",
+      "Bash(git branch:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git fetch)",
+      "Bash(git fetch:*)",
+      "Bash(git blame:*)",
+      "Bash(git cat-file:*)",
+
+      "Bash(ls)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(jq:*)",
+      "Bash(tree)",
+      "Bash(tree:*)",
+      "Bash(file:*)",
+      "Bash(test:*)",
+      "Bash(pwd)",
+      "Bash(nproc)",
+      "Bash(nproc:*)",
+
+      "Bash(mkdir .tig-iterate)",
+      "Bash(mkdir -p .tig-iterate)",
+      "Bash(mkdir .tig-iterate/:*)",
+      "Bash(mkdir -p .tig-iterate/:*)",
+      "Bash(mkdir tig-algorithms/src/energy_arbitrage/:*)",
+      "Bash(mkdir -p tig-algorithms/src/energy_arbitrage/:*)",
+
+      "Bash(rm tig-algorithms/src/energy_arbitrage/:*)",
+      "Bash(rm -f tig-algorithms/src/energy_arbitrage/:*)",
+      "Bash(rm -r tig-algorithms/src/energy_arbitrage/:*)",
+      "Bash(rm -rf tig-algorithms/src/energy_arbitrage/:*)",
+      "Bash(rm tig-algorithms/lib/energy_arbitrage/:*)",
+      "Bash(rm -f tig-algorithms/lib/energy_arbitrage/:*)",
+      "Bash(rm -r tig-algorithms/lib/energy_arbitrage/:*)",
+      "Bash(rm -rf tig-algorithms/lib/energy_arbitrage/:*)"
+    ],
+    "deny": [
+      "Bash(docker exec tig-dev-energy_arbitrage:* --ignore-invalid:*)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)"
+    ]
+  }
+}

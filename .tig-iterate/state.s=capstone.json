@@ -1,0 +1,18 @@
+{
+  "challenge": "energy_arbitrage",
+  "track": "s=capstone",
+  "stem": "energy_solver_capstone",
+  "seed_algorithm": "energy_solver_1",
+  "next_version": 1,
+  "seed": "iterate-v1",
+  "nonces": 100,
+  "grid_points": 12,
+  "current_best": {
+    "name": "energy_solver_1",
+    "hyperparameters": {"charge_threshold": 8.0, "discharge_threshold": 6.0},
+    "score": 0
+  },
+  "history": [
+    {"event": "track_init", "note": "Per-track state created. Universal seed: energy_solver_1. Score 0 by fiat (first child auto-promotes). s=capstone: 150 nodes, 100 batteries, x0.40 flow limits, high volatility — hardest track; expect frequent flow violations; counter-help mechanism may finally trigger."}
+  ]
+}
