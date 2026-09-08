@@ -64,8 +64,6 @@ Audited L40 runs and their compact reports are in:
 - `results/l40_7000x7000_poly_seed1/`
 - `results/l40_7000x7000_poly_seed1_eight/`
 - `results/l40_8000x8000_poly_seed0_verifier_fast_u/`
-- `results/l40_8000x8000_poly_seed0_sketchy_v2/`
-- `results/l40_8000x8000_poly_seeds0-2_sketchy_v2/`
 
 The 2000x3000, 6000x6000, and first 7000x7000 directories predate the
 eight-sub-instance, fixed-15%-noise revision and are retained as historical
@@ -99,12 +97,9 @@ sizes; unlike the legacy challenge, they need not have the form 2^p+1.
 
 The repository `.c3` file points at `run_c3_8000_quality.sh`, which runs the
 production-design 8000x8000 polynomial benchmark with index-only solutions and
-verifier-computed fast U. Set `CUR_SEED_START` and `CUR_SEEDS` to run a
-sequential range of deterministic instances; the
-`run_c3_8000_quality_3seeds.sh` wrapper selects seeds 0 through 2. Submit with
-`c3 deploy` and retrieve its JSON report and portable PTX with
-`c3 pull <job-id>`. The `run_c3_smoke.sh` and `run_c3_challenge_smoke.sh`
-scripts provide smaller end-to-end checks.
+verifier-computed fast U. Submit with `c3 deploy` and retrieve its JSON report
+and portable PTX with `c3 pull <job-id>`. The `run_c3_smoke.sh` and
+`run_c3_challenge_smoke.sh` scripts provide smaller end-to-end checks.
 
 The runner compiles the testbed kernel bundle from source for virtual
 architecture `compute_70`. This is forward-compatible PTX rather than an
