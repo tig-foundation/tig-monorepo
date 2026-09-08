@@ -300,7 +300,8 @@
 
 // c003_a151
 
-// c003_a152
+pub mod zero_knap_sa;
+pub use zero_knap_sa as c003_a152;
 
 // c003_a153
 
