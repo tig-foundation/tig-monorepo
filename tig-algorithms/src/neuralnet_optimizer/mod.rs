@@ -98,7 +98,8 @@
 
 // c006_a050
 
-// c006_a051
+pub mod dc_steer_imp;
+pub use dc_steer_imp as c006_a051;
 
 // c006_a052
 
