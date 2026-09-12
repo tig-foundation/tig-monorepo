@@ -244,7 +244,8 @@
 
 // c001_a123
 
-// c001_a124
+pub mod walkfront;
+pub use walkfront as c001_a124;
 
 // c001_a125
 
