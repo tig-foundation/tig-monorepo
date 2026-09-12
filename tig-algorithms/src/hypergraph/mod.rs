@@ -68,7 +68,8 @@
 
 // c005_a035
 
-// c005_a036
+pub mod exact_round_engine;
+pub use exact_round_engine as c005_a036;
 
 // c005_a037
 
