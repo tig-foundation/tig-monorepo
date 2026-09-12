@@ -302,7 +302,8 @@
 
 // c003_a152
 
-// c003_a153
+pub mod knap_exact16_fast3;
+pub use knap_exact16_fast3 as c003_a153;
 
 // c003_a154
 
