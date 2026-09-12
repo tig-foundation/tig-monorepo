@@ -232,7 +232,8 @@
 
 // c002_a117
 
-// c002_a118
+pub mod a0_vrp_v1;
+pub use a0_vrp_v1 as c002_a118;
 
 // c002_a119
 
