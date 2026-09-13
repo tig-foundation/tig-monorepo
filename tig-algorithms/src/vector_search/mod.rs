@@ -222,7 +222,8 @@ pub use autovector_f as c004_a101;
 pub mod autovector_g;
 pub use autovector_g as c004_a103;
 
-// c004_a104
+pub mod autovector_i;
+pub use autovector_i as c004_a104;
 
 // c004_a105
 

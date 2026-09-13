@@ -70,7 +70,8 @@ pub use hyper_opt_extrem_v11 as c005_a028;
 pub mod hyper_sigma_v2;
 pub use hyper_sigma_v2 as c005_a030;
 
-// c005_a031
+pub mod sigma_freud_opt;
+pub use sigma_freud_opt as c005_a031;
 
 // c005_a032
 
