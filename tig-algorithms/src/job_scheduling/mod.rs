@@ -82,7 +82,8 @@
 
 // c007_a042
 
-// c007_a043
+pub mod hybrid_job;
+pub use hybrid_job as c007_a043;
 
 // c007_a044
 
