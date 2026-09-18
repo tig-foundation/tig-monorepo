@@ -248,7 +248,8 @@
 
 // c001_a125
 
-// c001_a126
+pub mod sat_imp_v7;
+pub use sat_imp_v7 as c001_a126;
 
 // c001_a127
 
