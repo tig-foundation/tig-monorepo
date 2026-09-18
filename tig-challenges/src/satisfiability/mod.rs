@@ -67,7 +67,7 @@ impl Challenge {
             .collect();
 
         Ok(Self {
-            seed: seed.clone(),
+            seed: rng.r#gen(),
             num_variables: track.n_vars.clone(),
             clauses,
         })
