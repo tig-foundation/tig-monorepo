@@ -102,7 +102,8 @@
 
 // c006_a052
 
-// c006_a053
+pub mod nebeltrotz;
+pub use nebeltrotz as c006_a053;
 
 // c006_a054
 
