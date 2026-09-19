@@ -212,7 +212,8 @@
 
 // c004_a107
 
-// c004_a108
+pub mod vs_fused_exact;
+pub use vs_fused_exact as c004_a108;
 
 // c004_a109
 
