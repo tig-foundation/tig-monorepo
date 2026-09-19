@@ -104,7 +104,8 @@
 
 // c006_a053
 
-// c006_a054
+pub mod parallax_arcturus;
+pub use parallax_arcturus as c006_a054;
 
 // c006_a055
 
