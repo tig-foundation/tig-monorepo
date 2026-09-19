@@ -70,7 +70,8 @@
 
 // c005_a036
 
-// c005_a037
+pub mod mica_inf;
+pub use mica_inf as c005_a037;
 
 // c005_a038
 
