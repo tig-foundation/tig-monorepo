@@ -99,7 +99,8 @@ pub use dc_steer_v6 as c006_a044;
 
 // c006_a045
 
-// c006_a046
+pub mod dc_steer_v8;
+pub use dc_steer_v8 as c006_a046;
 
 // c006_a047
 

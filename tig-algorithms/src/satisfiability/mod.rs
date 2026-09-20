@@ -237,7 +237,8 @@ pub use sat_hybrid as c001_a109;
 pub mod sat_tailwalk_v6;
 pub use sat_tailwalk_v6 as c001_a114;
 
-// c001_a115
+pub mod sat_hybrid_v3;
+pub use sat_hybrid_v3 as c001_a115;
 
 // c001_a116
 

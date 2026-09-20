@@ -89,7 +89,8 @@ pub use task_tree_j as c007_a036;
 
 // c007_a039
 
-// c007_a040
+pub mod ember_stromboli;
+pub use ember_stromboli as c007_a040;
 
 // c007_a041
 
