@@ -86,7 +86,8 @@
 
 // c007_a044
 
-// c007_a045
+pub mod new_adaptive_js;
+pub use new_adaptive_js as c007_a045;
 
 // c007_a046
 
