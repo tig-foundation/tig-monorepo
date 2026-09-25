@@ -250,7 +250,8 @@
 
 // c001_a126
 
-// c001_a127
+pub mod sat_exact_sp128;
+pub use sat_exact_sp128 as c001_a127;
 
 // c001_a128
 
