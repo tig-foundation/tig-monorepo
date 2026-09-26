@@ -106,7 +106,8 @@
 
 // c006_a054
 
-// c006_a055
+pub mod parallax_proxima;
+pub use parallax_proxima as c006_a055;
 
 // c006_a056
 
