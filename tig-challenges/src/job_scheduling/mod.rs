@@ -199,7 +199,7 @@ impl Challenge {
             .collect::<Vec<_>>();
 
         Ok(Challenge {
-            seed: seed.clone(),
+            seed: rng.r#gen(),
             num_jobs: n_jobs,
             num_machines: n_machines,
             num_operations: n_op_types,

@@ -1,7 +1,7 @@
 use crate::QUALITY_PRECISION;
 mod baselines;
 use anyhow::{anyhow, Result};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{rngs::{SmallRng,StdRng}, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use statrs::function::erf::{erf, erf_inv};
 use std::cell::RefCell;
@@ -45,7 +45,7 @@ pub struct Challenge {
 
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], track: &Track) -> Result<Self> {
-        let mut rng = SmallRng::from_seed(seed.clone());
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).r#gen());
         let max_capacity = 200;
 
         let num_clusters = rng.gen_range(3..=8);
@@ -142,7 +142,7 @@ impl Challenge {
         }
 
         let mut c = Challenge {
-            seed: seed.clone(),
+            seed: rng.r#gen(), 
             num_nodes: track.n_nodes.clone(),
             demands,
             node_positions,

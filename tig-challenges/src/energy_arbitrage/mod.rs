@@ -66,9 +66,10 @@ pub struct State {
     pub total_profit: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
+    #[serde(skip_serializing)]
     hidden_seed: [u8; 32],
     pub num_steps: usize,
     pub num_batteries: usize,
@@ -76,6 +77,16 @@ pub struct Challenge {
     pub batteries: Vec<Battery>,
     pub exogenous_injections: Vec<Vec<f64>>,
     pub market: Market,
+}
+
+impl std::fmt::Debug for Challenge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Challenge")
+            .field("seed", &self.seed)
+            .field("num_steps", &self.num_steps)
+            .field("num_batteries", &self.num_batteries)
+            .finish_non_exhaustive()
+    }
 }
 
 pub enum NextRTPrices {
@@ -385,6 +396,51 @@ mod tests {
             .into_iter()
             .map(move |s| Challenge::generate_instance(&seed.clone(), &Track { s }).unwrap())
         })
+    }
+
+    #[test]
+    fn test_hidden_seed_not_serialized() {
+        let challenge = Challenge::generate_instance(
+            &[0; 32],
+            &Track {
+                s: Scenario::BASELINE,
+            },
+        )
+        .unwrap();
+        let mut different_hidden_seed = challenge.clone();
+        different_hidden_seed.hidden_seed[0] ^= 1;
+
+        let serialized = serde_json::to_value(&challenge).unwrap();
+        assert!(serialized.get("hidden_seed").is_none());
+        assert_eq!(serialized["seed"], serde_json::to_value(challenge.seed).unwrap());
+        assert_eq!(
+            serialized,
+            serde_json::to_value(&different_hidden_seed).unwrap()
+        );
+        assert_eq!(
+            bincode::serialize(&challenge).unwrap(),
+            bincode::serialize(&different_hidden_seed).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_hidden_seed_not_in_debug_output() {
+        let challenge = Challenge::generate_instance(
+            &[0; 32],
+            &Track {
+                s: Scenario::BASELINE,
+            },
+        )
+        .unwrap();
+        let mut different_hidden_seed = challenge.clone();
+        different_hidden_seed.hidden_seed[0] ^= 1;
+
+        let debug = format!("{:?}", challenge);
+        let pretty_debug = format!("{:#?}", challenge);
+        assert!(!debug.contains("hidden_seed"));
+        assert!(!pretty_debug.contains("hidden_seed"));
+        assert_eq!(debug, format!("{:?}", different_hidden_seed));
+        assert_eq!(pretty_debug, format!("{:#?}", different_hidden_seed));
     }
 
     #[test]

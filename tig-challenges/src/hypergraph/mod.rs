@@ -2,7 +2,7 @@ use crate::QUALITY_PRECISION;
 use anyhow::{anyhow, Result};
 use cudarc::driver::*;
 use cudarc::runtime::sys::cudaDeviceProp;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::{SmallRng,StdRng}, Rng, SeedableRng};
 use std::sync::Arc;
 
 impl_kv_string_serde! {
@@ -26,6 +26,7 @@ impl Solution {
 }
 
 pub struct Challenge {
+    /// Deterministic seed for solvers, derived from the instance generator's RNG.
     pub seed: [u8; 32],
     pub num_hyperedges: u32,
     pub num_nodes: u32,
@@ -58,7 +59,8 @@ impl Challenge {
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
-        let mut rng = StdRng::from_seed(seed.clone());
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).r#gen());
+//let mut rng = StdRng::from_seed(seed.clone());
         let num_hyperedges = track.n_h_edges;
         let target_num_nodes = track.n_h_edges; // actual number may be around 8% less
         let depth = 6;
@@ -353,7 +355,8 @@ impl Challenge {
         let max_part_size = ((num_nodes as f32 / num_parts as f32) * 1.03).ceil() as u32;
 
         Ok(Self {
-            seed: *seed,
+            // Expose fresh RNG output so solvers do not receive the instance generation seed.
+            seed: rng.r#gen(),
             num_hyperedges: track.n_h_edges,
             num_nodes: target_num_nodes - num_prune,
             num_parts,

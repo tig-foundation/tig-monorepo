@@ -138,6 +138,9 @@ impl Challenge {
         const TRAIN_SIZE: usize = 1000;
         const VALIDATION_SIZE: usize = 200;
         const TEST_SIZE: usize = 250;
+
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).r#gen());
+
         let scaling_factor = RFF_AMPLITUDE_PER_FUNC * (2.0 / K_RFF as f32).sqrt();
 
         let d_seed = stream.memcpy_stod(seed)?;
@@ -207,7 +210,7 @@ impl Challenge {
         stream.synchronize()?;
 
         Ok(Self {
-            seed: *seed,
+            seed: rng.r#gen(),
             num_hidden_layers: track.n_hidden.clone(),
             hidden_layers_dims: 256,
             batch_size: 128,
