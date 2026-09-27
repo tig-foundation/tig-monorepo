@@ -106,7 +106,8 @@
 
 // c008_a054
 
-// c008_a055
+pub mod voltpath;
+pub use voltpath as c008_a055;
 
 // c008_a056
 
