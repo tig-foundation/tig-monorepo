@@ -307,7 +307,8 @@ pub use knap_lean as c003_a144;
 
 // c003_a148
 
-// c003_a149
+pub mod knap_killer_one;
+pub use knap_killer_one as c003_a149;
 
 // c003_a150
 

@@ -102,7 +102,8 @@ pub use dc_steer_v6 as c006_a044;
 pub mod dc_steer_v8;
 pub use dc_steer_v8 as c006_a046;
 
-// c006_a047
+pub mod parallax_vega;
+pub use parallax_vega as c006_a047;
 
 // c006_a048
 
