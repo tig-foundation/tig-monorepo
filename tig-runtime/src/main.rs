@@ -411,6 +411,18 @@ pub fn compute_solution(
                     &prop,
                 )?;
 
+                gen_stream.synchronize()?;
+                // cuBLAS accumulates host-side fuel even on an unmetered stream.
+                // Discard generation's pending charge before the first checked
+                // launch transfers it into the solver's GPU fuel counter.
+                // cudarc exports this atomic, but its Rust accessor is private.
+                unsafe {
+                    extern "C" {
+                        static __cudarc_fuel_used: std::sync::atomic::AtomicU64;
+                    }
+                    __cudarc_fuel_used.store(0, std::sync::atomic::Ordering::Relaxed);
+                }
+
                 let initialize_kernel = module.load_function("initialize_kernel")?;
                 let init_cfg = LaunchConfig {
                     grid_dim: (1, 1, 1),

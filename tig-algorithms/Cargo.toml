@@ -43,6 +43,10 @@ required-features = ["cur_decomposition"]
 name = "cur_quality_benchmark"
 required-features = ["cur_decomposition"]
 
+[[example]]
+name = "good_cur_compare"
+required-features = ["cur_decomposition"]
+
 [features]
 c001 = ["tig-challenges/c001"]
 satisfiability = ["c001"]

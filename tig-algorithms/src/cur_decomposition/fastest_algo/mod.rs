@@ -40,7 +40,7 @@ pub fn solve_challenge(
     _module: Arc<CudaModule>,
     _stream: Arc<CudaStream>,
     _prop: &cudaDeviceProp,
-) -> anyhow::Result<Option<Solution>> {
+) -> Result<()> {
     let m_sz = challenge.m as usize;
     let n_sz = challenge.n as usize;
     let k_sz = challenge.target_k as usize;
@@ -51,6 +51,5 @@ pub fn solve_challenge(
     let r_idxs = uniform_sample_k(m_sz, k_sz, &mut rng);
 
     let sol = Solution { c_idxs, r_idxs };
-    save_solution(&sol)?;
-    Ok(Some(sol))
+    save_solution(&sol)
 }

@@ -1,4 +1,6 @@
-// c009_a001
+pub mod good_cur_alg;
+
+pub mod fastest_algo;
 
 // c009_a002
 

@@ -59,7 +59,13 @@ As part of the `runtime` and `dev` images, there are a bunch of useful scripts a
 
 * `list_algorithms`
 * `download_algorithm <algorithm_name_or_id>`
-* `test_algorithm <algorithm_name> <difficulty>`
+* `test_algorithm <algorithm_name> <track_id> <hyperparameters>`
+
+Add `--output "my_results_from_test_algorithm"` to save results to
+`my_results_from_test_algorithm.csv` in the current directory. You can also provide
+a path ending in `.csv`. The CSV contains one row per completed nonce, ordered by
+nonce, with `nonce`, `runtime_ms`, `valid`, and `quality` columns. Invalid results
+have an empty quality field. Existing output files are overwritten.
 
 Notes:
 * The docker will automatically set a CHALLENGE environment variable used by these scripts
