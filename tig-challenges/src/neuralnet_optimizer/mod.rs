@@ -451,6 +451,7 @@ pub fn training_loop(
 
             // Query optimizer for parameter modifications before forward pass
             let model_params = model.extract_parameters(stream.clone())?;
+            let backup = model_params.clone();
             let original_params = if let Some(modified_params) = optimizer_query_at_params(
                 optimizer_state.as_ref(),
                 &model_params,
@@ -461,7 +462,6 @@ pub fn training_loop(
                 module.clone(),
                 prop,
             )? {
-                let backup = model_params.clone();
                 model.set_parameters(&modified_params, stream.clone(), module.clone())?;
                 Some(backup)
             } else {
