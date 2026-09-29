@@ -244,7 +244,11 @@ impl Challenge {
                             job,
                         ));
                     }
-                    let finish_time = start_time + eligible_machines[&machine];
+                    let finish_time = start_time
+                        .checked_add(eligible_machines[&machine])
+                        .ok_or_else(|| {
+                            anyhow!("Job {} operation {} finish time overflows u32", job, op_idx)
+                        })?;
                     machine_usage
                         .entry(machine)
                         .or_default()
