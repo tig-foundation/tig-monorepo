@@ -88,7 +88,8 @@
 
 // c007_a045
 
-// c007_a046
+pub mod etna_highcap;
+pub use etna_highcap as c007_a046;
 
 // c007_a047
 
