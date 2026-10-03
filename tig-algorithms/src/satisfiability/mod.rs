@@ -254,7 +254,8 @@
 
 // c001_a128
 
-// c001_a129
+pub mod flintwalk;
+pub use flintwalk as c001_a129;
 
 // c001_a130
 
