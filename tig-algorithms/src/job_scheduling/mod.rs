@@ -90,7 +90,8 @@
 
 // c007_a046
 
-// c007_a047
+pub mod shiftforge;
+pub use shiftforge as c007_a047;
 
 // c007_a048
 
