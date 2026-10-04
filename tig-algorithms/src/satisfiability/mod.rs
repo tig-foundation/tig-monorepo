@@ -256,7 +256,8 @@
 
 // c001_a129
 
-// c001_a130
+pub mod flipwave;
+pub use flipwave as c001_a130;
 
 // c001_a131
 
