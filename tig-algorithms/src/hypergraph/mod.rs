@@ -77,7 +77,8 @@ pub use sigma_freud_opt as c005_a031;
 
 // c005_a033
 
-// c005_a034
+pub mod submission003_engine;
+pub use submission003_engine as c005_a034;
 
 // c005_a035
 
