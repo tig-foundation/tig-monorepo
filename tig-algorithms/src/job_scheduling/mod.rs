@@ -94,7 +94,8 @@
 
 // c007_a048
 
-// c007_a049
+pub mod etna_highcap_fast;
+pub use etna_highcap_fast as c007_a049;
 
 // c007_a050
 
