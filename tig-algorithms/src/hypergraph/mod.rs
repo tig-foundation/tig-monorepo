@@ -76,7 +76,8 @@
 
 // c005_a039
 
-// c005_a040
+pub mod engine_block_reheat;
+pub use engine_block_reheat as c005_a040;
 
 // c005_a041
 
