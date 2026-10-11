@@ -78,7 +78,8 @@
 
 // c005_a040
 
-// c005_a041
+pub mod sigma_freud_high;
+pub use sigma_freud_high as c005_a041;
 
 // c005_a042
 
