@@ -260,7 +260,8 @@
 
 // c001_a131
 
-// c001_a132
+pub mod emberwalk;
+pub use emberwalk as c001_a132;
 
 // c001_a133
 
