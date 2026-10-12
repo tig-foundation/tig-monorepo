@@ -113,7 +113,8 @@ pub use parallax_vega as c006_a047;
 
 // c006_a051
 
-// c006_a052
+pub mod dc_vega_v3;
+pub use dc_vega_v3 as c006_a052;
 
 // c006_a053
 
