@@ -47,9 +47,9 @@ impl Solution {
 }
 
 pub struct Dataset {
-    pub inputs: CudaSlice<f32>,
-    pub targets_noisy: CudaSlice<f32>,
-    pub targets_true_f: CudaSlice<f32>,
+    pub(crate) inputs: CudaSlice<f32>,
+    pub(crate) targets_noisy: CudaSlice<f32>,
+    pub(crate) targets_true_f: CudaSlice<f32>,
 
     pub train_size: usize,
     pub validation_size: usize,
@@ -67,7 +67,7 @@ impl Dataset {
         self.targets_noisy
             .slice(0..self.train_size * self.output_dims)
     }
-    pub fn train_targets_true_f(&self) -> CudaView<'_, f32> {
+    pub(crate) fn train_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f
             .slice(0..self.train_size * self.output_dims)
     }
@@ -83,25 +83,25 @@ impl Dataset {
                 ..(self.train_size + self.validation_size) * self.output_dims,
         )
     }
-    pub fn validation_targets_true_f(&self) -> CudaView<'_, f32> {
+    pub(crate) fn validation_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f.slice(
             self.train_size * self.output_dims
                 ..(self.train_size + self.validation_size) * self.output_dims,
         )
     }
-    pub fn test_inputs(&self) -> CudaView<'_, f32> {
+    pub(crate) fn test_inputs(&self) -> CudaView<'_, f32> {
         self.inputs.slice(
             (self.train_size + self.validation_size) * self.input_dims
                 ..(self.train_size + self.validation_size + self.test_size) * self.input_dims,
         )
     }
-    pub fn test_targets_noisy(&self) -> CudaView<'_, f32> {
+    pub(crate) fn test_targets_noisy(&self) -> CudaView<'_, f32> {
         self.targets_noisy.slice(
             (self.train_size + self.validation_size) * self.output_dims
                 ..(self.train_size + self.validation_size + self.test_size) * self.output_dims,
         )
     }
-    pub fn test_targets_true_f(&self) -> CudaView<'_, f32> {
+    pub(crate) fn test_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f.slice(
             (self.train_size + self.validation_size) * self.output_dims
                 ..(self.train_size + self.validation_size + self.test_size) * self.output_dims,
