@@ -67,6 +67,7 @@ impl Dataset {
         self.targets_noisy
             .slice(0..self.train_size * self.output_dims)
     }
+    #[allow(dead_code)]
     pub(crate) fn train_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f
             .slice(0..self.train_size * self.output_dims)
@@ -83,6 +84,7 @@ impl Dataset {
                 ..(self.train_size + self.validation_size) * self.output_dims,
         )
     }
+    #[allow(dead_code)]
     pub(crate) fn validation_targets_true_f(&self) -> CudaView<'_, f32> {
         self.targets_true_f.slice(
             self.train_size * self.output_dims
