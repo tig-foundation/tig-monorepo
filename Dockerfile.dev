@@ -36,9 +36,9 @@ ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib/rust"
 
 RUN ARCH=$(uname -m) && \
     LLVM_URL=$(if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc4%2B19.1.7/llvm.tar.zst"; \
+        echo "https://github.com/tig-foundation/llvm/releases/download/aarch64.rc6%2B19.1.7/llvm.tar.zst"; \
     else \
-        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc4%2B19.1.7/llvm.tar.zst"; \
+        echo "https://github.com/tig-foundation/llvm/releases/download/amd64.rc6%2B19.1.7/llvm.tar.zst"; \
     fi) && \
     curl -L $LLVM_URL -O && \
     mkdir -p /opt/llvm && \
