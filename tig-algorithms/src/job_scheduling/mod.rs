@@ -98,7 +98,8 @@
 
 // c007_a050
 
-// c007_a051
+pub mod malinois;
+pub use malinois as c007_a051;
 
 // c007_a052
 
