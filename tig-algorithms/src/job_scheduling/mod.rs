@@ -100,7 +100,8 @@
 
 // c007_a051
 
-// c007_a052
+pub mod ember_vesuvio;
+pub use ember_vesuvio as c007_a052;
 
 // c007_a053
 
