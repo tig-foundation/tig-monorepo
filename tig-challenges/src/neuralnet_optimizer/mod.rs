@@ -451,6 +451,9 @@ pub fn training_loop(
 
             // Query optimizer for parameter modifications before forward pass
             let model_params = model.extract_parameters(stream.clone())?;
+            // Snapshot before the hook runs: the hook receives live device buffers,
+            // so cloning after it returns would back up values it may have already mutated.
+            let backup = model_params.clone();
             let original_params = if let Some(modified_params) = optimizer_query_at_params(
                 optimizer_state.as_ref(),
                 &model_params,
@@ -461,7 +464,6 @@ pub fn training_loop(
                 module.clone(),
                 prop,
             )? {
-                let backup = model_params.clone();
                 model.set_parameters(&modified_params, stream.clone(), module.clone())?;
                 Some(backup)
             } else {
