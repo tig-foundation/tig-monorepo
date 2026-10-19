@@ -99,7 +99,8 @@ pub use ttj_shuttle_ember as c007_a042;
 
 // c007_a043
 
-// c007_a044
+pub mod ember_etna;
+pub use ember_etna as c007_a044;
 
 // c007_a045
 

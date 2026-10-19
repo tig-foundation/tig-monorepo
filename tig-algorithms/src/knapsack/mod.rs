@@ -320,7 +320,8 @@ pub use knap_exact16 as c003_a150;
 pub mod knap_exact16_fast3;
 pub use knap_exact16_fast3 as c003_a153;
 
-// c003_a154
+pub mod satchel;
+pub use satchel as c003_a154;
 
 // c003_a155
 
