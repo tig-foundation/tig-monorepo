@@ -1,4 +1,5 @@
-// c008_a001
+pub mod always_profit;
+pub use always_profit as c008_a001;
 
 // c008_a002
 

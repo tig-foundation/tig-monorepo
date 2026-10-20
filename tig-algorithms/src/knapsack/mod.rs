@@ -1,6 +1,7 @@
 // c003_a001
 
-// c003_a002
+pub mod classic_quadkp;
+pub use classic_quadkp as c003_a002;
 
 // c003_a003
 
@@ -14,7 +15,8 @@
 
 // c003_a008
 
-// c003_a009
+pub mod knap_supreme;
+pub use knap_supreme as c003_a009;
 
 // c003_a010
 

@@ -1,4 +1,5 @@
-// c007_a001
+pub mod simple_heuristic;
+pub use simple_heuristic as c007_a001;
 
 pub mod dispatching_rules;
 pub use dispatching_rules as c007_a002;
