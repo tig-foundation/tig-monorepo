@@ -264,7 +264,8 @@
 
 // c001_a133
 
-// c001_a134
+pub mod sat_frontier;
+pub use sat_frontier as c001_a134;
 
 // c001_a135
 
