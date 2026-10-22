@@ -312,7 +312,8 @@
 
 // c003_a157
 
-// c003_a158
+pub mod stage_b2_hybrid_v10;
+pub use stage_b2_hybrid_v10 as c003_a158;
 
 // c003_a159
 
