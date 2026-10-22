@@ -108,7 +108,8 @@
 
 // c008_a055
 
-// c008_a056
+pub mod water_thimble_001;
+pub use water_thimble_001 as c008_a056;
 
 // c008_a057
 
