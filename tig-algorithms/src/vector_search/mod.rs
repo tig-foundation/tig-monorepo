@@ -218,7 +218,8 @@
 
 // c004_a110
 
-// c004_a111
+pub mod daripal;
+pub use daripal as c004_a111;
 
 // c004_a112
 
