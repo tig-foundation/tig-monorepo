@@ -106,7 +106,8 @@
 
 // c007_a054
 
-// c007_a055
+pub mod etna_lexwork_v3;
+pub use etna_lexwork_v3 as c007_a055;
 
 // c007_a056
 
