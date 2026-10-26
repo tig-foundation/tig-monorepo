@@ -1,4 +1,5 @@
 import argparse
+import fcntl
 import io
 import json
 import os
@@ -52,15 +53,21 @@ def download_library(challenge: str, algorithm: str, download_url: str):
     challenge_folder = f"{ALGO_DIR}/{challenge}"
     so_path = f"{challenge_folder}/{CPU_ARCH}/{algorithm}.so"
     ptx_path = f"{challenge_folder}/ptx/{algorithm}.ptx"
-    if not os.path.exists(so_path):
-        start = now()
-        print(f"downloading {algorithm}.tar.gz from {download_url}")
-        resp = requests.get(download_url, stream=True)
-        if resp.status_code != 200:
-            raise Exception(f"status {resp.status_code} when downloading algorithm library: {resp.text}")
-        with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
-            tar.extractall(path=challenge_folder)
-        print(f"downloading {algorithm}.tar.gz took {now() - start}ms")
+    # Per-algorithm lock so parallel runs don't download the same .so on top of each
+    # other. First run holds the lock and downloads; others wait, then find it cached.
+    # Different algorithms use different lock files, so they still download in parallel.
+    os.makedirs(os.path.dirname(so_path), exist_ok=True)
+    with open(so_path + ".lock", "w") as _lock:
+        fcntl.flock(_lock, fcntl.LOCK_EX)
+        if not os.path.exists(so_path):
+            start = now()
+            print(f"downloading {algorithm}.tar.gz from {download_url}")
+            resp = requests.get(download_url, stream=True)
+            if resp.status_code != 200:
+                raise Exception(f"status {resp.status_code} when downloading algorithm library: {resp.text}")
+            with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
+                tar.extractall(path=challenge_folder)
+            print(f"downloading {algorithm}.tar.gz took {now() - start}ms")
 
     if not os.path.exists(ptx_path):
         return so_path, None
@@ -70,6 +77,14 @@ def download_library(challenge: str, algorithm: str, download_url: str):
 def run_tig_runtime(nonce, batch, so_path, ptx_path):
     settings = json.dumps(batch["settings"], separators=(',',':'))
     start = now()
+    # tig-runtime writes its solution to <output_dir>/<nonce>.json and tig-verifier
+    # reads it back. The default is a bare "<nonce>.json" in the container's cwd, which
+    # is SHARED by every run of a challenge (one container per challenge) and keyed only
+    # by nonce -- so two concurrent runs of the same challenge that reuse a nonce number
+    # would clobber each other's handoff file. Give each process a unique dir (tig-runtime
+    # create_dir_all's it) so runs can be parallelised safely.
+    output_dir = f"/tmp/tig-verify/{os.getpid()}-{nonce}"
+    output_json = f"{output_dir}/{nonce}.json"
     cmd = [
         "docker", "exec", batch["challenge"], "tig-runtime",
         settings,
@@ -77,6 +92,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path):
         str(nonce),
         so_path,
         "--fuel", str(batch["fuel_budget"]),
+        "--output", output_dir,
     ]
     if batch["hyperparameters"] is not None:
         cmd += [
@@ -103,7 +119,7 @@ def run_tig_runtime(nonce, batch, so_path, ptx_path):
                 settings,
                 batch["rand_hash"],
                 str(nonce),
-                f"{nonce}.json",
+                output_json,
             ]
             if ptx_path is not None:
                 cmd += [
