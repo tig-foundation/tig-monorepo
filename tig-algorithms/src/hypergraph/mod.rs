@@ -90,7 +90,8 @@ pub use mica_inf as c005_a037;
 
 // c005_a038
 
-// c005_a039
+pub mod mica_clintonite;
+pub use mica_clintonite as c005_a039;
 
 // c005_a040
 

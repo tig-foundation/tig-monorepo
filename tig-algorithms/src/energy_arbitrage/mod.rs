@@ -114,7 +114,8 @@ pub use titan_killer as c008_a050;
 pub mod gridflow;
 pub use gridflow as c008_a052;
 
-// c008_a053
+pub mod peakshift;
+pub use peakshift as c008_a053;
 
 // c008_a054
 
