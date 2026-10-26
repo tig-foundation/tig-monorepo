@@ -84,7 +84,8 @@
 
 // c005_a043
 
-// c005_a044
+pub mod mica_xanthophyllite;
+pub use mica_xanthophyllite as c005_a044;
 
 // c005_a045
 
