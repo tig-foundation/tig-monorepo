@@ -86,7 +86,8 @@
 
 // c005_a044
 
-// c005_a045
+pub mod mica_bityite;
+pub use mica_bityite as c005_a045;
 
 // c005_a046
 
