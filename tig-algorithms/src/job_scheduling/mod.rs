@@ -108,7 +108,8 @@
 
 // c007_a055
 
-// c007_a056
+pub mod ember_krakatoa;
+pub use ember_krakatoa as c007_a056;
 
 // c007_a057
 
