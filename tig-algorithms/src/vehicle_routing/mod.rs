@@ -244,7 +244,8 @@
 
 // c002_a123
 
-// c002_a124
+pub mod hgs_epure_bois;
+pub use hgs_epure_bois as c002_a124;
 
 // c002_a125
 
