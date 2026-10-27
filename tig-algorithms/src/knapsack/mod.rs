@@ -318,7 +318,8 @@
 
 // c003_a160
 
-// c003_a161
+pub mod satchel_cluster;
+pub use satchel_cluster as c003_a161;
 
 // c003_a162
 
