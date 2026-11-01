@@ -116,7 +116,8 @@
 
 // c007_a059
 
-// c007_a060
+pub mod ember_opt_v4;
+pub use ember_opt_v4 as c007_a060;
 
 // c007_a061
 
