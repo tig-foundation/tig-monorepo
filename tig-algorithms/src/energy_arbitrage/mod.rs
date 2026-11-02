@@ -112,7 +112,8 @@
 
 // c008_a057
 
-// c008_a058
+pub mod linepulse;
+pub use linepulse as c008_a058;
 
 // c008_a059
 
