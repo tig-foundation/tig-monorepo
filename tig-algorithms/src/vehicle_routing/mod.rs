@@ -248,7 +248,8 @@
 
 // c002_a125
 
-// c002_a126
+pub mod hgs_epure_pierre;
+pub use hgs_epure_pierre as c002_a126;
 
 // c002_a127
 
