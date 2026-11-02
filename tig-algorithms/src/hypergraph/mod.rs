@@ -90,7 +90,8 @@
 
 // c005_a046
 
-// c005_a047
+pub mod mica_celadonite;
+pub use mica_celadonite as c005_a047;
 
 // c005_a048
 
