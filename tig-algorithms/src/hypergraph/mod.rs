@@ -92,7 +92,8 @@
 
 // c005_a047
 
-// c005_a048
+pub mod sigma_freud_v14;
+pub use sigma_freud_v14 as c005_a048;
 
 // c005_a049
 
