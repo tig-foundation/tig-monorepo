@@ -120,7 +120,8 @@
 
 // c007_a061
 
-// c007_a062
+pub mod ember_pinatubo;
+pub use ember_pinatubo as c007_a062;
 
 // c007_a063
 
