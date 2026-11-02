@@ -246,7 +246,8 @@
 
 // c002_a124
 
-// c002_a125
+pub mod murelan_v2;
+pub use murelan_v2 as c002_a125;
 
 // c002_a126
 
