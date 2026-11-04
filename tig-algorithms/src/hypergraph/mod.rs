@@ -88,7 +88,8 @@ pub use exact_round_engine as c005_a036;
 pub mod mica_inf;
 pub use mica_inf as c005_a037;
 
-// c005_a038
+pub mod hyper_ada_v1;
+pub use hyper_ada_v1 as c005_a038;
 
 pub mod mica_clintonite;
 pub use mica_clintonite as c005_a039;
