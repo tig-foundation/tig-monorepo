@@ -250,7 +250,8 @@
 
 // c002_a126
 
-// c002_a127
+pub mod hgs_talos;
+pub use hgs_talos as c002_a127;
 
 // c002_a128
 
