@@ -12,6 +12,11 @@ pub struct Hyperparameters {
     // pub param2: f64,
 }
 
+pub fn help() {
+    // Print help information about your algorithm here. It will be invoked with `help_algorithm` script
+    println!("No help information provided.");
+}
+
 pub fn solve_challenge(
     challenge: &Challenge,
     save_solution: &dyn Fn(&Solution) -> Result<()>,
