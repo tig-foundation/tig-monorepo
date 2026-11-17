@@ -1,7 +1,7 @@
 use crate::QUALITY_PRECISION;
 mod baselines;
 use anyhow::{anyhow, Result};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{rngs::{SmallRng,StdRng}, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashSet, f64::consts::PI};
 
@@ -44,7 +44,7 @@ pub struct Challenge {
 
 impl Challenge {
     pub fn generate_instance(seed: &[u8; 32], track: &Track) -> Result<Self> {
-        let mut rng = SmallRng::from_seed(seed.clone());
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).r#gen());
         let n_participants = track.n_items;
         let n_projects = 30000;
         let log_normal_mean = 4.0;
@@ -136,7 +136,7 @@ impl Challenge {
         let max_weight = (track.budget as f64 / 100.0 * weights.iter().sum::<u32>() as f64) as u32;
 
         Ok(Challenge {
-            seed: seed.clone(),
+            seed: rng.r#gen(),
             num_items: n_participants,
             weights,
             values,
