@@ -106,6 +106,20 @@ serializable_struct_with_getters! {
     }
 }
 serializable_struct_with_getters! {
+    Report {
+        id: String,
+        details: ReportDetails,
+        state: ReportState,
+    }
+}
+serializable_struct_with_getters! {
+    Arbitration {
+        report_id: String,
+        details: ArbitrationDetails,
+        state: ArbitrationState,
+    }
+}
+serializable_struct_with_getters! {
     TopUp {
         id: String,
         details: TopUpDetails,
@@ -219,6 +233,7 @@ serializable_struct_with_getters! {
 #[serde(rename_all = "lowercase")]
 pub enum TxType {
     Advance,
+    Arbitration,
     Benchmark,
     Binary,
     Challenge,
@@ -227,6 +242,7 @@ pub enum TxType {
     Fraud,
     Precommit,
     Proof,
+    Report,
     TopUp,
     Verified,
 }
@@ -247,6 +263,7 @@ pub enum EmissionsType {
     Advance,
     Benchmarker,
     Bootstrap,
+    Penalty,
     ChallengeOwner,
     Code,
     Delegator,
@@ -407,6 +424,20 @@ serializable_struct_with_getters! {
         num_bundles: u64,
     }
 }
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ComputeType {
+    AWS_T3,
+    AWS_T3a,
+    AWS_T4g,
+    AWS_C7i,
+    AWS_C7a,
+    AWS_C7g,
+    AWS_M7i,
+    AWS_M7a,
+    AWS_M7g,
+    AWS_G4dn,
+}
 serializable_struct_with_getters! {
     PrecommitDetails {
         block_started: u32,
@@ -416,6 +447,7 @@ serializable_struct_with_getters! {
         fee_paid: PreciseNumber,
         fuel_budget: u64,
         hyperparameters: Option<Map<String, Value>>,
+        compute_type: ComputeType,
     }
 }
 serializable_struct_with_getters! {
@@ -454,6 +486,42 @@ serializable_struct_with_getters! {
 impl OutputData {
     pub fn calc_solution_signature(&self) -> u64 {
         u64s_from_str(&jsonify(&self.solution))[0]
+    }
+}
+
+// Report child structs
+serializable_struct_with_getters! {
+    ReportDetails {
+        player_id: String,
+        benchmarker: String,
+        benchmark_id: String,
+        nonce: u64,
+        round: u32,
+        fee_paid: PreciseNumber,
+    }
+}
+serializable_struct_with_getters! {
+    ReportState {
+        block_confirmed: u32,
+    }
+}
+
+// Arbitration child structs
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ArbitrationResult {
+    NONREPRODUCIBLE,
+    REPRODUCIBLE,
+    INCONCLUSIVE,
+}
+serializable_struct_with_getters! {
+    ArbitrationDetails {
+        result: ArbitrationResult,
+    }
+}
+serializable_struct_with_getters! {
+    ArbitrationState {
+        block_confirmed: u32,
     }
 }
 
