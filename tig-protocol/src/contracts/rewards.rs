@@ -137,26 +137,33 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
                 )
         }
         let coinbase_amount = opow_data.reward - opow_data.reward_share;
+        let mut remaining_amount = coinbase_amount.clone();
+        if let Some(coinbase) = active_players_state[delegatee].coinbase.as_ref() {
+            for (output, fraction) in coinbase.value.iter().filter(|(id, _)| *id != delegatee) {
+                let fraction = PreciseNumber::from_f64(*fraction);
+                let reward = coinbase_amount * fraction;
+                remaining_amount -= reward.clone();
+                opow_data.coinbase.insert(output.clone(), reward.clone());
 
-        for (output, fraction) in active_players_state[delegatee]
-            .coinbase
-            .as_ref()
-            .map_or_else(
-                || HashMap::from([(delegatee.clone(), 1.0)]),
-                |x| x.value.clone(),
-            )
-            .iter()
+                let player_data = active_players_block_data.get_mut(output).unwrap();
+                *player_data
+                    .reward_by_type
+                    .entry(EmissionsType::Benchmarker)
+                    .or_insert_with(|| zero.clone()) += reward;
+                total_benchmarkers_reward += reward;
+            }
+        }
         {
-            let fraction = PreciseNumber::from_f64(*fraction);
-            let reward = coinbase_amount * fraction;
-            opow_data.coinbase.insert(output.clone(), reward.clone());
+            opow_data
+                .coinbase
+                .insert(delegatee.clone(), remaining_amount.clone());
 
-            let player_data = active_players_block_data.get_mut(output).unwrap();
+            let player_data = active_players_block_data.get_mut(delegatee).unwrap();
             *player_data
                 .reward_by_type
                 .entry(EmissionsType::Benchmarker)
-                .or_insert_with(|| zero.clone()) += reward;
-            total_benchmarkers_reward += reward;
+                .or_insert_with(|| zero.clone()) += remaining_amount;
+            total_benchmarkers_reward += remaining_amount;
         }
 
         if opow_data.reward_share == zero {
@@ -178,10 +185,52 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
 
     let challenge_owners_reward_pool =
         scaled_reward * PreciseNumber::from_f64(config.rewards.distribution.challenge_owners);
+    let mut total_challenge_owners_reward = zero.clone();
+    for challenge_id in active_challenge_ids.iter() {
+        if let Some(challenge_owner) = &config.challenges[challenge_id].challenge_owner {
+            let reward =
+                challenge_owners_reward_pool / PreciseNumber::from(2 * active_challenge_ids.len());
+            let player_data = active_players_block_data.get_mut(challenge_owner).unwrap();
+            *player_data
+                .reward_by_type
+                .entry(EmissionsType::ChallengeOwner)
+                .or_insert_with(|| zero.clone()) += reward;
+            total_challenge_owners_reward += reward;
+        }
+    }
+    let num_eligible_advances = active_advances_state
+        .iter()
+        .filter(|(_, state)| {
+            state
+                .round_active
+                .is_some_and(|x| x >= block_details.round - config.advances.performance_period)
+        })
+        .fold(HashMap::new(), |mut acc, (algorithm_id, _)| {
+            *acc.entry(active_advances_details[algorithm_id].challenge_id.clone())
+                .or_insert_with(|| 0) += 1;
+            acc
+        });
+    if !num_eligible_advances.is_empty() {
+        let total = num_eligible_advances.values().sum::<u32>();
+        for (challenge_id, num_advances) in num_eligible_advances.iter() {
+            if let Some(challenge_owner) = &config.challenges[challenge_id].challenge_owner {
+                let reward = challenge_owners_reward_pool
+                    * PreciseNumber::from_f64(*num_advances as f64 / (2 * total) as f64);
+                let player_data = active_players_block_data.get_mut(challenge_owner).unwrap();
+                *player_data
+                    .reward_by_type
+                    .entry(EmissionsType::ChallengeOwner)
+                    .or_insert_with(|| zero.clone()) += reward;
+                total_challenge_owners_reward += reward;
+            }
+        }
+    }
 
     block_details.emissions.insert(
         EmissionsType::Bootstrap,
-        (advances_reward_pool - total_advances_reward) + (codes_reward_pool - total_codes_reward),
+        (challenge_owners_reward_pool - total_challenge_owners_reward) + 
+        (advances_reward_pool - total_advances_reward) +
+        (codes_reward_pool - total_codes_reward),
     );
     block_details.emissions.insert(
         EmissionsType::Vault,
@@ -206,5 +255,5 @@ pub(crate) async fn update(cache: &mut AddBlockCache) {
         .insert(EmissionsType::Delegator, total_delegators_reward);
     block_details
         .emissions
-        .insert(EmissionsType::ChallengeOwner, challenge_owners_reward_pool);
+        .insert(EmissionsType::ChallengeOwner, total_challenge_owners_reward);
 }
