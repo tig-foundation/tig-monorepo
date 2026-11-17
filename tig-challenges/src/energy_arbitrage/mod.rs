@@ -66,9 +66,10 @@ pub struct State {
     pub total_profit: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Clone)]
 pub struct Challenge {
     pub seed: [u8; 32],
+    #[serde(skip_serializing)]
     hidden_seed: [u8; 32],
     pub num_steps: usize,
     pub num_batteries: usize,
@@ -76,6 +77,16 @@ pub struct Challenge {
     pub batteries: Vec<Battery>,
     pub exogenous_injections: Vec<Vec<f64>>,
     pub market: Market,
+}
+
+impl std::fmt::Debug for Challenge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Challenge")
+            .field("seed", &self.seed)
+            .field("num_steps", &self.num_steps)
+            .field("num_batteries", &self.num_batteries)
+            .finish_non_exhaustive()
+    }
 }
 
 pub enum NextRTPrices {
@@ -345,25 +356,13 @@ impl Challenge {
 
     conditional_pub!(
         fn compute_baseline(&self) -> Result<(Solution, f64)> {
-            let (greedy_schedule, state) = self.simulate(&baselines::greedy::policy)?;
-            let greedy_total_profit = state.total_profit;
-            let (conservative_schedule, state) = self.simulate(&baselines::conservative::policy)?;
-            let conservative_total_profit = state.total_profit;
-            if greedy_total_profit > conservative_total_profit {
-                Ok((
-                    Solution {
-                        schedule: greedy_schedule,
-                    },
-                    greedy_total_profit,
-                ))
-            } else {
-                Ok((
-                    Solution {
-                        schedule: conservative_schedule,
-                    },
-                    conservative_total_profit,
-                ))
-            }
+            let (schedule, state) = self.simulate(&baselines::energy_v1::policy)?;
+            Ok((
+                Solution {
+                    schedule,
+                },
+                state.total_profit,
+            ))
         }
     );
 
@@ -397,6 +396,51 @@ mod tests {
             .into_iter()
             .map(move |s| Challenge::generate_instance(&seed.clone(), &Track { s }).unwrap())
         })
+    }
+
+    #[test]
+    fn test_hidden_seed_not_serialized() {
+        let challenge = Challenge::generate_instance(
+            &[0; 32],
+            &Track {
+                s: Scenario::BASELINE,
+            },
+        )
+        .unwrap();
+        let mut different_hidden_seed = challenge.clone();
+        different_hidden_seed.hidden_seed[0] ^= 1;
+
+        let serialized = serde_json::to_value(&challenge).unwrap();
+        assert!(serialized.get("hidden_seed").is_none());
+        assert_eq!(serialized["seed"], serde_json::to_value(challenge.seed).unwrap());
+        assert_eq!(
+            serialized,
+            serde_json::to_value(&different_hidden_seed).unwrap()
+        );
+        assert_eq!(
+            bincode::serialize(&challenge).unwrap(),
+            bincode::serialize(&different_hidden_seed).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_hidden_seed_not_in_debug_output() {
+        let challenge = Challenge::generate_instance(
+            &[0; 32],
+            &Track {
+                s: Scenario::BASELINE,
+            },
+        )
+        .unwrap();
+        let mut different_hidden_seed = challenge.clone();
+        different_hidden_seed.hidden_seed[0] ^= 1;
+
+        let debug = format!("{:?}", challenge);
+        let pretty_debug = format!("{:#?}", challenge);
+        assert!(!debug.contains("hidden_seed"));
+        assert!(!pretty_debug.contains("hidden_seed"));
+        assert_eq!(debug, format!("{:?}", different_hidden_seed));
+        assert_eq!(pretty_debug, format!("{:#?}", different_hidden_seed));
     }
 
     #[test]
@@ -447,6 +491,55 @@ mod tests {
             let (_, total_profit) = result.unwrap();
             assert!(total_profit > 0.0);
         }
+    }
+
+    #[test]
+    fn benchmark_baselines() {
+        let scenarios = [
+            ("BASELINE", Scenario::BASELINE),
+            ("CONGESTED", Scenario::CONGESTED),
+            ("MULTIDAY", Scenario::MULTIDAY),
+            ("DENSE", Scenario::DENSE),
+            ("CAPSTONE", Scenario::CAPSTONE),
+        ];
+        let num_seeds = 5;
+
+        println!("\n{:<12} {:>12} {:>12} {:>12} {:>10}", "Track", "Greedy($)", "Conserv.($)", "Best Baseline", "Time(ms)");
+        println!("{}", "-".repeat(62));
+
+        for (name, scenario) in &scenarios {
+            let mut greedy_total = 0.0_f64;
+            let mut conservative_total = 0.0_f64;
+            let mut total_ms = 0u64;
+
+            for i in 0..num_seeds {
+                let seed = [i as u8; 32];
+                let challenge = Challenge::generate_instance(&seed, &Track { s: *scenario }).unwrap();
+
+                let start = std::time::Instant::now();
+                let (greedy_sched, greedy_state) = challenge.simulate(&baselines::greedy::policy).unwrap();
+                let (_, conservative_state) = challenge.simulate(&baselines::conservative::policy).unwrap();
+                total_ms += start.elapsed().as_millis() as u64;
+
+                greedy_total += greedy_state.total_profit;
+                conservative_total += conservative_state.total_profit;
+            }
+
+            let avg_greedy = greedy_total / num_seeds as f64;
+            let avg_conservative = conservative_total / num_seeds as f64;
+            let (best, best_name) = if avg_greedy >= avg_conservative {
+                (avg_greedy, "greedy")
+            } else {
+                (avg_conservative, "conserv.")
+            };
+            let avg_ms = total_ms as f64 / (num_seeds * 2) as f64;
+
+            println!(
+                "{:<12} {:>12.2} {:>12.2} {:>12.2} ({}) {:>8.1}",
+                name, avg_greedy, avg_conservative, best, best_name, avg_ms
+            );
+        }
+        println!();
     }
 
     #[test]
