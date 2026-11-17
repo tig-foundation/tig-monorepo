@@ -9,4 +9,4 @@ Benchmarker for TIG. Designed to run with a single master and multiple slaves di
 
 # License
 
-[End User License Agreement](../docs/agreements/end_user_license_agreement.pdf)
+[End User License Agreement](../docs/licenses/TIG_Game_Source_Code_End_User_License_Agreement_v1.0.pdf)
