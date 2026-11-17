@@ -4,7 +4,7 @@ use cudarc::{
     driver::{safe::LaunchConfig, CudaModule, CudaSlice, CudaStream, PushKernelArg},
     runtime::sys::cudaDeviceProp,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::{SmallRng,StdRng}, Rng, SeedableRng};
 use std::sync::Arc;
 
 impl_kv_string_serde! {
@@ -46,7 +46,7 @@ impl Challenge {
         stream: Arc<CudaStream>,
         _prop: &cudaDeviceProp,
     ) -> Result<Self> {
-        let mut rng = StdRng::from_seed(seed.clone());
+        let mut rng = SmallRng::from_seed(StdRng::from_seed(seed.clone()).r#gen());
         let vector_dims = 250;
         let database_size = 100 * track.n_queries;
         let avg_cluster_size: f32 = 700.0;
@@ -129,7 +129,7 @@ impl Challenge {
         stream.synchronize()?;
 
         return Ok(Self {
-            seed: seed.clone(),
+            seed: rng.r#gen(),
             num_queries: track.n_queries.clone(),
             vector_dims,
             database_size,
