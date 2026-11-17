@@ -76,6 +76,7 @@ class PrecommitManager:
                 track_id="",
             ),
             track_settings=selection["track_settings"],
+            compute_type=selection["compute_type"]
         )
         logger.info(f"Created precommit with algorithm: {a_id}")
         return req
