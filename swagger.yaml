@@ -12,7 +12,7 @@ info:
     email: contact@tig.foundation
   license:
     name: End User License Agreement
-    url: https://github.com/tig-foundation/tig-monorepo/blob/main/docs/agreements/end_user_license_agreement.pdf
+    url: https://github.com/tig-foundation/tig-monorepo/blob/main/docs/licenses/TIG_Game_Source_Code_End_User_License_Agreement_v1.0.pdf
   version: 1.0.0
 servers:
   - url: https://mainnet-api.tig.foundation
