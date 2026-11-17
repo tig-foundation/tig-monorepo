@@ -29,6 +29,7 @@ serializable_struct_with_getters! {
         submission_fee: PreciseNumber,
         adoption_threshold: f64,
         merge_points_threshold: u32,
+        performance_period: u32,
     }
 }
 serializable_struct_with_getters! {
@@ -92,6 +93,7 @@ serializable_struct_with_getters! {
         max_qualifiers_per_track: u64,
         legacy_multiplier_span: f32,
         min_num_bundles: u64,
+        challenge_owner: Option<String>,
     }
 }
 serializable_struct_with_getters! {
