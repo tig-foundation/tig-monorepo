@@ -202,6 +202,68 @@ pub async fn set_vote<T: Context>(
 }
 
 #[time]
+pub async fn submit_report<T: Context>(
+    ctx: &T,
+    player_id: String,
+    benchmark_id: String,
+    nonce: u64,
+) -> Result<String> {
+    let config = ctx.get_config().await;
+
+    let latest_block_id = ctx.get_latest_block_id().await;
+    let latest_block_details = ctx.get_block_details(&latest_block_id).await.unwrap();
+
+    // check can report
+    let (benchmarker, round) = match ctx.get_reportable_benchmark(&benchmark_id).await {
+        Some((benchmarker, _challenge_id, round, _num_bundles, num_nonces, reported_nonces)) => {
+            if latest_block_details.round > round + config.reports.submission_period {
+                return Err(anyhow!(
+                    "Can no longer submit report for benchmark '{}'",
+                    benchmark_id
+                ));
+            }
+            if nonce >= num_nonces {
+                return Err(anyhow!(
+                    "Nonce {} is out of range for benchmark '{}'",
+                    nonce,
+                    benchmark_id
+                ));
+            }
+            if reported_nonces.contains(&nonce) {
+                return Err(anyhow!(
+                    "Nonce {} has already been reported for benchmark '{}'",
+                    nonce,
+                    benchmark_id
+                ));
+            }
+            (benchmarker, round)
+        }
+        None => return Err(anyhow!("Benchmark '{}' is not reportable", benchmark_id)),
+    };
+
+    // verify player has sufficient balance
+    if !ctx
+        .get_player_state(&player_id)
+        .await
+        .is_some_and(|s| s.available_fee_balance >= config.reports.submission_fee)
+    {
+        return Err(anyhow!("Insufficient balance to submit report"));
+    }
+
+    let report_id = ctx
+        .add_report_to_mempool(ReportDetails {
+            player_id,
+            benchmarker,
+            benchmark_id,
+            nonce,
+            round,
+            fee_paid: config.reports.submission_fee,
+        })
+        .await?;
+    Ok(report_id)
+}
+
+#[time]
 pub(crate) async fn update(cache: &mut AddBlockCache) {
     let AddBlockCache {
         config,
