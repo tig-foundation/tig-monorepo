@@ -21,6 +21,7 @@ class TrackSettings(FromDict):
 class SubmitPrecommitRequest(FromDict):
     settings: BenchmarkSettings
     track_settings: Dict[str, TrackSettings]
+    compute_type: str
 
 @dataclass
 class SubmitBenchmarkRequest(FromDict):
