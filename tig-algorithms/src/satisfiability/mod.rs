@@ -286,7 +286,8 @@
 
 // c001_a144
 
-// c001_a145
+pub mod sat_hybrid_dn_v1;
+pub use sat_hybrid_dn_v1 as c001_a145;
 
 // c001_a146
 
