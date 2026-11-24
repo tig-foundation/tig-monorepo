@@ -256,7 +256,8 @@ pub use hgs_epure as c002_a120;
 
 // c002_a122
 
-// c002_a123
+pub mod murelan;
+pub use murelan as c002_a123;
 
 // c002_a124
 
