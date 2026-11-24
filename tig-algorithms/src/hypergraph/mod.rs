@@ -96,7 +96,8 @@
 
 // c005_a049
 
-// c005_a050
+pub mod mica_ephesite;
+pub use mica_ephesite as c005_a050;
 
 // c005_a051
 
