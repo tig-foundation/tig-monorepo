@@ -278,7 +278,8 @@
 
 // c001_a140
 
-// c001_a141
+pub mod sat_nexus;
+pub use sat_nexus as c001_a141;
 
 // c001_a142
 
