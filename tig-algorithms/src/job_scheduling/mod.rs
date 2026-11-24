@@ -128,7 +128,8 @@
 
 // c007_a065
 
-// c007_a066
+pub mod adaptive_js_dn_v1;
+pub use adaptive_js_dn_v1 as c007_a066;
 
 // c007_a067
 
