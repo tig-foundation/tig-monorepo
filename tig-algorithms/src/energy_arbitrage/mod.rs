@@ -116,7 +116,8 @@
 
 // c008_a059
 
-// c008_a060
+pub mod energy_talos_v1;
+pub use energy_talos_v1 as c008_a060;
 
 // c008_a061
 
