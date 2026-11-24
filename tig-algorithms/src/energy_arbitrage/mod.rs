@@ -120,7 +120,8 @@
 
 // c008_a061
 
-// c008_a062
+pub mod harimox_v3;
+pub use harimox_v3 as c008_a062;
 
 // c008_a063
 
