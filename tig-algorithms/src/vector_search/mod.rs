@@ -220,7 +220,8 @@
 
 // c004_a111
 
-// c004_a112
+pub mod daripal_ptx_v2;
+pub use daripal_ptx_v2 as c004_a112;
 
 // c004_a113
 
