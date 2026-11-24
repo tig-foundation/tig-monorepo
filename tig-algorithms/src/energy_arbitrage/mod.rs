@@ -118,7 +118,8 @@
 
 // c008_a060
 
-// c008_a061
+pub mod arb_omega_c2;
+pub use arb_omega_c2 as c008_a061;
 
 // c008_a062
 
