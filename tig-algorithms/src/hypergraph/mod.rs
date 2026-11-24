@@ -94,7 +94,8 @@
 
 // c005_a048
 
-// c005_a049
+pub mod zofogin_v3;
+pub use zofogin_v3 as c005_a049;
 
 // c005_a050
 
