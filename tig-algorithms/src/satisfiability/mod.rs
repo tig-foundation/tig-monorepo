@@ -280,7 +280,8 @@
 
 // c001_a141
 
-// c001_a142
+pub mod talos;
+pub use talos as c001_a142;
 
 // c001_a143
 
