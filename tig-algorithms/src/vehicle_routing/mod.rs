@@ -256,7 +256,8 @@
 
 // c002_a129
 
-// c002_a130
+pub mod hgs_epure_dn_v1;
+pub use hgs_epure_dn_v1 as c002_a130;
 
 // c002_a131
 
