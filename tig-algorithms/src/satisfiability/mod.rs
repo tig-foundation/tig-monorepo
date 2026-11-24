@@ -282,7 +282,8 @@
 
 // c001_a142
 
-// c001_a143
+pub mod sat_omega_c33;
+pub use sat_omega_c33 as c001_a143;
 
 // c001_a144
 
