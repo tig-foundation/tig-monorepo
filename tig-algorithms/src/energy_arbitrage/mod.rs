@@ -114,7 +114,8 @@
 
 // c008_a058
 
-// c008_a059
+pub mod harimox_v2;
+pub use harimox_v2 as c008_a059;
 
 // c008_a060
 
