@@ -252,7 +252,8 @@
 
 // c002_a127
 
-// c002_a128
+pub mod hgs_epure_titane;
+pub use hgs_epure_titane as c002_a128;
 
 // c002_a129
 
