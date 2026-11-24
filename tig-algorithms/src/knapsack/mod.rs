@@ -320,7 +320,8 @@
 
 // c003_a161
 
-// c003_a162
+pub mod packsat_talos;
+pub use packsat_talos as c003_a162;
 
 // c003_a163
 
