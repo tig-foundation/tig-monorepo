@@ -126,7 +126,8 @@
 
 // c007_a064
 
-// c007_a065
+pub mod ember_tambora;
+pub use ember_tambora as c007_a065;
 
 // c007_a066
 
